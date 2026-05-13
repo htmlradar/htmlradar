@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumenforge — Seed Deck, Q2 2026</title>
+    <meta
+      name="description"
+      content="Lumenforge — fusion-grade lighting for indoor agriculture. Seed round, May 2026."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #f6f1e7;
+        --paper-deep: #efe7d4;
+        --ink: #1c1a15;
+        --ink-soft: #4a4439;
+        --rule: #d9cfb8;
+        --accent: #b85c1c;
+        --accent-soft: #e8b994;
+        --accent-deep: #7a3a10;
+        --grid: #e6dcc4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        background: var(--paper);
+        color: var(--ink);
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          'Inter',
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          sans-serif;
+        font-size: 15px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 56px 32px 96px;
+      }
+
+      header.cover {
+        border-bottom: 1px solid var(--rule);
+        padding-bottom: 40px;
+        margin-bottom: 48px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        font-weight: 600;
+      }
+      h1 {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 500;
+        font-size: 54px;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 14px 0 12px;
+      }
+      h1 .mark {
+        color: var(--accent);
+      }
+      .tagline {
+        font-family: 'Fraunces', Georgia, serif;
+        font-style: italic;
+        font-size: 22px;
+        color: var(--ink-soft);
+        margin: 0 0 28px;
+        max-width: 560px;
+      }
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        font-size: 12px;
+        color: var(--ink-soft);
+        letter-spacing: 0.04em;
+      }
+      .meta-row b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      section {
+        margin: 56px 0;
+        scroll-margin-top: 24px;
+      }
+      h2 {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 500;
+        font-size: 28px;
+        letter-spacing: -0.01em;
+        margin: 0 0 6px;
+      }
+      h2 .num {
+        display: inline-block;
+        width: 36px;
+        font-size: 13px;
+        font-family: 'Inter', sans-serif;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        vertical-align: 4px;
+      }
+      h3 {
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        margin: 28px 0 8px;
+      }
+      p {
+        margin: 12px 0;
+        color: var(--ink-soft);
+      }
+      p strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .lede {
+        font-size: 17px;
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      hr.rule {
+        border: 0;
+        border-top: 1px solid var(--rule);
+        margin: 40px 0;
+      }
+
+      pre.diagram {
+        background: var(--paper-deep);
+        border: 1px solid var(--rule);
+        border-left: 3px solid var(--accent);
+        padding: 18px 20px;
+        font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--ink);
+        overflow-x: auto;
+        border-radius: 2px;
+      }
+
+      /* Market grid */
+      .market-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1px;
+        background: var(--rule);
+        border: 1px solid var(--rule);
+        margin: 18px 0 8px;
+      }
+      .market-grid > div {
+        background: var(--paper);
+        padding: 18px 16px;
+      }
+      .market-grid .label {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        font-weight: 600;
+      }
+      .market-grid .value {
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 30px;
+        line-height: 1.1;
+        margin: 6px 0 4px;
+        color: var(--ink);
+      }
+      .market-grid .note {
+        font-size: 12px;
+        color: var(--ink-soft);
+        line-height: 1.45;
+      }
+
+      /* Bar chart for traction */
+      table.bars {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+        font-size: 13px;
+      }
+      table.bars td {
+        padding: 8px 0;
+        vertical-align: middle;
+        border-bottom: 1px dotted var(--rule);
+      }
+      table.bars td.q {
+        width: 70px;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink-soft);
+      }
+      table.bars td.b {
+        padding-right: 12px;
+      }
+      table.bars td.n {
+        width: 90px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .bar {
+        height: 14px;
+        background: linear-gradient(90deg, var(--accent) 0%, var(--accent-soft) 100%);
+        border-radius: 1px;
+      }
+
+      /* Roadmap */
+      .roadmap {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin: 18px 0;
+      }
+      .roadmap .q {
+        background: var(--paper-deep);
+        padding: 14px;
+        border-top: 2px solid var(--accent);
+      }
+      .roadmap .q .qlbl {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .roadmap .q h4 {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 500;
+        font-size: 15px;
+        margin: 0 0 8px;
+        color: var(--ink);
+      }
+      .roadmap .q ul {
+        margin: 0;
+        padding-left: 14px;
+        font-size: 12px;
+        color: var(--ink-soft);
+        line-height: 1.5;
+      }
+      .roadmap .q li {
+        margin: 2px 0;
+      }
+
+      /* Competition table */
+      table.compet {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+        font-size: 13px;
+      }
+      table.compet th,
+      table.compet td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--rule);
+      }
+      table.compet th {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        font-weight: 600;
+        border-bottom: 1px solid var(--ink);
+      }
+      table.compet td.us {
+        background: var(--paper-deep);
+        font-weight: 600;
+        color: var(--ink);
+      }
+      table.compet .check {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      /* Team */
+      .team {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 18px;
+        margin: 18px 0;
+      }
+      .founder {
+        border-top: 1px solid var(--ink);
+        padding-top: 12px;
+      }
+      .founder .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--paper);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+      .founder h4 {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 500;
+        font-size: 17px;
+        margin: 0;
+        color: var(--ink);
+      }
+      .founder .role {
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        margin: 2px 0 8px;
+      }
+      .founder p {
+        font-size: 12.5px;
+        line-height: 1.5;
+        margin: 0;
+      }
+
+      /* Ask */
+      .ask-card {
+        background: var(--paper-deep);
+        border-left: 3px solid var(--accent);
+        padding: 22px 24px;
+        margin: 18px 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .ask-card .row .label {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        font-weight: 600;
+      }
+      .ask-card .row .value {
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 22px;
+        color: var(--ink);
+        margin-top: 4px;
+      }
+
+      /* Pie chart for use of funds */
+      .funds {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 28px;
+        align-items: center;
+        margin: 18px 0;
+      }
+      .pie {
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        background: conic-gradient(
+          var(--accent) 0 45%,
+          var(--accent-soft) 45% 70%,
+          #2a6f5c 70% 85%,
+          #c89866 85% 95%,
+          var(--ink-soft) 95% 100%
+        );
+        position: relative;
+        box-shadow: inset 0 0 0 1px var(--rule);
+      }
+      .pie::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 70px;
+        height: 70px;
+        background: var(--paper);
+        border-radius: 50%;
+        border: 1px solid var(--rule);
+      }
+      .legend {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 13px;
+      }
+      .legend li {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px dotted var(--rule);
+      }
+      .legend .sw {
+        width: 10px;
+        height: 10px;
+        display: inline-block;
+        border-radius: 1px;
+        flex-shrink: 0;
+        transform: translateY(1px);
+      }
+      .legend .label {
+        flex: 1;
+        color: var(--ink);
+      }
+      .legend .pct {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: var(--accent-deep);
+      }
+
+      /* Contact */
+      .contact {
+        border-top: 1px solid var(--ink);
+        padding-top: 18px;
+        margin-top: 20px;
+      }
+      .contact a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid var(--accent-soft);
+      }
+      .contact a:hover {
+        border-bottom-color: var(--accent);
+      }
+
+      footer.colophon {
+        margin-top: 80px;
+        padding-top: 24px;
+        border-top: 1px solid var(--rule);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: var(--ink-soft);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      /* TOC strip under cover */
+      nav.toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 22px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        margin-top: 20px;
+      }
+      nav.toc a {
+        color: var(--ink-soft);
+        text-decoration: none;
+        border-bottom: 1px dotted transparent;
+      }
+      nav.toc a:hover {
+        color: var(--accent);
+        border-bottom-color: var(--accent-soft);
+      }
+      nav.toc .n {
+        color: var(--accent);
+        margin-right: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      @media (max-width: 640px) {
+        .wrap {
+          padding: 36px 20px 64px;
+        }
+        h1 {
+          font-size: 38px;
+        }
+        .market-grid,
+        .roadmap,
+        .team,
+        .ask-card,
+        .funds {
+          grid-template-columns: 1fr;
+        }
+        .funds .pie {
+          margin: 0 auto;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+        .wrap {
+          max-width: 100%;
+          padding: 0;
+        }
+        section {
+          page-break-inside: avoid;
+        }
+      }
+    </style>
+    <!-- HTMLRADAR_EMBED -->
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="cover">
+        <div class="eyebrow">Seed Deck &middot; May 2026 &middot; Confidential</div>
+        <h1>Lumen<span class="mark">forge</span>.</h1>
+        <p class="tagline">
+          Fusion-grade lighting for indoor agriculture &mdash; eight times the photon density, one
+          third the wattage.
+        </p>
+        <div class="meta-row">
+          <span><b>Stage</b> &middot; Seed</span>
+          <span><b>Round</b> &middot; $4.5M on $20M post</span>
+          <span><b>Location</b> &middot; Eindhoven &middot; Boulder</span>
+          <span><b>Prepared for</b> &middot; Strategic & Lead Investors</span>
+        </div>
+        <nav class="toc">
+          <a href="#problem"><span class="n">01</span>Problem</a>
+          <a href="#solution"><span class="n">02</span>Solution</a>
+          <a href="#how"><span class="n">03</span>How it works</a>
+          <a href="#market"><span class="n">04</span>Market</a>
+          <a href="#traction"><span class="n">05</span>Traction</a>
+          <a href="#roadmap"><span class="n">06</span>Roadmap</a>
+          <a href="#model"><span class="n">07</span>Business model</a>
+          <a href="#competition"><span class="n">08</span>Competition</a>
+          <a href="#team"><span class="n">09</span>Team</a>
+          <a href="#ask"><span class="n">10</span>Ask</a>
+          <a href="#funds"><span class="n">11</span>Use of funds</a>
+          <a href="#contact"><span class="n">12</span>Contact</a>
+        </nav>
+      </header>
+
+      <section>
+        <h2 id="problem"><span class="num">01</span>Problem</h2>
+        <p class="lede">
+          Indoor agriculture lighting has been stuck on plant-grade LEDs since 2015. Diodes have
+          crept from 2.5 to 3.1&nbsp;&micro;mol/J in a decade &mdash; a 24% gain &mdash; while
+          energy is now the single largest line item for every commercial vertical farm in North
+          America and the EU.
+        </p>
+        <p>
+          The result is a category that quietly broke. Of the eleven vertical-farm operators that
+          raised over $50M between 2019 and 2023,
+          <strong
+            >seven have shut down, sold for parts, or restructured at zero equity value.</strong
+          >
+          Three of the survivors cite lighting cost-per-gram as the headline blocker on their next
+          facility.
+        </p>
+        <p>
+          Greenhouse supplemental lighting is the same shape of problem, masked by daylight. A
+          12-hectare Dutch tomato greenhouse running 200 W/m&sup2; HPS supplement for 16 hours a day
+          spends roughly &euro;3.1M per year on electricity for photons. Swapping to current
+          best-in-class LED bars cuts that to &euro;2.0M. It is not enough. Operators need a step
+          change, not another 20%.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="solution"><span class="num">02</span>Solution</h2>
+        <p class="lede">
+          Lumenforge builds <strong>tunable-spectrum micro-fusion-emitter arrays</strong> &mdash;
+          lighting fixtures that use inertial-confinement micro-pellet emitters to produce a
+          continuously tunable photon spectrum from 380&nbsp;nm to 780&nbsp;nm at
+          24.6&nbsp;&micro;mol/J wall-plug efficiency.
+        </p>
+        <p>
+          That is roughly <strong>8&times; the photosynthetic photon flux per watt</strong> of the
+          best commercial horticultural LED shipping today. The output spectrum is software-defined
+          per square meter, so growers can run a "morning blue" recipe at dawn and a "fruit-set red"
+          recipe at noon without swapping hardware or losing yield to spectral compromise.
+        </p>
+        <p>
+          One MF-220 fixture replaces seven Fluence SPYDR 2p bars while drawing 380&nbsp;W instead
+          of 2,310&nbsp;W. We are not selling efficiency. We are selling a new unit economic.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="how"><span class="num">03</span>How it works</h2>
+        <p>
+          Each MF-220 fixture contains a 6&times;6 grid of micro-fusion emitter cells. Each cell
+          holds a deuterated polymer micro-pellet (12&nbsp;mg) inside a sapphire confinement cavity.
+          A pulsed 940&nbsp;nm diode array drives the pellet into a sustained low-yield aneutronic
+          reaction; the resulting bremsstrahlung is downconverted by a doped phosphor stack into a
+          clean visible spectrum. A pellet lasts roughly 14,000 operating hours. Spectrum is shaped
+          per-cell by modulating phosphor bias voltages on a 2&nbsp;kHz cycle &mdash; that is what
+          makes the spectrum software-defined.
+        </p>
+        <pre class="diagram">
+    940 nm pump diode array
+              |
+              v
+   +---------------------+
+   |  sapphire cavity    |     <-- per-cell, 36 per fixture
+   |  [ D-polymer pellet ]|
+   +---------------------+
+              |  soft X-ray / UV
+              v
+   +---------------------+
+   |  doped phosphor      |    <-- bias-modulated, 380-780 nm
+   |  stack (5 layers)    |
+   +---------------------+
+              |
+              v
+          PAR output  -->  24.6 umol/J wall-plug
+  </pre
+        >
+        <p>
+          The pump diodes, sapphire optics, and phosphor stacks are all off-the-shelf supply chains.
+          The defensible piece &mdash; the pellet chemistry and the bias-modulation firmware &mdash;
+          is ours, and is filed under PCT/NL2025/050118 and three continuations.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="market"><span class="num">04</span>Market</h2>
+        <p>We size by addressable installed wattage, then convert to fixture revenue at our ASP.</p>
+
+        <div class="market-grid">
+          <div>
+            <div class="label">TAM</div>
+            <div class="value">$18.4B</div>
+            <div class="note">
+              All commercial horticultural lighting hardware + recurring spectrum software, global,
+              by 2030.
+            </div>
+          </div>
+          <div>
+            <div class="label">SAM</div>
+            <div class="value">$4.2B</div>
+            <div class="note">
+              High-density operators in NL, DE, US, CA, JP, KR with &gt;2,000&nbsp;m&sup2; under
+              glass or in racks.
+            </div>
+          </div>
+          <div>
+            <div class="label">SOM</div>
+            <div class="value">$310M</div>
+            <div class="note">
+              Year-5 realistic share &mdash; 7.4% of SAM &mdash; concentrated in 180 named accounts.
+            </div>
+          </div>
+        </div>
+
+        <h3>Why now</h3>
+        <p>
+          European glasshouse electricity has settled at &euro;0.21&ndash;&euro;0.28/kWh post-2024,
+          more than double the pre-Ukraine baseline. Three of the largest Dutch tomato cooperatives
+          have publicly committed to halving lighting energy by 2028. Meanwhile, North American
+          vertical farms that survived the 2023 cull are rebuilding around unit economics, not
+          topline &mdash; lighting cost-per-gram is the line they all need to move.
+        </p>
+
+        <h3>Segments we are not chasing</h3>
+        <p>
+          Cannabis indoor (regulatory whiplash, price compression), hobby and prosumer (margin-thin,
+          support-heavy), and research chambers (volume too low). Our wedge is commercial
+          leafy-greens vertical farms and high-density Dutch glasshouse tomato and pepper.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="traction"><span class="num">05</span>Traction</h2>
+        <p>
+          We started shipping MF-220 evaluation units to design partners in October 2025. Revenue is
+          paid pilot installations plus deposits on Q3 production slots.
+        </p>
+
+        <table class="bars">
+          <tr>
+            <td class="q">Oct '25</td>
+            <td class="b"><div class="bar" style="width: 4%"></div></td>
+            <td class="n">$14K</td>
+          </tr>
+          <tr>
+            <td class="q">Nov '25</td>
+            <td class="b"><div class="bar" style="width: 7%"></div></td>
+            <td class="n">$28K</td>
+          </tr>
+          <tr>
+            <td class="q">Dec '25</td>
+            <td class="b"><div class="bar" style="width: 14%"></div></td>
+            <td class="n">$56K</td>
+          </tr>
+          <tr>
+            <td class="q">Jan '26</td>
+            <td class="b"><div class="bar" style="width: 22%"></div></td>
+            <td class="n">$88K</td>
+          </tr>
+          <tr>
+            <td class="q">Feb '26</td>
+            <td class="b"><div class="bar" style="width: 38%"></div></td>
+            <td class="n">$152K</td>
+          </tr>
+          <tr>
+            <td class="q">Mar '26</td>
+            <td class="b"><div class="bar" style="width: 61%"></div></td>
+            <td class="n">$244K</td>
+          </tr>
+          <tr>
+            <td class="q">Apr '26</td>
+            <td class="b"><div class="bar" style="width: 92%"></div></td>
+            <td class="n">$368K</td>
+          </tr>
+        </table>
+
+        <p>
+          <strong>Named design partners:</strong> Koppert Cress (NL, 1.4&nbsp;ha glasshouse), Bowery
+          2.0 (Kearny, NJ, 3,200&nbsp;m&sup2; vertical), Plenty Compton (CA, retrofit bay 4), and a
+          Tier-1 Japanese leafy-greens operator under NDA. All four have signed LOIs for 2026
+          production-slot deposits totalling $2.1M.
+        </p>
+        <p>
+          Independent yield results from the Koppert Cress pilot (12 weeks, basil, side-by-side
+          against Fluence VYPR 3p):
+          <strong>+19% fresh weight per square meter, &minus;58% kWh per gram.</strong>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="roadmap"><span class="num">06</span>Product roadmap</h2>
+
+        <div class="roadmap">
+          <div class="q">
+            <div class="qlbl">Q3 2026</div>
+            <h4>MF-220 GA</h4>
+            <ul>
+              <li>1,200-unit production run, Eindhoven line</li>
+              <li>UL 8800 + DLC Horticultural V3</li>
+              <li>Spectrum Cloud v1 (SaaS, recipe library)</li>
+            </ul>
+          </div>
+          <div class="q">
+            <div class="qlbl">Q4 2026</div>
+            <h4>Glasshouse SKU</h4>
+            <ul>
+              <li>MF-220-G: IP66, suspended ballast-free</li>
+              <li>3 Dutch coop deployments at 0.4&nbsp;ha each</li>
+              <li>Pellet auto-swap dock (field-serviceable)</li>
+            </ul>
+          </div>
+          <div class="q">
+            <div class="qlbl">Q1 2027</div>
+            <h4>Rack SKU + retrofit</h4>
+            <ul>
+              <li>MF-90 strip for 1.2&nbsp;m grow rack</li>
+              <li>Retrofit kit: Fluence SPYDR socket-compat</li>
+              <li>First Japan deployment</li>
+            </ul>
+          </div>
+          <div class="q">
+            <div class="qlbl">Q2 2027</div>
+            <h4>Spectrum API</h4>
+            <ul>
+              <li>Open API for crop-science partners</li>
+              <li>Closed-loop integration: Priva, Hoogendoorn</li>
+              <li>ARR target: $3.2M run-rate</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 id="model"><span class="num">07</span>Business model</h2>
+        <p>Two revenue lines, intentionally coupled.</p>
+        <p>
+          <strong>Hardware.</strong> MF-220 ASP is $1,940 per fixture at list, $1,620 at
+          named-account volume pricing. BOM at our Q3 production run is $612, falling to $470 at
+          10,000 units. Gross margin walks from 62% to 71% over the funded period. Pellet refills
+          are sold as a $89 four-pack on 14,000-hour intervals &mdash; not a profit center, a
+          lock-in.
+        </p>
+        <p>
+          <strong>Spectrum Cloud (recurring).</strong> Every fixture phones home for recipe updates,
+          yield telemetry, and a managed library of validated spectra by crop and growth stage.
+          $14/fixture/month, billed annually. A 10,000-fixture customer pays $1.68M/year for
+          software on top of their hardware. Spectrum Cloud carries 84% gross margin and is the line
+          that gets us to a software multiple at exit.
+        </p>
+        <p>Year-3 mix target: 64% hardware, 36% recurring, blended 71% GM.</p>
+      </section>
+
+      <section>
+        <h2 id="competition"><span class="num">08</span>Competition</h2>
+        <p>
+          The horticultural lighting market is consolidated around three serious incumbents and a
+          long tail of regional brands. None of them ship anything in the photon-density range we
+          operate in.
+        </p>
+
+        <table class="compet">
+          <tr>
+            <th>Vendor</th>
+            <th>Top fixture</th>
+            <th>&micro;mol/J</th>
+            <th>Watts</th>
+            <th>Tunable spectrum</th>
+            <th>SaaS layer</th>
+          </tr>
+          <tr>
+            <td>Fluence (Signify)</td>
+            <td>SPYDR 2p</td>
+            <td>3.0</td>
+            <td>645</td>
+            <td>3 fixed channels</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Gavita</td>
+            <td>1700e Gen2</td>
+            <td>2.9</td>
+            <td>645</td>
+            <td>Fixed</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Heliospectra</td>
+            <td>MITRA X</td>
+            <td>2.6</td>
+            <td>630</td>
+            <td>4 channels, manual</td>
+            <td>helioCORE (basic)</td>
+          </tr>
+          <tr>
+            <td class="us">Lumenforge</td>
+            <td class="us">MF-220</td>
+            <td class="us">24.6</td>
+            <td class="us">380</td>
+            <td class="us"><span class="check">&#10003;</span> continuous, per-cell</td>
+            <td class="us"><span class="check">&#10003;</span> Spectrum Cloud</td>
+          </tr>
+        </table>
+
+        <p>
+          The defensible gap is not photon density alone &mdash; an incumbent could in principle
+          stack more diodes. It is the combination of
+          <strong>per-cell continuous-spectrum tuning</strong> with a recipe library validated
+          against 60+ crop-stage combinations. Catching us requires both a hardware platform shift
+          and three years of crop-science data they have not collected.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="team"><span class="num">09</span>Team</h2>
+
+        <div class="team">
+          <div class="founder">
+            <div class="avatar">SV</div>
+            <h4>Saskia van Aalst</h4>
+            <div class="role">CEO &middot; Co-founder</div>
+            <p>
+              Ten years at ASML on EUV pellicle and pump-diode integration. Led the team that
+              brought NXE:3600D pump efficiency from 0.4 to 1.1 J. MSc Applied Physics, TU Delft.
+              Grew up on a family glasshouse outside Westland.
+            </p>
+          </div>
+          <div class="founder">
+            <div class="avatar">RM</div>
+            <h4>Dr. Rohan Mehrotra</h4>
+            <div class="role">CTO &middot; Co-founder</div>
+            <p>
+              PhD Plasma Physics, MIT (2018), thesis on aneutronic micro-confinement. Four years at
+              Commonwealth Fusion on pellet fueling. Two granted patents on deuterated polymer
+              micro-pellet synthesis.
+            </p>
+          </div>
+          <div class="founder">
+            <div class="avatar">EC</div>
+            <h4>Elena Costa</h4>
+            <div class="role">VP Crop Science &middot; Co-founder</div>
+            <p>
+              Twelve years at Wageningen Plant Research, last four leading the LED Recipe Lab.
+              Author of 23 peer-reviewed papers on photomorphogenesis. Built the spectrum library
+              now licensed by Priva and Hoogendoorn.
+            </p>
+          </div>
+        </div>
+
+        <p>
+          Eleven full-time employees today (six in Eindhoven, three in Boulder, two remote). Plan is
+          to be at twenty-six by end of Q1 2027.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="ask"><span class="num">10</span>Ask</h2>
+        <div class="ask-card">
+          <div class="row">
+            <div class="label">Raising</div>
+            <div class="value">$4.5M seed</div>
+          </div>
+          <div class="row">
+            <div class="label">Post-money</div>
+            <div class="value">$20.0M</div>
+          </div>
+          <div class="row">
+            <div class="label">Lead</div>
+            <div class="value">Committed &mdash; $2.5M</div>
+          </div>
+          <div class="row">
+            <div class="label">Allocation remaining</div>
+            <div class="value">$2.0M</div>
+          </div>
+        </div>
+        <p>
+          Lead is a European deep-tech fund with prior board seats at two fusion-adjacent portfolio
+          companies (under NDA until announcement, expected late May). We have $1.4M of additional
+          verbal interest from strategics in the Dutch greenhouse cooperative ecosystem and one
+          US-based ag-supply Tier-1 we expect to confirm within two weeks. Round close target:
+          <strong>June 30, 2026</strong>.
+        </p>
+        <p>
+          This capital takes us to
+          <strong>$6.4M run-rate ARR and gross profitability by Q3 2027</strong>, which is the
+          trigger point for a Series A on hardware-software unit economics rather than category
+          narrative.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="funds"><span class="num">11</span>Use of funds</h2>
+        <p>Funds carry us 22 months &mdash; through GA, two SKU launches, and DLC certification.</p>
+
+        <div class="funds">
+          <div class="pie" role="img" aria-label="Use of funds pie chart"></div>
+          <ul class="legend">
+            <li>
+              <span class="sw" style="background: var(--accent)"></span
+              ><span class="label">Engineering & production (45%)</span
+              ><span class="pct">$2.03M</span>
+            </li>
+            <li>
+              <span class="sw" style="background: var(--accent-soft)"></span
+              ><span class="label">Crop-science & recipe library (25%)</span
+              ><span class="pct">$1.13M</span>
+            </li>
+            <li>
+              <span class="sw" style="background: #2a6f5c"></span
+              ><span class="label">Go-to-market & field deployment (15%)</span
+              ><span class="pct">$0.68M</span>
+            </li>
+            <li>
+              <span class="sw" style="background: #c89866"></span
+              ><span class="label">Regulatory, IP & certifications (10%)</span
+              ><span class="pct">$0.45M</span>
+            </li>
+            <li>
+              <span class="sw" style="background: var(--ink-soft)"></span
+              ><span class="label">Reserve & G&amp;A (5%)</span><span class="pct">$0.23M</span>
+            </li>
+          </ul>
+        </div>
+
+        <h3>What we are not spending on</h3>
+        <p>
+          No brand or paid acquisition spend. No US sales hires until Q2 2027 &mdash; design-partner
+          pull is enough through GA. No second facility &mdash; Eindhoven line is sized to 4,200
+          units/quarter, more than we need through the funded period.
+        </p>
+
+        <h3>Milestones tied to the round</h3>
+        <p>
+          1,200 MF-220 units shipped by Q4 2026. Three glasshouse coop deployments at
+          &ge;0.4&nbsp;ha each. Spectrum Cloud at 2,400 paying fixtures. Pellet auto-swap dock in
+          field trial. Series A-ready data room by Q2 2027.
+        </p>
+      </section>
+
+      <section>
+        <h2 id="contact"><span class="num">12</span>Contact</h2>
+        <div class="contact">
+          <p class="lede">
+            Want a follow-up? We are sharing the technical data room and pilot videos with investors
+            under NDA on a rolling basis.
+          </p>
+          <p>
+            <strong>Saskia van Aalst</strong> &middot; CEO<br />
+            <a href="mailto:founders@lumenforge.io">founders@lumenforge.io</a><br />
+            Lumenforge B.V. &middot; High Tech Campus 27, 5656 AE Eindhoven, Netherlands<br />
+            US office: 1535 Pearl St, Suite 300, Boulder CO 80302
+          </p>
+          <p>
+            If you would like a deeper walkthrough, reply to this thread or book directly &mdash; we
+            hold two investor slots per week through round close.
+          </p>
+        </div>
+      </section>
+
+      <footer class="colophon">
+        <span>&copy; 2026 Lumenforge B.V. &middot; KvK 89412037</span>
+        <span>Confidential &mdash; do not redistribute</span>
+        <span>v2026.05.11</span>
+      </footer>
+    </div>
+  </body>
+</html>

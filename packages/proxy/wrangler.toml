@@ -1,0 +1,28 @@
+name = "htmlradar-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = []
+workers_dev = false  # We don't want this exposed at *.workers.dev — only via the zone route
+
+# Production route — the worker intercepts htmlradar.com/r/* and serves the
+# tracked HTML with our tracker injected. Anything else on the apex falls
+# through to Cloudflare Pages (the Next.js app).
+[[routes]]
+pattern = "htmlradar.com/r/*"
+zone_name = "htmlradar.com"
+
+[vars]
+TRACKER_URL = "https://htmlradar.com/v1/tracker.js"
+
+# Secrets — set via `wrangler secret put`:
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_ANON_KEY        (passed to tracker as data-supabase-anon-key)
+#   SESSION_SECRET           (HMAC key for password-auth cookies)
+
+[[r2_buckets]]
+binding = "DOCS_BUCKET"
+bucket_name = "htmlradar-docs"
+
+[observability]
+enabled = true

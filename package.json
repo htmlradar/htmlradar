@@ -1,0 +1,48 @@
+{
+  "name": "htmlradar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source DocSend for HTML. Know who's reading.",
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://htmlradar.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/htmlradar/htmlradar.git"
+  },
+  "packageManager": "pnpm@10.26.2",
+  "engines": {
+    "node": ">=20.9.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "eslint . --ext .ts,.tsx,.js,.mjs --max-warnings=0",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css,html}\"",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm -r test:e2e",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,html}": [
+      "prettier --write"
+    ]
+  }
+}

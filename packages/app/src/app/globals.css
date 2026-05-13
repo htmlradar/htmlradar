@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  /* Alias --font-sans to whatever Geist's variable resolves to.
+     The `geist` npm package hard-codes `--font-geist-sans`; the Tailwind
+     config + components reference `--font-sans`. One line bridges them
+     without touching every component. */
+  html {
+    --font-sans: var(--font-geist-sans);
+  }
+
+  html,
+  body {
+    background: #fbf1e8;
+    color: #1f1108;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings:
+      'ss01' 1,
+      'cv11' 1;
+  }
+
+  ::selection {
+    background: #ff6d00;
+    color: #fbf1e8;
+  }
+
+  /* Subtle dotted texture on warm paper — adds depth without being a
+     "card grid" or gradient. Only on the body background. */
+  body {
+    background-image: radial-gradient(rgba(31, 17, 8, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: 0 0;
+  }
+
+  /* When the user prefers reduced motion, kill everything that moves. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* The single signature element: a "radar contact" mono kicker that
+     appears as a section marker. e.g. § 02. Used as a typographic rule
+     instead of horizontal lines. Slightly Emborange-tinted so it reads
+     as the document's recurring brand voice rather than dead metadata. */
+  .section-mark {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-signal-dark;
+  }
+}
+
+@layer utilities {
+  /* Editorial measure — keeps prose readable. ~66 characters wide. */
+  .measure {
+    max-width: 38rem;
+  }
+
+  /* For the radar-pulse rings — sets a CSS variable that the animation
+     reads, so we can stagger three rings at different delays without
+     writing three separate animations. */
+  .radar-ring {
+    --ring-delay: 0s;
+    animation: radar-ring 4s ease-out var(--ring-delay) infinite;
+  }
+
+  @keyframes radar-ring {
+    0% {
+      transform: scale(0.4);
+      opacity: 0;
+    }
+    20% {
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  /* HeroRadar — slow sweep rotation. One full turn every 12s. Linear so
+     the wedge moves like an actual radar, not a UI spinner. */
+  .hero-radar-sweep {
+    animation: hero-radar-sweep 12s linear infinite;
+    transform-box: view-box;
+  }
+
+  @keyframes hero-radar-sweep {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* HeroRadar — ping cycle. Each ping is invisible most of the time,
+     fades in for ~1.5s, fades out. 12s cycle synchronises with the
+     sweep so pings appear to "tag" contacts as the sweep passes. */
+  .hero-radar-ping {
+    opacity: 0;
+    animation: hero-radar-ping 12s linear infinite;
+  }
+
+  @keyframes hero-radar-ping {
+    0%,
+    85% {
+      opacity: 0;
+    }
+    88% {
+      opacity: 1;
+    }
+    96% {
+      opacity: 0.45;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* Letterpress — barely-there ink shadow on Fraunces headlines. Reads
+     as printed paper rather than digital text at sizes >32px. The
+     effect should be imperceptible unless directly compared. */
+  .text-letterpress {
+    text-shadow:
+      0 1px 0 rgba(31, 17, 8, 0.05),
+      0 0.5px 0 rgba(31, 17, 8, 0.03);
+  }
+
+  /* Link with a sliding underline that expands from left to right on
+     hover. Cubic-bezier matches the page's reveal-up easing. */
+  .link-slide {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: inherit;
+  }
+  .link-slide::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    height: 1.5px;
+    width: 100%;
+    background-color: #7a1f2e;
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .link-slide:hover::after {
+    transform: scaleX(1);
+  }
+
+  /* Hero bloom — a faint oxblood radial gradient seated behind the
+     hero. Adds dimensionality without becoming a "gradient website."
+     Sized large with low opacity so it's barely perceptible. */
+  .hero-bloom {
+    background-image: radial-gradient(
+      ellipse 65% 75% at 78% 35%,
+      rgba(122, 31, 46, 0.09),
+      rgba(122, 31, 46, 0.04) 35%,
+      transparent 65%
+    );
+  }
+}

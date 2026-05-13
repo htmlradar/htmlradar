@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+
+# Run gitleaks if installed locally; otherwise skip with a warning.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact -v --config=.gitleaks.toml || {
+    echo ""
+    echo "❌ gitleaks found secrets in your staged changes. Commit blocked."
+    echo "   Remove the secret, stage the cleaned file, and try again."
+    exit 1
+  }
+else
+  echo "⚠️  gitleaks not installed locally — relying on CI. Install via 'brew install gitleaks' for local protection."
+fi
+
+# Run lint-staged
+npx lint-staged

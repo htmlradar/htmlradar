@@ -1,0 +1,23 @@
+{
+  "name": "@htmlradar/tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The embedded tracker script. Served from cdn.htmlradar.com/v1/tracker.js.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "dist/tracker.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0",
+    "@vitest/coverage-v8": "^1.4.0"
+  }
+}

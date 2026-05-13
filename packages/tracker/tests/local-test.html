@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tracker local test</title>
+    <style>
+      body {
+        font-family: -apple-system, system-ui, sans-serif;
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 20px;
+        color: #1c1814;
+      }
+      section {
+        padding: 60vh 0;
+        border-bottom: 1px dashed #ddd4c2;
+      }
+      h2 {
+        margin: 0 0 16px;
+      }
+    </style>
+    <script>
+      // Override defaults for local testing.
+      window.HTMLRadarConfig = {
+        privacy: { mode: 'email-gated' },
+        gate: { enabled: true },
+        debug: true,
+        hooks: {
+          onSectionEnter: (s) => console.log('enter →', s.title),
+          onSectionRead: (s) => console.log('read  ✓', s.title),
+        },
+      };
+    </script>
+    <!-- During dev, point this at the local esbuild output: ../dist/tracker.js -->
+    <script
+      type="module"
+      src="../dist/tracker.js"
+      data-supabase-url="https://YOUR-PROJECT.supabase.co"
+      data-supabase-anon-key="eyJ..."
+      data-share-slug="local-test-share-slug"
+      defer
+    ></script>
+  </head>
+  <body>
+    <h1>HTMLRadar — local tracker test</h1>
+    <p>
+      Scroll. Watch the console. Verify the email gate, the session start, the section-enter /
+      section-read events, and a periodic flush to the Supabase RPC.
+    </p>
+
+    <section>
+      <h2 id="intro">Intro</h2>
+      <p>Scroll down to load the next section.</p>
+    </section>
+    <section>
+      <h2 id="problem">Problem</h2>
+      <p>Investor decks rendered as HTML have no native DocSend equivalent.</p>
+    </section>
+    <section>
+      <h2 id="solution">Solution</h2>
+      <p>HTMLRadar — tracks scroll, sections, and time.</p>
+    </section>
+    <section>
+      <h2 id="market">Market</h2>
+      <p>Anyone sending an HTML doc they care about.</p>
+    </section>
+    <section>
+      <h2 id="end">End</h2>
+      <p>Stop scrolling. The heartbeat fires every 15s.</p>
+    </section>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Env / secrets — NEVER COMMIT
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Test outputs
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+
+# Next.js / Vercel build output
+.vercel/
+next-env.d.ts
+
+# Misc
+*.local
+.cache/
+
+# macOS Finder duplicates (Cmd+D / iCloud sync artifacts)
+* 2.*
+* [0-9].*

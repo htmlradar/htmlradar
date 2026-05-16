@@ -142,7 +142,7 @@ begin
 
           <!-- Viewer chip: 40px avatar + email line. Personal anchor
                before the doc-title headline. The avatar is a single
-               uppercase letter in cream on oxblood; round via 50%
+               uppercase letter in cream on oxblood; round via 50%%
                border-radius (some Outlook builds drop this — degrades
                to a square chip, still readable). -->
           <tr>

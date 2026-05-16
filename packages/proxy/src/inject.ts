@@ -1,4 +1,4 @@
-import type { Share } from './supabase.js';
+import type { Attachment, Share } from './supabase.js';
 import { escapeHtml } from './escape.js';
 
 interface InjectOptions {
@@ -15,6 +15,11 @@ interface InjectOptions {
     os?: string;
     browser?: string;
   };
+  // Supporting materials to surface inside the rendered doc. Only
+  // populated when the share has `allow_download = true`. When empty
+  // or undefined the materials panel is NOT injected — recipients have
+  // no signal that attachments exist.
+  attachments?: Attachment[];
 }
 
 // Injects the tracker config + script tag into <head>, and (for free tier)
@@ -23,6 +28,10 @@ interface InjectOptions {
 export function injectTracker(html: Response, opts: InjectOptions): Response {
   const headSnippet = headInjection(opts);
   const footerSnippet = opts.tier === 'free' ? chromeFooter() : '';
+  const materialsSnippet =
+    opts.share.allow_download && opts.attachments && opts.attachments.length > 0
+      ? materialsPanel(opts.share.slug, opts.attachments)
+      : '';
 
   const rewriter = new HTMLRewriter()
     .on('head', {
@@ -32,6 +41,7 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
     })
     .on('body', {
       element(el) {
+        if (materialsSnippet) el.append(materialsSnippet, { html: true });
         if (footerSnippet) el.append(footerSnippet, { html: true });
       },
     });
@@ -74,6 +84,124 @@ function headInjection(opts: InjectOptions): string {
     ` data-share-slug="${escapeHtml(opts.share.slug)}"`,
     ` defer></script>`,
   ].join('');
+}
+
+// Supporting-materials panel. Injected before </body> when the share has
+// allow_download = true AND attachments exist. Renders as a compact
+// pinned button at the bottom-right of the viewport that expands to a
+// file list with Download links.
+//
+// All styles are inline + scoped under unique class names so they can't
+// collide with the host document's CSS. The toggle uses a tiny inline
+// script (no external deps). The download links point at the proxy's
+// /r/{slug}/m/{att_id} route — every click cookie-gated + logged.
+function materialsPanel(slug: string, attachments: Attachment[]): string {
+  const items = attachments
+    .map((a) => {
+      const safeName = escapeHtml(a.filename);
+      const safeKb = formatBytesForPanel(a.size_bytes);
+      const safeExt = (extOf(a.filename) || a.mime_type.split('/').pop() || 'file').toUpperCase();
+      const href = `/r/${escapeHtml(slug)}/m/${escapeHtml(a.id)}`;
+      return `
+        <li class="htmlradar-mat-item">
+          <span class="htmlradar-mat-meta">${escapeHtml(safeExt)} · ${escapeHtml(safeKb)}</span>
+          <a href="${href}" class="htmlradar-mat-link" download="${safeName}">
+            <span class="htmlradar-mat-name">${safeName}</span>
+            <span class="htmlradar-mat-dl" aria-hidden="true">↓</span>
+          </a>
+        </li>`;
+    })
+    .join('');
+
+  const count = attachments.length;
+  return `
+<div class="htmlradar-mat-root" data-state="collapsed">
+  <button type="button" class="htmlradar-mat-toggle" aria-expanded="false" aria-controls="htmlradar-mat-list">
+    <span class="htmlradar-mat-toggle-icon" aria-hidden="true">📎</span>
+    Materials
+    <span class="htmlradar-mat-toggle-count">${count}</span>
+  </button>
+  <div class="htmlradar-mat-panel" id="htmlradar-mat-list" role="region" aria-label="Supporting materials">
+    <div class="htmlradar-mat-header">
+      <span>Supporting materials</span>
+      <button type="button" class="htmlradar-mat-close" aria-label="Close materials">×</button>
+    </div>
+    <ul class="htmlradar-mat-list">
+      ${items}
+    </ul>
+    <div class="htmlradar-mat-footer">Shared via HTMLRadar · every download tracked</div>
+  </div>
+</div>
+<style>
+.htmlradar-mat-root{position:fixed;right:16px;bottom:48px;z-index:2147483645;
+  font:13px/1.45 -apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;
+  color:#1F1108}
+.htmlradar-mat-root *{box-sizing:border-box}
+.htmlradar-mat-toggle{display:inline-flex;align-items:center;gap:8px;
+  background:#FBF1E8;color:#1F1108;border:1px solid #E8D5BD;border-radius:999px;
+  padding:8px 14px;font:inherit;cursor:pointer;box-shadow:0 2px 8px rgba(31,17,8,.08);
+  transition:background-color 120ms ease,border-color 120ms ease}
+.htmlradar-mat-toggle:hover{background:#F4E1CB;border-color:#7A1F2E}
+.htmlradar-mat-toggle-icon{font-size:14px}
+.htmlradar-mat-toggle-count{display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;padding:0 6px;font:500 10px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  color:#FBF1E8;background:#7A1F2E;border-radius:999px}
+.htmlradar-mat-panel{display:none;margin-top:10px;width:min(360px,calc(100vw - 32px));
+  background:#FBF1E8;border:1px solid #E8D5BD;border-radius:14px;
+  box-shadow:0 8px 32px rgba(31,17,8,.12);overflow:hidden}
+.htmlradar-mat-root[data-state="open"] .htmlradar-mat-panel{display:block}
+.htmlradar-mat-header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 10px;font:500 11px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  text-transform:uppercase;letter-spacing:.16em;color:#876959;border-bottom:1px solid #E8D5BD}
+.htmlradar-mat-close{background:transparent;border:0;color:#876959;font-size:18px;line-height:1;
+  cursor:pointer;padding:0 4px}
+.htmlradar-mat-close:hover{color:#5A1521}
+.htmlradar-mat-list{list-style:none;margin:0;padding:6px 0;max-height:min(420px,60vh);overflow:auto}
+.htmlradar-mat-item{padding:0}
+.htmlradar-mat-link{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 16px;text-decoration:none;color:#1F1108;transition:background-color 120ms ease}
+.htmlradar-mat-link:hover{background:#F4E1CB}
+.htmlradar-mat-name{display:block;font-weight:500;font-size:13.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}
+.htmlradar-mat-meta{display:block;padding:4px 16px 0;font:500 10px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  text-transform:uppercase;letter-spacing:.14em;color:#876959}
+.htmlradar-mat-dl{color:#7A1F2E;font:500 16px/1 system-ui}
+.htmlradar-mat-footer{padding:10px 16px;font:500 10px/1.4 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  text-transform:uppercase;letter-spacing:.14em;color:#876959;border-top:1px solid #E8D5BD}
+@media (prefers-reduced-motion: reduce){.htmlradar-mat-toggle,.htmlradar-mat-link{transition:none}}
+</style>
+<script>(function(){
+  var root=document.currentScript&&document.currentScript.previousElementSibling;
+  // currentScript may not be reachable in all renderers — fall back to
+  // a queryselector. The class name is unique enough to be safe.
+  if(!root||!root.classList||!root.classList.contains('htmlradar-mat-root')){
+    root=document.querySelector('.htmlradar-mat-root');
+  }
+  if(!root)return;
+  var toggle=root.querySelector('.htmlradar-mat-toggle');
+  var closeBtn=root.querySelector('.htmlradar-mat-close');
+  function set(state){
+    root.setAttribute('data-state',state);
+    if(toggle)toggle.setAttribute('aria-expanded',state==='open'?'true':'false');
+  }
+  if(toggle)toggle.addEventListener('click',function(){
+    set(root.getAttribute('data-state')==='open'?'collapsed':'open');
+  });
+  if(closeBtn)closeBtn.addEventListener('click',function(){set('collapsed');});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')set('collapsed');});
+})();</script>
+`.trim();
+}
+
+function formatBytesForPanel(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function extOf(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
 }
 
 function chromeFooter(): string {

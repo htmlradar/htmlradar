@@ -13,11 +13,21 @@ When a recipient opens a tracked share, we record:
 
 We do **not** collect: keystrokes, mouse positions, third-party trackers, anything from outside the document, or anything that identifies the recipient beyond the email they provided.
 
+## What we collect when you use the app yourself
+
+Separately from share-tracking above, the hosted app records first-party usage data:
+
+- **Product events**: when you sign in, upload a document, create or revoke a share, hit the free-tier cap, view the upgrade page, click a CTA, or submit feedback. Stored in an `app_events` table (PostHog-compatible schema — if we wire PostHog later we replay this table over).
+- **Page views**: when your browser loads a page on htmlradar.com. Path, referrer, and a random fingerprint (generated client-side, never linked to your email unless you're signed in).
+- **Crash and error reports**: JavaScript errors captured to an `error_log` table. We do not use Sentry or any third-party error service.
+- **Feedback**: anything submitted through `/feedback` is stored in a `feedback` table and emailed directly to the founder. Email field is optional.
+
+No third-party trackers (no Google Analytics, no Segment, no Mixpanel). No advertising cookies. No session replay.
+
 ## Where data lives
 
 - Document HTML you upload — Cloudflare R2 (encrypted at rest, in the region of your bucket).
 - All other data — Supabase Postgres (encrypted at rest).
-- Sentry receives crash data only (no personal data in error contexts).
 
 ## Who can see your data
 

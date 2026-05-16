@@ -6,12 +6,14 @@
 
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { captureClientEvent } from '@/lib/events-client';
 
 export function CopySlugButton({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     const fullUrl = `https://htmlradar.com/r/${slug}`;
+    void captureClientEvent('share.copied', { slug });
     try {
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);

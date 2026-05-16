@@ -1,11 +1,16 @@
 import type { FlushPayload, SectionInfo, SessionInfo, TrackerConfig } from './types.js';
 import { SectionTracker } from './sections.js';
-import { createTransport, RpcError } from './transport.js';
+import { createTransport, RpcError, type StartSessionResult } from './transport.js';
 
 interface SessionOptions {
   config: TrackerConfig;
   email: string | null;
   fingerprint: string;
+  // When the email gate already called start_session (so it could surface
+  // server-side rejections in the gate UI), this is the result. Session
+  // installs it directly and skips its own RPC — preventing duplicate
+  // session rows + duplicate first-read emails.
+  preStarted?: StartSessionResult;
 }
 
 // Owns the lifecycle: starts the session, runs the heartbeat, tracks scroll
@@ -61,14 +66,16 @@ export class Session {
     this.sections.start();
     this.updateMaxScroll();
 
-    const result = await this.transport.startSession({
-      shareSlug: this.opts.config.shareSlug,
-      email: this.opts.email,
-      fingerprint: this.opts.fingerprint,
-      referrer: document.referrer ?? '',
-      userAgent: navigator.userAgent ?? '',
-      ...(this.opts.config.geo ? { geo: this.opts.config.geo } : {}),
-    });
+    const result =
+      this.opts.preStarted ??
+      (await this.transport.startSession({
+        shareSlug: this.opts.config.shareSlug,
+        email: this.opts.email,
+        fingerprint: this.opts.fingerprint,
+        referrer: document.referrer ?? '',
+        userAgent: navigator.userAgent ?? '',
+        ...(this.opts.config.geo ? { geo: this.opts.config.geo } : {}),
+      }));
 
     this.info = {
       sessionId: result.sessionId,

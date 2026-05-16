@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Newsreader, JetBrains_Mono } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
+import { EventTracker } from '@/components/EventTracker';
 import './globals.css';
 
 // Newsreader — variable serif for editorial headlines. Less ubiquitous
@@ -31,35 +32,35 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "HTMLRadar — Know who's reading.", template: '%s · HTMLRadar' },
+  title: { default: 'HTMLRadar — Document tracking for HTML', template: '%s · HTMLRadar' },
   description:
-    'Open-source document analytics for HTML. Upload a deck, brief, or proposal. See exactly who read it, how long, and which sections they actually dwelled on.',
+    'Open-source read tracking for HTML decks, briefs, and proposals. Upload a file or paste a URL, send a tracked link, see who opened it and where they dwelled.',
   metadataBase: new URL(process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://htmlradar.com'),
   applicationName: 'HTMLRadar',
   authors: [{ name: 'HTMLRadar' }],
   keywords: [
-    'document analytics',
+    'document tracking',
     'html tracking',
     'docsend alternative',
-    'pitch deck analytics',
-    'section-level tracking',
+    'pitch deck tracking',
+    'section-level dwell',
     'open source docsend',
     'agpl document tracking',
   ],
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    title: "HTMLRadar — Know who's reading.",
+    title: 'HTMLRadar — Document tracking for HTML',
     description:
-      'Section-level read tracking for HTML decks, briefs, and proposals. Open source under AGPL-3.0. Free for the first 10 documents.',
+      'The deck moved to HTML. Tracking should follow. Open-source read tracking for HTML decks, mocks, briefs, and updates. AGPL-3.0.',
     siteName: 'HTMLRadar',
     url: process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://htmlradar.com',
   },
   twitter: {
     card: 'summary_large_image',
-    title: "HTMLRadar — Know who's reading.",
+    title: 'HTMLRadar — Document tracking for HTML',
     description:
-      'Open-source document analytics for HTML. Section-level dwell, per-recipient shares, real-time read notifications.',
+      'Open-source read tracking for HTML decks, mocks, briefs, and updates. Section-level dwell, per-recipient shares, real-time read notifications.',
   },
   robots: {
     index: true,
@@ -76,7 +77,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${newsreader.variable} ${GeistSans.variable} ${mono.variable}`}>
-      <body className="min-h-screen font-sans">{children}</body>
+      <body className="min-h-screen font-sans">
+        <EventTracker />
+        {children}
+      </body>
     </html>
   );
 }

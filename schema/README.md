@@ -5,6 +5,11 @@ Apply in order via the Supabase SQL Editor (or `psql`):
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
 3. `003_triggers.sql` — doc cap enforcement + first-open email notification + notifications_log
+4. `004_password_security.sql` — per-slug rate limit on password verify + minimum length bump
+5. `005_security_followup.sql` — disposable-email blocklist + error obfuscation
+6. `006_observability.sql` — `app_events` / `error_log` / `feedback` tables + `share.first_view` event + `notify_on_feedback` + `recent_events` view
+
+Every migration uses `CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, etc., so re-running any of them is safe.
 
 ## Secrets via Supabase Vault (works on free tier)
 
@@ -37,6 +42,9 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `notifications_log` — observability for the `notify_on_first_open` trigger.
 - `waitlist` — v1.1 paid feature waitlist.
 - `rate_limits` — IP/identity-keyed rate-limit counters for RPCs.
+- `app_events` — PostHog-shaped product events (`distinct_id`, `event`, `properties`, `user_id`).
+- `error_log` — client/server/worker JS error sink.
+- `feedback` — user-submitted feedback from `/feedback`.
 
 ## RLS posture
 
@@ -50,8 +58,9 @@ Verify the tables exist:
 
 ```sql
 select tablename from pg_tables where schemaname = 'public' order by tablename;
--- Expect 9 rows: document_shares, documents, notifications_log, profiles,
--- rate_limits, section_events, sessions, viewers, waitlist
+-- Expect 12 rows: app_events, document_shares, documents, error_log,
+-- feedback, notifications_log, profiles, rate_limits, section_events,
+-- sessions, viewers, waitlist
 ```
 
 Manually invoke an RPC:

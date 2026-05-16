@@ -1,120 +1,152 @@
 # HTMLRadar
 
-**Know who's reading.** Section-level read tracking for HTML decks, briefs, and proposals. Open source under AGPL-3.0.
+Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
-- **Hosted:** [htmlradar.com](https://htmlradar.com) — free for the first 10 documents, $15/mo for unlimited + custom domain + chrome-free viewer.
-- **License:** AGPL-3.0-or-later. Code under `packages/` and `schema/` is the canonical source.
-- **Discuss:** [GitHub Issues](https://github.com/htmlradar/htmlradar/issues) — bug reports and feature requests welcome.
+- **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 10 documents lifetime, $15/mo Pro for unlimited + 10× attachment headroom
+- **Source**: this repo, AGPL-3.0 · current release: **v1.1**
+- **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
+- **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
 
 ---
 
 ## What this is
 
-DocSend, rebuilt for HTML. Investor decks now ship as Pitch exports, single-file pages typed into Claude, or interactive prototypes. The category that grew up around document analytics — DocSend, PandaDoc, Brevo — was built when PDFs were the answer, and stayed loyal to it. HTMLRadar tracks what those tools don't: who read your HTML, which sections they actually dwelled on, and whether they came back.
+Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you already host), send a tracked link `htmlradar.com/r/{slug}`, see who opened it, which sections they dwelled on, and when they bounced. Section-level dwell, not "opened."
 
-### What it gets right
+The bigger pattern: teams that use LLMs heavily ship more and more of their work as HTML — specs, design mocks, reports, dashboards, internal briefs. ChatGPT, Claude, v0, Lovable, Anthropic Artifacts all produce HTML for the things that matter. PDFs are a pre-LLM artifact; the analytics tooling stayed on PDFs. HTMLRadar follows the deliverable.
 
-- **Section-level dwell, not "opened."** A three-second threshold separates a real read from a scroll-past. The dashboard tells you Marc spent 2m 41s on §03 The Ask, twelve seconds on Problem, and skipped Market sizing entirely.
-- **Per-recipient share links.** One document, many shares. Each share carries its own email gate, password, expiry, and revocation. The dashboard tells you _which_ recipient opened it, not "someone opened it."
-- **Replace the HTML, keep the link.** Re-upload after partner feedback. Every share you've already sent now points at v2. No re-sending. No broken URLs in inboxes.
-- **Email when a real read happens.** A notification fires the moment the recipient crosses the three-second dwell threshold. Subject line includes the document title and the recipient.
-- **No watermark on your document body.** A thin "Shared with HTMLRadar" mark sits in the viewer chrome — never on the document itself. Send to investors without flinching.
+## What it does
 
-### What it deliberately is not
+- **Section-level dwell.** A three-second floor separates a real read from a scroll-past. The dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12 seconds on Problem, and skipped Market sizing.
+- **Per-recipient share links.** One document, many shares. Each share carries its own email gate, password, expiry, revocation, and email-domain or per-email allow-list.
+- **Supporting materials.** Attach PDFs, financial models, images, and ZIPs alongside the HTML deck. Per-share `Allow downloads` toggle; recipients see no signal that materials exist when it's off. Every download is tracked.
+- **Edit + preview on the fly.** Change a share's password, expiry, or allow-list without revoking. Preview the doc as the recipient sees it before sending — short-lived HMAC token, no gate.
+- **Re-upload, keep the link.** Replace the HTML after partner feedback. Every share you've already sent now points at v2. No re-sending.
+- **First-read email notifications.** A Postgres trigger calls Resend the moment a recipient crosses the dwell threshold.
+- **Privacy-respecting.** No mouse tracking, no keystrokes, no DOM snapshots, no session replay. Section dwell + scroll depth + active time. Recipients can opt out via `window.HTMLRadar.optOut()`.
 
-It's a sender-side analytics tool for one document at a time. Not a CMS, not a deck builder, not a static-site host, not a PDF viewer, not website analytics. You bring the HTML.
+## What it deliberately is not
 
----
-
-## Quick start (hosted)
-
-1. Sign in at [htmlradar.com](https://htmlradar.com) with Google or a magic link.
-2. Upload an HTML file or paste a URL.
-3. Create a per-recipient share. Set an email gate, password, or expiry if you want.
-4. Send the tracked link.
-5. Watch the dashboard. First read notification lands in your inbox the moment the recipient crosses the dwell threshold.
-
-Free tier: **10 documents lifetime**, unlimited shares per document. Pro tier (**$15/mo**) unlocks unlimited documents, custom domain on share URLs, chrome footer removed, allow-list, and 90-day analytics retention. Or self-host the whole thing — see below.
+A sender-side analytics tool for one document at a time. **Not** a CMS, deck builder, static-site host, PDF viewer, or website analytics platform. You bring the HTML.
 
 ---
 
-## Self-host
+## Architecture
 
-The full source runs on Cloudflare + Supabase free tiers.
-
-You need:
-
-- A Cloudflare account (Workers + R2)
-- A Supabase project (free tier)
-- A domain on Cloudflare DNS
-- Node ≥20, PNPM ≥10, a Resend account for outbound email (optional)
-
-See [`docs/self-hosting.md`](./docs/self-hosting.md) for the full guide — roughly 15 minutes if you already have CF and Supabase accounts. The schema is in [`schema/`](./schema/), the worker in [`packages/proxy/`](./packages/proxy/), and the web app in [`packages/app/`](./packages/app/).
-
-Self-hosted instances must remain AGPL-3.0 — if you modify the source and run a network service from it, you have to make your modifications available. See [`LICENSE`](./LICENSE).
-
----
-
-## Repo layout
+Three packages, three places. Each is small and does one thing.
 
 ```
 htmlradar/
 ├── packages/
-│   ├── tracker/      # The embedded tracker JS (~14 KB gzipped, ESM)
-│   ├── proxy/        # Cloudflare Worker that serves /r/{slug}
-│   └── app/          # Next.js 14 web app (auth, upload, dashboard)
-├── schema/           # SQL: tables, RLS policies, SECURITY DEFINER RPCs, triggers
-├── examples/         # Demo HTML documents
-└── docs/             # Self-hosting, privacy, architecture, quickstart
+│   ├── tracker/      # 14 KB browser IIFE — embedded in the recipient's view
+│   ├── proxy/        # Cloudflare Worker at /r/{slug} — gates + HTML fetch + tracker inject + attachment serving
+│   └── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
+├── schema/           # 9 SQL files — tables, RLS, SECURITY DEFINER RPCs, triggers, attachments
+├── examples/         # Demo HTML for trying it locally
+└── docs/             # Self-hosting, architecture, privacy, quickstart
 ```
 
-The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled PostgREST instead of `@supabase/supabase-js`, why stored-token session auth — are in [`docs/architecture.md`](./docs/architecture.md).
+The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled PostgREST instead of `@supabase/supabase-js`, why stored-token session auth instead of HMAC — are in [`docs/architecture.md`](./docs/architecture.md).
+
+## Stack
+
+- **Frontend**: Next.js 14 (App Router, Server Components), Tailwind CSS, Newsreader + Geist (self-hosted via `next/font`)
+- **Backend**: Supabase Postgres — RLS + SECURITY DEFINER RPCs + `pg_net` triggers for email
+- **Proxy**: Cloudflare Worker, HTMLRewriter for tracker injection
+- **Storage**: Cloudflare R2 for uploaded HTML
+- **Auth**: Supabase Auth (Google OAuth + magic-link)
+- **Email**: Resend, invoked from Postgres via `pg_net`
+- **Payments**: Polar.sh checkout link (Stripe Connect Express under the hood for Indian indie founders)
+
+Two vendors total: Cloudflare + Supabase. Free tiers cover personal use end-to-end.
+
+---
+
+## Quick start — hosted
+
+1. Sign in at [htmlradar.com](https://htmlradar.com) with Google or magic link.
+2. Upload an HTML file or paste a URL.
+3. Create a per-recipient share. Email gate / password / expiry / allow-list optional per share.
+4. Send the tracked link.
+5. Watch the dashboard. First-read email lands when the recipient crosses the three-second threshold.
+
+Free tier: 10 documents lifetime, 20 attachments per doc up to 25 MB each and 100 MB total. Pro tier ($15/month): unlimited documents, 50 attachments per doc up to 100 MB each and 1 GB total, no "Shared with HTMLRadar" chrome on the recipient view, priority support. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
+
+## Quick start — self-host
+
+You'll need:
+
+- A Cloudflare account (Workers + R2 + Pages)
+- A Supabase project (free tier is enough)
+- A domain on Cloudflare DNS
+- Node ≥20, PNPM ≥10
+- A Resend account for outbound email (optional — without it, the first-read trigger writes a `skipped` row to `notifications_log` and the rest of the product still works)
+
+Then:
+
+```bash
+git clone https://github.com/htmlradar/htmlradar
+cd htmlradar
+pnpm install
+cp .env.example .env.local           # fill in keys (Supabase, R2, Resend)
+pnpm typecheck && pnpm test          # sanity check
+pnpm build                           # build all 3 packages
+```
+
+Schema setup: apply `schema/001_init.sql` through `schema/009_attachments.sql` in order via the Supabase SQL editor. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, etc.) so re-running is safe.
+
+Resend secrets go in Supabase Vault (works on free tier — no `ALTER DATABASE SET` required):
+
+```sql
+select vault.create_secret('re_your_resend_api_key', 'resend_api_key');
+select vault.create_secret('hello@yourdomain.com',  'resend_from');
+```
+
+Full guide with deployment commands in [`docs/self-hosting.md`](./docs/self-hosting.md).
+
+If you modify the source and run a network service from it, AGPL-3.0 requires you to make your modifications available. See [`LICENSE`](./LICENSE).
 
 ---
 
 ## Development
 
 ```bash
-pnpm install
-cp .env.example .env.local            # fill in keys (Supabase, R2, Resend)
-pnpm dev                              # runs tracker + proxy + app in parallel
-pnpm test                             # unit + integration tests
-pnpm typecheck                        # tsc --noEmit across all packages
+pnpm dev                              # runs all 3 packages in parallel
+pnpm typecheck                        # tsc --noEmit across packages
 pnpm lint                             # eslint + prettier
+pnpm test                             # vitest across tracker + proxy
 ```
 
-Requires Node ≥20, PNPM ≥10. The web app dev server listens on `http://localhost:3000`, the proxy worker on `http://localhost:8787`, and the tracker is served from `packages/tracker/dist/tracker.js` after a build.
+Local URLs after `pnpm dev`:
 
----
+- Web app: `http://localhost:3000`
+- Proxy worker: `http://localhost:8787`
+- Tracker bundle: `packages/tracker/dist/tracker.js` (after `pnpm --filter @htmlradar/tracker build`)
 
-## Stack
-
-- **Frontend:** Next.js 14 (App Router, Server Components), Tailwind CSS, Fraunces (variable serif), self-hosted via next/font.
-- **Backend:** Supabase Postgres with Row Level Security + SECURITY DEFINER RPCs.
-- **Proxy:** Cloudflare Worker with HTMLRewriter for tracker injection.
-- **Storage:** Cloudflare R2 for uploaded HTML.
-- **Auth:** Supabase Auth (Google OAuth + magic-link).
-- **Email:** Resend via `pg_net` triggered from Postgres.
-- **Payments:** Stripe Payment Link (Wizard-of-Oz at launch; proper checkout post-launch).
+Tracker bundle size budget: ≤14 KB gzipped. Build will warn if you cross it.
 
 ---
 
 ## Contributing
 
-PRs welcome. We use [DCO sign-off](https://developercertificate.org/) instead of a CLA — just `git commit -s`. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full guide and code style.
+PRs welcome. [DCO sign-off](https://developercertificate.org/) is required — just `git commit -s`. No CLA.
 
-Big features go through an issue first. Bug fixes and small improvements can go straight to PR.
+- Big features: open an issue first to discuss scope.
+- Bug fixes + small improvements: PR directly.
+- Style is enforced by `pnpm lint`. CI runs the full suite on every push.
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full guide.
 
 ## Security
 
-Found a vulnerability? Email **security@htmlradar.com**. Don't open a public issue. See [`SECURITY.md`](./SECURITY.md) for the disclosure policy.
+Found a vulnerability? Email `security@htmlradar.com`. Please don't open a public issue. See [`SECURITY.md`](./SECURITY.md) for the disclosure policy.
 
 ## License
 
 AGPL-3.0-or-later. See [`LICENSE`](./LICENSE).
 
-If you want to embed HTMLRadar's tracker in a closed-source product or run a hosted service without sharing your modifications, contact `hello@htmlradar.com` to discuss a commercial license.
+Want to run a hosted service from a closed-source modified version, or embed the tracker in a closed-source product? Email `hello@htmlradar.com` to discuss a commercial license.
 
 ---
 
-Built with [Claude Code](https://claude.com/claude-code).
+Engineering deep-dive: [htmlradar.com/blog/how-we-built-htmlradar](https://htmlradar.com/blog/how-we-built-htmlradar)

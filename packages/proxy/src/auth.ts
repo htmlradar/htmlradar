@@ -9,6 +9,11 @@
 const PWD_PREFIX = 'htmlradar_auth_';
 const EMAIL_PREFIX = 'htmlradar_email_';
 const TTL_SECONDS = 24 * 60 * 60;
+// Owner preview tokens are short-lived because they're meant to be
+// generated and consumed in a single navigation. 10 minutes covers
+// "click the button, the page loads, owner pokes around for a few
+// minutes." Doesn't need to be reusable.
+const OWNER_PREVIEW_TTL_SECONDS = 10 * 60;
 
 export interface VerifiedAuth {
   slug: string;
@@ -79,6 +84,62 @@ export async function verifyEmailCookie(
   }
   const expected = await hmac(`${slug}:${email}:${expiresAt}`, secret);
   return constantTimeEqual(mac, expected) ? { slug, email, expiresAt } : null;
+}
+
+// Owner-preview token. Mints a short-lived HMAC over
+// `owner-preview:{slug}:{exp}` so the doc-owner can preview their own
+// share without entering the email gate (which they wouldn't satisfy —
+// it's gated by the proxy on a slug-scoped cookie). The token is bound
+// to a single slug and expires fast; replay outside the slug or after
+// TTL fails.
+//
+// Format: `{slug}.{exp}.{hmac}` — same shape as the auth cookie but
+// the HMAC message has a different prefix so a captured auth cookie
+// can't be replayed as a preview token (or vice versa).
+export async function issueOwnerPreviewToken(slug: string, secret: string): Promise<string> {
+  const expiresAt = Math.floor(Date.now() / 1000) + OWNER_PREVIEW_TTL_SECONDS;
+  const mac = await hmac(`owner-preview:${slug}:${expiresAt}`, secret);
+  return `${slug}.${expiresAt}.${mac}`;
+}
+
+export async function verifyOwnerPreviewToken(
+  token: string | null,
+  slug: string,
+  secret: string,
+): Promise<boolean> {
+  if (!token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  const [tokenSlug, expiryStr, mac] = parts as [string, string, string];
+  if (tokenSlug !== slug) return false;
+  const expiresAt = Number.parseInt(expiryStr, 10);
+  if (!Number.isFinite(expiresAt)) return false;
+  if (expiresAt < Math.floor(Date.now() / 1000)) return false;
+  const expected = await hmac(`owner-preview:${slug}:${expiresAt}`, secret);
+  return constantTimeEqual(mac, expected);
+}
+
+// Owner-DOCUMENT-preview token. Distinct from the share-bound owner
+// preview above: this one is bound to a document_id, not a share slug,
+// and lets the doc owner view the raw uploaded HTML *before* creating
+// any share. The message prefix is different (`owner-doc-preview:`) so
+// a captured share-preview token can't be replayed as a doc-preview
+// token (or vice versa).
+export async function verifyOwnerDocPreviewToken(
+  token: string | null,
+  docId: string,
+  secret: string,
+): Promise<boolean> {
+  if (!token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  const [tokenDocId, expiryStr, mac] = parts as [string, string, string];
+  if (tokenDocId !== docId) return false;
+  const expiresAt = Number.parseInt(expiryStr, 10);
+  if (!Number.isFinite(expiresAt)) return false;
+  if (expiresAt < Math.floor(Date.now() / 1000)) return false;
+  const expected = await hmac(`owner-doc-preview:${docId}:${expiresAt}`, secret);
+  return constantTimeEqual(mac, expected);
 }
 
 function cookieAttrs(name: string, value: string): string {

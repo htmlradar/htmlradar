@@ -1,91 +1,323 @@
 import { escapeHtml } from './escape.js';
 
-// Pre-rendered HTML responses for error states and the password gate.
-// Kept inline so the worker is single-file deployable.
+// Recipient-facing HTML shells served by the proxy: the gate forms (email,
+// password) and the error states (revoked, expired, not found, source
+// unreachable). These are every recipient's first impression of HTMLRadar
+// — same care + brand fidelity as the marketing site, none of the chrome
+// or weight.
+//
+// Design intent:
+//   - Warm cream paper + oxblood accent + Fraunces serif headline.
+//     Matches the v2 palette in `packages/app/tailwind.config.ts`.
+//   - Editorial, not enterprise. The reader is a real person who just
+//     received a deck from someone they know; the shell should feel like
+//     receiving a well-typeset letter, not signing into a SaaS portal.
+//   - Inline CSS so every response is one round-trip. Fraunces is loaded
+//     from Google Fonts via <link rel=preconnect> + swap so the layout
+//     doesn't shift when it lands.
+//   - Mobile-first. Most recipients open links on phone first.
+//   - prefers-reduced-motion respected.
+//
+// Constraints kept from the prior shell:
+//   - All forms still POST to /r/{slug}/{auth|email} (proxy gate handlers
+//     unchanged).
+//   - HTTP status codes preserved (200 on first render, 401 on form error,
+//     403 revoked, 404 not found, 410 expired, 502 source-unreachable).
+//   - Output Content-Type stays text/html; charset=utf-8.
+//
+// OG meta tags are generic ("A document on HTMLRadar") — by design, no
+// recipient or sender names leak into link unfurls.
 
-const SHELL = (title: string, body: string, status: number): Response =>
+const FONTS_LINK = `
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+`.trim();
+
+// Generic OG tags. No personalisation — see privacy note above.
+const OG_TAGS = `
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HTMLRadar">
+<meta property="og:title" content="A document on HTMLRadar">
+<meta property="og:description" content="Tracked document delivery, built for HTML. Open source.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="A document on HTMLRadar">
+<meta name="twitter:description" content="Tracked document delivery, built for HTML. Open source.">
+<meta name="robots" content="noindex, nofollow">
+`.trim();
+
+// Compact, tasteful radar mark — a single ring + sweep line + center dot,
+// inline so we don't ship an SVG file in the bundle. Sits top-left of
+// every shell as the brand kicker. No animation (would compete with the
+// content).
+const RADAR_MARK = `
+<svg aria-hidden viewBox="0 0 24 24" width="20" height="20" style="vertical-align:-3px">
+  <circle cx="12" cy="12" r="9" fill="none" stroke="#7A1F2E" stroke-width="1" opacity="0.35"/>
+  <circle cx="12" cy="12" r="5" fill="none" stroke="#7A1F2E" stroke-width="1" opacity="0.55"/>
+  <line x1="12" y1="12" x2="12" y2="3" stroke="#7A1F2E" stroke-width="1.25" stroke-linecap="round"/>
+  <circle cx="12" cy="12" r="1.6" fill="#7A1F2E"/>
+</svg>
+`.trim();
+
+const STYLES = `
+:root {
+  --paper: #FBF1E8;
+  --paper-2: #F4E1CB;
+  --paper-3: #EDD5BD;
+  --ink: #1F1108;
+  --ink-soft: #3A2818;
+  --graphite: #876959;
+  --signal: #7A1F2E;
+  --signal-dark: #5A1521;
+  --signal-soft: #D9B5B0;
+  --line: #E8D5BD;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  background: var(--paper);
+  background-image: radial-gradient(rgba(31, 17, 8, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Inter", system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  display: flex;
+  flex-direction: column;
+}
+.frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 28px 56px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 12px/1 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+  text-decoration: none;
+  margin-bottom: auto;
+  padding-top: 4px;
+}
+.brand:hover { color: var(--signal); }
+.card {
+  margin-top: 18vh;
+  margin-bottom: auto;
+}
+@media (max-height: 640px) { .card { margin-top: 28px; } }
+.kicker {
+  font: 500 11px/1 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--graphite);
+  margin: 0 0 14px;
+}
+h1 {
+  font-family: "Fraunces", "Charter", "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+  color: var(--ink);
+  margin: 0 0 14px;
+}
+p.lede {
+  margin: 0 0 28px;
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+form { margin: 0; }
+input[type="email"], input[type="password"] {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+input::placeholder { color: rgba(135, 105, 89, 0.7); }
+input:focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px rgba(122, 31, 46, 0.10);
+}
+input.invalid {
+  border-color: var(--signal-dark);
+  box-shadow: 0 0 0 3px rgba(90, 21, 33, 0.12);
+}
+.error {
+  min-height: 18px;
+  margin: 10px 2px 0;
+  font: 500 13px/1.4 inherit;
+  color: var(--signal-dark);
+}
+button {
+  width: 100%;
+  margin-top: 16px;
+  font: 500 15px/1 inherit;
+  padding: 14px 16px;
+  background: var(--signal);
+  color: var(--paper);
+  border: 1px solid var(--signal);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+  letter-spacing: 0.005em;
+}
+button:hover { background: var(--signal-dark); border-color: var(--signal-dark); }
+button:active { transform: translateY(0.5px); }
+.notice {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(244, 225, 203, 0.35);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.footer {
+  margin-top: 56px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font: 500 11px/1.5 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--graphite);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  justify-content: space-between;
+}
+.footer a { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(135, 105, 89, 0.6); }
+.footer a:hover { color: var(--signal); border-bottom-color: var(--signal); }
+@media (max-width: 480px) {
+  .frame { padding: 24px 20px 40px; }
+  h1 { font-size: 32px; }
+  .card { margin-top: 8vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+`.trim();
+
+const SHELL = (title: string, body: string, status: number, kicker?: string): Response =>
   new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)} — HTMLRadar</title>
-<style>
-  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
-    background:#faf7f1; color:#1c1814; padding:24px; }
-  .card { background:#fff; border:1px solid #ddd4c2; border-radius:12px; padding:32px;
-    max-width:420px; width:100%;
-    box-shadow:0 4px 16px rgba(0,0,0,0.04); }
-  h1 { margin:0 0 8px; font-size:20px; letter-spacing:-0.01em; }
-  p { margin:0 0 16px; color:#6b6258; font-size:15px; line-height:1.55; }
-  .footer { font-family:'JetBrains Mono','SF Mono',Menlo,monospace; font-size:11px;
-    color:#9b9285; margin-top:20px; padding-top:16px; border-top:1px solid #e8e1d2; }
-  .footer a { color:inherit; text-decoration:none; border-bottom:1px dotted currentColor; }
-  input, button { font:inherit; }
-  input { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #ddd4c2; border-radius:6px;
-    margin-bottom:12px; }
-  input:focus { outline:none; border-color:#1a8870; }
-  button { width:100%; padding:11px 16px; background:#1a8870; color:#fff; border:none; border-radius:6px;
-    font-weight:500; cursor:pointer; }
-  button:hover { opacity:0.92; }
-  .error { color:#b35314; font-size:13px; margin-top:-6px; margin-bottom:12px; min-height:18px; }
-</style></head>
-<body><div class="card">${body}<div class="footer">via <a href="https://htmlradar.com">HTMLRadar</a></div></div></body></html>`,
+${OG_TAGS}
+${FONTS_LINK}
+<style>${STYLES}</style>
+</head>
+<body>
+<div class="frame">
+  <a class="brand" href="https://htmlradar.com">${RADAR_MARK}<span>HTMLRadar</span></a>
+  <main class="card">
+    ${kicker ? `<p class="kicker">${escapeHtml(kicker)}</p>` : ''}
+    ${body}
+  </main>
+  <footer class="footer">
+    <span>Open source · AGPL-3.0</span>
+    <a href="https://github.com/htmlradar/htmlradar" rel="noopener">github.com/htmlradar/htmlradar</a>
+  </footer>
+</div>
+</body>
+</html>`,
     { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
   );
 
 export const notFound = (): Response =>
   SHELL(
-    'Not found',
-    `<h1>This share isn't available.</h1>
-     <p>The link may have been deleted or never existed.</p>`,
+    'Share not found',
+    `<h1>Share not found.</h1>
+     <p class="lede">The link may have been deleted, or it never existed. Check with the person who sent it to you.</p>`,
     404,
+    'No record',
   );
 
 export const revoked = (): Response =>
   SHELL(
     'Access revoked',
-    `<h1>This link has been revoked.</h1>
-     <p>The sender removed access to this document. Contact them for a new link.</p>`,
+    `<h1>Access revoked.</h1>
+     <p class="lede">The sender removed access to this document. Get in touch with them for a new link.</p>`,
     403,
+    'Revoked by sender',
   );
 
 export const expired = (): Response =>
   SHELL(
     'Link expired',
-    `<h1>This link has expired.</h1>
-     <p>The sender set this link to expire. Contact them for a new link.</p>`,
+    `<h1>Link expired.</h1>
+     <p class="lede">This link's window has closed. The sender can issue a fresh one whenever they like.</p>`,
     410,
+    'Past expiry',
   );
 
 export const sourceUnreachable = (): Response =>
   SHELL(
-    'Document unreachable',
-    `<h1>We couldn't load this document.</h1>
-     <p>The source URL didn't respond. The sender has been notified.</p>`,
+    'Document unavailable',
+    `<h1>Document unavailable.</h1>
+     <p class="lede">The sender's source didn't respond. They've been notified — try again in a moment, or reach out directly.</p>`,
     502,
+    'Source error',
   );
 
 export const passwordForm = (slug: string, error?: string): Response =>
   SHELL(
-    'Enter password',
-    `<h1>This document is password-protected.</h1>
-     <p>Enter the password the sender shared with you.</p>
-     <form method="POST" action="/r/${escapeHtml(slug)}/auth">
-       <input type="password" name="password" placeholder="Password" autocomplete="current-password" required autofocus />
-       <div class="error">${error ? escapeHtml(error) : ''}</div>
+    error ? 'Incorrect password' : 'Enter password',
+    `<h1>Locked.</h1>
+     <p class="lede">Enter the password the sender shared with you to continue.</p>
+     <form method="POST" action="/r/${escapeHtml(slug)}/auth" novalidate>
+       <input
+         type="password"
+         name="password"
+         placeholder="Password"
+         autocomplete="current-password"
+         required
+         autofocus
+         ${error ? 'class="invalid" aria-invalid="true"' : ''}
+       />
+       <div class="error" role="alert" aria-live="polite">${error ? escapeHtml(error) : ''}</div>
        <button type="submit">Continue</button>
      </form>`,
     error ? 401 : 200,
+    'Password required',
   );
 
 export const emailGateForm = (slug: string, error?: string): Response =>
   SHELL(
-    'Enter your email',
+    error ? 'Email error' : 'Enter your email',
     `<h1>View this document.</h1>
-     <p>Enter your email to continue. The sender will see who opened it.</p>
-     <form method="POST" action="/r/${escapeHtml(slug)}/email">
-       <input type="email" name="email" placeholder="you@example.com" required autofocus autocomplete="email" />
-       <div class="error">${error ? escapeHtml(error) : ''}</div>
+     <p class="lede">Enter your email to continue. The sender will see who opened it.</p>
+     <form method="POST" action="/r/${escapeHtml(slug)}/email" novalidate>
+       <input
+         type="email"
+         name="email"
+         placeholder="you@example.com"
+         autocomplete="email"
+         required
+         autofocus
+         ${error ? 'class="invalid" aria-invalid="true"' : ''}
+       />
+       <div class="error" role="alert" aria-live="polite">${error ? escapeHtml(error) : ''}</div>
        <button type="submit">Continue</button>
      </form>`,
     error ? 401 : 200,
+    'Email required',
   );

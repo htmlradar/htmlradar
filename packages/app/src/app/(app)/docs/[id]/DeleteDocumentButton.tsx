@@ -50,14 +50,23 @@ export function DeleteDocumentButton({
     shareCount === 0
       ? `"${documentTitle}"`
       : `"${documentTitle}" and its ${shareCount} ${shareCount === 1 ? 'share' : 'shares'}`;
+  // Make the analytics consequence explicit — feedback during testing was
+  // "I didn't realise deleting the doc would hide the analytics too."
+  // Soft delete means the rows still exist in Postgres (recoverable by
+  // support), but the per-share dashboards filter `documents.deleted_at`
+  // and stop rendering once the doc is gone.
+  const analyticsLine =
+    shareCount === 0 ? '' : ' Analytics for past reads will stop being visible.';
 
   return (
     <form onSubmit={handle} className="flex flex-wrap items-center gap-3">
       <input type="hidden" name="document_id" value={documentId} />
       {armed && (
-        <span className="inline-flex items-center gap-1.5 text-[12px] text-alert">
-          <AlertTriangle aria-hidden className="size-3.5" />
-          Delete {shareLine}? Click again to confirm.
+        <span className="inline-flex max-w-md items-start gap-1.5 text-[12px] leading-snug text-alert">
+          <AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Delete {shareLine}?{analyticsLine} Click again to confirm.
+          </span>
         </span>
       )}
       <button

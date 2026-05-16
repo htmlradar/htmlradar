@@ -71,6 +71,50 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
+            <Section title="What we collect when you use the app yourself">
+              <p>
+                Separately from the share-tracking above, the hosted app records a small amount of
+                first-party usage data so we can fix bugs and understand which features get used:
+              </p>
+              <ul className="mt-3 list-disc space-y-1.5 pl-5">
+                <li>
+                  <strong className="text-ink">Product events</strong> — when you sign in, upload a
+                  document, create or revoke a share, hit the free-tier cap, view the upgrade page,
+                  click a CTA, or submit feedback. Stored in a table called{' '}
+                  <code className="font-mono text-[14px] text-signal-dark">app_events</code>. Schema
+                  is PostHog-compatible — if we wire PostHog later, we'll port this table over.
+                </li>
+                <li>
+                  <strong className="text-ink">Page views</strong> — when your browser loads a page
+                  on htmlradar.com. We store the path, referrer, and a random fingerprint
+                  (anonymous, generated client-side, never linked to your email unless you're signed
+                  in).
+                </li>
+                <li>
+                  <strong className="text-ink">Crash + error reports</strong> — when JavaScript on a
+                  page throws an error, we capture the message + stack to a{' '}
+                  <code className="font-mono text-[14px] text-signal-dark">error_log</code> table so
+                  we can fix it. We do not use Sentry or any third-party error service.
+                </li>
+                <li>
+                  <strong className="text-ink">Feedback</strong> — anything you submit through{' '}
+                  <Link
+                    href="/feedback"
+                    className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
+                  >
+                    /feedback
+                  </Link>{' '}
+                  is stored in a{' '}
+                  <code className="font-mono text-[14px] text-signal-dark">feedback</code> table and
+                  emailed directly to the founder. Email field is optional.
+                </li>
+              </ul>
+              <p className="mt-4">
+                No third-party trackers (no Google Analytics, no Segment, no Mixpanel). No
+                advertising cookies. No session replay.
+              </p>
+            </Section>
+
             <Section title="Where data lives">
               <ul className="list-disc space-y-1.5 pl-5">
                 <li>
@@ -78,7 +122,6 @@ export default function PrivacyPage() {
                   bucket.
                 </li>
                 <li>All other data — Supabase Postgres, encrypted at rest.</li>
-                <li>Sentry receives crash data only. No personal data.</li>
               </ul>
             </Section>
 
@@ -175,11 +218,14 @@ export default function PrivacyPage() {
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
             <div className="font-mono text-[12px] tracking-wide text-graphite">
-              HTML<span className="text-signal">Radar</span>. Know who's reading.
+              HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
             </div>
             <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
               <Link href="/why" className="link-slide hover:text-signal-dark">
                 Why this exists
+              </Link>
+              <Link href="/blog" className="link-slide hover:text-signal-dark">
+                Blog
               </Link>
               <a
                 href="https://github.com/htmlradar/htmlradar"

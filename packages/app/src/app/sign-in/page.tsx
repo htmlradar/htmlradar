@@ -5,10 +5,11 @@
 // chrome was rewritten to match landing v4 voice + palette. A small
 // HeroRadar at the top gives visual continuity with the marketing pages.
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { browserClient } from '@/lib/supabase-browser';
 import { HeroRadar } from '@/components/HeroRadar';
+import { isDisposableEmail } from '@/lib/disposable-emails';
 
 export const runtime = 'edge';
 
@@ -20,6 +21,23 @@ export default function SignInPage() {
   );
 }
 
+// Map server-side error codes (from /auth/callback failure paths) to a
+// human-readable message. Without this the form silently shows nothing
+// and the user just sees an empty sign-in page after a failed OAuth round-trip.
+function errorCopy(code: string | null): string | null {
+  switch (code) {
+    case 'callback':
+      return "We couldn't complete the sign-in. Try again, or use the magic-link option below.";
+    case 'expired':
+      return 'That magic link expired. Send yourself a fresh one.';
+    case null:
+    case '':
+      return null;
+    default:
+      return 'Something went wrong signing in. Try again, or email hello@htmlradar.com.';
+  }
+}
+
 function SignInBody() {
   const params = useSearchParams();
   const next = params.get('next') ?? '/docs';
@@ -27,6 +45,15 @@ function SignInBody() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Surface server-side callback errors. /auth/callback redirects to
+  // /sign-in?error=callback on failure; without this hydration step the
+  // user sees a fresh-looking form and has no idea sign-in failed.
+  useEffect(() => {
+    const code = params.get('error');
+    const msg = errorCopy(code);
+    if (msg) setError(msg);
+  }, [params]);
 
   async function signInWithGoogle() {
     setBusy(true);
@@ -47,6 +74,18 @@ function SignInBody() {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    // Client-side block before the magic link gets generated. Saves us
+    // a Supabase Auth call and gives the user immediate feedback instead
+    // of a magic link they can't actually receive (or that just makes
+    // multi-account abuse trivial). Same disposable list lives in the
+    // start_session RPC so recipients are blocked the same way.
+    if (isDisposableEmail(email)) {
+      setError(
+        "Disposable email addresses aren't accepted for signup. Use a real work or personal email.",
+      );
+      setBusy(false);
+      return;
+    }
     const supabase = browserClient();
     const { error: err } = await supabase.auth.signInWithOtp({
       email,
@@ -82,13 +121,36 @@ function SignInBody() {
           Continue with Google or get a magic link in your inbox.
         </p>
 
+        {error && !sent && (
+          <div
+            role="alert"
+            className="mt-8 rounded-md border border-alert/40 bg-alert/5 px-4 py-3 text-[13.5px] leading-relaxed text-alert"
+          >
+            {error}
+          </div>
+        )}
+
         <button
           onClick={signInWithGoogle}
           disabled={busy}
-          className="mt-10 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-paper px-4 py-3 text-[14.5px] font-medium text-ink shadow-[0_1px_0_rgba(31,17,8,0.04)] transition hover:border-signal hover:text-signal-dark disabled:opacity-50"
+          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-paper px-4 py-3 text-[14.5px] font-medium text-ink shadow-[0_1px_0_rgba(31,17,8,0.04)] transition hover:border-signal hover:text-signal-dark disabled:opacity-50"
         >
           Continue with Google
         </button>
+
+        <p className="mt-3 text-[11.5px] leading-relaxed text-graphite">
+          Google may briefly show <span className="font-mono">supabase.co</span> — that&rsquo;s the
+          open-source auth backend HTMLRadar runs on. Stack is auditable at{' '}
+          <a
+            href="https://github.com/htmlradar/htmlradar"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-line decoration-2 underline-offset-4 hover:text-signal-dark hover:decoration-signal"
+          >
+            github.com/htmlradar/htmlradar
+          </a>
+          .
+        </p>
 
         <div className="my-7 flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
           <div className="h-px flex-1 bg-line" />
@@ -111,7 +173,7 @@ function SignInBody() {
               placeholder="you@example.com"
               className="w-full rounded-md border border-line bg-paper px-3.5 py-3 text-[14.5px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)]"
             />
-            {error && <p className="text-[13px] text-alert">{error}</p>}
+            {/* form-specific (magic-link) error: only show here if not already shown above */}
             <button
               type="submit"
               disabled={busy}

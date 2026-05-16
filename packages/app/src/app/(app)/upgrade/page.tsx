@@ -15,11 +15,19 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { requireUser } from '@/lib/supabase-server';
+import { captureServerEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
 export default async function UpgradePage() {
   const user = await requireUser();
+  // Fire on every render. Free-tier cap-hit users land here as the
+  // intended conversion moment; we want to count every view.
+  void captureServerEvent({
+    event: 'upgrade.viewed',
+    distinctId: user.id,
+    userId: user.id,
+  });
   const rawCheckoutUrl = process.env['STRIPE_PAYMENT_LINK_URL'];
   const checkoutAvailable =
     !!rawCheckoutUrl && rawCheckoutUrl !== '#' && rawCheckoutUrl.startsWith('http');
@@ -38,15 +46,14 @@ export default async function UpgradePage() {
     <div className="mx-auto max-w-2xl space-y-8 py-8">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
-          You hit the Free tier cap
+          Free tier cap reached
         </p>
         <h1 className="text-letterpress mt-4 font-serif text-[36px] font-normal leading-[1.08] tracking-tightest text-ink md:text-[44px]">
-          Ten documents in. <span className="italic text-signal">Now what?</span>
+          Pro <span className="italic text-signal">unlocks the rest.</span>
         </h1>
         <p className="mt-5 max-w-lg text-[16px] leading-relaxed text-ink-soft">
-          Free is ten documents lifetime. You can free up slots by deleting old ones, or upgrade to
-          Pro for unlimited documents plus the presentation features that make HTMLRadar look like
-          yours.
+          Free covers ten documents lifetime, total. Move to Pro for unlimited documents and the
+          presentation features that make HTMLRadar look like yours.
         </p>
       </header>
 
@@ -68,12 +75,12 @@ export default async function UpgradePage() {
 
         <ul className="mt-7 space-y-3 text-[14.5px] text-ink-soft">
           {[
-            'Unlimited documents and shares',
-            'Custom domain on share URLs (share.yourdomain.com)',
-            '“Shared with HTMLRadar” chrome footer removed',
-            'Allow-list by recipient email domain',
-            '90-day analytics retention',
+            'Unlimited documents',
+            'No “Shared with HTMLRadar” footer on recipient views',
             'Priority support',
+            'Coming soon: custom domain (share.yourdomain.com)',
+            'Coming soon: dynamic per-viewer watermark',
+            'Coming soon: repeat-open alerts',
           ].map((f) => (
             <li key={f} className="flex items-start gap-3">
               <Check aria-hidden className="mt-1 size-3.5 shrink-0 text-signal-dark" />
@@ -86,6 +93,7 @@ export default async function UpgradePage() {
           href={checkoutUrl}
           target={checkoutAvailable ? '_blank' : undefined}
           rel={checkoutAvailable ? 'noopener noreferrer' : undefined}
+          data-cta="upgrade.checkout"
           className="group mt-8 inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
         >
           {checkoutAvailable ? 'Upgrade to Pro' : 'Email us to upgrade'}

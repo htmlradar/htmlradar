@@ -59,29 +59,27 @@ function Hero() {
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.25fr_1fr] lg:gap-10">
           <div className="relative">
             <Reveal reveal={false}>
-              <SectionMark>Open-source document analytics for HTML.</SectionMark>
+              <SectionMark>Open source. AGPL-3.0.</SectionMark>
             </Reveal>
 
             <Reveal reveal={false} delay={0.05}>
-              <h1 className="text-letterpress mt-8 max-w-[14ch] font-serif text-[44px] font-normal leading-[1.04] tracking-tightest text-ink md:text-[78px]">
-                You sent the deck.
-                <br />
-                They opened it.
+              <h1 className="text-letterpress mt-8 max-w-[16ch] font-serif text-[44px] font-normal leading-[1.04] tracking-tightest text-ink md:text-[78px]">
+                Decks moved to HTML.
                 <br />
                 <span
                   className="italic text-signal"
                   style={{ fontVariationSettings: '"opsz" 144' }}
                 >
-                  Then what?
+                  Tracking should follow.
                 </span>
               </h1>
             </Reveal>
 
             <Reveal reveal={false} delay={0.15}>
               <p className="mt-8 max-w-[34rem] text-[19px] leading-relaxed text-ink-soft">
-                HTMLRadar tells you who read your HTML, and which sections they actually dwelled on.
-                Upload a file or paste a URL. Send the tracked link. Watch the read happen in real
-                time.
+                HTMLRadar is read tracking for the documents your work actually produces now — pitch
+                decks, design mocks, reports, investor updates. Upload a file or paste a URL, send a
+                tracked link, see who opened it and where they dwelled.
               </p>
             </Reveal>
 
@@ -89,9 +87,10 @@ function Hero() {
               <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4">
                 <Link
                   href="/sign-in"
+                  data-cta="hero.start_free"
                   className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
                 >
-                  Start free. 10 documents.
+                  Start free
                   <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
                 </Link>
                 <Link
@@ -209,6 +208,49 @@ function TheMoment() {
 
 /* ----------------------------- What it does ---------------------------- */
 
+// Inline mock for the new "Supporting materials" landing-page claim.
+// Renders a static preview of the recipient's Materials pill + expanded
+// panel from the proxy injection. Pure markup; the real version in
+// packages/proxy/src/inject.ts materialsPanel() is what ships to
+// recipients. This is the marketing-page mirror.
+function MaterialsPanelMock() {
+  return (
+    <div className="relative mx-auto max-w-[360px] rounded-2xl border border-line bg-paper p-5 shadow-[0_18px_40px_-30px_rgba(31,17,8,0.18)]">
+      <div className="flex items-center justify-between border-b border-line pb-3">
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-graphite">
+          Supporting materials
+        </span>
+        <span className="font-mono text-[10.5px] text-graphite">×</span>
+      </div>
+      <ul className="space-y-1 pt-2 text-[13.5px]">
+        {[
+          { name: 'Series A Deck.pdf', meta: 'PDF · 3.4 MB' },
+          { name: 'Cap Table v3.xlsx', meta: 'XLSX · 88 KB' },
+          { name: 'Product Demo.png', meta: 'PNG · 412 KB' },
+        ].map((f) => (
+          <li
+            key={f.name}
+            className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-paper-2/60"
+          >
+            <div className="min-w-0">
+              <div className="truncate font-medium text-ink">{f.name}</div>
+              <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">
+                {f.meta}
+              </div>
+            </div>
+            <span className="ml-3 text-signal" aria-hidden>
+              ↓
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 border-t border-line pt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">
+        Shared via HTMLRadar · every download tracked
+      </div>
+    </div>
+  );
+}
+
 function WhatWeBuilt() {
   // Four product claims. Each rendered alongside its own mock in an
   // alternating layout (text-left/mock-right, then mock-left/text-right).
@@ -236,6 +278,12 @@ function WhatWeBuilt() {
       title: 'Read, not "opened."',
       body: "A three-second dwell threshold separates a real read from a scroll-past. Most analytics count both. HTMLRadar doesn't.",
       mock: <DwellThreshold />,
+    },
+    {
+      num: '04',
+      title: 'Send the deck. Attach the diligence.',
+      body: 'Supporting materials live alongside the HTML. Toggle "Allow downloads" per share to decide whether this recipient sees a Materials panel or not — when it’s off, they don’t even know files exist. Every download is logged with the recipient’s email and the moment it happened.',
+      mock: <MaterialsPanelMock />,
     },
   ];
 
@@ -353,9 +401,10 @@ function Close() {
             <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
               <Link
                 href="/sign-in"
+                data-cta="close.start_free"
                 className="group inline-flex items-center gap-2 rounded-md bg-signal px-7 py-3.5 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
               >
-                Start free. 10 documents.
+                Start free
                 <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
               </Link>
               <a
@@ -380,11 +429,14 @@ function Footer() {
     <footer className="border-t border-line">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
         <div className="font-mono text-[12px] tracking-wide text-graphite">
-          HTML<span className="text-signal">Radar</span>. Know who's reading.
+          HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
         </div>
         <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
           <Link href="/why" className="link-slide hover:text-signal-dark">
             Why this exists
+          </Link>
+          <Link href="/blog" className="link-slide hover:text-signal-dark">
+            Blog
           </Link>
           <a
             href="https://github.com/htmlradar/htmlradar"

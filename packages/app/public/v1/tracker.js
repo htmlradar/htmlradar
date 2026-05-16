@@ -1,51 +1,51 @@
-var H = Object.defineProperty;
-var F = (n, e, t) =>
-  e in n ? H(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
-var s = (n, e, t) => (F(n, typeof e != 'symbol' ? e + '' : e, t), t);
-var u = {
+var K = Object.defineProperty;
+var $ = (n, e, t) =>
+  e in n ? K(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
+var s = (n, e, t) => ($(n, typeof e != 'symbol' ? e + '' : e, t), t);
+var h = {
   sections: { selector: 'h1[id], h2[id], h3[id]', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
   gate: {
     enabled: !0,
-    brand: { accentColor: '#1a8870', backgroundColor: '#faf7f1' },
+    brand: { accentColor: '#7A1F2E', backgroundColor: '#FAF5EE' },
     copy: {
-      heading: 'View this document',
-      subhead: 'Enter your email to continue.',
-      buttonLabel: 'View document',
-      placeholder: 'you@example.com',
-      privacyNote: 'Your email is shared with the sender of this document.',
+      heading: 'Confirm your email to open.',
+      subhead: 'The sender wants to know when this document gets read.',
+      buttonLabel: 'Open document',
+      placeholder: 'you@company.com',
+      privacyNote: 'Your email goes to the sender only. Not used for marketing.',
     },
   },
   privacy: { mode: 'email-gated' },
   hooks: {},
   debug: !1,
 };
-function y(n) {
-  let e = n ? U(n) : {},
+function M(n) {
+  let e = n ? D(n) : {},
     t = window.HTMLRadarConfig ?? {},
-    i = t.supabaseUrl ?? e.supabaseUrl,
+    r = t.supabaseUrl ?? e.supabaseUrl,
     o = t.supabaseAnonKey ?? e.supabaseAnonKey,
     a = t.shareSlug ?? e.shareSlug;
-  if (!i || !o || !a) return null;
-  let r = {
-    supabaseUrl: i,
+  if (!r || !o || !a) return null;
+  let i = {
+    supabaseUrl: r,
     supabaseAnonKey: o,
     shareSlug: a,
-    sections: { ...u.sections, ...(t.sections ?? {}) },
-    session: { ...u.session, ...(t.session ?? {}) },
+    sections: { ...h.sections, ...(t.sections ?? {}) },
+    session: { ...h.session, ...(t.session ?? {}) },
     gate: {
-      ...u.gate,
+      ...h.gate,
       ...(t.gate ?? {}),
-      brand: { ...u.gate.brand, ...(t.gate?.brand ?? {}) },
-      copy: { ...u.gate.copy, ...(t.gate?.copy ?? {}) },
+      brand: { ...h.gate.brand, ...(t.gate?.brand ?? {}) },
+      copy: { ...h.gate.copy, ...(t.gate?.copy ?? {}) },
     },
-    privacy: { ...u.privacy, ...(t.privacy ?? {}) },
+    privacy: { ...h.privacy, ...(t.privacy ?? {}) },
     hooks: t.hooks ?? {},
     debug: t.debug ?? !1,
   };
-  return (t.email && (r.email = t.email), t.geo && (r.geo = t.geo), r);
+  return (t.email && (i.email = t.email), t.geo && (i.geo = t.geo), i);
 }
-function U(n) {
+function D(n) {
   let e = {};
   return (
     n.dataset.supabaseUrl && (e.supabaseUrl = n.dataset.supabaseUrl),
@@ -54,45 +54,45 @@ function U(n) {
     e
   );
 }
-var S = 'htmlradar:',
-  g = `${S}fp`,
-  b = `${S}email`,
-  T = `${S}optout`;
-function M() {
+var T = 'htmlradar:',
+  w = `${T}fp`,
+  k = `${T}email`,
+  C = `${T}optout`;
+function _() {
   try {
-    return localStorage.getItem(T) === '1';
+    return localStorage.getItem(C) === '1';
   } catch {
     return !1;
   }
 }
-function I() {
+function R() {
   try {
-    (localStorage.setItem(T, '1'), localStorage.removeItem(g), localStorage.removeItem(b));
+    (localStorage.setItem(C, '1'), localStorage.removeItem(w), localStorage.removeItem(k));
   } catch {}
 }
-function k() {
+function A() {
   try {
-    let n = localStorage.getItem(g);
+    let n = localStorage.getItem(w);
     if (n) return n;
-    let e = w();
-    return (localStorage.setItem(g, e), e);
+    let e = I();
+    return (localStorage.setItem(w, e), e);
   } catch {
-    return w();
+    return I();
   }
 }
-function E() {
+function L() {
   try {
-    return localStorage.getItem(b);
+    return localStorage.getItem(k);
   } catch {
     return null;
   }
 }
-function v(n) {
+function E(n) {
   try {
-    localStorage.setItem(b, n);
+    localStorage.setItem(k, n);
   } catch {}
 }
-function w() {
+function I() {
   return typeof crypto < 'u' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (n) => {
@@ -100,37 +100,55 @@ function w() {
         return (n === 'x' ? e : (e & 3) | 8).toString(16);
       });
 }
-var _ = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function C(n) {
-  return new Promise((e) => {
-    let t = document.createElement('div');
-    ((t.id = 'htmlradar-gate'),
-      (t.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
-      document.body.appendChild(t));
-    let i = t.attachShadow({ mode: 'closed' });
-    i.innerHTML = K(n);
-    let o = i.querySelector('form'),
-      a = i.querySelector('input[type=email]'),
-      r = i.querySelector('.error'),
-      c = i.querySelector('button');
-    (requestAnimationFrame(() => a.focus()),
-      o.addEventListener('submit', (m) => {
-        m.preventDefault();
-        let l = a.value.trim().toLowerCase();
-        if (!_.test(l)) {
-          ((r.textContent = 'Please enter a valid email address.'),
-            a.setAttribute('aria-invalid', 'true'));
+var P = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function H(n, e) {
+  return new Promise((t) => {
+    let r = document.createElement('div');
+    ((r.id = 'htmlradar-gate'),
+      (r.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
+      document.body.appendChild(r));
+    let o = r.attachShadow({ mode: 'closed' });
+    o.innerHTML = j(n);
+    let a = o.querySelector('form'),
+      i = o.querySelector('input[type=email]'),
+      c = o.querySelector('.error'),
+      l = o.querySelector('button'),
+      u = l.textContent ?? 'Continue';
+    requestAnimationFrame(() => i.focus());
+    let d = (y) => {
+        ((c.textContent = y), i.setAttribute('aria-invalid', 'true'));
+      },
+      m = () => {
+        ((c.textContent = ''), i.removeAttribute('aria-invalid'));
+      };
+    (i.addEventListener('input', m),
+      a.addEventListener('submit', async (y) => {
+        y.preventDefault();
+        let x = i.value.trim().toLowerCase();
+        if (!P.test(x)) {
+          d('Please enter a valid email address.');
           return;
         }
-        ((c.disabled = !0), t.remove(), e(l));
+        ((l.disabled = !0), (l.textContent = 'Loading\u2026'), m());
+        let g;
+        try {
+          g = await e(x);
+        } catch {
+          g = "We couldn't reach the server. Check your connection and try again.";
+        }
+        if (g) {
+          ((l.disabled = !1), (l.textContent = u), d(g));
+          return;
+        }
+        (r.remove(), t(x));
       }));
   });
 }
-function K(n) {
+function j(n) {
   let e = n.gate.copy,
-    t = R(n.gate.brand.accentColor, '#1a8870'),
-    i = R(n.gate.brand.backgroundColor, '#faf7f1'),
-    o = { accentColor: t, backgroundColor: i };
+    t = O(n.gate.brand.accentColor, '#1a8870'),
+    r = O(n.gate.brand.backgroundColor, '#faf7f1'),
+    o = { accentColor: t, backgroundColor: r };
   return `
 <style>
   :host { all: initial; }
@@ -190,32 +208,32 @@ function K(n) {
 </style>
 <div class="backdrop">
   <form class="card" novalidate>
-    <h2>${d(e.heading)}</h2>
-    <p class="subhead">${d(e.subhead)}</p>
+    <h2>${f(e.heading)}</h2>
+    <p class="subhead">${f(e.subhead)}</p>
     <label for="hr-email">Email</label>
-    <input id="hr-email" type="email" placeholder="${d(e.placeholder)}" required autocomplete="email" />
+    <input id="hr-email" type="email" placeholder="${f(e.placeholder)}" required autocomplete="email" />
     <div class="error" role="alert"></div>
-    <button type="submit">${d(e.buttonLabel)}</button>
-    <p class="privacy">${d(e.privacyNote)}</p>
+    <button type="submit">${f(e.buttonLabel)}</button>
+    <p class="privacy">${f(e.privacyNote)}</p>
     <div class="footer">Shared with <a href="https://htmlradar.com" target="_blank" rel="noopener">HTMLRadar</a></div>
   </form>
 </div>`;
 }
-function d(n) {
+function f(n) {
   return n
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-function R(n, e) {
+function O(n, e) {
   return /^#[0-9a-fA-F]{3,8}$/.test(n) ||
     /^rgba?\(\s*\d+(?:\s*,\s*\d+){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n) ||
     /^hsla?\(\s*\d+(?:\s*,\s*[\d.]+%?){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n)
     ? n
     : e;
 }
-var f = class {
+var S = class {
   constructor(e) {
     s(this, 'opts');
     s(this, 'sections', []);
@@ -267,13 +285,13 @@ var f = class {
     );
   }
   discoverSections() {
-    document.querySelectorAll(this.opts.selector).forEach((t, i) => {
+    document.querySelectorAll(this.opts.selector).forEach((t, r) => {
       t.id &&
         this.sections.push({
           id: t.id,
           title: (t.textContent ?? '').trim().slice(0, 200),
-          depth: $(t.tagName),
-          ordinal: i,
+          depth: q(t.tagName),
+          ordinal: r,
           element: t,
           accumulatedMs: 0,
           hasReadFired: !1,
@@ -289,31 +307,31 @@ var f = class {
       (this.currentStartMs = t === null ? null : e),
       t !== null)
     ) {
-      let i = this.sections.find((o) => o.id === t);
-      i && this.opts.onSectionEnter && this.opts.onSectionEnter(L(i));
+      let r = this.sections.find((o) => o.id === t);
+      r && this.opts.onSectionEnter && this.opts.onSectionEnter(F(r));
     }
   }
   creditCurrent(e) {
     if (this.currentId === null || this.currentStartMs === null) return;
     let t = e - this.currentStartMs;
     if (t <= 0) return;
-    let i = this.sections.find((o) => o.id === this.currentId);
-    i &&
-      ((i.accumulatedMs += t),
-      !i.hasReadFired &&
-        i.accumulatedMs >= this.opts.minDwellMs &&
-        ((i.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(L(i))));
+    let r = this.sections.find((o) => o.id === this.currentId);
+    r &&
+      ((r.accumulatedMs += t),
+      !r.hasReadFired &&
+        r.accumulatedMs >= this.opts.minDwellMs &&
+        ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(F(r))));
   }
   computeCurrent() {
     let e = this.opts.boundaryOffsetPx,
       t = null;
-    for (let i of this.sections)
-      if (i.element.getBoundingClientRect().top - e <= 0) t = i.id;
+    for (let r of this.sections)
+      if (r.element.getBoundingClientRect().top - e <= 0) t = r.id;
       else break;
     return t;
   }
 };
-function $(n) {
+function q(n) {
   switch (n) {
     case 'H1':
       return 1;
@@ -325,7 +343,7 @@ function $(n) {
       return 4;
   }
 }
-function L(n) {
+function F(n) {
   return {
     id: n.id,
     title: n.title,
@@ -335,47 +353,47 @@ function L(n) {
   };
 }
 var p = class extends Error {
-  constructor(t, i, o) {
-    super(i);
+  constructor(t, r, o) {
+    super(r);
     this.code = t;
     this.httpStatus = o;
     this.name = 'RpcError';
   }
 };
-function A(n) {
-  let e = (r) => `${n.supabaseUrl}/rest/v1/rpc/${r}`,
-    t = (r = {}) => ({
+function b(n) {
+  let e = (i) => `${n.supabaseUrl}/rest/v1/rpc/${i}`,
+    t = (i = {}) => ({
       apikey: n.anonKey,
       Authorization: `Bearer ${n.anonKey}`,
       'Content-Type': 'application/json',
-      ...r,
+      ...i,
     });
-  async function i(r, c, m = !1) {
-    let l = await fetch(e(r), {
+  async function r(i, c, l = !1) {
+    let u = await fetch(e(i), {
       method: 'POST',
       headers: t(),
       body: JSON.stringify(c),
-      keepalive: m,
+      keepalive: l,
     });
-    if (!l.ok) {
-      let x = await l.text().catch(() => ''),
-        P = D(x) ?? `http_${l.status}`;
-      throw new p(P, x || l.statusText, l.status);
+    if (!u.ok) {
+      let d = await u.text().catch(() => ''),
+        m = z(d) ?? `http_${u.status}`;
+      throw new p(m, d || u.statusText, u.status);
     }
-    return l.status === 204 ? null : await l.json();
+    return u.status === 204 ? null : await u.json();
   }
-  async function o(r) {
-    let c = await i('start_session', {
-      p_share_slug: r.shareSlug,
-      p_email: r.email,
-      p_fingerprint: r.fingerprint,
-      p_referrer: r.referrer,
-      p_user_agent: r.userAgent,
-      p_country_code: r.geo?.country ?? null,
-      p_city: r.geo?.city ?? null,
-      p_device_type: r.geo?.deviceType ?? null,
-      p_os: r.geo?.os ?? null,
-      p_browser: r.geo?.browser ?? null,
+  async function o(i) {
+    let c = await r('start_session', {
+      p_share_slug: i.shareSlug,
+      p_email: i.email,
+      p_fingerprint: i.fingerprint,
+      p_referrer: i.referrer,
+      p_user_agent: i.userAgent,
+      p_country_code: i.geo?.country ?? null,
+      p_city: i.geo?.city ?? null,
+      p_device_type: i.geo?.deviceType ?? null,
+      p_os: i.geo?.os ?? null,
+      p_browser: i.geo?.browser ?? null,
     });
     return {
       sessionId: c.session_id,
@@ -384,22 +402,22 @@ function A(n) {
       documentVersion: c.document_version,
     };
   }
-  async function a(r, c = !1) {
-    await i(
+  async function a(i, c = !1) {
+    await r(
       'update_session',
       {
-        p_session_id: r.sessionId,
-        p_token: r.token,
-        p_active_seconds: r.activeSeconds,
-        p_max_scroll: r.maxScrollDepth,
-        p_sections: r.sections,
+        p_session_id: i.sessionId,
+        p_token: i.token,
+        p_active_seconds: i.activeSeconds,
+        p_max_scroll: i.maxScrollDepth,
+        p_sections: i.sections,
       },
       c,
     );
   }
   return { startSession: o, updateSession: a };
 }
-function D(n) {
+function z(n) {
   try {
     let e = JSON.parse(n);
     if (e.code) return e.code;
@@ -410,7 +428,7 @@ function D(n) {
   } catch {}
   return null;
 }
-var h = class {
+var v = class {
   constructor(e) {
     s(this, 'opts');
     s(this, 'transport');
@@ -448,11 +466,11 @@ var h = class {
         }));
     });
     ((this.opts = e),
-      (this.transport = A({
+      (this.transport = b({
         supabaseUrl: e.config.supabaseUrl,
         anonKey: e.config.supabaseAnonKey,
       })),
-      (this.sections = new f({
+      (this.sections = new S({
         selector: e.config.sections.selector,
         boundaryOffsetPx: e.config.sections.boundaryOffsetPx,
         minDwellMs: e.config.sections.minDwellMs,
@@ -465,14 +483,16 @@ var h = class {
       this.bindListeners(),
       this.sections.start(),
       this.updateMaxScroll());
-    let e = await this.transport.startSession({
-      shareSlug: this.opts.config.shareSlug,
-      email: this.opts.email,
-      fingerprint: this.opts.fingerprint,
-      referrer: document.referrer ?? '',
-      userAgent: navigator.userAgent ?? '',
-      ...(this.opts.config.geo ? { geo: this.opts.config.geo } : {}),
-    });
+    let e =
+      this.opts.preStarted ??
+      (await this.transport.startSession({
+        shareSlug: this.opts.config.shareSlug,
+        email: this.opts.email,
+        fingerprint: this.opts.fingerprint,
+        referrer: document.referrer ?? '',
+        userAgent: navigator.userAgent ?? '',
+        ...(this.opts.config.geo ? { geo: this.opts.config.geo } : {}),
+      }));
     return (
       (this.info = {
         sessionId: e.sessionId,
@@ -492,7 +512,7 @@ var h = class {
         this.tickActive(performance.now());
         let t = this.sections.snapshot();
         if (t.length === 0 && !this.dirty) return;
-        let i = {
+        let r = {
             sessionId: this.info.sessionId,
             token: this.token,
             activeSeconds: Math.round(this.activeMs / 1e3),
@@ -505,13 +525,13 @@ var h = class {
               time_seconds: a.timeSeconds,
             })),
           },
-          o = this.opts.config.hooks.beforeFlush?.(i) ?? i;
+          o = this.opts.config.hooks.beforeFlush?.(r) ?? r;
         if (o === !1) return;
         (await this.transport.updateSession(o, e), (this.dirty = !1));
       } catch (t) {
-        let i = t instanceof Error ? t : new Error(String(t));
-        (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', i),
-          this.opts.config.hooks.onFlushError?.(i),
+        let r = t instanceof Error ? t : new Error(String(t));
+        (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', r),
+          this.opts.config.hooks.onFlushError?.(r),
           t instanceof p && t.code === 'P0010' && this.stop());
       } finally {
         this.flushing = !1;
@@ -565,23 +585,47 @@ var h = class {
     (t > 0 && ((this.activeMs += t), (this.dirty = !0)), (this.activeRunningSince = e));
   }
 };
-function O(n) {
+function U(n) {
   let e = {
     version: n.version,
     ready: n.ready,
     flush: () => n.session.flush(),
     optOut: () => {
-      (I(), n.session.stop());
+      (R(), n.session.stop());
     },
   };
   return ((window.HTMLRadar = e), e);
 }
-var V = '0.1.0';
-j();
-async function j() {
-  if (M()) return;
+function V(n) {
+  if (n instanceof p)
+    switch (n.code) {
+      case 'P0001':
+        return 'Too many tries from this email. Wait a minute, then try again.';
+      case 'P0002':
+        return "This link doesn't seem to exist. Ask the sender for a fresh one.";
+      case 'P0003':
+        return 'The sender revoked this link. Ask them for a new one.';
+      case 'P0004':
+        return 'This link has expired. Ask the sender for a fresh one.';
+      case 'P0006':
+        return 'That email looks malformed. Check the spelling.';
+      case 'P0007':
+        return "Your email's domain isn't on the sender's allow list. Use the address they're expecting.";
+      case 'P0008':
+        return 'The document for this link was removed.';
+      case 'P0023':
+        return "Disposable email addresses aren't accepted here. Use your work email.";
+      default:
+        return "Something didn't work. Try again, or contact the sender.";
+    }
+  return "We couldn't reach the server. Check your connection and try again.";
+}
+var N = '0.1.0';
+G();
+async function G() {
+  if (_()) return;
   let n = document.currentScript,
-    e = y(n);
+    e = M(n);
   if (!e) {
     typeof console < 'u' &&
       console.warn(
@@ -589,18 +633,38 @@ async function j() {
       );
     return;
   }
-  let t = k(),
-    i = E(),
-    o = null;
-  e.email
-    ? ((o = e.email), o !== i && v(o))
-    : e.privacy.mode === 'email-gated' &&
-      e.gate.enabled &&
-      ((o = i ?? (await C(e))), o !== i && v(o));
-  let a = new h({ config: e, email: o, fingerprint: t }),
-    r = a.start().catch((c) => {
-      throw (e.debug && console.warn('[HTMLRadar] session start failed', c), c);
+  let t = A(),
+    r = L(),
+    o = null,
+    a;
+  if (e.email) ((o = e.email), o !== r && E(o));
+  else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
+    if (r) o = r;
+    else {
+      let l = b({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
+      ((o = await H(e, async (u) => {
+        try {
+          return (
+            (a = await l.startSession({
+              shareSlug: e.shareSlug,
+              email: u,
+              fingerprint: t,
+              referrer: document.referrer ?? '',
+              userAgent: navigator.userAgent ?? '',
+              ...(e.geo ? { geo: e.geo } : {}),
+            })),
+            null
+          );
+        } catch (d) {
+          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), V(d));
+        }
+      })),
+        E(o));
+    }
+  let i = new v({ config: e, email: o, fingerprint: t, ...(a ? { preStarted: a } : {}) }),
+    c = i.start().catch((l) => {
+      throw (e.debug && console.warn('[HTMLRadar] session start failed', l), l);
     });
-  O({ session: a, ready: r, version: V });
+  U({ session: i, ready: c, version: N });
 }
 //# sourceMappingURL=tracker.js.map

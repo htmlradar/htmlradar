@@ -80,7 +80,7 @@ export function NewDocumentForm({ action }: NewDocumentFormProps) {
           placeholder="Q2 Investor Brief"
           required
           maxLength={120}
-          className="mt-3 w-full rounded-md border border-line bg-paper px-4 py-3 text-[15px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)]"
+          className="mt-3 w-full rounded-md border border-line bg-paper px-4 py-3 text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] md:text-[15px]"
         />
       </div>
 
@@ -332,7 +332,7 @@ function UrlPanel({
         onChange={(e) => onValueChange(e.target.value)}
         placeholder="https://yourdomain.com/deck.html"
         className={cn(
-          'w-full rounded-md border bg-paper px-4 py-3 font-mono text-[14px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)]',
+          'w-full rounded-md border bg-paper px-4 py-3 font-mono text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] md:text-[14px]',
           error ? 'border-alert/60 focus:border-alert' : 'border-line focus:border-signal',
         )}
       />

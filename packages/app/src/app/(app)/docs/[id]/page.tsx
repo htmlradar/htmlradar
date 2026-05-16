@@ -33,7 +33,9 @@ import {
 import { DeleteDocumentButton } from './DeleteDocumentButton';
 import { ReplaceDocumentButton } from './ReplaceDocumentButton';
 import { PreviewDocumentButton } from './PreviewDocumentButton';
+import { LiveRefresh } from './LiveRefresh';
 import { SharesTable } from './SharesTable';
+import { ViewerInsights } from './ViewerInsights';
 import { AttachmentsPanel, type AttachmentRow } from './AttachmentsPanel';
 
 export const runtime = 'edge';
@@ -213,6 +215,8 @@ export default async function DocumentPage({
             </span>
             <span aria-hidden>·</span>
             <span>v{doc.current_version}</span>
+            <span aria-hidden>·</span>
+            <LiveRefresh />
             {doc.source_type === 'url' && doc.source_url && (
               <>
                 <span aria-hidden>·</span>
@@ -304,6 +308,8 @@ export default async function DocumentPage({
             optional supplements, not a parallel concept. Empty state is
             a one-line CTA so the panel doesn't compete with the share
             manager for attention when the user has no attachments yet. */}
+        <ViewerInsights viewers={allViewers} sessions={allSessions} />
+
         <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
 
         <DocumentShareManager

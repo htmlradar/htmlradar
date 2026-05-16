@@ -48,7 +48,7 @@ export default function PricingPage() {
             </p>
           </Reveal>
 
-          <div className="mt-16 grid gap-6 lg:grid-cols-2">
+          <div className="mt-16 grid gap-6 md:grid-cols-2">
             <Reveal delay={0.1}>
               <Tier
                 name="Hosted, Free"

@@ -27,6 +27,11 @@ export interface ShareAnalyticsProps {
   viewers: Viewer[];
   sessions: Session[];
   sections: SectionRow[];
+  // Hide the top 4-stat row when the caller already shows the same
+  // numbers above (e.g. on /docs/[id] for a single-share doc where the
+  // ViewerInsights strip is the canonical rollup). Default = false
+  // (the standalone /dashboard/[slug] page wants the stats).
+  hideStatRow?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -42,6 +47,7 @@ export function ShareAnalytics({
   viewers,
   sessions,
   sections,
+  hideStatRow = false,
 }: ShareAnalyticsProps) {
   if (sessions.length === 0) {
     return <WaitingState shareSlug={shareSlug} recipientLabel={recipientLabel} />;
@@ -53,12 +59,14 @@ export function ShareAnalytics({
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Viewers" value={String(viewers.length)} />
-        <Stat label="Sessions" value={String(sessions.length)} />
-        <Stat label="Avg active time" value={formatDuration(avgActiveSeconds)} />
-        <Stat label="Max scroll" value={`${Math.round(maxScroll * 100)}%`} />
-      </div>
+      {!hideStatRow && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Stat label="Viewers" value={String(viewers.length)} />
+          <Stat label="Sessions" value={String(sessions.length)} />
+          <Stat label="Avg active time" value={formatDuration(avgActiveSeconds)} />
+          <Stat label="Max scroll" value={`${Math.round(maxScroll * 100)}%`} />
+        </div>
+      )}
 
       <section>
         <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
@@ -93,11 +101,11 @@ export function ShareAnalytics({
         </ul>
       </section>
 
-      {sections.length > 0 && (
-        <section>
-          <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-            Sections read
-          </h3>
+      <section>
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+          Sections read
+        </h3>
+        {sections.length > 0 ? (
           <ul className="mt-3 overflow-hidden rounded-xl border border-line bg-paper">
             {sections.map((s) => (
               <li key={s.id} className="border-b border-line px-4 py-3.5 last:border-b-0">
@@ -113,8 +121,20 @@ export function ShareAnalytics({
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ) : (
+          // Sections are computed by the in-page tracker at READ time.
+          // Sessions captured before this share's tracker version had
+          // auto-detection won't have section_events rows — there's
+          // nothing to back-fill from. State this clearly without the
+          // old "<h2 id=…>" technical jargon that confused recipients
+          // earlier.
+          <p className="mt-3 rounded-xl border border-dashed border-line bg-paper-2/30 px-4 py-3.5 text-[13.5px] leading-relaxed text-ink-soft">
+            Section dwell appears here once a recipient reads with the current tracker. We
+            auto-detect sections from your HTML — headings, slide containers, or paragraph blocks.
+            Reads captured before this update can&rsquo;t be back-filled.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

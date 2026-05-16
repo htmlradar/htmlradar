@@ -108,7 +108,7 @@ function Hero({ isAuthed }: { isAuthed: boolean }) {
                 </Link>
                 <Link
                   href="#the-moment"
-                  className="link-slide text-[15px] text-ink-soft hover:text-signal-dark"
+                  className="link-slide inline-flex items-center gap-1.5 py-2 text-[15px] text-ink-soft hover:text-signal-dark"
                 >
                   See it work
                   <ArrowRight className="size-4" />

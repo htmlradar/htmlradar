@@ -202,6 +202,11 @@ export function DocumentShareManager({
                 toggleShare={toggleShare}
                 previewShare={previewShare}
                 onEdit={() => handleEditShare(share.id)}
+                // When there's only one share, the per-doc ViewerInsights
+                // strip above is identical to the share-level numbers.
+                // We pass shareCount so SharePane can hide its duplicate
+                // stat cards in that case.
+                shareCount={shares.length}
               />
             );
           })()
@@ -275,8 +280,10 @@ function ShareRail({
                   type="button"
                   onClick={() => onSelectShare(s.id)}
                   className={cn(
-                    'flex w-full items-start gap-3 px-5 py-4 text-left transition',
-                    active ? 'bg-signal/6 shadow-[inset_3px_0_0_0_#7A1F2E]' : 'hover:bg-paper-2/40',
+                    'flex w-full items-start gap-3 border-l-2 px-5 py-4 text-left transition',
+                    active
+                      ? 'border-signal bg-signal/8 text-ink'
+                      : 'border-transparent hover:border-signal/30 hover:bg-paper-2/40',
                   )}
                 >
                   <span
@@ -341,6 +348,7 @@ function SharePane({
   toggleShare,
   previewShare,
   onEdit,
+  shareCount,
 }: {
   documentId: string;
   share: ShareRow;
@@ -350,6 +358,10 @@ function SharePane({
     formData: FormData,
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   onEdit: () => void;
+  // Total shares on the parent doc. Used to suppress duplicate stat
+  // cards when this is the only share (the per-doc ViewerInsights
+  // strip above shows identical numbers).
+  shareCount: number;
 }) {
   const isRevoked = !!share.revoked_at;
   const isExpired = !!share.expires_at && new Date(share.expires_at) < new Date();
@@ -434,6 +446,12 @@ function SharePane({
           viewers={analytics.viewers}
           sessions={analytics.sessions}
           sections={analytics.sections}
+          // When this is the only share on the doc, the per-doc
+          // ViewerInsights strip already shows the same Viewers /
+          // Sessions / Avg active / Max scroll numbers. Suppress the
+          // duplicate stat row inside ShareAnalytics so the page stops
+          // triple-stacking the same data.
+          hideStatRow={shareCount === 1}
         />
       ) : isLive ? (
         <WaitingInline shareSlug={share.slug} recipientLabel={share.recipient_label} />
@@ -729,7 +747,7 @@ function ShareSettingsForm({
             defaultValue={initial?.recipient_label ?? ''}
             placeholder="Marc at Example Ventures"
             maxLength={120}
-            className="mt-2 w-full rounded-md border border-line bg-paper px-4 py-3 text-[14.5px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)]"
+            className="mt-2 w-full rounded-md border border-line bg-paper px-4 py-3 text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] md:text-[14.5px]"
           />
         </Field>
 
@@ -756,10 +774,10 @@ function ShareSettingsForm({
         {attachmentCount > 0 ? (
           <CheckboxRow
             name="allow_download"
-            label={`Allow recipient to download attachments (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'})`}
+            label={`Allow recipient to download files (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'})`}
             checked={allowDownload}
             onChange={setAllowDownload}
-            hint="Off by default. When on, a download panel appears in the recipient's view. Every download is tracked. When off, the recipient sees the deck only and has no signal that attachments exist."
+            hint="Off by default. When on, a download panel appears in the recipient's view. Every download is tracked. When off, the recipient sees the deck only and has no signal that files exist."
           />
         ) : (
           <div className="rounded-xl border border-dashed border-line bg-paper-2/30 p-4">
@@ -770,12 +788,12 @@ function ShareSettingsForm({
               />
               <div className="min-w-0 flex-1">
                 <p className="text-[14px] font-medium text-ink-soft">
-                  Allow recipient to download attachments
+                  Allow recipient to download files
                 </p>
                 <p className="mt-1 text-[12.5px] leading-relaxed text-graphite">
-                  No attachments on this document yet. Add files in the{' '}
-                  <span className="font-medium text-ink-soft">Attachments</span> section below the
-                  share list (PDF, Excel, ZIP, images, Office docs), then flip this on per share.
+                  No files attached to this document yet. Add some in the{' '}
+                  <span className="font-medium text-ink-soft">Files</span> section below the share
+                  list (PDF, Excel, ZIP, images, Office docs), then flip this on per share.
                 </p>
               </div>
             </div>
@@ -810,7 +828,7 @@ function ShareSettingsForm({
                   : 'Disabled — turn on password gate above'
               }
               className={cn(
-                'w-full rounded-md border bg-paper px-4 py-3 pr-11 font-mono text-[13.5px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite',
+                'w-full rounded-md border bg-paper px-4 py-3 pr-11 font-mono text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite md:text-[13.5px]',
                 passwordTooShort
                   ? 'border-alert/60 focus:border-alert'
                   : 'border-line focus:border-signal',
@@ -855,7 +873,7 @@ function ShareSettingsForm({
                 : 'Disabled — turn on email gate above'
             }
             className={cn(
-              'mt-2 w-full resize-y rounded-md border bg-paper px-4 py-3 font-mono text-[13.5px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite',
+              'mt-2 w-full resize-y rounded-md border bg-paper px-4 py-3 font-mono text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite md:text-[13.5px]',
               domainsError
                 ? 'border-alert/60 focus:border-alert'
                 : 'border-line focus:border-signal',
@@ -889,7 +907,7 @@ function ShareSettingsForm({
                 : 'Disabled — turn on email gate above'
             }
             className={cn(
-              'mt-2 w-full resize-y rounded-md border bg-paper px-4 py-3 font-mono text-[13.5px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite',
+              'mt-2 w-full resize-y rounded-md border bg-paper px-4 py-3 font-mono text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite md:text-[13.5px]',
               emailsError
                 ? 'border-alert/60 focus:border-alert'
                 : 'border-line focus:border-signal',
@@ -902,7 +920,7 @@ function ShareSettingsForm({
             name="expires_at"
             type="datetime-local"
             defaultValue={initial?.expires_at ? toDatetimeLocal(initial.expires_at) : ''}
-            className="mt-2 rounded-md border border-line bg-paper px-4 py-3 font-mono text-[13.5px] text-ink outline-none transition focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)]"
+            className="mt-2 rounded-md border border-line bg-paper px-4 py-3 font-mono text-[16px] text-ink outline-none transition focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] md:text-[13.5px]"
           />
         </Field>
 

@@ -1,9 +1,9 @@
-var K = Object.defineProperty;
-var $ = (n, e, t) =>
-  e in n ? K(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
-var s = (n, e, t) => ($(n, typeof e != 'symbol' ? e + '' : e, t), t);
-var h = {
-  sections: { selector: 'h1[id], h2[id], h3[id]', boundaryOffsetPx: 120, minDwellMs: 3e3 },
+var q = Object.defineProperty;
+var N = (n, e, t) =>
+  e in n ? q(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
+var a = (n, e, t) => (N(n, typeof e != 'symbol' ? e + '' : e, t), t);
+var f = {
+  sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
   gate: {
     enabled: !0,
@@ -21,31 +21,31 @@ var h = {
   debug: !1,
 };
 function M(n) {
-  let e = n ? D(n) : {},
+  let e = n ? j(n) : {},
     t = window.HTMLRadarConfig ?? {},
     r = t.supabaseUrl ?? e.supabaseUrl,
-    o = t.supabaseAnonKey ?? e.supabaseAnonKey,
-    a = t.shareSlug ?? e.shareSlug;
-  if (!r || !o || !a) return null;
-  let i = {
+    i = t.supabaseAnonKey ?? e.supabaseAnonKey,
+    o = t.shareSlug ?? e.shareSlug;
+  if (!r || !i || !o) return null;
+  let s = {
     supabaseUrl: r,
-    supabaseAnonKey: o,
-    shareSlug: a,
-    sections: { ...h.sections, ...(t.sections ?? {}) },
-    session: { ...h.session, ...(t.session ?? {}) },
+    supabaseAnonKey: i,
+    shareSlug: o,
+    sections: { ...f.sections, ...(t.sections ?? {}) },
+    session: { ...f.session, ...(t.session ?? {}) },
     gate: {
-      ...h.gate,
+      ...f.gate,
       ...(t.gate ?? {}),
-      brand: { ...h.gate.brand, ...(t.gate?.brand ?? {}) },
-      copy: { ...h.gate.copy, ...(t.gate?.copy ?? {}) },
+      brand: { ...f.gate.brand, ...(t.gate?.brand ?? {}) },
+      copy: { ...f.gate.copy, ...(t.gate?.copy ?? {}) },
     },
-    privacy: { ...h.privacy, ...(t.privacy ?? {}) },
+    privacy: { ...f.privacy, ...(t.privacy ?? {}) },
     hooks: t.hooks ?? {},
     debug: t.debug ?? !1,
   };
-  return (t.email && (i.email = t.email), t.geo && (i.geo = t.geo), i);
+  return (t.email && (s.email = t.email), t.geo && (s.geo = t.geo), s);
 }
-function D(n) {
+function j(n) {
   let e = {};
   return (
     n.dataset.supabaseUrl && (e.supabaseUrl = n.dataset.supabaseUrl),
@@ -54,45 +54,45 @@ function D(n) {
     e
   );
 }
-var T = 'htmlradar:',
-  w = `${T}fp`,
-  k = `${T}email`,
-  C = `${T}optout`;
-function _() {
+var w = 'htmlradar:',
+  T = `${w}fp`,
+  E = `${w}email`,
+  I = `${w}optout`;
+function A() {
   try {
-    return localStorage.getItem(C) === '1';
+    return localStorage.getItem(I) === '1';
   } catch {
     return !1;
   }
 }
-function R() {
+function _() {
   try {
-    (localStorage.setItem(C, '1'), localStorage.removeItem(w), localStorage.removeItem(k));
+    (localStorage.setItem(I, '1'), localStorage.removeItem(T), localStorage.removeItem(E));
   } catch {}
-}
-function A() {
-  try {
-    let n = localStorage.getItem(w);
-    if (n) return n;
-    let e = I();
-    return (localStorage.setItem(w, e), e);
-  } catch {
-    return I();
-  }
 }
 function L() {
   try {
-    return localStorage.getItem(k);
+    let n = localStorage.getItem(T);
+    if (n) return n;
+    let e = C();
+    return (localStorage.setItem(T, e), e);
+  } catch {
+    return C();
+  }
+}
+function R() {
+  try {
+    return localStorage.getItem(E);
   } catch {
     return null;
   }
 }
-function E(n) {
+function k(n) {
   try {
-    localStorage.setItem(k, n);
+    localStorage.setItem(E, n);
   } catch {}
 }
-function I() {
+function C() {
   return typeof crypto < 'u' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (n) => {
@@ -101,30 +101,30 @@ function I() {
       });
 }
 var P = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function H(n, e) {
+function O(n, e) {
   return new Promise((t) => {
     let r = document.createElement('div');
     ((r.id = 'htmlradar-gate'),
       (r.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
       document.body.appendChild(r));
-    let o = r.attachShadow({ mode: 'closed' });
-    o.innerHTML = j(n);
-    let a = o.querySelector('form'),
-      i = o.querySelector('input[type=email]'),
-      c = o.querySelector('.error'),
-      l = o.querySelector('button'),
+    let i = r.attachShadow({ mode: 'closed' });
+    i.innerHTML = z(n);
+    let o = i.querySelector('form'),
+      s = i.querySelector('input[type=email]'),
+      c = i.querySelector('.error'),
+      l = i.querySelector('button'),
       u = l.textContent ?? 'Continue';
-    requestAnimationFrame(() => i.focus());
-    let d = (y) => {
-        ((c.textContent = y), i.setAttribute('aria-invalid', 'true'));
+    requestAnimationFrame(() => s.focus());
+    let d = (v) => {
+        ((c.textContent = v), s.setAttribute('aria-invalid', 'true'));
       },
       m = () => {
-        ((c.textContent = ''), i.removeAttribute('aria-invalid'));
+        ((c.textContent = ''), s.removeAttribute('aria-invalid'));
       };
-    (i.addEventListener('input', m),
-      a.addEventListener('submit', async (y) => {
-        y.preventDefault();
-        let x = i.value.trim().toLowerCase();
+    (s.addEventListener('input', m),
+      o.addEventListener('submit', async (v) => {
+        v.preventDefault();
+        let x = s.value.trim().toLowerCase();
         if (!P.test(x)) {
           d('Please enter a valid email address.');
           return;
@@ -144,11 +144,11 @@ function H(n, e) {
       }));
   });
 }
-function j(n) {
+function z(n) {
   let e = n.gate.copy,
-    t = O(n.gate.brand.accentColor, '#1a8870'),
-    r = O(n.gate.brand.backgroundColor, '#faf7f1'),
-    o = { accentColor: t, backgroundColor: r };
+    t = H(n.gate.brand.accentColor, '#1a8870'),
+    r = H(n.gate.brand.backgroundColor, '#faf7f1'),
+    i = { accentColor: t, backgroundColor: r };
   return `
 <style>
   :host { all: initial; }
@@ -161,7 +161,7 @@ function j(n) {
     color: #1c1814;
   }
   .card {
-    background: ${o.backgroundColor};
+    background: ${i.backgroundColor};
     border-radius: 12px;
     box-shadow: 0 24px 64px -16px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.08);
     padding: 32px;
@@ -180,14 +180,14 @@ function j(n) {
     outline: none;
     transition: border-color 120ms;
   }
-  input[type=email]:focus { border-color: ${o.accentColor}; }
+  input[type=email]:focus { border-color: ${i.accentColor}; }
   input[aria-invalid="true"] { border-color: #b35314; }
   .error { color: #b35314; font-size: 13px; min-height: 18px; margin-top: 6px; }
   button {
     margin-top: 16px;
     width: 100%;
     padding: 11px 16px;
-    background: ${o.accentColor};
+    background: ${i.accentColor};
     color: #fff;
     border: none; border-radius: 6px;
     font-size: 15px; font-weight: 500;
@@ -208,25 +208,25 @@ function j(n) {
 </style>
 <div class="backdrop">
   <form class="card" novalidate>
-    <h2>${f(e.heading)}</h2>
-    <p class="subhead">${f(e.subhead)}</p>
+    <h2>${h(e.heading)}</h2>
+    <p class="subhead">${h(e.subhead)}</p>
     <label for="hr-email">Email</label>
-    <input id="hr-email" type="email" placeholder="${f(e.placeholder)}" required autocomplete="email" />
+    <input id="hr-email" type="email" placeholder="${h(e.placeholder)}" required autocomplete="email" />
     <div class="error" role="alert"></div>
-    <button type="submit">${f(e.buttonLabel)}</button>
-    <p class="privacy">${f(e.privacyNote)}</p>
+    <button type="submit">${h(e.buttonLabel)}</button>
+    <p class="privacy">${h(e.privacyNote)}</p>
     <div class="footer">Shared with <a href="https://htmlradar.com" target="_blank" rel="noopener">HTMLRadar</a></div>
   </form>
 </div>`;
 }
-function f(n) {
+function h(n) {
   return n
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-function O(n, e) {
+function H(n, e) {
   return /^#[0-9a-fA-F]{3,8}$/.test(n) ||
     /^rgba?\(\s*\d+(?:\s*,\s*\d+){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n) ||
     /^hsla?\(\s*\d+(?:\s*,\s*[\d.]+%?){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n)
@@ -235,13 +235,13 @@ function O(n, e) {
 }
 var S = class {
   constructor(e) {
-    s(this, 'opts');
-    s(this, 'sections', []);
-    s(this, 'currentId', null);
-    s(this, 'currentStartMs', null);
-    s(this, 'rafScheduled', !1);
-    s(this, 'active', !1);
-    s(this, 'onScroll', () => {
+    a(this, 'opts');
+    a(this, 'sections', []);
+    a(this, 'currentId', null);
+    a(this, 'currentStartMs', null);
+    a(this, 'rafScheduled', !1);
+    a(this, 'active', !1);
+    a(this, 'onScroll', () => {
       this.rafScheduled ||
         ((this.rafScheduled = !0),
         requestAnimationFrame(() => {
@@ -285,17 +285,33 @@ var S = class {
     );
   }
   discoverSections() {
-    document.querySelectorAll(this.opts.selector).forEach((t, r) => {
-      t.id &&
+    let e = G(this.opts.selector),
+      t = new Map();
+    e.elements.forEach((r, i) => {
+      let o = r.id;
+      if (!o)
+        if (e.strategy === 'slides') o = `slide-${i + 1}`;
+        else if (e.strategy === 'prose') {
+          let l = F((r.textContent ?? '').trim());
+          o = U(l) || `part-${i + 1}`;
+        } else o = U((r.textContent ?? '').trim()) || `section-${i + 1}`;
+      let s = (t.get(o) ?? 0) + 1;
+      (t.set(o, s), s > 1 && (o = `${o}-${s}`));
+      let c;
+      (e.strategy === 'slides'
+        ? (c = W(r, i + 1))
+        : e.strategy === 'prose'
+          ? (c = F((r.textContent ?? '').trim()) || `Part ${i + 1}`)
+          : (c = (r.textContent ?? '').trim().slice(0, 200)),
         this.sections.push({
-          id: t.id,
-          title: (t.textContent ?? '').trim().slice(0, 200),
-          depth: q(t.tagName),
-          ordinal: r,
-          element: t,
+          id: o,
+          title: c,
+          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : V(r.tagName),
+          ordinal: i,
+          element: r,
           accumulatedMs: 0,
           hasReadFired: !1,
-        });
+        }));
     });
   }
   update(e) {
@@ -307,20 +323,20 @@ var S = class {
       (this.currentStartMs = t === null ? null : e),
       t !== null)
     ) {
-      let r = this.sections.find((o) => o.id === t);
-      r && this.opts.onSectionEnter && this.opts.onSectionEnter(F(r));
+      let r = this.sections.find((i) => i.id === t);
+      r && this.opts.onSectionEnter && this.opts.onSectionEnter(K(r));
     }
   }
   creditCurrent(e) {
     if (this.currentId === null || this.currentStartMs === null) return;
     let t = e - this.currentStartMs;
     if (t <= 0) return;
-    let r = this.sections.find((o) => o.id === this.currentId);
+    let r = this.sections.find((i) => i.id === this.currentId);
     r &&
       ((r.accumulatedMs += t),
       !r.hasReadFired &&
         r.accumulatedMs >= this.opts.minDwellMs &&
-        ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(F(r))));
+        ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(K(r))));
   }
   computeCurrent() {
     let e = this.opts.boundaryOffsetPx,
@@ -331,7 +347,7 @@ var S = class {
     return t;
   }
 };
-function q(n) {
+function V(n) {
   switch (n) {
     case 'H1':
       return 1;
@@ -343,7 +359,82 @@ function q(n) {
       return 4;
   }
 }
+function G(n) {
+  let e = (i) => {
+      try {
+        let o = getComputedStyle(i).position;
+        return o === 'fixed' || o === 'sticky';
+      } catch {
+        return !1;
+      }
+    },
+    t = Array.from(document.querySelectorAll(n)).filter((i) => !e(i));
+  if (t.length >= 2) return { elements: t, strategy: 'configured' };
+  if (
+    ((t = Array.from(document.querySelectorAll('h1, h2, h3')).filter((i) => !e(i))), t.length >= 2)
+  )
+    return { elements: t, strategy: 'headings' };
+  if (
+    ((t = Array.from(
+      document.querySelectorAll(
+        'section, article, [class*="slide"], [class*="page"], [data-slide], [data-page]',
+      ),
+    ).filter((i) => !e(i))),
+    t.length >= 2)
+  )
+    return { elements: t, strategy: 'slides' };
+  let r = Y(e);
+  return r.length >= 2
+    ? { elements: r, strategy: 'prose' }
+    : { elements: [], strategy: 'configured' };
+}
+var $ = 8,
+  B = 40;
+function Y(n) {
+  let e = Array.from(document.querySelectorAll('p, li, blockquote')).filter(
+    (i) =>
+      !(
+        (i.textContent ?? '').trim().length < B ||
+        n(i) ||
+        i.closest(
+          'nav, footer, aside, header, [role="banner"], [role="navigation"], [role="contentinfo"], [aria-hidden="true"]',
+        )
+      ),
+  );
+  if (e.length === 0) return [];
+  if (e.length <= $) return e;
+  let t = Math.ceil(e.length / $),
+    r = [];
+  for (let i = 0; i < e.length; i += t) {
+    let o = e[i];
+    o && r.push(o);
+  }
+  return r;
+}
 function F(n) {
+  let e = n.replace(/\s+/g, ' ').trim();
+  if (!e) return '';
+  let t = e.slice(0, 200).match(/^[\s\S]{1,120}?[.!?](?=\s|$)/);
+  return t ? t[0].trim() : e.length > 80 ? `${e.slice(0, 80)}\u2026` : e;
+}
+function U(n) {
+  return n
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+function W(n, e) {
+  let r = n.querySelector('h1, h2, h3, [role="heading"]')?.textContent?.trim();
+  if (r) return r.slice(0, 200);
+  let o = n.querySelector('p, span')?.textContent?.trim();
+  if (o) return o.slice(0, 200);
+  let s = (n.textContent ?? '').trim();
+  return s ? (s.length > 80 ? `${s.slice(0, 80)}\u2026` : s) : `Slide ${e}`;
+}
+function K(n) {
   return {
     id: n.id,
     title: n.title,
@@ -353,23 +444,23 @@ function F(n) {
   };
 }
 var p = class extends Error {
-  constructor(t, r, o) {
+  constructor(t, r, i) {
     super(r);
     this.code = t;
-    this.httpStatus = o;
+    this.httpStatus = i;
     this.name = 'RpcError';
   }
 };
-function b(n) {
-  let e = (i) => `${n.supabaseUrl}/rest/v1/rpc/${i}`,
-    t = (i = {}) => ({
+function y(n) {
+  let e = (s) => `${n.supabaseUrl}/rest/v1/rpc/${s}`,
+    t = (s = {}) => ({
       apikey: n.anonKey,
       Authorization: `Bearer ${n.anonKey}`,
       'Content-Type': 'application/json',
-      ...i,
+      ...s,
     });
-  async function r(i, c, l = !1) {
-    let u = await fetch(e(i), {
+  async function r(s, c, l = !1) {
+    let u = await fetch(e(s), {
       method: 'POST',
       headers: t(),
       body: JSON.stringify(c),
@@ -377,23 +468,23 @@ function b(n) {
     });
     if (!u.ok) {
       let d = await u.text().catch(() => ''),
-        m = z(d) ?? `http_${u.status}`;
+        m = X(d) ?? `http_${u.status}`;
       throw new p(m, d || u.statusText, u.status);
     }
     return u.status === 204 ? null : await u.json();
   }
-  async function o(i) {
+  async function i(s) {
     let c = await r('start_session', {
-      p_share_slug: i.shareSlug,
-      p_email: i.email,
-      p_fingerprint: i.fingerprint,
-      p_referrer: i.referrer,
-      p_user_agent: i.userAgent,
-      p_country_code: i.geo?.country ?? null,
-      p_city: i.geo?.city ?? null,
-      p_device_type: i.geo?.deviceType ?? null,
-      p_os: i.geo?.os ?? null,
-      p_browser: i.geo?.browser ?? null,
+      p_share_slug: s.shareSlug,
+      p_email: s.email,
+      p_fingerprint: s.fingerprint,
+      p_referrer: s.referrer,
+      p_user_agent: s.userAgent,
+      p_country_code: s.geo?.country ?? null,
+      p_city: s.geo?.city ?? null,
+      p_device_type: s.geo?.deviceType ?? null,
+      p_os: s.geo?.os ?? null,
+      p_browser: s.geo?.browser ?? null,
     });
     return {
       sessionId: c.session_id,
@@ -402,22 +493,22 @@ function b(n) {
       documentVersion: c.document_version,
     };
   }
-  async function a(i, c = !1) {
+  async function o(s, c = !1) {
     await r(
       'update_session',
       {
-        p_session_id: i.sessionId,
-        p_token: i.token,
-        p_active_seconds: i.activeSeconds,
-        p_max_scroll: i.maxScrollDepth,
-        p_sections: i.sections,
+        p_session_id: s.sessionId,
+        p_token: s.token,
+        p_active_seconds: s.activeSeconds,
+        p_max_scroll: s.maxScrollDepth,
+        p_sections: s.sections,
       },
       c,
     );
   }
-  return { startSession: o, updateSession: a };
+  return { startSession: i, updateSession: o };
 }
-function z(n) {
+function X(n) {
   try {
     let e = JSON.parse(n);
     if (e.code) return e.code;
@@ -428,23 +519,23 @@ function z(n) {
   } catch {}
   return null;
 }
-var v = class {
+var b = class {
   constructor(e) {
-    s(this, 'opts');
-    s(this, 'transport');
-    s(this, 'sections');
-    s(this, 'info', null);
-    s(this, 'token', null);
-    s(this, 'activeMs', 0);
-    s(this, 'activeRunningSince', null);
-    s(this, 'maxScroll', 0);
-    s(this, 'heartbeatTimer', null);
-    s(this, 'maxSessionTimer', null);
-    s(this, 'flushing', !1);
-    s(this, 'dirty', !1);
-    s(this, 'rafScrollScheduled', !1);
-    s(this, 'boundCount', 0);
-    s(this, 'onVisibility', () => {
+    a(this, 'opts');
+    a(this, 'transport');
+    a(this, 'sections');
+    a(this, 'info', null);
+    a(this, 'token', null);
+    a(this, 'activeMs', 0);
+    a(this, 'activeRunningSince', null);
+    a(this, 'maxScroll', 0);
+    a(this, 'heartbeatTimer', null);
+    a(this, 'maxSessionTimer', null);
+    a(this, 'flushing', !1);
+    a(this, 'dirty', !1);
+    a(this, 'rafScrollScheduled', !1);
+    a(this, 'boundCount', 0);
+    a(this, 'onVisibility', () => {
       document.hidden
         ? (this.tickActive(performance.now()),
           (this.activeRunningSince = null),
@@ -452,13 +543,13 @@ var v = class {
           this.flush())
         : ((this.activeRunningSince = performance.now()), this.sections.resume());
     });
-    s(this, 'onPageHide', () => {
+    a(this, 'onPageHide', () => {
       (this.tickActive(performance.now()),
         (this.activeRunningSince = null),
         this.sections.pause(),
         this.flush(!0));
     });
-    s(this, 'onScroll', () => {
+    a(this, 'onScroll', () => {
       this.rafScrollScheduled ||
         ((this.rafScrollScheduled = !0),
         requestAnimationFrame(() => {
@@ -466,7 +557,7 @@ var v = class {
         }));
     });
     ((this.opts = e),
-      (this.transport = b({
+      (this.transport = y({
         supabaseUrl: e.config.supabaseUrl,
         anonKey: e.config.supabaseAnonKey,
       })),
@@ -479,6 +570,11 @@ var v = class {
       })));
   }
   async start() {
+    if (!this.opts.preStarted) {
+      if (document.hidden) return null;
+      let t = 5e3;
+      if ((await new Promise((r) => setTimeout(r, t)), document.hidden)) return null;
+    }
     (document.hidden || (this.activeRunningSince = performance.now()),
       this.bindListeners(),
       this.sections.start(),
@@ -517,17 +613,17 @@ var v = class {
             token: this.token,
             activeSeconds: Math.round(this.activeMs / 1e3),
             maxScrollDepth: this.maxScroll,
-            sections: t.map((a) => ({
-              section_id: a.id,
-              section_title: a.title,
-              depth: a.depth,
-              ordinal: a.ordinal,
-              time_seconds: a.timeSeconds,
+            sections: t.map((o) => ({
+              section_id: o.id,
+              section_title: o.title,
+              depth: o.depth,
+              ordinal: o.ordinal,
+              time_seconds: o.timeSeconds,
             })),
           },
-          o = this.opts.config.hooks.beforeFlush?.(r) ?? r;
-        if (o === !1) return;
-        (await this.transport.updateSession(o, e), (this.dirty = !1));
+          i = this.opts.config.hooks.beforeFlush?.(r) ?? r;
+        if (i === !1) return;
+        (await this.transport.updateSession(i, e), (this.dirty = !1));
       } catch (t) {
         let r = t instanceof Error ? t : new Error(String(t));
         (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', r),
@@ -585,18 +681,18 @@ var v = class {
     (t > 0 && ((this.activeMs += t), (this.dirty = !0)), (this.activeRunningSince = e));
   }
 };
-function U(n) {
+function D(n) {
   let e = {
     version: n.version,
     ready: n.ready,
     flush: () => n.session.flush(),
     optOut: () => {
-      (R(), n.session.stop());
+      (_(), n.session.stop());
     },
   };
   return ((window.HTMLRadar = e), e);
 }
-function V(n) {
+function J(n) {
   if (n instanceof p)
     switch (n.code) {
       case 'P0001':
@@ -620,10 +716,10 @@ function V(n) {
     }
   return "We couldn't reach the server. Check your connection and try again.";
 }
-var N = '0.1.0';
-G();
-async function G() {
-  if (_()) return;
+var Q = '0.1.0';
+Z();
+async function Z() {
+  if (A()) return;
   let n = document.currentScript,
     e = M(n);
   if (!e) {
@@ -633,19 +729,19 @@ async function G() {
       );
     return;
   }
-  let t = A(),
-    r = L(),
-    o = null,
-    a;
-  if (e.email) ((o = e.email), o !== r && E(o));
+  let t = L(),
+    r = R(),
+    i = null,
+    o;
+  if (e.email) ((i = e.email), i !== r && k(i));
   else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
-    if (r) o = r;
+    if (r) i = r;
     else {
-      let l = b({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
-      ((o = await H(e, async (u) => {
+      let l = y({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
+      ((i = await O(e, async (u) => {
         try {
           return (
-            (a = await l.startSession({
+            (o = await l.startSession({
               shareSlug: e.shareSlug,
               email: u,
               fingerprint: t,
@@ -656,15 +752,15 @@ async function G() {
             null
           );
         } catch (d) {
-          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), V(d));
+          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), J(d));
         }
       })),
-        E(o));
+        k(i));
     }
-  let i = new v({ config: e, email: o, fingerprint: t, ...(a ? { preStarted: a } : {}) }),
-    c = i.start().catch((l) => {
+  let s = new b({ config: e, email: i, fingerprint: t, ...(o ? { preStarted: o } : {}) }),
+    c = s.start().catch((l) => {
       throw (e.debug && console.warn('[HTMLRadar] session start failed', l), l);
     });
-  U({ session: i, ready: c, version: N });
+  D({ session: s, ready: c, version: Q });
 }
 //# sourceMappingURL=tracker.js.map

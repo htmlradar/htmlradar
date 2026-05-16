@@ -204,28 +204,37 @@ function extOf(filename: string): string {
   return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
 }
 
-// Free-tier badge baked into the recipient view. Same solid oxblood
-// pill the gate/error shells use — top-right, unmissable, so the
-// recipient knows the tracking surface they're on. Inlined styles
-// (no external CSS) and a high z-index keep this readable on any
-// background the sender's HTML uses.
+// Free-tier "Powered by HTMLRadar" credit baked into the recipient view.
+//
+// Visual register is deliberately quiet:
+//   - bottom-right corner (out of the reading path)
+//   - small typographic mark, no big colour block
+//   - translucent cream chip so it sits on top of any sender background
+//     (dark or light) without screaming
+//
+// The big solid pill is reserved for surfaces HTMLRadar OWNS (the gate,
+// the error pages — see proxy/src/responses.ts). On the viewed doc the
+// sender's content is the canvas; the brand is a credit, not a billboard.
+//
+// Removing this badge is the Pro tier's value prop — see
+// injectTracker(opts.tier) and the pricing page's "No footer" bullet.
 function chromeFooter(): string {
   return [
     `<a href="https://htmlradar.com" target="_blank" rel="noopener" `,
-    `style="position:fixed;top:16px;right:16px;z-index:2147483646;`,
-    `display:inline-flex;align-items:center;gap:8px;`,
-    `background:#7A1F2E;color:#FBF1E8;text-decoration:none;`,
-    `font:600 11px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;`,
-    `text-transform:uppercase;letter-spacing:0.16em;`,
-    `padding:8px 14px 8px 12px;border-radius:999px;`,
-    `box-shadow:0 1px 0 rgba(31,17,8,0.12),0 6px 18px -8px rgba(122,31,46,0.35);">`,
-    `<svg aria-hidden viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px">`,
-    `<circle cx="12" cy="12" r="9" fill="none" stroke="#FBF1E8" stroke-width="1.3" opacity="0.45"/>`,
-    `<circle cx="12" cy="12" r="5" fill="none" stroke="#FBF1E8" stroke-width="1.3" opacity="0.7"/>`,
-    `<line x1="12" y1="12" x2="12" y2="3" stroke="#FBF1E8" stroke-width="1.5" stroke-linecap="round"/>`,
-    `<circle cx="12" cy="12" r="1.7" fill="#FBF1E8"/>`,
+    `style="position:fixed;bottom:10px;right:12px;z-index:2147483646;`,
+    `display:inline-flex;align-items:center;gap:6px;`,
+    `background:rgba(251,241,232,0.92);color:#3A2818;text-decoration:none;`,
+    `font:500 10.5px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;`,
+    `letter-spacing:0.04em;`,
+    `padding:5px 9px 5px 7px;border-radius:6px;`,
+    `border:1px solid rgba(135,105,89,0.25);`,
+    `box-shadow:0 1px 2px rgba(31,17,8,0.06);backdrop-filter:blur(6px);">`,
+    `<svg aria-hidden viewBox="0 0 24 24" width="11" height="11" style="vertical-align:-1px;flex:0 0 auto;">`,
+    `<circle cx="12" cy="12" r="9" fill="none" stroke="#7A1F2E" stroke-width="1.6" opacity="0.55"/>`,
+    `<line x1="12" y1="12" x2="12" y2="3" stroke="#7A1F2E" stroke-width="1.8" stroke-linecap="round"/>`,
+    `<circle cx="12" cy="12" r="1.8" fill="#7A1F2E"/>`,
     `</svg>`,
-    `<span>HTMLRadar</span>`,
+    `<span>Powered by <span style="color:#7A1F2E;">HTMLRadar</span></span>`,
     `</a>`,
   ].join('');
 }

@@ -10,7 +10,11 @@ import { optOut } from './identity.js';
 
 export interface HTMLRadarApi {
   readonly version: string;
-  readonly ready: Promise<SessionInfo>;
+  // `ready` resolves with the session info when the tracker starts a
+  // session, OR with `null` when the 5s warm-up filter bailed (the
+  // recipient bounced before the session row was created). Host pages
+  // should null-check.
+  readonly ready: Promise<SessionInfo | null>;
   flush(): Promise<void>;
   optOut(): void;
 }
@@ -23,7 +27,7 @@ declare global {
 
 interface InstallOptions {
   session: Session;
-  ready: Promise<SessionInfo>;
+  ready: Promise<SessionInfo | null>;
   version: string;
 }
 

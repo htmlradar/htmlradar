@@ -18,8 +18,8 @@ export default function NewDocumentPage() {
         Upload an HTML file, <span className="italic text-signal">or paste a URL.</span>
       </h1>
       <p className="mt-4 max-w-lg text-[15.5px] leading-relaxed text-ink-soft">
-        Give it a title, drop the file (or point at a URL you already host), and you'll land on the
-        document page to create your first per-recipient share.
+        HTMLRadar tracks reads, scroll, and per-section dwell on HTML. Drop the deck here. PDFs,
+        Excel, and ZIPs ride along as downloadable files once the HTML is up.
       </p>
 
       <div className="mt-10">

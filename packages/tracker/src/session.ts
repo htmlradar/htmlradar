@@ -58,7 +58,32 @@ export class Session {
     });
   }
 
-  async start(): Promise<SessionInfo> {
+  async start(): Promise<SessionInfo | null> {
+    // ---------------------------------------------------------------
+    // Bot / accidental-tap filter
+    // ---------------------------------------------------------------
+    // When the email gate already created a session server-side (the
+    // recipient typed an email + clicked Continue — a strong "real
+    // human" signal), there's no warm-up wait: we install the
+    // pre-started session immediately.
+    //
+    // For every OTHER path — anonymous shares, allow-listed pre-auth,
+    // returning recipients with localStorage'd email — we hold for 5s
+    // before creating the session row. If the recipient bounced or
+    // backgrounded the tab during the wait, we skip session creation
+    // entirely. Stops link-preview crawlers, accidental clicks, and
+    // 1-second mis-opens from inflating viewer counts and triggering
+    // owner-notification emails.
+    //
+    // Listener binding is deferred until AFTER the warm-up so a bounce
+    // during the wait leaves nothing to clean up.
+    if (!this.opts.preStarted) {
+      if (document.hidden) return null;
+      const SESSION_DELAY_MS = 5000;
+      await new Promise<void>((resolve) => setTimeout(resolve, SESSION_DELAY_MS));
+      if (document.hidden) return null;
+    }
+
     if (!document.hidden) {
       this.activeRunningSince = performance.now();
     }

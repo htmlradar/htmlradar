@@ -122,6 +122,10 @@ async function boot(): Promise<void> {
     fingerprint,
     ...(preStarted ? { preStarted } : {}),
   });
+  // Session.start() now returns null when it bails out during the 5s
+  // warm-up filter (recipient bounced before the session could be
+  // created). The `ready` promise resolves either way so hosts that
+  // `await window.HTMLRadar.ready` don't hang.
   const ready = session.start().catch((err) => {
     if (config.debug) {
       // eslint-disable-next-line no-console

@@ -1,7 +1,7 @@
-// /docs — Document library. Lists every non-deleted document the user
-// owns. Empty state renders a clean "upload your first" card with the
-// brand radar instead of the plain dashed border — keeps the v4
-// register consistent.
+// /docs — Document library. Top-line stat strip + per-row metadata
+// (status dot, share count, last opened, viewer count). The bare list
+// felt like a hobbyist tool; the strip + rich rows lift it to "this
+// is a working dashboard" register without redesigning anything.
 
 import Link from 'next/link';
 import { ArrowRight, FileText, Link2 } from 'lucide-react';
@@ -11,17 +11,116 @@ import { HeroRadar } from '@/components/HeroRadar';
 
 export const runtime = 'edge';
 
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds < 1) return '—';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
+}
+
+function formatRelative(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const then = new Date(iso).getTime();
+  const diff = Math.max(0, Date.now() - then);
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 export default async function DocumentsPage() {
   await requireUser();
   const supabase = serverClient();
 
-  const { data: docs } = await supabase
-    .from('documents')
-    .select('id, title, source_type, current_version, created_at')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+  // Fan-out: docs + shares + recent sessions in three parallel queries.
+  // We aggregate client-side because the join cost in Postgres for these
+  // small tables (per-user scoped via RLS) is similar to assembling in
+  // memory and the latter is easier to read.
+  const [docsRes, sharesRes] = await Promise.all([
+    supabase
+      .from('documents')
+      .select('id, title, source_type, current_version, created_at')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('document_shares')
+      .select('id, document_id, revoked_at, expires_at')
+      .is('revoked_at', null),
+  ]);
 
-  const hasDocs = (docs?.length ?? 0) > 0;
+  const docs = docsRes.data ?? [];
+  const shares = sharesRes.data ?? [];
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const shareIds = shares.map((s) => s.id);
+
+  // One sessions query for the entire library — used for "reads this
+  // week" stat and per-doc "last opened" + active-time average.
+  const sessionsRes = shareIds.length
+    ? await supabase
+        .from('sessions')
+        .select('share_id, started_at, active_time_seconds')
+        .in('share_id', shareIds)
+        .gte('started_at', sevenDaysAgo)
+    : { data: [] as Array<{ share_id: string; started_at: string; active_time_seconds: number }> };
+
+  // Also fetch ALL sessions (not just 7d) just for the per-doc "last
+  // opened" relative timestamp. We bound the query to the user's own
+  // shares so it stays cheap.
+  const allSessionsRes = shareIds.length
+    ? await supabase
+        .from('sessions')
+        .select('share_id, started_at, active_time_seconds')
+        .in('share_id', shareIds)
+        .order('started_at', { ascending: false })
+        .limit(500)
+    : { data: [] as Array<{ share_id: string; started_at: string; active_time_seconds: number }> };
+
+  const weeklySessions = sessionsRes.data ?? [];
+  const recentSessions = allSessionsRes.data ?? [];
+
+  // Map share_id → document_id for fast roll-ups.
+  const shareToDoc = new Map(shares.map((s) => [s.id, s.document_id]));
+
+  // Per-doc rollups.
+  const sharesByDoc = new Map<string, number>();
+  for (const s of shares) {
+    sharesByDoc.set(s.document_id, (sharesByDoc.get(s.document_id) ?? 0) + 1);
+  }
+  const lastOpenedByDoc = new Map<string, string>();
+  for (const sess of recentSessions) {
+    const docId = shareToDoc.get(sess.share_id);
+    if (!docId) continue;
+    const prev = lastOpenedByDoc.get(docId);
+    if (!prev || sess.started_at > prev) {
+      lastOpenedByDoc.set(docId, sess.started_at);
+    }
+  }
+
+  // Top-line stats.
+  const totalDocs = docs.length;
+  const activeShares = shares.length;
+  const readsThisWeek = weeklySessions.length;
+  const avgActiveThisWeek = weeklySessions.length
+    ? weeklySessions.reduce((acc, s) => acc + (s.active_time_seconds ?? 0), 0) /
+      weeklySessions.length
+    : 0;
+
+  // A doc is "active" if it has had at least one read in the last 24h.
+  const dayCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const activeDocIds = new Set<string>();
+  for (const sess of recentSessions) {
+    if (new Date(sess.started_at).getTime() < dayCutoff) continue;
+    const docId = shareToDoc.get(sess.share_id);
+    if (docId) activeDocIds.add(docId);
+  }
+
+  const hasDocs = totalDocs > 0;
 
   return (
     <div className="py-8">
@@ -41,41 +140,84 @@ export default async function DocumentsPage() {
         </Link>
       </div>
 
+      {/* Top-line stat strip — same visual language as the per-doc
+          ViewerInsights strip. Renders even on empty libraries so the
+          numbers read as "zero so far" rather than absent. */}
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Documents" value={String(totalDocs)} />
+        <Stat label="Active shares" value={String(activeShares)} />
+        <Stat label="Reads · 7d" value={String(readsThisWeek)} />
+        <Stat label="Avg read · 7d" value={formatDuration(avgActiveThisWeek)} />
+      </div>
+
       {!hasDocs ? (
         <EmptyDocs />
       ) : (
-        <ul className="mt-10 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
-          {docs!.map((d) => (
-            <li key={d.id}>
-              <Link
-                href={`/docs/${d.id}`}
-                className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-paper-2/40"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-4">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-paper-3 text-signal-dark">
-                    {d.source_type === 'upload' ? (
-                      <FileText aria-hidden className="size-4" />
-                    ) : (
-                      <Link2 aria-hidden className="size-4" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-serif text-[18px] text-ink">{d.title}</div>
-                    <div className="mt-1 font-mono text-[11px] text-graphite">
-                      {d.source_type === 'upload' ? 'Uploaded' : 'URL source'} · v
-                      {d.current_version} · {new Date(d.created_at).toLocaleDateString()}
+        <ul className="mt-8 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
+          {docs.map((d) => {
+            const shareCount = sharesByDoc.get(d.id) ?? 0;
+            const lastOpened = lastOpenedByDoc.get(d.id);
+            const isActive = activeDocIds.has(d.id);
+            return (
+              <li key={d.id}>
+                <Link
+                  href={`/docs/${d.id}`}
+                  className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-paper-2/40"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-4">
+                    <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-paper-3 text-signal-dark">
+                      {d.source_type === 'upload' ? (
+                        <FileText aria-hidden className="size-4" />
+                      ) : (
+                        <Link2 aria-hidden className="size-4" />
+                      )}
+                      {isActive && (
+                        <span
+                          aria-label="Activity in the last 24 hours"
+                          className="absolute -right-0.5 -top-0.5 flex size-2.5"
+                        >
+                          <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
+                          <span className="relative inline-flex size-2.5 rounded-full bg-signal" />
+                        </span>
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-serif text-[18px] text-ink">{d.title}</div>
+                      <div className="mt-1 truncate font-mono text-[11px] text-graphite">
+                        {d.source_type === 'upload' ? 'Uploaded' : 'URL source'} · v
+                        {d.current_version} · {new Date(d.created_at).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <ArrowRight
-                  aria-hidden
-                  className="size-4 shrink-0 text-graphite transition group-hover:translate-x-0.5 group-hover:text-signal-dark"
-                />
-              </Link>
-            </li>
-          ))}
+                  <div className="hidden text-right sm:block">
+                    <div className="font-mono text-[12px] tabular-nums text-ink">
+                      {shareCount} {shareCount === 1 ? 'share' : 'shares'}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
+                      {lastOpened ? formatRelative(lastOpened) : 'no opens yet'}
+                    </div>
+                  </div>
+                  <ArrowRight
+                    aria-hidden
+                    className="size-4 shrink-0 text-graphite transition group-hover:translate-x-0.5 group-hover:text-signal-dark"
+                  />
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-line bg-paper px-4 py-3.5">
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">{label}</div>
+      <div className="mt-1.5 font-serif text-[22px] tabular-nums leading-none text-ink">
+        {value}
+      </div>
     </div>
   );
 }

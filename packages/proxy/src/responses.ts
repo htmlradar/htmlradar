@@ -35,14 +35,22 @@ const FONTS_LINK = `
 `.trim();
 
 // Generic OG tags. No personalisation — see privacy note above.
+// Copy stays neutral and inviting (NOT "tracked document delivery" —
+// telling the recipient they're being tracked before they click sets
+// the wrong tone, and most premium document-share products don't say
+// it explicitly).
 const OG_TAGS = `
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="HTMLRadar">
 <meta property="og:title" content="A document on HTMLRadar">
-<meta property="og:description" content="Tracked document delivery, built for HTML. Open source.">
-<meta name="twitter:card" content="summary">
+<meta property="og:description" content="A document has been shared with you. Open to view.">
+<meta property="og:image" content="https://htmlradar.com/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="A document on HTMLRadar">
-<meta name="twitter:description" content="Tracked document delivery, built for HTML. Open source.">
+<meta name="twitter:description" content="A document has been shared with you. Open to view.">
+<meta name="twitter:image" content="https://htmlradar.com/og-card.png">
 <meta name="robots" content="noindex, nofollow">
 `.trim();
 
@@ -116,7 +124,11 @@ body {
   text-decoration: none;
   background: var(--signal);
   border-radius: 999px;
-  padding: 8px 14px 8px 12px;
+  /* Vertical padding gives the pill a 44px tap target on mobile
+     (iOS HIG minimum) while keeping the desktop visual unchanged. */
+  padding: 12px 16px 12px 14px;
+  min-height: 44px;
+  box-sizing: border-box;
   box-shadow: 0 1px 0 rgba(31, 17, 8, 0.12), 0 6px 18px -8px rgba(122, 31, 46, 0.35);
   transition: background-color 120ms ease, transform 120ms ease;
 }
@@ -124,7 +136,9 @@ body {
 .brand:active { transform: translateY(0.5px); }
 @media (max-width: 480px) {
   .brand-mount { top: 14px; right: 14px; }
-  .brand { padding: 7px 12px 7px 10px; font-size: 10.5px; letter-spacing: 0.14em; }
+  /* On phones we keep the 44px tap target but tighten letter-spacing
+     so the pill doesn't dominate the small viewport. */
+  .brand { padding: 11px 14px 11px 12px; font-size: 10.5px; letter-spacing: 0.14em; }
 }
 .card {
   margin-top: 18vh;
@@ -157,7 +171,10 @@ form { margin: 0; }
 input[type="email"], input[type="password"] {
   width: 100%;
   font: inherit;
-  font-size: 15px;
+  /* 16px is the iOS Safari zoom-on-focus threshold. Anything smaller
+     triggers a viewport zoom when the field is focused, shifting the
+     layout and looking broken. Keep this at 16px on every breakpoint. */
+  font-size: 16px;
   padding: 13px 14px;
   border: 1px solid var(--line);
   background: #fff;
@@ -266,7 +283,8 @@ export const notFound = (): Response =>
   SHELL(
     'Share not found',
     `<h1>Share not found.</h1>
-     <p class="lede">The link may have been deleted, or it never existed. Check with the person who sent it to you.</p>`,
+     <p class="lede">The link may have been deleted, or it never existed. Check with the person who sent it to you.</p>
+     <p style="margin-top:28px;"><a href="https://htmlradar.com" style="display:inline-block;color:#7A1F2E;text-decoration:none;border-bottom:1px dotted currentColor;font-size:14.5px;padding:6px 0;">What is HTMLRadar? &rarr;</a></p>`,
     404,
     'No record',
   );
@@ -324,7 +342,7 @@ export const emailGateForm = (slug: string, error?: string): Response =>
   SHELL(
     error ? 'Email error' : 'Enter your email',
     `<h1>View this document.</h1>
-     <p class="lede">Enter your email to continue. The sender will see who opened it.</p>
+     <p class="lede">Enter your email to continue.</p>
      <form method="POST" action="/r/${escapeHtml(slug)}/email" novalidate>
        <input
          type="email"

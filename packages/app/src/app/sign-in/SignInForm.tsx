@@ -158,7 +158,10 @@ export function SignInForm({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-md border border-line bg-paper px-3.5 py-3 text-[14.5px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)]"
+              // 16px font on mobile prevents iOS Safari's zoom-on-focus
+              // which shifts the layout. On md+ we shrink to the
+              // original 14.5px for visual rhythm.
+              className="w-full rounded-md border border-line bg-paper px-3.5 py-3 text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] md:text-[14.5px]"
             />
             <button
               type="submit"

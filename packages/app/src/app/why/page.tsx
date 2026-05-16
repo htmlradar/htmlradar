@@ -98,9 +98,10 @@ export default function WhyPage() {
               </Link>
               <Link
                 href="/sign-in"
+                data-cta="why.start_free"
                 className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
               >
-                Start free. 10 documents.
+                Start free
                 <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
               </Link>
             </div>
@@ -110,11 +111,14 @@ export default function WhyPage() {
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
             <div className="font-mono text-[12px] tracking-wide text-graphite">
-              HTML<span className="text-signal">Radar</span>. Know who's reading.
+              HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
             </div>
             <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
               <Link href="/why" className="link-slide hover:text-signal-dark">
                 Why this exists
+              </Link>
+              <Link href="/blog" className="link-slide hover:text-signal-dark">
+                Blog
               </Link>
               <a
                 href="https://github.com/htmlradar/htmlradar"

@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { r2Key, uploadHtml } from '@/lib/r2';
+import { captureServerEvent } from '@/lib/events';
 
 const FREE_TIER_CAP = 10;
 const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
@@ -33,7 +34,14 @@ export async function createDocument(formData: FormData) {
       .select('id', { count: 'exact', head: true })
       .eq('owner_id', user.id)
       .is('deleted_at', null);
-    if ((count ?? 0) >= FREE_TIER_CAP) redirect('/upgrade');
+    if ((count ?? 0) >= FREE_TIER_CAP) {
+      await captureServerEvent({
+        event: 'free_tier.cap_hit',
+        distinctId: user.id,
+        userId: user.id,
+      });
+      redirect('/upgrade');
+    }
   }
 
   const sourceType = formData.get('source_type') as 'upload' | 'url';
@@ -74,6 +82,13 @@ export async function createDocument(formData: FormData) {
       throw err;
     }
   }
+
+  await captureServerEvent({
+    event: 'document.created',
+    distinctId: user.id,
+    userId: user.id,
+    properties: { source_type: sourceType, doc_id: docId },
+  });
 
   revalidatePath('/docs');
   redirect(`/docs/${docId}`);

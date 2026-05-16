@@ -1,7 +1,9 @@
-// /pricing — public pricing page. v2 model: free hosted with a small cap
-// (10 docs lifetime), Pro $15/mo unlocks *presentation* (custom domain,
-// no chrome footer, allow-list, longer retention) rather than volume.
-// Self-host stays AGPL-3.0 free, no caps. Stripe Payment Link URL is
+// /pricing — public pricing page. v1.1 model: free hosted with a small
+// doc cap (10 lifetime) AND moderate attachment caps; Pro $15/mo lifts
+// the caps + drops the recipient-view chrome. Self-host stays AGPL-3.0
+// free, no caps. Roadmap items (custom domain, watermark, repeat-open
+// alerts) live in a separate section linked to GitHub issues — they're
+// not promised inside the Pro tier itself. Stripe Payment Link URL is
 // read from env at render time so the live deploy reads from Vercel's
 // env, while local dev falls back to a `#` href.
 
@@ -17,7 +19,7 @@ export const runtime = 'edge';
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'Open source under AGPL-3.0. Run it yourself on Cloudflare and Supabase, free forever. Or use the hosted version — free for 10 documents, $15/month for unlimited and custom-domain shares.',
+    'Open source under AGPL-3.0. Run it yourself on Cloudflare and Supabase, free forever. Or use the hosted version — free for 10 documents and 100 MB of supporting materials, $15/month for unlimited documents and 10× the attachment headroom.',
 };
 
 export default function PricingPage() {
@@ -56,11 +58,13 @@ export default function PricingPage() {
                 features={[
                   '10 documents lifetime',
                   'Unlimited shares per document',
-                  'Section-level dwell, per recipient',
-                  'Email gate, password, expiry, revoke',
+                  'Section-level dwell tracking, per recipient',
+                  'Email gate, password, expiry, revoke per share',
+                  'Email-domain and per-email allow-lists',
+                  'Supporting materials: 20 files · 25 MB each · 100 MB per doc',
+                  'Per-share download permission, with every download tracked',
                   'Real-time email when a real read happens',
-                  '“Shared with HTMLRadar” chrome footer on the viewer',
-                  '30-day analytics retention',
+                  '“Shared with HTMLRadar” footer on the viewer',
                 ]}
                 ctaLabel="Start free"
                 ctaHref="/sign-in"
@@ -74,14 +78,13 @@ export default function PricingPage() {
                 price="$15"
                 cadence="per month, cancel anytime"
                 accent
-                description="Send from your own domain, with the chrome gone. For founders, agencies, and consultants whose presentation is the product."
+                description="For founders and consultants who send real diligence packages."
                 features={[
                   'Everything in Free, plus:',
-                  'Custom domain on share URLs (share.yourdomain.com)',
-                  '“Shared with HTMLRadar” chrome footer removed',
-                  'Allow-list by recipient email domain',
-                  '90-day analytics retention',
-                  'Priority support',
+                  'Unlimited documents',
+                  'Supporting materials: 50 files · 100 MB each · 1 GB per doc',
+                  'No “Shared with HTMLRadar” footer on recipient views',
+                  'Priority email support, response inside one business day',
                 ]}
                 ctaLabel="Upgrade to Pro"
                 ctaHref={stripeUrl}
@@ -90,6 +93,48 @@ export default function PricingPage() {
               />
             </Reveal>
           </div>
+
+          <Reveal delay={0.24}>
+            <section className="mt-20 rounded-2xl border border-line bg-paper-2/30 p-7 md:p-9">
+              <SectionMark>Roadmap</SectionMark>
+              <p className="mt-5 max-w-2xl text-[15.5px] leading-relaxed text-ink-soft">
+                What we're working on next, public-visible and trackable on GitHub. Nothing on this
+                list is promised inside the Pro tier above — it&apos;ll move into Pro the moment
+                it&apos;s shipped, not before.
+              </p>
+              <ul className="mt-6 grid gap-3 text-[14.5px] text-ink-soft md:grid-cols-3">
+                <li className="rounded-xl border border-line bg-paper px-4 py-3">
+                  <span className="block font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">
+                    Custom domain
+                  </span>
+                  <span className="mt-1.5 block text-ink">share.yourdomain.com on every link</span>
+                </li>
+                <li className="rounded-xl border border-line bg-paper px-4 py-3">
+                  <span className="block font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">
+                    Per-viewer watermark
+                  </span>
+                  <span className="mt-1.5 block text-ink">
+                    recipient&apos;s email overlaid on the page
+                  </span>
+                </li>
+                <li className="rounded-xl border border-line bg-paper px-4 py-3">
+                  <span className="block font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">
+                    Repeat-open alerts
+                  </span>
+                  <span className="mt-1.5 block text-ink">notify when someone re-opens a deck</span>
+                </li>
+              </ul>
+              <Link
+                href="https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap"
+                className="link-slide mt-6 inline-flex items-center gap-1.5 text-[14px] text-ink-soft hover:text-signal-dark"
+                target="_blank"
+                rel="noopener"
+              >
+                Track + vote on GitHub
+                <ArrowUpRight className="size-4" />
+              </Link>
+            </section>
+          </Reveal>
 
           <Reveal delay={0.28}>
             <section className="mt-24 border-t border-line pt-12">
@@ -122,11 +167,14 @@ export default function PricingPage() {
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
             <div className="font-mono text-[12px] tracking-wide text-graphite">
-              HTML<span className="text-signal">Radar</span>. Know who's reading.
+              HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
             </div>
             <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
               <Link href="/why" className="link-slide hover:text-signal-dark">
                 Why this exists
+              </Link>
+              <Link href="/blog" className="link-slide hover:text-signal-dark">
+                Blog
               </Link>
               <a
                 href="https://github.com/htmlradar/htmlradar"
@@ -213,6 +261,7 @@ function Tier({
             href={ctaHref}
             target={external ? '_blank' : undefined}
             rel={external ? 'noopener noreferrer' : undefined}
+            data-cta="pricing.upgrade"
             className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
           >
             {ctaLabel}
@@ -221,6 +270,7 @@ function Tier({
         ) : (
           <Link
             href={ctaHref}
+            data-cta="pricing.start_free"
             className="group inline-flex items-center gap-2 rounded-md border border-line bg-paper-2/50 px-6 py-3 text-[15px] font-medium text-ink transition hover:border-signal hover:text-signal-dark"
           >
             {ctaLabel}

@@ -62,7 +62,7 @@ describe('resolveConfig', () => {
     expect(config?.sections.minDwellMs).toBe(1500);
     expect(config?.sections.boundaryOffsetPx).toBe(120); // default kept
     expect(config?.gate.copy.heading).toBe('Custom heading');
-    expect(config?.gate.copy.buttonLabel).toBe('View document'); // default kept
+    expect(config?.gate.copy.buttonLabel).toBe('Open document'); // default kept
   });
 
   it('propagates proxy-injected email + geo when present', () => {

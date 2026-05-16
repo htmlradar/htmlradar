@@ -8,7 +8,7 @@
 // our Server Action, which means we can enforce the 10-doc cap and the
 // 30 MB body size limit in one place.
 
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const accessKeyId = process.env['CLOUDFLARE_R2_ACCESS_KEY_ID']!;
 const secretAccessKey = process.env['CLOUDFLARE_R2_SECRET_ACCESS_KEY']!;
@@ -58,6 +58,44 @@ export async function uploadHtml(key: string, body: Uint8Array): Promise<void> {
       Key: key,
       Body: body,
       ContentType: 'text/html; charset=utf-8',
+    }),
+  );
+}
+
+/**
+ * Upload a binary attachment (PDF / Office doc / image / ZIP / etc.) to
+ * R2 under the `attachments/...` namespace. ContentType comes from the
+ * server-controlled `ALLOWED_EXTENSIONS` map (see lib/attachments.ts);
+ * the user-provided MIME is never trusted.
+ */
+export async function uploadAttachment(
+  key: string,
+  body: Uint8Array,
+  contentType: string,
+): Promise<void> {
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
+/**
+ * Delete an attachment from R2. Used when the sender removes an
+ * attachment from a doc; we delete the DB row first, then the R2 object.
+ * If the R2 delete fails the DB row is already gone — periodic
+ * reconciliation (post-launch) can sweep orphaned R2 objects later. The
+ * worse failure mode is an orphan file with no DB row, not a phantom
+ * DB row pointing to nothing.
+ */
+export async function deleteR2Object(key: string): Promise<void> {
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
     }),
   );
 }

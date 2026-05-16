@@ -4,10 +4,13 @@
 -- Apply AFTER 001_init.sql and 002_rpcs.sql.
 
 -- ============================================================
--- enforce_doc_cap: free tier = 10 docs lifetime
--- Counts non-deleted documents. Deleted docs free up slots.
--- Pricing v2 (2026-05-12) lowered cap 20 → 10 — value moved to
--- presentation features (custom domain, no chrome) rather than volume.
+-- enforce_doc_cap: free tier = 10 documents lifetime.
+-- HARD CAP: deletes do NOT free slots. Once a free-tier user has
+-- ever created 10 documents (deleted or not), the 11th raises P0030.
+-- This is the conversion lever — without it the cap is symbolic
+-- because heavy users rotate by deleting and reusing slots.
+-- Pricing v2 (2026-05-12) lowered cap 20 → 10. Pricing v3
+-- (2026-05-14) removed the slot-refund.
 -- ============================================================
 create or replace function enforce_doc_cap()
 returns trigger language plpgsql as $$
@@ -22,15 +25,21 @@ begin
   end if;
 
   -- Serialise concurrent inserts per owner so two simultaneous uploads
-  -- can't both see count=19 and pass the cap. The lock releases at xact
+  -- can't both see count=9 and pass the cap. The lock releases at xact
   -- end; deadlock-free because keyed on a single owner_id per transaction.
   perform pg_advisory_xact_lock(hashtext('doc_cap:' || new.owner_id::text));
 
-  select count(*) into v_count from documents where owner_id = new.owner_id and deleted_at is null;
+  -- All documents ever created count, including soft-deleted ones.
+  -- That's the lifetime-cap behaviour: free-tier users can't keep
+  -- rotating slots forever.
+  select count(*) into v_count from documents where owner_id = new.owner_id;
   if v_count >= v_cap then
     raise exception 'free_tier_cap_reached'
       using errcode = 'P0030',
-            hint = format('Free tier is %s documents. Delete unused docs or upgrade to Pro.', v_cap);
+            hint = format(
+              'Free tier is %s documents lifetime. Upgrade to Pro for unlimited.',
+              v_cap
+            );
   end if;
 
   return new;

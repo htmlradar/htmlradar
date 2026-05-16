@@ -2,11 +2,22 @@ import type { TrackerConfig } from './types.js';
 import { EMAIL_REGEX } from './identity.js';
 
 // Email gate rendered in a Shadow DOM so host-page CSS can't bleed into us
-// and our styles can't break the host. Brand overrides via constructor opts.
+// and our styles can't break the host.
 //
-// Returns a promise that resolves with the entered email, or rejects if the
-// host removes the element. Callers handle storage + transport.
-export function showEmailGate(config: TrackerConfig): Promise<string> {
+// The caller passes an `attempt` callback. On submit the gate:
+//   1. validates email format client-side
+//   2. disables the submit button + shows "Loading…"
+//   3. calls attempt(email), which the caller wires to start_session
+//   4. if attempt returns null, the gate closes and resolves with the email
+//   5. if attempt returns an error string, the gate re-enables and shows it
+//
+// This pattern means server-side rejections (disposable email, rate limit,
+// domain not allowed) are surfaced to the recipient instead of failing
+// silently behind a closed gate.
+export function showEmailGate(
+  config: TrackerConfig,
+  attempt: (email: string) => Promise<string | null>,
+): Promise<string> {
   return new Promise((resolve) => {
     const host = document.createElement('div');
     host.id = 'htmlradar-gate';
@@ -20,18 +31,46 @@ export function showEmailGate(config: TrackerConfig): Promise<string> {
     const input = shadow.querySelector<HTMLInputElement>('input[type=email]')!;
     const error = shadow.querySelector<HTMLElement>('.error')!;
     const button = shadow.querySelector<HTMLButtonElement>('button')!;
+    const defaultButtonLabel = button.textContent ?? 'Continue';
 
     requestAnimationFrame(() => input.focus());
 
-    form.addEventListener('submit', (e) => {
+    const showError = (msg: string) => {
+      error.textContent = msg;
+      input.setAttribute('aria-invalid', 'true');
+    };
+    const clearError = () => {
+      error.textContent = '';
+      input.removeAttribute('aria-invalid');
+    };
+
+    input.addEventListener('input', clearError);
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const value = input.value.trim().toLowerCase();
       if (!EMAIL_REGEX.test(value)) {
-        error.textContent = 'Please enter a valid email address.';
-        input.setAttribute('aria-invalid', 'true');
+        showError('Please enter a valid email address.');
         return;
       }
       button.disabled = true;
+      button.textContent = 'Loading…';
+      clearError();
+
+      let serverError: string | null;
+      try {
+        serverError = await attempt(value);
+      } catch {
+        serverError = "We couldn't reach the server. Check your connection and try again.";
+      }
+
+      if (serverError) {
+        button.disabled = false;
+        button.textContent = defaultButtonLabel;
+        showError(serverError);
+        return;
+      }
+
       host.remove();
       resolve(value);
     });

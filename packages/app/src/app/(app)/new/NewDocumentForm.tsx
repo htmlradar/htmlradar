@@ -8,7 +8,7 @@
 // The mode toggle is real radio state under the hood (carried via a
 // hidden input), so server reads it from formData consistently.
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { AlertCircle, ArrowRight, FileText, Link2, Upload } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -33,10 +33,17 @@ export function NewDocumentForm({ action }: NewDocumentFormProps) {
   const [urlValue, setUrlValue] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
 
+  // Track in-flight submission so the button shows "Uploading…" / "Saving…"
+  // and ignores second clicks. Without this a user on slow 3G can click
+  // upload, see no visible response for 10 seconds, click again, and end
+  // up with two documents (and two R2 uploads worth of bandwidth).
+  const [isPending, startTransition] = useTransition();
+
   const canSubmit =
-    mode === 'upload'
+    !isPending &&
+    (mode === 'upload'
       ? fileName !== null && fileError === null
-      : urlValue.trim().length > 0 && urlError === null;
+      : urlValue.trim().length > 0 && urlError === null);
 
   const validateUrl = (v: string): string | null => {
     const trimmed = v.trim();
@@ -57,7 +64,7 @@ export function NewDocumentForm({ action }: NewDocumentFormProps) {
 
   return (
     <form
-      action={action}
+      action={(fd) => startTransition(() => action(fd))}
       className="space-y-8 rounded-2xl border border-line bg-paper p-8 shadow-[0_18px_40px_-30px_rgba(31,17,8,0.18)] md:p-10"
     >
       <div>
@@ -147,10 +154,17 @@ export function NewDocumentForm({ action }: NewDocumentFormProps) {
           disabled={!canSubmit}
           className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-signal"
         >
-          Create document
-          <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          {isPending ? (mode === 'upload' ? 'Uploading…' : 'Saving…') : 'Create document'}
+          {!isPending && <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />}
         </button>
-        {!canSubmit && fileError === null && urlError === null && (
+        {isPending && (
+          <p className="text-[13px] text-graphite">
+            {mode === 'upload'
+              ? 'Uploading and creating the document — usually a few seconds.'
+              : 'Saving the URL — usually a few seconds.'}
+          </p>
+        )}
+        {!isPending && !canSubmit && fileError === null && urlError === null && (
           <p className="text-[13px] text-graphite">
             {mode === 'upload' ? 'Pick an HTML file first.' : 'Paste a URL first.'}
           </p>

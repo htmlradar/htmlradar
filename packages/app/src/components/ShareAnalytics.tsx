@@ -70,17 +70,21 @@ export function ShareAnalytics({
             return (
               <li
                 key={s.id}
-                className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-[13.5px]"
+                className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 text-[13.5px]"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-ink">{v?.email ?? 'Anonymous'}</div>
-                  <div className="mt-0.5 truncate font-mono text-[10.5px] text-graphite">
+                  <div className="truncate text-[14px] font-medium text-ink">
+                    {v?.email ?? 'Anonymous'}
+                  </div>
+                  <div className="mt-1 truncate font-mono text-[11.5px] text-ink-soft/80">
                     {v?.country_code ?? '—'} · {v?.device_type ?? '—'} · {v?.os ?? '—'} ·{' '}
                     {new Date(s.started_at).toLocaleString()}
                   </div>
                 </div>
-                <div className="text-right font-mono text-[10.5px] text-graphite">
-                  <span className="text-signal-dark">{formatDuration(s.active_time_seconds)}</span>{' '}
+                <div className="text-right font-mono text-[12px] text-ink-soft">
+                  <span className="text-[13px] font-semibold text-signal-dark">
+                    {formatDuration(s.active_time_seconds)}
+                  </span>{' '}
                   · {Math.round(s.max_scroll_depth * 100)}% scroll
                 </div>
               </li>
@@ -94,15 +98,36 @@ export function ShareAnalytics({
           Sections read
         </h3>
         {sections.length === 0 ? (
-          <p className="mt-3 text-[13px] text-graphite">No section dwell recorded yet.</p>
+          // Feedback from testing was "if it's not a deck, it doesn't show
+          // sections" — the tracker needs heading anchors (`<h2 id="...">`,
+          // `<h3 id="...">`) to compute per-section dwell. Flat HTML with no
+          // sections falls through to this state. Make the why explicit.
+          <div className="mt-3 rounded-xl border border-dashed border-line bg-paper-2/30 px-4 py-3.5">
+            <p className="text-[13.5px] leading-relaxed text-ink-soft">
+              No section dwell yet. HTMLRadar splits read time by{' '}
+              <code className="rounded bg-paper-3/60 px-1 py-0.5 font-mono text-[12px] text-ink-soft">
+                {'<h2 id="…">'}
+              </code>{' '}
+              and{' '}
+              <code className="rounded bg-paper-3/60 px-1 py-0.5 font-mono text-[12px] text-ink-soft">
+                {'<h3 id="…">'}
+              </code>{' '}
+              headings in the source HTML.
+            </p>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-graphite">
+              Single-section pages still show overall scroll + active time at the top — the
+              per-section breakdown only fires when the document has anchored headings to break it
+              up.
+            </p>
+          </div>
         ) : (
           <ul className="mt-3 overflow-hidden rounded-xl border border-line bg-paper">
             {sections.map((s) => (
-              <li key={s.id} className="border-b border-line px-4 py-3 last:border-b-0">
+              <li key={s.id} className="border-b border-line px-4 py-3.5 last:border-b-0">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-[14px] font-medium text-ink">{s.title}</span>
-                  <span className="font-mono text-[10.5px] text-graphite">
-                    <span className="text-signal-dark">
+                  <span className="font-mono text-[12px] text-ink-soft">
+                    <span className="text-[13px] font-semibold text-signal-dark">
                       {formatDuration(s.totalSeconds / Math.max(1, s.viewers))}
                     </span>{' '}
                     avg · {s.viewers} viewer{s.viewers === 1 ? '' : 's'}

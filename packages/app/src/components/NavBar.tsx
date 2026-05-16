@@ -7,10 +7,13 @@
 // feeling editorial while the nav stays accessible during long scrolls.
 
 import Link from 'next/link';
-import { getCachedUser } from '@/lib/supabase-server';
+import { serverClient } from '@/lib/supabase-server';
 
 export async function NavBar() {
-  const user = await getCachedUser();
+  const supabase = serverClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
     <header className="sticky top-0 z-30 border-b border-line/60 bg-paper/85 backdrop-blur-md backdrop-saturate-150">

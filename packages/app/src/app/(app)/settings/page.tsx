@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
+import { captureServerEvent } from '@/lib/events';
 import { SectionMark } from '@/components/SectionMark';
 import { ArrowRight, LogOut } from 'lucide-react';
 import Link from 'next/link';
@@ -16,6 +17,18 @@ export const runtime = 'edge';
 async function signOut() {
   'use server';
   const supabase = serverClient();
+  // Capture before signOut so we still have the user context.
+  // Fire-and-forget: don't let analytics latency block the redirect.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    void captureServerEvent({
+      event: 'user.signed_out',
+      distinctId: user.id,
+      userId: user.id,
+    });
+  }
   await supabase.auth.signOut();
   // Bust the router cache so back-button on /sign-in or / doesn't
   // flash the previous-user's authed pages before middleware re-checks.

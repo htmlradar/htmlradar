@@ -1,0 +1,39 @@
+name: DCO
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  dco-check:
+    name: Verify DCO sign-off
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check sign-off on all commits in PR
+        run: |
+          # Get commits in this PR
+          commits=$(git log --no-merges --pretty=format:"%H %s%n%b%n--END--" origin/main..HEAD)
+          missing=""
+          while IFS= read -r line; do
+            if [[ "$line" == "--END--" ]]; then
+              if [[ -z "$current_sob" && -n "$current_sha" ]]; then
+                missing="$missing $current_sha"
+              fi
+              current_sha=""
+              current_sob=""
+            elif [[ -z "$current_sha" ]]; then
+              current_sha=$(echo "$line" | awk '{print $1}')
+            elif [[ "$line" == *"Signed-off-by:"* ]]; then
+              current_sob="$line"
+            fi
+          done <<< "$commits"
+          if [[ -n "$missing" ]]; then
+            echo "Commits missing DCO sign-off:$missing"
+            echo "Run: git commit --amend -s  (or rebase and add -s to all commits)"
+            exit 1
+          fi
+          echo "All commits signed-off."

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
+import { resolveRecipientIdentity } from '@/lib/recipient-identity';
 import type { Viewer, Session } from '@/lib/types';
 
 export interface ShareRow {
@@ -69,7 +70,9 @@ interface DocumentShareManagerProps {
   createShare: (formData: FormData) => Promise<void>;
   toggleShare: (formData: FormData) => Promise<void>;
   editShare: (formData: FormData) => Promise<void>;
-  previewShare: (formData: FormData) => Promise<void>;
+  previewShare: (
+    formData: FormData,
+  ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   // Count of supporting materials on the parent document. When zero we
   // hide the "Allow recipient to download materials" toggle entirely —
   // no point offering a permission for files that don't exist.
@@ -147,6 +150,7 @@ export function DocumentShareManager({
     <div className="grid gap-5 lg:grid-cols-[320px_1fr] lg:gap-6">
       <ShareRail
         shares={shares}
+        analyticsByShareId={analyticsByShareId}
         selection={selection}
         onSelectShare={handleSelectShare}
         onSelectNew={handleSelectNew}
@@ -211,11 +215,13 @@ export function DocumentShareManager({
 
 function ShareRail({
   shares,
+  analyticsByShareId,
   selection,
   onSelectShare,
   onSelectNew,
 }: {
   shares: ShareRow[];
+  analyticsByShareId: Record<string, ShareAnalyticsData>;
   selection: Selection;
   onSelectShare: (id: string) => void;
   onSelectNew: () => void;
@@ -283,16 +289,38 @@ function ShareRail({
                     )}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-medium text-ink">
-                      {s.recipient_label ?? 'Unlabeled'}
-                    </div>
-                    <div className="mt-0.5 truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
-                      {status === 'revoked'
-                        ? 'Revoked'
-                        : status === 'expired'
-                          ? 'Expired'
-                          : `${s.viewCount} ${s.viewCount === 1 ? 'view' : 'views'}`}
-                    </div>
+                    {(() => {
+                      const identity = resolveRecipientIdentity(
+                        s,
+                        analyticsByShareId[s.id]?.viewers ?? [],
+                      );
+                      return (
+                        <>
+                          <div
+                            className="truncate text-[14px] font-medium text-ink"
+                            title={
+                              identity.secondary
+                                ? `${identity.primary} — ${identity.secondary}`
+                                : identity.primary
+                            }
+                          >
+                            {identity.primary}
+                          </div>
+                          {identity.secondary && (
+                            <div className="mt-0.5 truncate text-[11px] text-graphite">
+                              Labelled {identity.secondary}
+                            </div>
+                          )}
+                          <div className="mt-0.5 truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
+                            {status === 'revoked'
+                              ? 'Revoked'
+                              : status === 'expired'
+                                ? 'Expired'
+                                : `${s.viewCount} ${s.viewCount === 1 ? 'view' : 'views'}`}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </button>
               </li>
@@ -318,7 +346,9 @@ function SharePane({
   share: ShareRow;
   analytics: ShareAnalyticsData | undefined;
   toggleShare: (formData: FormData) => Promise<void>;
-  previewShare: (formData: FormData) => Promise<void>;
+  previewShare: (
+    formData: FormData,
+  ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   onEdit: () => void;
 }) {
   const isRevoked = !!share.revoked_at;
@@ -341,9 +371,9 @@ function SharePane({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite transition hover:border-signal hover:text-signal-dark"
+              className="inline-flex items-center gap-1.5 rounded-md border border-ink/15 bg-paper px-3.5 py-2 text-[13px] font-medium text-ink shadow-[0_1px_0_rgba(31,17,8,0.04)] transition hover:border-signal hover:text-signal-dark"
             >
-              <Pencil aria-hidden className="size-3" />
+              <Pencil aria-hidden className="size-3.5" />
               Edit settings
             </button>
             {isExpired ? (
@@ -553,28 +583,39 @@ function PreviewAsYouButton({
 }: {
   shareId: string;
   documentId: string;
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
 }) {
   const [isPending, startTransition] = useTransition();
-  const handle = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    startTransition(() => action(fd));
+  // Hard navigation via window.location.href, NOT redirect(): Next.js's
+  // server-action redirect would route same-hostname URLs through the
+  // app's client router, where /r/{slug}?owner_preview=... isn't a known
+  // route → app's not-found.tsx renders instead of the proxy serving
+  // the doc. Returning the URL and navigating client-side bypasses Next
+  // entirely; the browser hits the Worker route directly.
+  const onClick = () => {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set('share_id', shareId);
+      fd.set('document_id', documentId);
+      const res = await action(fd);
+      if (res.ok) {
+        window.location.href = res.url;
+      } else {
+        window.location.href = `/docs/${documentId}?share_error=${encodeURIComponent(res.error)}`;
+      }
+    });
   };
   return (
-    <form onSubmit={handle}>
-      <input type="hidden" name="share_id" value={shareId} />
-      <input type="hidden" name="document_id" value={documentId} />
-      <button
-        type="submit"
-        disabled={isPending}
-        title="Open the share URL in a new tab, bypassing the email gate — only you can do this."
-        className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite transition hover:border-signal hover:text-signal-dark disabled:cursor-wait disabled:opacity-60"
-      >
-        <ExternalLink aria-hidden className="size-3" />
-        {isPending ? 'Opening…' : 'Preview as you'}
-      </button>
-    </form>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isPending}
+      title="Open the share URL, bypassing the email gate — only you can do this."
+      className="inline-flex items-center gap-1.5 rounded-md border border-ink/15 bg-paper px-3.5 py-2 text-[13px] font-medium text-ink shadow-[0_1px_0_rgba(31,17,8,0.04)] transition hover:border-signal hover:text-signal-dark disabled:cursor-wait disabled:opacity-60"
+    >
+      <ExternalLink aria-hidden className="size-3.5" />
+      {isPending ? 'Opening…' : 'Preview as you'}
+    </button>
   );
 }
 
@@ -662,14 +703,12 @@ function ShareSettingsForm({
           {isEdit ? 'Edit share' : 'New share'}
         </p>
         <h2 className="text-letterpress mt-2 font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-          {isEdit
-            ? (initial?.recipient_label ?? 'Unlabeled')
-            : 'A tracked link, just for one recipient.'}
+          {isEdit ? (initial?.recipient_label ?? 'Unlabeled') : 'Create a tracked link.'}
         </h2>
         <p className="mt-3 max-w-xl text-[14.5px] leading-relaxed text-ink-soft">
           {isEdit
             ? 'Update gates, password, allow-list, or expiry without revoking. Past read history stays intact; the next visitor sees the new settings.'
-            : 'Each share is its own URL with its own gates (email, password, expiry, domain allow-list). Send to one recipient. Track them individually in the dashboard.'}
+            : 'Send it to one person or a whole list — anyone with the URL who passes the gates can view. Make a separate share when you want individual analytics or different gates per recipient.'}
         </p>
       </header>
 
@@ -711,17 +750,36 @@ function ShareSettingsForm({
           />
         </div>
 
-        {/* Supporting materials permission. Hidden entirely when the
-            parent document has no attachments — no need to offer a
-            permission for files that don't exist. */}
-        {attachmentCount > 0 && (
+        {/* Supporting materials permission. Always visible so the sender
+            knows the option exists; disabled when the parent document has
+            no attachments, with copy that explains where to add them. */}
+        {attachmentCount > 0 ? (
           <CheckboxRow
             name="allow_download"
-            label={`Allow downloads of supporting materials (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'})`}
+            label={`Allow recipient to download attachments (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'})`}
             checked={allowDownload}
             onChange={setAllowDownload}
-            hint="When off, the recipient sees the deck only and has no signal that attachments exist. When on, a Materials panel appears in the document with download buttons. Every download is tracked."
+            hint="Off by default. When on, a download panel appears in the recipient's view. Every download is tracked. When off, the recipient sees the deck only and has no signal that attachments exist."
           />
+        ) : (
+          <div className="rounded-xl border border-dashed border-line bg-paper-2/30 p-4">
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden
+                className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-line bg-paper-2/60"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-medium text-ink-soft">
+                  Allow recipient to download attachments
+                </p>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-graphite">
+                  No attachments on this document yet. Add files in the{' '}
+                  <span className="font-medium text-ink-soft">Attachments</span> section below the
+                  share list (PDF, Excel, ZIP, images, Office docs), then flip this on per share.
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
         <Field

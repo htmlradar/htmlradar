@@ -1,6 +1,7 @@
 // Landing page. Server-rendered, animations are pure CSS via Reveal.
 
 import Link from 'next/link';
+import { serverClient } from '@/lib/supabase-server';
 import { NavBar } from '@/components/NavBar';
 import { Reveal } from '@/components/Reveal';
 import { ScrollProgress } from '@/components/ScrollProgress';
@@ -18,20 +19,32 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react';
 
 export const runtime = 'edge';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Read the session once at the top so the hero + close-block CTAs can
+  // route authed users straight to /docs. Without this, clicking "Start
+  // free" while already signed in kicks Supabase through a fresh OAuth
+  // round-trip whose PKCE verifier doesn't match the live session — that's
+  // the source of the "We couldn't complete the sign-in" callback error
+  // the gf hit when re-clicking the CTA after signing in.
+  const supabase = serverClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isAuthed = !!user;
+
   return (
     <>
       <NavBar />
       <ScrollProgress />
       <main className="relative overflow-x-clip">
         <CursorGlow />
-        <Hero />
+        <Hero isAuthed={isAuthed} />
         <WhyThisExists />
         <TheMoment />
         <WhatWeBuilt />
         <WhatRecipientSees />
         <OpenSource />
-        <Close />
+        <Close isAuthed={isAuthed} />
         <Footer />
       </main>
     </>
@@ -40,7 +53,7 @@ export default function LandingPage() {
 
 /* --------------------------------- Hero --------------------------------- */
 
-function Hero() {
+function Hero({ isAuthed }: { isAuthed: boolean }) {
   return (
     <section className="relative isolate overflow-hidden">
       {/* radial bloom — barely perceptible warmth seated under the hero */}
@@ -86,11 +99,11 @@ function Hero() {
             <Reveal reveal={false} delay={0.22}>
               <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4">
                 <Link
-                  href="/sign-in"
-                  data-cta="hero.start_free"
+                  href={isAuthed ? '/docs' : '/sign-in'}
+                  data-cta={isAuthed ? 'hero.open_dashboard' : 'hero.start_free'}
                   className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
                 >
-                  Start free
+                  {isAuthed ? 'Open dashboard' : 'Start free'}
                   <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
                 </Link>
                 <Link
@@ -384,7 +397,7 @@ function OpenSource() {
 
 /* ------------------------------- Close --------------------------------- */
 
-function Close() {
+function Close({ isAuthed }: { isAuthed: boolean }) {
   return (
     <section className="relative">
       <div className="mx-auto max-w-6xl px-6 py-28 md:py-36">
@@ -400,11 +413,11 @@ function Close() {
             </h2>
             <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
               <Link
-                href="/sign-in"
-                data-cta="close.start_free"
+                href={isAuthed ? '/docs' : '/sign-in'}
+                data-cta={isAuthed ? 'close.open_dashboard' : 'close.start_free'}
                 className="group inline-flex items-center gap-2 rounded-md bg-signal px-7 py-3.5 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
               >
-                Start free
+                {isAuthed ? 'Open dashboard' : 'Start free'}
                 <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
               </Link>
               <a

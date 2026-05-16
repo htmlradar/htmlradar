@@ -15,6 +15,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { resolveRecipientIdentity } from '@/lib/recipient-identity';
 import type { ShareRow, ShareAnalyticsData } from './DocumentShareManager';
 
 type Status = 'active' | 'revoked' | 'expired';
@@ -71,14 +72,15 @@ export function SharesTable({
 
   return (
     <section className="mb-8">
-      <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-graphite">
-        At a glance
-      </h2>
-      <p className="mt-1.5 text-[13px] text-graphite">
-        Every share for this document with its top-line metrics. Click a row to open the per-share
-        dashboard.
-      </p>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-paper">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-3">
+        <h2 className="font-serif text-[22px] leading-tight text-ink md:text-[26px]">
+          At a glance
+        </h2>
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+          {shares.length} {shares.length === 1 ? 'share' : 'shares'} · click a row to drill in
+        </p>
+      </div>
+      <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-line bg-paper-2/40 text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
@@ -110,6 +112,7 @@ export function SharesTable({
               );
               const lastOpenedAt = sessions[0]?.started_at as string | undefined;
 
+              const identity = resolveRecipientIdentity(share, viewers);
               return (
                 <tr
                   key={share.id}
@@ -118,10 +121,20 @@ export function SharesTable({
                   <td className="px-4 py-3">
                     <Link
                       href={`/dashboard/${share.slug}`}
-                      className="font-medium text-ink hover:text-signal-dark"
+                      className="block truncate font-medium text-ink hover:text-signal-dark"
+                      title={
+                        identity.secondary
+                          ? `${identity.primary} — ${identity.secondary}`
+                          : identity.primary
+                      }
                     >
-                      {share.recipient_label ?? 'Unlabeled'}
+                      {identity.primary}
                     </Link>
+                    {identity.secondary && (
+                      <div className="mt-0.5 truncate text-[11.5px] text-graphite">
+                        Labelled <span className="text-ink-soft">{identity.secondary}</span>
+                      </div>
+                    )}
                     <div className="mt-0.5 truncate font-mono text-[10.5px] text-graphite">
                       htmlradar.com/r/{share.slug}
                     </div>
@@ -147,7 +160,7 @@ export function SharesTable({
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/dashboard/${share.slug}`}
-                      aria-label={`Open ${share.recipient_label ?? 'share'} dashboard`}
+                      aria-label={`Open ${identity.primary} dashboard`}
                       className="inline-flex items-center gap-1 text-signal-dark hover:text-signal"
                     >
                       <ArrowRight aria-hidden className="size-4" />

@@ -11,7 +11,7 @@
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink, FileText, Link2 } from 'lucide-react';
+import { ArrowLeft, FileText, Link2 } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import {
@@ -23,6 +23,7 @@ import {
   previewDocumentAction,
   uploadAttachmentsAction,
   deleteAttachmentAction,
+  replaceDocumentAction,
 } from './actions';
 import {
   DocumentShareManager,
@@ -30,6 +31,8 @@ import {
   type ShareAnalyticsData,
 } from './DocumentShareManager';
 import { DeleteDocumentButton } from './DeleteDocumentButton';
+import { ReplaceDocumentButton } from './ReplaceDocumentButton';
+import { PreviewDocumentButton } from './PreviewDocumentButton';
 import { SharesTable } from './SharesTable';
 import { AttachmentsPanel, type AttachmentRow } from './AttachmentsPanel';
 
@@ -40,7 +43,14 @@ export default async function DocumentPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { share_error?: string; delete_error?: string; attachment_error?: string };
+  searchParams?: {
+    share_error?: string;
+    delete_error?: string;
+    attachment_error?: string;
+    preview_error?: string;
+    replace_error?: string;
+    replaced?: string;
+  };
 }) {
   await requireUser();
   const supabase = serverClient();
@@ -51,6 +61,13 @@ export default async function DocumentPage({
   const deleteError = searchParams?.delete_error
     ? decodeURIComponent(searchParams.delete_error)
     : null;
+  const previewError = searchParams?.preview_error
+    ? decodeURIComponent(searchParams.preview_error)
+    : null;
+  const replaceError = searchParams?.replace_error
+    ? decodeURIComponent(searchParams.replace_error)
+    : null;
+  const replacedFlash = searchParams?.replaced === '1';
 
   const { data: doc } = await supabase
     .from('documents')
@@ -218,17 +235,10 @@ export default async function DocumentPage({
               for URL-type docs we surface the source URL inline above
               instead (clicking it opens the source directly). */}
           {doc.source_type === 'upload' && (
-            <form action={previewDocumentAction}>
-              <input type="hidden" name="document_id" value={doc.id} />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite transition hover:border-signal hover:text-signal-dark"
-                title="Open the uploaded HTML as-is — no gate, no tracker."
-              >
-                <ExternalLink aria-hidden className="size-3.5" />
-                Preview document
-              </button>
-            </form>
+            <>
+              <PreviewDocumentButton documentId={doc.id} action={previewDocumentAction} />
+              <ReplaceDocumentButton documentId={doc.id} action={replaceDocumentAction} />
+            </>
           )}
           <DeleteDocumentButton
             documentId={doc.id}
@@ -255,6 +265,30 @@ export default async function DocumentPage({
           Couldn't delete this document: {deleteError}
         </div>
       )}
+      {previewError && (
+        <div
+          role="alert"
+          className="mt-6 rounded-md border border-alert/40 bg-alert/5 px-4 py-3 text-[14px] leading-relaxed text-alert"
+        >
+          Preview couldn't open: {previewError}
+        </div>
+      )}
+      {replaceError && (
+        <div
+          role="alert"
+          className="mt-6 rounded-md border border-alert/40 bg-alert/5 px-4 py-3 text-[14px] leading-relaxed text-alert"
+        >
+          Couldn't replace the document: {replaceError}
+        </div>
+      )}
+      {replacedFlash && (
+        <div
+          role="status"
+          className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark"
+        >
+          New version saved. All existing share links now serve v{doc.current_version}.
+        </div>
+      )}
       {searchParams?.attachment_error && (
         <div
           role="alert"
@@ -265,13 +299,11 @@ export default async function DocumentPage({
       )}
 
       <div className="mt-8 space-y-8">
-        <AttachmentsPanel
-          documentId={doc.id}
-          attachments={attachments}
-          uploadAction={uploadAttachmentsAction}
-          deleteAction={deleteAttachmentAction}
-        />
-
+        {/* Order matters: HTML doc + its shares are the primary surface.
+            Attachments are deliberately demoted to the bottom — they're
+            optional supplements, not a parallel concept. Empty state is
+            a one-line CTA so the panel doesn't compete with the share
+            manager for attention when the user has no attachments yet. */}
         <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
 
         <DocumentShareManager
@@ -283,6 +315,13 @@ export default async function DocumentPage({
           editShare={editShareAction}
           previewShare={previewShareAction}
           attachmentCount={attachments.length}
+        />
+
+        <AttachmentsPanel
+          documentId={doc.id}
+          attachments={attachments}
+          uploadAction={uploadAttachmentsAction}
+          deleteAction={deleteAttachmentAction}
         />
       </div>
     </div>

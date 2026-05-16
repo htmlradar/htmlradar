@@ -5,6 +5,8 @@
 
 import Link from 'next/link';
 import { requireUser, serverClient } from '@/lib/supabase-server';
+import { resolveRecipientIdentity } from '@/lib/recipient-identity';
+import type { Viewer } from '@/lib/types';
 import { SectionMark } from '@/components/SectionMark';
 import { SampleDashboard } from '@/components/SampleDashboard';
 import { ArrowRight } from 'lucide-react';
@@ -23,23 +25,29 @@ export default async function DashboardPage() {
   const { data: shares } = await supabase
     .from('document_shares')
     .select(
-      'id, slug, recipient_label, created_at, document_id, documents!inner(title, deleted_at)',
+      'id, slug, recipient_label, require_email, created_at, document_id, documents!inner(title, deleted_at)',
     )
     .is('documents.deleted_at', null)
     .order('created_at', { ascending: false });
 
   const shareIds = (shares ?? []).map((s) => s.id);
   const stats = new Map<string, { views: number; lastSeen: string | null }>();
+  const viewersByShare = new Map<string, Pick<Viewer, 'email' | 'first_seen'>[]>();
   if (shareIds.length > 0) {
-    const { data: sessions } = await supabase
-      .from('sessions')
-      .select('share_id, started_at')
-      .in('share_id', shareIds);
-    for (const s of sessions ?? []) {
+    const [sessionsRes, viewersRes] = await Promise.all([
+      supabase.from('sessions').select('share_id, started_at').in('share_id', shareIds),
+      supabase.from('viewers').select('share_id, email, first_seen').in('share_id', shareIds),
+    ]);
+    for (const s of sessionsRes.data ?? []) {
       const cur = stats.get(s.share_id) ?? { views: 0, lastSeen: null };
       cur.views += 1;
       cur.lastSeen = cur.lastSeen && cur.lastSeen > s.started_at ? cur.lastSeen : s.started_at;
       stats.set(s.share_id, cur);
+    }
+    for (const v of viewersRes.data ?? []) {
+      const list = viewersByShare.get(v.share_id) ?? [];
+      list.push({ email: v.email, first_seen: v.first_seen });
+      viewersByShare.set(v.share_id, list);
     }
   }
 
@@ -85,6 +93,12 @@ export default async function DashboardPage() {
               const title = Array.isArray(s.documents)
                 ? (s.documents[0] as { title: string } | undefined)?.title
                 : (s.documents as unknown as { title: string } | null)?.title;
+              const viewers = viewersByShare.get(s.id) ?? [];
+              const identity = resolveRecipientIdentity(
+                { recipient_label: s.recipient_label, require_email: s.require_email },
+                viewers,
+              );
+              const hasViewers = viewers.length > 0;
               return (
                 <li key={s.id}>
                   <Link
@@ -95,8 +109,23 @@ export default async function DashboardPage() {
                       <div className="truncate font-serif text-[18px] text-ink">
                         {title ?? 'Untitled'}
                       </div>
-                      <div className="mt-1 truncate font-mono text-[11px] text-graphite">
-                        {s.recipient_label ?? '—'} · /r/{s.slug}
+                      <div className="mt-1 truncate text-[12.5px] text-ink-soft">
+                        {hasViewers ? (
+                          <>
+                            Opened by <span className="text-ink">{identity.primary}</span>
+                            {identity.secondary && (
+                              <span className="text-graphite">
+                                {' '}
+                                · labelled {identity.secondary}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-graphite">{identity.primary}</span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 truncate font-mono text-[11px] text-graphite">
+                        /r/{s.slug}
                       </div>
                     </div>
                     <div className="text-right">

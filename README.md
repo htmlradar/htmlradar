@@ -3,7 +3,7 @@
 Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
 - **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 10 documents lifetime, $15/mo Pro for unlimited + 10× attachment headroom
-- **Source**: this repo, AGPL-3.0 · current release: **v1.1**
+- **Source**: this repo, AGPL-3.0 · current release: **v1.1.2**
 - **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
 - **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
 
@@ -17,12 +17,14 @@ The bigger pattern: teams that use LLMs heavily ship more and more of their work
 
 ## What it does
 
-- **Section-level dwell.** A three-second floor separates a real read from a scroll-past. The dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12 seconds on Problem, and skipped Market sizing.
+- **Section-level dwell — on any HTML.** Three-second floor separates a real read from a scroll-past. The tracker auto-detects sections from your HTML: explicit anchored headings → bare `h1/h2/h3` (slugged from text) → slide/page containers (`section`, `.slide`, `.page`) → paragraph buckets on plain prose. Dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12s on Problem, and skipped Market sizing.
+- **Per-viewer dashboard, aggregated across every share.** One row per person who actually opened the doc, with email + country + device + referrer + total time + scroll depth + visits + first/last seen. Updates live every 30 seconds while the tab is in focus.
 - **Per-recipient share links.** One document, many shares. Each share carries its own email gate, password, expiry, revocation, and email-domain or per-email allow-list.
-- **Supporting materials.** Attach PDFs, financial models, images, and ZIPs alongside the HTML deck. Per-share `Allow downloads` toggle; recipients see no signal that materials exist when it's off. Every download is tracked.
+- **Files.** Attach PDFs, financial models, images, and ZIPs alongside the HTML deck. Per-share `Allow downloads` toggle; recipients see no signal that files exist when it's off. Every download is tracked.
 - **Edit + preview on the fly.** Change a share's password, expiry, or allow-list without revoking. Preview the doc as the recipient sees it before sending — short-lived HMAC token, no gate.
 - **Re-upload, keep the link.** Replace the HTML after partner feedback. Every share you've already sent now points at v2. No re-sending.
-- **First-read email notifications.** A Postgres trigger calls Resend the moment a recipient crosses the dwell threshold.
+- **Branded first-open email.** When a recipient crosses the dwell threshold, you get a properly designed HTML notification — viewer email + doc title + a single "See the read →" CTA back to the dashboard. Tease, not report.
+- **Bot / accidental-tap filter.** Sessions only create after a 5-second warm-up; if the recipient backgrounded the tab or bounced before then, no session, no notification, no inflated viewer count.
 - **Privacy-respecting.** No mouse tracking, no keystrokes, no DOM snapshots, no session replay. Section dwell + scroll depth + active time. Recipients can opt out via `window.HTMLRadar.optOut()`.
 
 ## What it deliberately is not
@@ -93,7 +95,7 @@ pnpm typecheck && pnpm test          # sanity check
 pnpm build                           # build all 3 packages
 ```
 
-Schema setup: apply `schema/001_init.sql` through `schema/009_attachments.sql` in order via the Supabase SQL editor. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, etc.) so re-running is safe.
+Schema setup: apply `schema/001_init.sql` through `schema/010_email_template.sql` in order via the Supabase SQL editor. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, etc.) so re-running is safe.
 
 Resend secrets go in Supabase Vault (works on free tier — no `ALTER DATABASE SET` required):
 

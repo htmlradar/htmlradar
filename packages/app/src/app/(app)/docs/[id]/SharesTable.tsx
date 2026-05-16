@@ -56,7 +56,11 @@ export function SharesTable({
   shares: ShareRow[];
   analyticsByShareId: Record<string, ShareAnalyticsData>;
 }) {
-  if (shares.length === 0) return null;
+  // Render only when there's something to compare. A one-row table
+  // duplicates the per-doc ViewerInsights strip above AND the share-
+  // pane stats below — pure clutter. With 2+ shares the row-by-row
+  // comparison is genuinely useful.
+  if (shares.length < 2) return null;
 
   // Sort: active first, then expired, then revoked. Within each group,
   // most-recent activity first (last-opened DESC, then create DESC).

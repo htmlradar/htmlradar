@@ -35,7 +35,13 @@ declare global {
 
 const DEFAULTS: Omit<TrackerConfig, 'supabaseUrl' | 'supabaseAnonKey' | 'shareSlug'> = {
   sections: {
-    selector: 'h1[id], h2[id], h3[id]',
+    // Default is the broadest heading selector. The discover step
+    // auto-slugs missing IDs from the heading text, and a fallback
+    // layer (see SectionTracker.pickCandidates) widens to slide/page
+    // containers when headings are absent. Hosts wanting the old
+    // strict behaviour can pass `'h1[id], h2[id], h3[id]'` via
+    // window.HTMLRadarConfig.sections.selector.
+    selector: 'h1, h2, h3',
     boundaryOffsetPx: 120,
     minDwellMs: 3000,
   },

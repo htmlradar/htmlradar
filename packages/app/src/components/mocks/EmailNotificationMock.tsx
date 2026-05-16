@@ -31,7 +31,7 @@ export function EmailNotificationMock({ variant = 'inbox' }: EmailNotificationMo
         <p className="mt-1 truncate text-[14px] font-medium text-ink">
           Marc just opened Seed Deck, Q2.
         </p>
-        <p className="mt-1 truncate text-[12.5px] leading-snug text-ink-soft">
+        <p className="mt-1 text-[12.5px] leading-snug text-ink-soft sm:truncate">
           Example Ventures · 2m 41s on §03 The Ask · still active
         </p>
         {isCard && (

@@ -1,11 +1,15 @@
 'use client';
 
-// Attachments panel on /docs/[id]. Visually demoted vs the main HTML
+// "Files" panel on /docs/[id]. Visually demoted vs the main HTML
 // deck: lives at the BOTTOM of the doc detail (after shares), renders
-// as a single-line CTA when empty, and uses "Attachments" framing
-// instead of the older "Supporting materials" copy that confused
-// senders into thinking attachments were a parallel concept to the
-// HTML doc itself.
+// as a single-line CTA when empty.
+//
+// Naming: "Files" — not "Attachments", not "Downloads", not "Supporting
+// materials". From the sender's POV they're adding a file alongside the
+// HTML deck; from the recipient's POV they might download it. "Files"
+// is the shortest sender-native word and the explainer line ("Files
+// ride along with the HTML deck. We track downloads, not reads.") nails
+// the relationship without baggage.
 //
 // Sender-side only. Recipient view comes via the proxy's injected
 // materials footer (when allow_download is true on their share).
@@ -126,37 +130,32 @@ export function AttachmentsPanel({
   // flips `expanded` and reveals the full panel below.
   if (!expanded && attachments.length === 0) {
     return (
-      <section aria-label="Attachments">
+      <section aria-label="Files">
         <button
           type="button"
           onClick={() => setExpanded(true)}
           className="group inline-flex items-center gap-2 text-[14px] text-ink-soft transition hover:text-signal-dark"
         >
           <Upload aria-hidden className="size-3.5" />
-          <span className="font-medium">Add attachments</span>
+          <span className="font-medium">Add a file</span>
           <span className="text-graphite">— PDF, Excel, ZIP, optional</span>
         </button>
         <p className="mt-1.5 max-w-xl text-[12.5px] leading-relaxed text-graphite">
-          Files recipients can download alongside this HTML. Off by default per share — flip the
-          toggle on a share to release them.
+          Files ride along with the HTML deck. We track downloads, not reads — recipients only see
+          them when you flip the per-share download toggle on.
         </p>
       </section>
     );
   }
 
   return (
-    <section
-      aria-label="Attachments"
-      className="rounded-2xl border border-line bg-paper-2/30 p-5 md:p-6"
-    >
+    <section aria-label="Files" className="rounded-2xl border border-line bg-paper-2/30 p-5 md:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-graphite">
-            Attachments
-          </h2>
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-graphite">Files</h2>
           <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-ink-soft">
-            Files recipients can download alongside this HTML. Off by default per share — flip the
-            toggle on a share to release them.
+            Files ride along with the HTML deck. We track downloads, not reads — recipients only see
+            them when you flip the per-share download toggle on.
           </p>
         </div>
         <span className="shrink-0 font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">

@@ -73,13 +73,14 @@ export function DeleteDocumentButton({
         type="submit"
         disabled={isPending}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-60',
+          'inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-[13px] font-medium shadow-[0_1px_0_rgba(31,17,8,0.04)] transition disabled:cursor-not-allowed disabled:opacity-60',
           armed
             ? 'border border-alert bg-alert text-paper hover:bg-alert/90'
-            : 'border border-line bg-paper text-graphite hover:border-alert hover:text-alert',
+            : 'border border-ink/15 bg-paper text-ink hover:border-alert hover:text-alert',
         )}
       >
-        {isPending ? 'Deleting…' : armed ? 'Confirm delete' : 'Delete document'}
+        <AlertTriangle aria-hidden className="size-3.5" />
+        {isPending ? 'Deleting…' : armed ? 'Confirm delete' : 'Delete'}
       </button>
     </form>
   );

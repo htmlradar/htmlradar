@@ -56,6 +56,7 @@ export interface Viewer {
   device_type: string | null;
   os: string | null;
   browser: string | null;
+  referrer: string | null;
 }
 
 export interface Session {

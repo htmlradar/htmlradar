@@ -15,6 +15,7 @@ export type AppEvent =
   | 'user.signed_out'
   | 'document.created'
   | 'document.deleted'
+  | 'document.replaced'
   | 'share.created'
   | 'share.edited'
   | 'share.revoked'

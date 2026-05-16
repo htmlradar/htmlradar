@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
 import { issueOwnerDocPreviewToken, issueOwnerPreviewToken } from '@/lib/preview-token';
-import { deleteR2Object, uploadAttachment } from '@/lib/r2';
+import { deleteR2Object, r2Key, uploadAttachment, uploadHtml } from '@/lib/r2';
 import {
   MAX_ATTACHMENTS_PER_DOC,
   MAX_TOTAL_BYTES_PER_DOC,
@@ -265,13 +265,15 @@ export async function editShareAction(formData: FormData) {
 // Requires SESSION_SECRET env var to be set in the app deploy, matching
 // the proxy's wrangler.toml SESSION_SECRET. If they diverge the proxy's
 // verify call will reject the token.
-export async function previewShareAction(formData: FormData) {
+// Same shape as previewDocumentAction: returns the URL for the client
+// to hard-navigate to. See that action's comment for why we don't
+// redirect() server-side.
+export async function previewShareAction(
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const user = await requireUser();
   const supabase = serverClient();
   const shareId = String(formData.get('share_id'));
-
-  let errorMessage: string | null = null;
-  let redirectTo: string | null = null;
 
   try {
     const { data: share, error } = await supabase
@@ -291,7 +293,7 @@ export async function previewShareAction(formData: FormData) {
     }
 
     const token = await issueOwnerPreviewToken(share.slug, secret);
-    redirectTo = `https://htmlradar.com/r/${share.slug}?owner_preview=${encodeURIComponent(token)}`;
+    const url = `https://htmlradar.com/r/${share.slug}?owner_preview=${encodeURIComponent(token)}`;
 
     await captureServerEvent({
       event: 'share.preview_opened',
@@ -299,15 +301,12 @@ export async function previewShareAction(formData: FormData) {
       userId: user.id,
       properties: { share_id: shareId, document_id: share.document_id },
     });
-  } catch (e) {
-    errorMessage = e instanceof Error ? e.message : 'Failed to start preview.';
-  }
 
-  if (errorMessage) {
-    const documentId = String(formData.get('document_id'));
-    redirect(`/docs/${documentId}?share_error=${encodeURIComponent(errorMessage)}`);
+    return { ok: true, url };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : 'Failed to start preview.';
+    return { ok: false, error };
   }
-  if (redirectTo) redirect(redirectTo);
 }
 
 // ============================================================
@@ -510,10 +509,14 @@ export async function deleteAttachmentAction(formData: FormData) {
 }
 
 // "Preview document" — the sender's pre-share preview. Mints a token
-// bound to the doc_id (not a share slug) and sends the owner to the
-// proxy's /r/_doc/{doc_id} route, which serves the raw uploaded HTML
-// with no gate, no tracker. Lets the sender verify their upload before
-// creating any shares.
+// bound to the doc_id (not a share slug) and returns the proxy URL the
+// CLIENT must navigate to. We deliberately do NOT call redirect() here:
+// Next.js Server Actions intercept same-hostname redirects via the
+// client-side router, which would try to resolve /r/_doc/... inside
+// the Next.js route tree and 404 (because /r/* is a Worker route, not
+// a Next.js route). Returning the URL forces the caller to do a hard
+// window.location navigation, which is what we want — the browser
+// GETs the proxy directly.
 //
 // Distinct from previewShareAction (which is bound to a SHARE slug and
 // shows the recipient-style view with the tracker injected). This one
@@ -521,34 +524,44 @@ export async function deleteAttachmentAction(formData: FormData) {
 // see this share?"
 //
 // Requires SESSION_SECRET to match the proxy's wrangler.toml value.
-export async function previewDocumentAction(formData: FormData) {
+export async function previewDocumentAction(
+  formData: FormData,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const user = await requireUser();
   const supabase = serverClient();
   const documentId = String(formData.get('document_id'));
 
-  let errorMessage: string | null = null;
-  let redirectTo: string | null = null;
-
   try {
+    // r2_key + source_type are pulled so we can fail-fast with a clear
+    // message if the doc has no blob to preview (URL-source or a botched
+    // upload that left the row without a key).
     const { data: doc, error } = await supabase
       .from('documents')
-      .select('id, owner_id, deleted_at')
+      .select('id, owner_id, deleted_at, source_type, r2_key')
       .eq('id', documentId)
       .single();
     if (error) throw new Error(error.message);
     if (!doc) throw new Error('Document not found.');
     if (doc.owner_id !== user.id) throw new Error('Not your document.');
     if (doc.deleted_at) throw new Error('This document has been deleted.');
+    if (doc.source_type !== 'upload') {
+      throw new Error(
+        'Preview is only available for uploaded HTML — URL-source docs open their source directly.',
+      );
+    }
+    if (!doc.r2_key) {
+      throw new Error('This document is missing its uploaded blob. Re-upload the HTML to fix.');
+    }
 
     const secret = process.env['SESSION_SECRET'];
     if (!secret) {
       throw new Error(
-        'SESSION_SECRET is not set on the app — preview requires the same secret the proxy uses.',
+        'Preview is unavailable — the deploy is missing its SESSION_SECRET env var. Set it on Cloudflare Pages (must match the Worker secret) and retry.',
       );
     }
 
     const token = await issueOwnerDocPreviewToken(doc.id, secret);
-    redirectTo = `https://htmlradar.com/r/_doc/${doc.id}?owner_doc_preview=${encodeURIComponent(token)}`;
+    const url = `https://htmlradar.com/r/_doc/${doc.id}?owner_doc_preview=${encodeURIComponent(token)}`;
 
     await captureServerEvent({
       event: 'document.preview_opened',
@@ -556,14 +569,12 @@ export async function previewDocumentAction(formData: FormData) {
       userId: user.id,
       properties: { document_id: doc.id },
     });
-  } catch (e) {
-    errorMessage = e instanceof Error ? e.message : 'Failed to start document preview.';
-  }
 
-  if (errorMessage) {
-    redirect(`/docs/${documentId}?delete_error=${encodeURIComponent(errorMessage)}`);
+    return { ok: true, url };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : 'Failed to start document preview.';
+    return { ok: false, error };
   }
-  if (redirectTo) redirect(redirectTo);
 }
 
 export async function deleteDocumentAction(formData: FormData) {
@@ -593,4 +604,93 @@ export async function deleteDocumentAction(formData: FormData) {
     redirect(`/docs/${docId}?delete_error=${encodeURIComponent(errorMessage)}`);
   }
   redirect('/docs');
+}
+
+// Replace the HTML body of an existing upload-type document with a new
+// version. Same R2 key namespace (`docs/{owner}/{doc}/v{n}.html`), bumped
+// version number. Existing share slugs keep working — they fetch the
+// current_version row from the document, so recipients automatically see
+// the new HTML on their next open.
+//
+// Old R2 objects are left in place (cheap; preserves a recovery path).
+// We don't delete them yet because R2 list/cleanup is a separate sweep
+// (post-launch) and the cost is negligible at our scale.
+//
+// Constraints:
+//   - upload-type docs only (URL-source docs update their content at the
+//     source; replacing here would be meaningless)
+//   - same 30 MB ceiling as createDocument
+//   - sender must own the doc (RLS would block anyway, but we check
+//     explicitly so the error is clear)
+const MAX_REPLACE_BYTES = 30 * 1024 * 1024;
+
+export async function replaceDocumentAction(formData: FormData) {
+  const user = await requireUser();
+  const supabase = serverClient();
+  const documentId = String(formData.get('document_id'));
+
+  let errorMessage: string | null = null;
+
+  try {
+    const { data: doc, error: fetchErr } = await supabase
+      .from('documents')
+      .select('id, owner_id, source_type, current_version, deleted_at')
+      .eq('id', documentId)
+      .single();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!doc) throw new Error('Document not found.');
+    if (doc.owner_id !== user.id) throw new Error('Not your document.');
+    if (doc.deleted_at) throw new Error('This document has been deleted.');
+    if (doc.source_type !== 'upload') {
+      throw new Error('URL-source documents update at their source; nothing to replace here.');
+    }
+
+    const file = formData.get('file') as File | null;
+    if (!file || file.size === 0) throw new Error('No file uploaded.');
+    if (file.size > MAX_REPLACE_BYTES) {
+      throw new Error('File exceeds the 30 MB limit.');
+    }
+    // Same content-type guard as the create flow. We deliberately accept
+    // a broad set (browsers report inconsistently), but reject obvious
+    // non-HTML so the recipient view never tries to render binary garbage.
+    if (file.type && !file.type.includes('html') && file.type !== '') {
+      throw new Error('Only HTML files can replace a document.');
+    }
+
+    const nextVersion = (doc.current_version ?? 0) + 1;
+    const newKey = r2Key(user.id, doc.id, nextVersion);
+
+    // Upload first. If this fails, the DB row still points at the prior
+    // version's blob — recipients are unaffected. If the DB update fails
+    // after a successful upload, we have an orphan R2 object (acceptable;
+    // periodic sweep cleans these up).
+    await uploadHtml(newKey, new Uint8Array(await file.arrayBuffer()));
+
+    const { error: updateErr } = await supabase
+      .from('documents')
+      .update({
+        current_version: nextVersion,
+        r2_key: newKey,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', doc.id)
+      .eq('owner_id', user.id);
+    if (updateErr) throw new Error(updateErr.message);
+
+    await captureServerEvent({
+      event: 'document.replaced',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { document_id: doc.id, version: nextVersion },
+    });
+
+    revalidatePath(`/docs/${doc.id}`);
+  } catch (e) {
+    errorMessage = e instanceof Error ? e.message : 'Failed to replace the document.';
+  }
+
+  if (errorMessage) {
+    redirect(`/docs/${documentId}?replace_error=${encodeURIComponent(errorMessage)}`);
+  }
+  redirect(`/docs/${documentId}?replaced=1`);
 }

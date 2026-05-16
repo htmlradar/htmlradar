@@ -71,11 +71,6 @@ export default {
       if (!doc || doc.deleted_at) return notFound();
       const htmlResp = await fetchDocumentHtml(doc, env);
       if (!htmlResp) return sourceUnreachable();
-      // No tracker injection — this is a sender-side preview, not a
-      // recipient view. Return the raw HTML so the sender sees exactly
-      // what they uploaded. fetchDocumentHtml already returns a Response;
-      // re-stream the body so we own the headers (one Content-Type, no
-      // cached R2 metadata leakage).
       const body = await htmlResp.text();
       return new Response(body, {
         status: 200,

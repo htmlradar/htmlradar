@@ -204,16 +204,29 @@ function extOf(filename: string): string {
   return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
 }
 
+// Free-tier badge baked into the recipient view. Same solid oxblood
+// pill the gate/error shells use — top-right, unmissable, so the
+// recipient knows the tracking surface they're on. Inlined styles
+// (no external CSS) and a high z-index keep this readable on any
+// background the sender's HTML uses.
 function chromeFooter(): string {
   return [
-    `<div style="position:fixed;bottom:8px;right:12px;z-index:2147483646;`,
-    `font:11px/1.4 'JetBrains Mono','SF Mono',Menlo,monospace;color:#6b6258;`,
-    `background:rgba(250,247,241,0.92);padding:4px 10px;border-radius:4px;`,
-    `border:1px solid #ddd4c2;backdrop-filter:blur(8px);">`,
-    `Shared with `,
     `<a href="https://htmlradar.com" target="_blank" rel="noopener" `,
-    `style="color:#0f5e4d;text-decoration:none;border-bottom:1px dotted currentColor;">HTMLRadar</a>`,
-    `</div>`,
+    `style="position:fixed;top:16px;right:16px;z-index:2147483646;`,
+    `display:inline-flex;align-items:center;gap:8px;`,
+    `background:#7A1F2E;color:#FBF1E8;text-decoration:none;`,
+    `font:600 11px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;`,
+    `text-transform:uppercase;letter-spacing:0.16em;`,
+    `padding:8px 14px 8px 12px;border-radius:999px;`,
+    `box-shadow:0 1px 0 rgba(31,17,8,0.12),0 6px 18px -8px rgba(122,31,46,0.35);">`,
+    `<svg aria-hidden viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px">`,
+    `<circle cx="12" cy="12" r="9" fill="none" stroke="#FBF1E8" stroke-width="1.3" opacity="0.45"/>`,
+    `<circle cx="12" cy="12" r="5" fill="none" stroke="#FBF1E8" stroke-width="1.3" opacity="0.7"/>`,
+    `<line x1="12" y1="12" x2="12" y2="3" stroke="#FBF1E8" stroke-width="1.5" stroke-linecap="round"/>`,
+    `<circle cx="12" cy="12" r="1.7" fill="#FBF1E8"/>`,
+    `</svg>`,
+    `<span>HTMLRadar</span>`,
+    `</a>`,
   ].join('');
 }
 

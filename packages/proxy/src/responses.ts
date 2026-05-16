@@ -46,16 +46,16 @@ const OG_TAGS = `
 <meta name="robots" content="noindex, nofollow">
 `.trim();
 
-// Compact, tasteful radar mark — a single ring + sweep line + center dot,
-// inline so we don't ship an SVG file in the bundle. Sits top-left of
-// every shell as the brand kicker. No animation (would compete with the
-// content).
+// Compact radar mark — single ring + sweep line + center dot. Drawn in
+// the brand badge's paper-cream so it reads against the solid oxblood
+// pill at the top-right of every shell. No animation (would compete with
+// the content).
 const RADAR_MARK = `
-<svg aria-hidden viewBox="0 0 24 24" width="20" height="20" style="vertical-align:-3px">
-  <circle cx="12" cy="12" r="9" fill="none" stroke="#7A1F2E" stroke-width="1" opacity="0.35"/>
-  <circle cx="12" cy="12" r="5" fill="none" stroke="#7A1F2E" stroke-width="1" opacity="0.55"/>
-  <line x1="12" y1="12" x2="12" y2="3" stroke="#7A1F2E" stroke-width="1.25" stroke-linecap="round"/>
-  <circle cx="12" cy="12" r="1.6" fill="#7A1F2E"/>
+<svg aria-hidden viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px">
+  <circle cx="12" cy="12" r="9" fill="none" stroke="#FBF1E8" stroke-width="1.3" opacity="0.45"/>
+  <circle cx="12" cy="12" r="5" fill="none" stroke="#FBF1E8" stroke-width="1.3" opacity="0.7"/>
+  <line x1="12" y1="12" x2="12" y2="3" stroke="#FBF1E8" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="12" cy="12" r="1.7" fill="#FBF1E8"/>
 </svg>
 `.trim();
 
@@ -95,19 +95,37 @@ body {
   margin: 0 auto;
   padding: 32px 28px 56px;
 }
+/* Brand badge — solid oxblood pill anchored top-right of every shell.
+   Unmissable by design: the recipient should know within a beat that
+   the link they're on belongs to HTMLRadar, not a phishing replica.
+   Position is fixed so the pill stays anchored even on long forms. */
+.brand-mount {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 5;
+}
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font: 500 12px/1 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  gap: 8px;
+  font: 600 11px/1 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--ink-soft);
+  letter-spacing: 0.16em;
+  color: var(--paper);
   text-decoration: none;
-  margin-bottom: auto;
-  padding-top: 4px;
+  background: var(--signal);
+  border-radius: 999px;
+  padding: 8px 14px 8px 12px;
+  box-shadow: 0 1px 0 rgba(31, 17, 8, 0.12), 0 6px 18px -8px rgba(122, 31, 46, 0.35);
+  transition: background-color 120ms ease, transform 120ms ease;
 }
-.brand:hover { color: var(--signal); }
+.brand:hover { background: var(--signal-dark); }
+.brand:active { transform: translateY(0.5px); }
+@media (max-width: 480px) {
+  .brand-mount { top: 14px; right: 14px; }
+  .brand { padding: 7px 12px 7px 10px; font-size: 10.5px; letter-spacing: 0.14em; }
+}
 .card {
   margin-top: 18vh;
   margin-bottom: auto;
@@ -226,8 +244,10 @@ ${FONTS_LINK}
 <style>${STYLES}</style>
 </head>
 <body>
+<div class="brand-mount">
+  <a class="brand" href="https://htmlradar.com" rel="noopener">${RADAR_MARK}<span>HTMLRadar</span></a>
+</div>
 <div class="frame">
-  <a class="brand" href="https://htmlradar.com">${RADAR_MARK}<span>HTMLRadar</span></a>
   <main class="card">
     ${kicker ? `<p class="kicker">${escapeHtml(kicker)}</p>` : ''}
     ${body}

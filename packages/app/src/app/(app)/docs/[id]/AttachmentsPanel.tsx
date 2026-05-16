@@ -1,9 +1,11 @@
 'use client';
 
-// Supporting materials panel on /docs/[id]. Visually demoted vs the main
-// HTML deck (smaller header, paper-2 background) so the deck stays the
-// page's identity. The mental model the user (Abhinandan) is solving for:
-// "HTML deck is the cover; attachments are supplementary."
+// Attachments panel on /docs/[id]. Visually demoted vs the main HTML
+// deck: lives at the BOTTOM of the doc detail (after shares), renders
+// as a single-line CTA when empty, and uses "Attachments" framing
+// instead of the older "Supporting materials" copy that confused
+// senders into thinking attachments were a parallel concept to the
+// HTML doc itself.
 //
 // Sender-side only. Recipient view comes via the proxy's injected
 // materials footer (when allow_download is true on their share).
@@ -68,6 +70,11 @@ export function AttachmentsPanel({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const [clientError, setClientError] = useState<string | null>(null);
+  // When the panel is empty, we render a single-line CTA. Clicking it
+  // expands the full upload UI. This stops the panel from competing
+  // with the HTML doc + share manager for visual attention when the
+  // sender hasn't added any attachments yet.
+  const [expanded, setExpanded] = useState(attachments.length > 0);
 
   const existingCount = attachments.length;
   const existingBytes = attachments.reduce((acc, a) => acc + a.size_bytes, 0);
@@ -114,23 +121,42 @@ export function AttachmentsPanel({
     }
   };
 
+  // Collapsed empty state — single inline CTA. Renders only when no
+  // attachments AND the user hasn't expanded it yet. Clicking the CTA
+  // flips `expanded` and reveals the full panel below.
+  if (!expanded && attachments.length === 0) {
+    return (
+      <section aria-label="Attachments">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="group inline-flex items-center gap-2 text-[14px] text-ink-soft transition hover:text-signal-dark"
+        >
+          <Upload aria-hidden className="size-3.5" />
+          <span className="font-medium">Add attachments</span>
+          <span className="text-graphite">— PDF, Excel, ZIP, optional</span>
+        </button>
+        <p className="mt-1.5 max-w-xl text-[12.5px] leading-relaxed text-graphite">
+          Files recipients can download alongside this HTML. Off by default per share — flip the
+          toggle on a share to release them.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section
-      aria-label="Supporting materials"
+      aria-label="Attachments"
       className="rounded-2xl border border-line bg-paper-2/30 p-5 md:p-6"
     >
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-graphite">
-            Supporting materials
+            Attachments
           </h2>
           <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-ink-soft">
-            Optional files recipients can download (PDFs, financial models, images, ZIPs). The HTML
-            deck stays the primary tracked artefact — these are supplementary.{' '}
-            <strong className="font-medium text-ink-soft">
-              Downloads are off by default per share.
-            </strong>{' '}
-            Toggle &quot;Allow downloads&quot; on a share to share them.
+            Files recipients can download alongside this HTML. Off by default per share — flip the
+            toggle on a share to release them.
           </p>
         </div>
         <span className="shrink-0 font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">

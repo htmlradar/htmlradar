@@ -221,9 +221,9 @@ function TheMoment() {
 
 /* ----------------------------- What it does ---------------------------- */
 
-// Inline mock for the new "Supporting materials" landing-page claim.
-// Renders a static preview of the recipient's Materials pill + expanded
-// panel from the proxy injection. Pure markup; the real version in
+// Inline mock for the "Files" landing-page claim. Renders a static
+// preview of the recipient's Files pill + expanded panel from the
+// proxy injection. Pure markup; the real version in
 // packages/proxy/src/inject.ts materialsPanel() is what ships to
 // recipients. This is the marketing-page mirror.
 function MaterialsPanelMock() {
@@ -231,7 +231,7 @@ function MaterialsPanelMock() {
     <div className="relative mx-auto max-w-[360px] rounded-2xl border border-line bg-paper p-5 shadow-[0_18px_40px_-30px_rgba(31,17,8,0.18)]">
       <div className="flex items-center justify-between border-b border-line pb-3">
         <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-graphite">
-          Supporting materials
+          Files
         </span>
         <span className="font-mono text-[10.5px] text-graphite">×</span>
       </div>
@@ -295,7 +295,7 @@ function WhatWeBuilt() {
     {
       num: '04',
       title: 'Send the deck. Attach the diligence.',
-      body: 'Supporting materials live alongside the HTML. Toggle "Allow downloads" per share to decide whether this recipient sees a Materials panel or not — when it’s off, they don’t even know files exist. Every download is logged with the recipient’s email and the moment it happened.',
+      body: 'Files ride along with the HTML deck — PDFs, cap tables, financial models, ZIPs. Toggle "Allow downloads" per share to decide whether this recipient sees a Files panel or not — when it’s off, they don’t even know they exist. Every download is logged with the recipient’s email and the moment it happened.',
       mock: <MaterialsPanelMock />,
     },
   ];

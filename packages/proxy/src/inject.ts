@@ -118,13 +118,13 @@ function materialsPanel(slug: string, attachments: Attachment[]): string {
 <div class="htmlradar-mat-root" data-state="collapsed">
   <button type="button" class="htmlradar-mat-toggle" aria-expanded="false" aria-controls="htmlradar-mat-list">
     <span class="htmlradar-mat-toggle-icon" aria-hidden="true">📎</span>
-    Materials
+    Files
     <span class="htmlradar-mat-toggle-count">${count}</span>
   </button>
-  <div class="htmlradar-mat-panel" id="htmlradar-mat-list" role="region" aria-label="Supporting materials">
+  <div class="htmlradar-mat-panel" id="htmlradar-mat-list" role="region" aria-label="Files">
     <div class="htmlradar-mat-header">
-      <span>Supporting materials</span>
-      <button type="button" class="htmlradar-mat-close" aria-label="Close materials">×</button>
+      <span>Files</span>
+      <button type="button" class="htmlradar-mat-close" aria-label="Close files">×</button>
     </div>
     <ul class="htmlradar-mat-list">
       ${items}

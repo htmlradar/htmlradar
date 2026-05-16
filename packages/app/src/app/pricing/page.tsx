@@ -19,7 +19,7 @@ export const runtime = 'edge';
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'Open source under AGPL-3.0. Run it yourself on Cloudflare and Supabase, free forever. Or use the hosted version — free for 10 documents and 100 MB of supporting materials, $15/month for unlimited documents and 10× the attachment headroom.',
+    'Open source under AGPL-3.0. Run it yourself on Cloudflare and Supabase, free forever. Or use the hosted version — free for 10 documents and 100 MB of attached files, $15/month for unlimited documents and 10× the attachment headroom.',
 };
 
 export default function PricingPage() {
@@ -61,7 +61,7 @@ export default function PricingPage() {
                   'Section-level dwell tracking, per recipient',
                   'Email gate, password, expiry, revoke per share',
                   'Email-domain and per-email allow-lists',
-                  'Supporting materials: 20 files · 25 MB each · 100 MB per doc',
+                  'Files attached to a deck: 20 files · 25 MB each · 100 MB per doc',
                   'Per-share download permission, with every download tracked',
                   'Real-time email when a real read happens',
                   '“Shared with HTMLRadar” footer on the viewer',
@@ -82,7 +82,7 @@ export default function PricingPage() {
                 features={[
                   'Everything in Free, plus:',
                   'Unlimited documents',
-                  'Supporting materials: 50 files · 100 MB each · 1 GB per doc',
+                  'Files attached to a deck: 50 files · 100 MB each · 1 GB per doc',
                   'No “Shared with HTMLRadar” footer on recipient views',
                   'Priority email support, response inside one business day',
                 ]}

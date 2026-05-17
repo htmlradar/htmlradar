@@ -2,7 +2,7 @@ var z = Object.defineProperty;
 var j = (n, e, t) =>
   e in n ? z(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
 var l = (n, e, t) => (j(n, typeof e != 'symbol' ? e + '' : e, t), t);
-var f = {
+var m = {
   sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
   gate: {
@@ -25,25 +25,25 @@ function L(n) {
     t = window.HTMLRadarConfig ?? {},
     r = t.supabaseUrl ?? e.supabaseUrl,
     i = t.supabaseAnonKey ?? e.supabaseAnonKey,
-    s = t.shareSlug ?? e.shareSlug;
-  if (!r || !i || !s) return null;
-  let o = {
+    o = t.shareSlug ?? e.shareSlug;
+  if (!r || !i || !o) return null;
+  let s = {
     supabaseUrl: r,
     supabaseAnonKey: i,
-    shareSlug: s,
-    sections: { ...f.sections, ...(t.sections ?? {}) },
-    session: { ...f.session, ...(t.session ?? {}) },
+    shareSlug: o,
+    sections: { ...m.sections, ...(t.sections ?? {}) },
+    session: { ...m.session, ...(t.session ?? {}) },
     gate: {
-      ...f.gate,
+      ...m.gate,
       ...(t.gate ?? {}),
-      brand: { ...f.gate.brand, ...(t.gate?.brand ?? {}) },
-      copy: { ...f.gate.copy, ...(t.gate?.copy ?? {}) },
+      brand: { ...m.gate.brand, ...(t.gate?.brand ?? {}) },
+      copy: { ...m.gate.copy, ...(t.gate?.copy ?? {}) },
     },
-    privacy: { ...f.privacy, ...(t.privacy ?? {}) },
+    privacy: { ...m.privacy, ...(t.privacy ?? {}) },
     hooks: t.hooks ?? {},
     debug: t.debug ?? !1,
   };
-  return (t.email && (o.email = t.email), t.geo && (o.geo = t.geo), o);
+  return (t.email && (s.email = t.email), t.geo && (s.geo = t.geo), s);
 }
 function V(n) {
   let e = {};
@@ -57,20 +57,20 @@ function V(n) {
 var M = 'htmlradar:',
   w = `${M}fp`,
   k = `${M}email`,
-  _ = `${M}optout`;
-function A() {
+  A = `${M}optout`;
+function _() {
   try {
-    return localStorage.getItem(_) === '1';
+    return localStorage.getItem(A) === '1';
   } catch {
     return !1;
   }
 }
 function R() {
   try {
-    (localStorage.setItem(_, '1'), localStorage.removeItem(w), localStorage.removeItem(k));
+    (localStorage.setItem(A, '1'), localStorage.removeItem(w), localStorage.removeItem(k));
   } catch {}
 }
-function O() {
+function H() {
   try {
     let n = localStorage.getItem(w);
     if (n) return n;
@@ -80,7 +80,7 @@ function O() {
     return C();
   }
 }
-function H() {
+function O() {
   try {
     return localStorage.getItem(k);
   } catch {
@@ -109,24 +109,24 @@ function F(n, e) {
       document.body.appendChild(r));
     let i = r.attachShadow({ mode: 'closed' });
     i.innerHTML = B(n);
-    let s = i.querySelector('form'),
-      o = i.querySelector('input[type=email]'),
+    let o = i.querySelector('form'),
+      s = i.querySelector('input[type=email]'),
       a = i.querySelector('.error'),
       c = i.querySelector('button'),
-      u = c.textContent ?? 'Continue';
-    requestAnimationFrame(() => o.focus());
-    let d = (T) => {
-        ((a.textContent = T), o.setAttribute('aria-invalid', 'true'));
+      d = c.textContent ?? 'Continue';
+    requestAnimationFrame(() => s.focus());
+    let u = (T) => {
+        ((a.textContent = T), s.setAttribute('aria-invalid', 'true'));
       },
       S = () => {
-        ((a.textContent = ''), o.removeAttribute('aria-invalid'));
+        ((a.textContent = ''), s.removeAttribute('aria-invalid'));
       };
-    (o.addEventListener('input', S),
-      s.addEventListener('submit', async (T) => {
+    (s.addEventListener('input', S),
+      o.addEventListener('submit', async (T) => {
         T.preventDefault();
-        let E = o.value.trim().toLowerCase();
+        let E = s.value.trim().toLowerCase();
         if (!P.test(E)) {
-          d('Please enter a valid email address.');
+          u('Please enter a valid email address.');
           return;
         }
         ((c.disabled = !0), (c.textContent = 'Loading\u2026'), S());
@@ -137,7 +137,7 @@ function F(n, e) {
           b = "We couldn't reach the server. Check your connection and try again.";
         }
         if (b) {
-          ((c.disabled = !1), (c.textContent = u), d(b));
+          ((c.disabled = !1), (c.textContent = d), u(b));
           return;
         }
         (r.remove(), t(E));
@@ -208,18 +208,18 @@ function B(n) {
 </style>
 <div class="backdrop">
   <form class="card" novalidate>
-    <h2>${h(e.heading)}</h2>
-    <p class="subhead">${h(e.subhead)}</p>
+    <h2>${g(e.heading)}</h2>
+    <p class="subhead">${g(e.subhead)}</p>
     <label for="hr-email">Email</label>
-    <input id="hr-email" type="email" placeholder="${h(e.placeholder)}" required autocomplete="email" />
+    <input id="hr-email" type="email" placeholder="${g(e.placeholder)}" required autocomplete="email" />
     <div class="error" role="alert"></div>
-    <button type="submit">${h(e.buttonLabel)}</button>
-    <p class="privacy">${h(e.privacyNote)}</p>
+    <button type="submit">${g(e.buttonLabel)}</button>
+    <p class="privacy">${g(e.privacyNote)}</p>
     <div class="footer">Shared with <a href="https://htmlradar.com" target="_blank" rel="noopener">HTMLRadar</a></div>
   </form>
 </div>`;
 }
-function h(n) {
+function g(n) {
   return n
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -293,23 +293,23 @@ var y = class {
     let e = W(this.opts.selector),
       t = new Map();
     e.elements.forEach((r, i) => {
-      let s = r.id;
-      if (!s)
-        if (e.strategy === 'slides') s = `slide-${i + 1}`;
+      let o = r.id;
+      if (!o)
+        if (e.strategy === 'slides') o = `slide-${i + 1}`;
         else if (e.strategy === 'prose') {
           let c = U((r.textContent ?? '').trim());
-          s = K(c) || `part-${i + 1}`;
-        } else s = K((r.textContent ?? '').trim()) || `section-${i + 1}`;
-      let o = (t.get(s) ?? 0) + 1;
-      (t.set(s, o), o > 1 && (s = `${s}-${o}`));
+          o = K(c) || `part-${i + 1}`;
+        } else o = K((r.textContent ?? '').trim()) || `section-${i + 1}`;
+      let s = (t.get(o) ?? 0) + 1;
+      (t.set(o, s), s > 1 && (o = `${o}-${s}`));
       let a;
       (e.strategy === 'slides'
         ? (a = Q(r, i + 1))
         : e.strategy === 'prose'
           ? (a = U((r.textContent ?? '').trim()) || `Part ${i + 1}`)
-          : (a = (r.textContent ?? '').trim().slice(0, 200)),
+          : (a = f(r.textContent ?? '').slice(0, 200) || `Section ${i + 1}`),
         this.sections.push({
-          id: s,
+          id: o,
           title: a,
           depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : G(r.tagName),
           ordinal: i,
@@ -359,17 +359,17 @@ var y = class {
     let e = null,
       t = 0,
       r = !1;
-    for (let o of this.sections) {
-      let a = this.intersectionByElement.get(o.element);
-      a !== void 0 && ((r = !0), a > t && ((t = a), (e = o.id)));
+    for (let s of this.sections) {
+      let a = this.intersectionByElement.get(s.element);
+      a !== void 0 && ((r = !0), a > t && ((t = a), (e = s.id)));
     }
     if (r) return t > 0 ? e : null;
     let i = this.opts.boundaryOffsetPx,
-      s = null;
-    for (let o of this.sections)
-      if (o.element.getBoundingClientRect().top - i <= 0) s = o.id;
+      o = null;
+    for (let s of this.sections)
+      if (s.element.getBoundingClientRect().top - i <= 0) o = s.id;
       else break;
-    return s;
+    return o;
   }
 };
 function G(n) {
@@ -387,17 +387,17 @@ function G(n) {
 function W(n) {
   let e = (i) => {
       try {
-        let s = getComputedStyle(i).position;
-        return s === 'fixed' || s === 'sticky';
+        let o = getComputedStyle(i).position;
+        return o === 'fixed' || o === 'sticky';
       } catch {
         return !1;
       }
     },
-    t = Array.from(document.querySelectorAll(n)).filter((i) => !e(i) && !m(g(i.textContent ?? '')));
+    t = Array.from(document.querySelectorAll(n)).filter((i) => !e(i) && !p(f(i.textContent ?? '')));
   if (t.length >= 2) return { elements: t, strategy: 'configured' };
   if (
     ((t = Array.from(document.querySelectorAll('h1, h2, h3')).filter(
-      (i) => !e(i) && !m(g(i.textContent ?? '')),
+      (i) => !e(i) && !p(f(i.textContent ?? '')),
     )),
     t.length >= 2)
   )
@@ -422,15 +422,15 @@ function Y(n) {
   if (n.length < 2) return n;
   let e = [...n].sort((r, i) => {
       if (r === i) return 0;
-      let s = r.compareDocumentPosition(i);
-      return s & Node.DOCUMENT_POSITION_FOLLOWING
+      let o = r.compareDocumentPosition(i);
+      return o & Node.DOCUMENT_POSITION_FOLLOWING
         ? -1
-        : s & Node.DOCUMENT_POSITION_PRECEDING
+        : o & Node.DOCUMENT_POSITION_PRECEDING
           ? 1
           : 0;
     }),
     t = [];
-  for (let r of e) t.some((s) => s !== r && s.contains(r)) || t.push(r);
+  for (let r of e) t.some((o) => o !== r && o.contains(r)) || t.push(r);
   return t;
 }
 var N = 8,
@@ -451,8 +451,8 @@ function J(n) {
   let t = Math.ceil(e.length / N),
     r = [];
   for (let i = 0; i < e.length; i += t) {
-    let s = e[i];
-    s && r.push(s);
+    let o = e[i];
+    o && r.push(o);
   }
   return r;
 }
@@ -472,15 +472,38 @@ function K(n) {
     .slice(0, 80);
 }
 function Q(n, e) {
-  let t = n.querySelector('h1, h2, h3, h4, [role="heading"]'),
-    r = g(t?.textContent ?? '');
-  if (r && !m(r) && r.length >= 3) return r.slice(0, 200);
-  let i = Z(n);
-  if (i) return i.slice(0, 200);
-  let s = ee(n);
-  return s ? s.slice(0, 200) : `Slide ${e}`;
+  let t = n.matches('[data-section-title], [data-slide-title]')
+    ? n
+    : n.querySelector('[data-section-title], [data-slide-title]');
+  if (t) {
+    let d = t.getAttribute('data-section-title') ?? t.getAttribute('data-slide-title') ?? '',
+      u = f(d);
+    if (u && u.length >= 3 && !p(u)) return u.slice(0, 200);
+  }
+  let r = [
+      '[class~="slide-label"]',
+      '[class~="slide-title"]',
+      '[class~="section-label"]',
+      '[class~="section-title"]',
+      '[class~="page-title"]',
+      '[class~="day-title"]',
+      '[class~="hero-title"]',
+      '[class~="card-title"]',
+    ].join(', '),
+    i = n.querySelectorAll(r);
+  for (let d of i) {
+    let u = f(d.textContent ?? '');
+    if (u && u.length >= 3 && !p(u)) return u.slice(0, 200);
+  }
+  let o = n.querySelector('h1, h2, h3, h4, [role="heading"]'),
+    s = f(o?.textContent ?? '');
+  if (s && !p(s) && s.length >= 3) return s.slice(0, 200);
+  let a = Z(n);
+  if (a) return a.slice(0, 200);
+  let c = ee(n);
+  return c ? c.slice(0, 200) : `Slide ${e}`;
 }
-function m(n) {
+function p(n) {
   let e = n.trim();
   return !!(
     !e ||
@@ -493,7 +516,7 @@ function m(n) {
     e.length <= 2
   );
 }
-function g(n) {
+function f(n) {
   return n.replace(/\s+/g, ' ').trim();
 }
 function Z(n) {
@@ -502,18 +525,18 @@ function Z(n) {
     r = document.createTreeWalker(n, NodeFilter.SHOW_ELEMENT, null),
     i = r.currentNode;
   for (; i; ) {
-    let s = i;
-    if (s.getAttribute('aria-hidden') === 'true') {
+    let o = i;
+    if (o.getAttribute('aria-hidden') === 'true') {
       i = r.nextSibling();
       continue;
     }
-    let o = '';
-    for (let c of s.childNodes) c.nodeType === 3 && (o += c.textContent ?? '');
-    let a = g(o);
-    if (a && a.length >= 3 && !m(a)) {
+    let s = '';
+    for (let c of o.childNodes) c.nodeType === 3 && (s += c.textContent ?? '');
+    let a = f(s);
+    if (a && a.length >= 3 && !p(a)) {
       let c = 0;
       try {
-        c = parseFloat(getComputedStyle(s).fontSize || '0');
+        c = parseFloat(getComputedStyle(o).fontSize || '0');
       } catch {
         c = 0;
       }
@@ -527,8 +550,8 @@ function ee(n) {
   let e = n.querySelectorAll('p, span, div, li');
   for (let t of e) {
     if (t.getAttribute('aria-hidden') === 'true') continue;
-    let r = g(t.textContent ?? '');
-    if (r && r.length >= 4 && !m(r)) return r;
+    let r = f(t.textContent ?? '');
+    if (r && r.length >= 4 && !p(r)) return r;
   }
   return null;
 }
@@ -541,7 +564,7 @@ function D(n) {
     timeSeconds: n.accumulatedMs / 1e3,
   };
 }
-var p = class extends Error {
+var h = class extends Error {
   constructor(t, r, i) {
     super(r);
     this.code = t;
@@ -550,39 +573,39 @@ var p = class extends Error {
   }
 };
 function v(n) {
-  let e = (o) => `${n.supabaseUrl}/rest/v1/rpc/${o}`,
-    t = (o = {}) => ({
+  let e = (s) => `${n.supabaseUrl}/rest/v1/rpc/${s}`,
+    t = (s = {}) => ({
       apikey: n.anonKey,
       Authorization: `Bearer ${n.anonKey}`,
       'Content-Type': 'application/json',
-      ...o,
+      ...s,
     });
-  async function r(o, a, c = !1) {
-    let u = await fetch(e(o), {
+  async function r(s, a, c = !1) {
+    let d = await fetch(e(s), {
       method: 'POST',
       headers: t(),
       body: JSON.stringify(a),
       keepalive: c,
     });
-    if (!u.ok) {
-      let d = await u.text().catch(() => ''),
-        S = te(d) ?? `http_${u.status}`;
-      throw new p(S, d || u.statusText, u.status);
+    if (!d.ok) {
+      let u = await d.text().catch(() => ''),
+        S = te(u) ?? `http_${d.status}`;
+      throw new h(S, u || d.statusText, d.status);
     }
-    return u.status === 204 ? null : await u.json();
+    return d.status === 204 ? null : await d.json();
   }
-  async function i(o) {
+  async function i(s) {
     let a = await r('start_session', {
-      p_share_slug: o.shareSlug,
-      p_email: o.email,
-      p_fingerprint: o.fingerprint,
-      p_referrer: o.referrer,
-      p_user_agent: o.userAgent,
-      p_country_code: o.geo?.country ?? null,
-      p_city: o.geo?.city ?? null,
-      p_device_type: o.geo?.deviceType ?? null,
-      p_os: o.geo?.os ?? null,
-      p_browser: o.geo?.browser ?? null,
+      p_share_slug: s.shareSlug,
+      p_email: s.email,
+      p_fingerprint: s.fingerprint,
+      p_referrer: s.referrer,
+      p_user_agent: s.userAgent,
+      p_country_code: s.geo?.country ?? null,
+      p_city: s.geo?.city ?? null,
+      p_device_type: s.geo?.deviceType ?? null,
+      p_os: s.geo?.os ?? null,
+      p_browser: s.geo?.browser ?? null,
     });
     return {
       sessionId: a.session_id,
@@ -591,20 +614,20 @@ function v(n) {
       documentVersion: a.document_version,
     };
   }
-  async function s(o, a = !1) {
+  async function o(s, a = !1) {
     await r(
       'update_session',
       {
-        p_session_id: o.sessionId,
-        p_token: o.token,
-        p_active_seconds: o.activeSeconds,
-        p_max_scroll: o.maxScrollDepth,
-        p_sections: o.sections,
+        p_session_id: s.sessionId,
+        p_token: s.token,
+        p_active_seconds: s.activeSeconds,
+        p_max_scroll: s.maxScrollDepth,
+        p_sections: s.sections,
       },
       a,
     );
   }
-  return { startSession: i, updateSession: s };
+  return { startSession: i, updateSession: o };
 }
 function te(n) {
   try {
@@ -711,12 +734,12 @@ var x = class {
             token: this.token,
             activeSeconds: Math.round(this.activeMs / 1e3),
             maxScrollDepth: this.maxScroll,
-            sections: t.map((s) => ({
-              section_id: s.id,
-              section_title: s.title,
-              depth: s.depth,
-              ordinal: s.ordinal,
-              time_seconds: s.timeSeconds,
+            sections: t.map((o) => ({
+              section_id: o.id,
+              section_title: o.title,
+              depth: o.depth,
+              ordinal: o.ordinal,
+              time_seconds: o.timeSeconds,
             })),
           },
           i = this.opts.config.hooks.beforeFlush?.(r) ?? r;
@@ -726,7 +749,7 @@ var x = class {
         let r = t instanceof Error ? t : new Error(String(t));
         (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', r),
           this.opts.config.hooks.onFlushError?.(r),
-          t instanceof p && t.code === 'P0010' && this.stop());
+          t instanceof h && t.code === 'P0010' && this.stop());
       } finally {
         this.flushing = !1;
       }
@@ -796,7 +819,7 @@ function q(n) {
   return ((window.HTMLRadar = e), e);
 }
 function ne(n) {
-  if (n instanceof p)
+  if (n instanceof h)
     switch (n.code) {
       case 'P0001':
         return 'Too many tries from this email. Wait a minute, then try again.';
@@ -822,7 +845,7 @@ function ne(n) {
 var re = '0.1.0';
 ie();
 async function ie() {
-  if (A()) return;
+  if (_()) return;
   let n = document.currentScript,
     e = L(n);
   if (!e) {
@@ -832,21 +855,21 @@ async function ie() {
       );
     return;
   }
-  let t = O(),
-    r = H(),
+  let t = H(),
+    r = O(),
     i = null,
-    s;
+    o;
   if (e.email) ((i = e.email), i !== r && I(i));
   else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
     if (r) i = r;
     else {
       let c = v({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
-      ((i = await F(e, async (u) => {
+      ((i = await F(e, async (d) => {
         try {
           return (
-            (s = await c.startSession({
+            (o = await c.startSession({
               shareSlug: e.shareSlug,
-              email: u,
+              email: d,
               fingerprint: t,
               referrer: document.referrer ?? '',
               userAgent: navigator.userAgent ?? '',
@@ -854,16 +877,16 @@ async function ie() {
             })),
             null
           );
-        } catch (d) {
-          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), ne(d));
+        } catch (u) {
+          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', u), ne(u));
         }
       })),
         I(i));
     }
-  let o = new x({ config: e, email: i, fingerprint: t, ...(s ? { preStarted: s } : {}) }),
-    a = o.start().catch((c) => {
+  let s = new x({ config: e, email: i, fingerprint: t, ...(o ? { preStarted: o } : {}) }),
+    a = s.start().catch((c) => {
       throw (e.debug && console.warn('[HTMLRadar] session start failed', c), c);
     });
-  q({ session: o, ready: a, version: re });
+  q({ session: s, ready: a, version: re });
 }
 //# sourceMappingURL=tracker.js.map

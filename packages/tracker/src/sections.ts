@@ -151,7 +151,10 @@ export class SectionTracker {
       } else if (candidates.strategy === 'prose') {
         title = firstSentence((el.textContent ?? '').trim()) || `Part ${i + 1}`;
       } else {
-        title = (el.textContent ?? '').trim().slice(0, 200);
+        // Headings strategy: el IS the heading. Normalize whitespace so
+        // <br> / nested <span> / multiline source don't produce mashed
+        // text like "Why SingingorWhistling" or trailing newlines.
+        title = cleanWhitespace(el.textContent ?? '').slice(0, 200) || `Section ${i + 1}`;
       }
 
       this.sections.push({
@@ -470,42 +473,83 @@ function slugify(s: string): string {
 
 // Extract a slide's title from its DOM subtree.
 //
-// The old "first heading → first paragraph → first text" cascade fell
-// apart on real-world decks where the title isn't in a semantic <h1>
-// (think: Canva exports, Figma-to-HTML, hand-styled `<div>` headings).
-// The fallback would grab the page-number indicator ("01 / 14") because
-// that was the first text node it found.
+// 6-layer priority chain (post-mortem 2026-05-17). Order matters; first
+// layer that yields non-meta text wins. The earlier 4-layer cascade
+// (semantic-heading → largest-font → first-meaningful → positional)
+// failed on the company-shape decks where the title lives in a class-
+// hinted span (`.slide-label`) rather than an `<h1>` — the largest-
+// font fallback would grab body-text pull-quotes like "We own the"
+// instead of the real slide name.
 //
-// New algorithm, in priority order:
-//   1. Semantic heading (h1-h4, [role="heading"]), filtered against
-//      meta-text patterns (page numbers, slide counters).
-//   2. Largest-font-size text in the slide. In any designed deck the
-//      title IS visually the biggest text — this is the most reliable
-//      signal across slide engines (Reveal.js, Slidev, Canva, Figma,
-//      hand-rolled HTML).
-//   3. First non-meta text element of meaningful length.
-//   4. Positional fallback: "Slide N" — never lets us return a page
-//      number or empty string.
+//   1. Explicit data-attr hint   (data-section-title / data-slide-title)
+//   2. Class-based hint          (.slide-label, .slide-title, .day-title, …)
+//   3. Semantic heading          (h1-h4, [role="heading"])
+//   4. Largest-font-size text    (Canva, pdf2htmlEX, Figma-to-HTML)
+//   5. First non-meta meaningful (plain prose without headings)
+//   6. Positional "Slide N"      (last resort — never empty)
 //
-// Meta-text rejection covers "01 / 14", "1/14", "Page 1 of 14",
-// "Slide 3", pure digits, bullet glyphs, and very-short fragments.
+// Meta-text rejection (isMetaPattern) is applied at every layer so
+// "01 / 14", "Page 5", bullets, etc. never win.
 function extractSlideTitle(el: HTMLElement, ord: number): string {
-  // 1. Semantic heading, if it isn't itself a page-number.
+  // Layer 1: explicit data-attr hint on the slide root or any descendant.
+  // Senders who care about title accuracy can opt in with
+  // `<div class="slide" data-section-title="The Vision">…</div>` or
+  // attach the attr to any child.
+  const dataAttrEl = el.matches('[data-section-title], [data-slide-title]')
+    ? el
+    : el.querySelector<HTMLElement>('[data-section-title], [data-slide-title]');
+  if (dataAttrEl) {
+    const raw =
+      dataAttrEl.getAttribute('data-section-title') ??
+      dataAttrEl.getAttribute('data-slide-title') ??
+      '';
+    const dataText = cleanWhitespace(raw);
+    if (dataText && dataText.length >= 3 && !isMetaPattern(dataText)) {
+      return dataText.slice(0, 200);
+    }
+  }
+
+  // Layer 2: convention-based class hints. The the company deck uses
+  // `<span class="slide-label">Cover</span>`; hand-coded itineraries
+  // use `<div class="day-title">…</div>`; LLM-generated decks
+  // sometimes use `.page-title` / `.card-title`. `[class~="x"]` is a
+  // whole-word match — matches `slide-label` but NOT `slide-label-extra`.
+  // First match wins; meta-pattern matches are skipped.
+  const classHintSelector = [
+    '[class~="slide-label"]',
+    '[class~="slide-title"]',
+    '[class~="section-label"]',
+    '[class~="section-title"]',
+    '[class~="page-title"]',
+    '[class~="day-title"]',
+    '[class~="hero-title"]',
+    '[class~="card-title"]',
+  ].join(', ');
+  const classHints = el.querySelectorAll<HTMLElement>(classHintSelector);
+  for (const hint of classHints) {
+    const hintText = cleanWhitespace(hint.textContent ?? '');
+    if (hintText && hintText.length >= 3 && !isMetaPattern(hintText)) {
+      return hintText.slice(0, 200);
+    }
+  }
+
+  // Layer 3: semantic heading.
   const heading = el.querySelector<HTMLElement>('h1, h2, h3, h4, [role="heading"]');
   const headingText = cleanWhitespace(heading?.textContent ?? '');
   if (headingText && !isMetaPattern(headingText) && headingText.length >= 3) {
     return headingText.slice(0, 200);
   }
 
-  // 2. Largest visible text by computed font-size.
+  // Layer 4: largest visible text by computed font-size. Last-resort
+  // visual signal for decks without semantic markup.
   const largest = findLargestVisibleText(el);
   if (largest) return largest.slice(0, 200);
 
-  // 3. First non-meta text element of meaningful length.
+  // Layer 5: first non-meta text element of meaningful length.
   const fallback = findFirstMeaningfulText(el);
   if (fallback) return fallback.slice(0, 200);
 
-  // 4. Positional last resort.
+  // Layer 6: positional last resort.
   return `Slide ${ord}`;
 }
 

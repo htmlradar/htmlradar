@@ -1,9 +1,12 @@
-// Public /feedback page. Anyone can submit, signed-in or not. Submissions
-// trigger an email to the founder via pg_net (see schema/006_observability.sql
-// notify_on_feedback trigger).
+// /feedback page. Gated behind sign-in (2026-05-17) — got a spam
+// submission trying to sell something. Anyone can sign up first; the
+// sign-up barrier filters drive-by promotional spam while still letting
+// real users tell us what's broken.
 
+import Link from 'next/link';
 import { SectionMark } from '@/components/SectionMark';
 import { NavBar } from '@/components/NavBar';
+import { serverClient } from '@/lib/supabase-server';
 import { submitFeedback } from './actions';
 
 export const runtime = 'edge';
@@ -14,11 +17,15 @@ export const metadata = {
     'Tell us what we missed, what broke, or what you wish HTMLRadar did. Goes straight to the founder.',
 };
 
-export default function FeedbackPage({
+export default async function FeedbackPage({
   searchParams,
 }: {
   searchParams?: { sent?: string; error?: string };
 }) {
+  const supabase = serverClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const sent = searchParams?.sent === '1';
   const error = searchParams?.error;
   const errorMessage =
@@ -49,7 +56,7 @@ export default function FeedbackPage({
                 Sent. Thanks.
               </p>
               <p className="mt-3 text-[16px] leading-relaxed text-ink">
-                We'll read it within a day. If you left an email, expect a reply.
+                We'll read it within a day. Reply lands in your inbox.
               </p>
               <a
                 href="/feedback"
@@ -57,6 +64,33 @@ export default function FeedbackPage({
               >
                 Submit another →
               </a>
+            </div>
+          ) : !user ? (
+            <div className="mt-12 rounded-2xl border border-line bg-paper p-8 md:p-10">
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+                Sign in required
+              </p>
+              <p className="mt-3 text-[16px] leading-relaxed text-ink">
+                We read every message — and we keep this channel signal-only by gating it behind a
+                free account. Takes 30 seconds.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Link
+                  href="/sign-in?next=/feedback"
+                  className="inline-flex items-center gap-2 rounded-md bg-signal px-5 py-3 text-[14.5px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
+                >
+                  Sign in to send feedback
+                </Link>
+                <span className="font-mono text-[12px] tracking-[0.08em] text-graphite">
+                  or email{' '}
+                  <a
+                    href="mailto:hello@htmlradar.com"
+                    className="text-ink underline decoration-line underline-offset-4 hover:text-signal-dark"
+                  >
+                    hello@htmlradar.com
+                  </a>
+                </span>
+              </div>
             </div>
           ) : (
             <form
@@ -73,18 +107,17 @@ export default function FeedbackPage({
                   htmlFor="email"
                   className="block font-mono text-[11px] uppercase tracking-[0.16em] text-graphite"
                 >
-                  Email (optional)
+                  Reply to
                 </label>
                 <input
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="you@company.com"
-                  className="mt-2 w-full rounded-md border border-line bg-paper px-4 py-3 text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:border-signal focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] md:text-[14.5px]"
+                  defaultValue={user.email ?? ''}
+                  readOnly
+                  className="mt-2 w-full rounded-md border border-line bg-paper-2 px-4 py-3 text-[16px] text-ink outline-none md:text-[14.5px]"
                 />
-                <p className="mt-2 text-[12.5px] text-graphite">
-                  Leave it blank for anonymous. Add it if you want a reply.
-                </p>
+                <p className="mt-2 text-[12.5px] text-graphite">Reply lands here.</p>
               </div>
 
               <div>

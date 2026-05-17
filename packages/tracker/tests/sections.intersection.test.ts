@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SectionTracker } from '../src/sections.js';
+import { SectionTracker } from '../src/sections-legacy.js';
 
 // IntersectionObserver-driven section tracking — validates the path
 // that makes swipe-based decks work.

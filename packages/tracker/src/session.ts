@@ -1,5 +1,8 @@
 import type { FlushPayload, SectionInfo, SessionInfo, TrackerConfig } from './types.js';
-import { SectionTracker } from './sections.js';
+// v2: viewport-coverage-weighted accumulation (post-mortem 2026-05-17).
+// One-line rollback: change this import to `./sections-legacy.js`. The
+// legacy file ships in the bundle until 2026-05-24 once v2 is stable.
+import { SectionTracker } from './sections-v2.js';
 import { createTransport, RpcError, type StartSessionResult } from './transport.js';
 
 interface SessionOptions {

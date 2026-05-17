@@ -9,7 +9,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SectionTracker } from '../src/sections.js';
+import { SectionTracker } from '../src/sections-legacy.js';
 
 const F1 =
   'fixture.html';

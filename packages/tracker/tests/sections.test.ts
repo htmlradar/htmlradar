@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SectionTracker } from '../src/sections.js';
+import { SectionTracker } from '../src/sections-legacy.js';
 
 // Audit fixes verified here:
 //   F-7 — minDwellMs threshold drops fast scroll-pasts.

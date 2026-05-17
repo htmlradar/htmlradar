@@ -1,8 +1,8 @@
-var z = Object.defineProperty;
-var j = (n, e, t) =>
-  e in n ? z(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
-var l = (n, e, t) => (j(n, typeof e != 'symbol' ? e + '' : e, t), t);
-var m = {
+var j = Object.defineProperty;
+var z = (t, e, n) =>
+  e in t ? j(t, e, { enumerable: !0, configurable: !0, writable: !0, value: n }) : (t[e] = n);
+var l = (t, e, n) => (z(t, typeof e != 'symbol' ? e + '' : e, n), n);
+var y = {
   sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
   gate: {
@@ -20,135 +20,135 @@ var m = {
   hooks: {},
   debug: !1,
 };
-function L(n) {
-  let e = n ? V(n) : {},
-    t = window.HTMLRadarConfig ?? {},
-    r = t.supabaseUrl ?? e.supabaseUrl,
-    i = t.supabaseAnonKey ?? e.supabaseAnonKey,
-    o = t.shareSlug ?? e.shareSlug;
-  if (!r || !i || !o) return null;
-  let s = {
-    supabaseUrl: r,
-    supabaseAnonKey: i,
+function _(t) {
+  let e = t ? G(t) : {},
+    n = window.HTMLRadarConfig ?? {},
+    i = n.supabaseUrl ?? e.supabaseUrl,
+    s = n.supabaseAnonKey ?? e.supabaseAnonKey,
+    o = n.shareSlug ?? e.shareSlug;
+  if (!i || !s || !o) return null;
+  let r = {
+    supabaseUrl: i,
+    supabaseAnonKey: s,
     shareSlug: o,
-    sections: { ...m.sections, ...(t.sections ?? {}) },
-    session: { ...m.session, ...(t.session ?? {}) },
+    sections: { ...y.sections, ...(n.sections ?? {}) },
+    session: { ...y.session, ...(n.session ?? {}) },
     gate: {
-      ...m.gate,
-      ...(t.gate ?? {}),
-      brand: { ...m.gate.brand, ...(t.gate?.brand ?? {}) },
-      copy: { ...m.gate.copy, ...(t.gate?.copy ?? {}) },
+      ...y.gate,
+      ...(n.gate ?? {}),
+      brand: { ...y.gate.brand, ...(n.gate?.brand ?? {}) },
+      copy: { ...y.gate.copy, ...(n.gate?.copy ?? {}) },
     },
-    privacy: { ...m.privacy, ...(t.privacy ?? {}) },
-    hooks: t.hooks ?? {},
-    debug: t.debug ?? !1,
+    privacy: { ...y.privacy, ...(n.privacy ?? {}) },
+    hooks: n.hooks ?? {},
+    debug: n.debug ?? !1,
   };
-  return (t.email && (s.email = t.email), t.geo && (s.geo = t.geo), s);
+  return (n.email && (r.email = n.email), n.geo && (r.geo = n.geo), r);
 }
-function V(n) {
+function G(t) {
   let e = {};
   return (
-    n.dataset.supabaseUrl && (e.supabaseUrl = n.dataset.supabaseUrl),
-    n.dataset.supabaseAnonKey && (e.supabaseAnonKey = n.dataset.supabaseAnonKey),
-    n.dataset.shareSlug && (e.shareSlug = n.dataset.shareSlug),
+    t.dataset.supabaseUrl && (e.supabaseUrl = t.dataset.supabaseUrl),
+    t.dataset.supabaseAnonKey && (e.supabaseAnonKey = t.dataset.supabaseAnonKey),
+    t.dataset.shareSlug && (e.shareSlug = t.dataset.shareSlug),
     e
   );
 }
-var M = 'htmlradar:',
-  w = `${M}fp`,
-  k = `${M}email`,
-  A = `${M}optout`;
-function _() {
+var A = 'htmlradar:',
+  M = `${A}fp`,
+  L = `${A}email`,
+  C = `${A}optout`;
+function H() {
   try {
-    return localStorage.getItem(A) === '1';
+    return localStorage.getItem(C) === '1';
   } catch {
     return !1;
   }
 }
 function R() {
   try {
-    (localStorage.setItem(A, '1'), localStorage.removeItem(w), localStorage.removeItem(k));
+    (localStorage.setItem(C, '1'), localStorage.removeItem(M), localStorage.removeItem(L));
   } catch {}
 }
-function H() {
+function P() {
   try {
-    let n = localStorage.getItem(w);
-    if (n) return n;
-    let e = C();
-    return (localStorage.setItem(w, e), e);
+    let t = localStorage.getItem(M);
+    if (t) return t;
+    let e = I();
+    return (localStorage.setItem(M, e), e);
   } catch {
-    return C();
+    return I();
   }
 }
 function O() {
   try {
-    return localStorage.getItem(k);
+    return localStorage.getItem(L);
   } catch {
     return null;
   }
 }
-function I(n) {
+function k(t) {
   try {
-    localStorage.setItem(k, n);
+    localStorage.setItem(L, t);
   } catch {}
 }
-function C() {
+function I() {
   return typeof crypto < 'u' && 'randomUUID' in crypto
     ? crypto.randomUUID()
-    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (n) => {
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (t) => {
         let e = (Math.random() * 16) | 0;
-        return (n === 'x' ? e : (e & 3) | 8).toString(16);
+        return (t === 'x' ? e : (e & 3) | 8).toString(16);
       });
 }
-var P = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function F(n, e) {
-  return new Promise((t) => {
-    let r = document.createElement('div');
-    ((r.id = 'htmlradar-gate'),
-      (r.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
-      document.body.appendChild(r));
-    let i = r.attachShadow({ mode: 'closed' });
-    i.innerHTML = B(n);
-    let o = i.querySelector('form'),
-      s = i.querySelector('input[type=email]'),
-      a = i.querySelector('.error'),
-      c = i.querySelector('button'),
-      d = c.textContent ?? 'Continue';
-    requestAnimationFrame(() => s.focus());
-    let u = (T) => {
-        ((a.textContent = T), s.setAttribute('aria-invalid', 'true'));
+var F = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function $(t, e) {
+  return new Promise((n) => {
+    let i = document.createElement('div');
+    ((i.id = 'htmlradar-gate'),
+      (i.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
+      document.body.appendChild(i));
+    let s = i.attachShadow({ mode: 'closed' });
+    s.innerHTML = W(t);
+    let o = s.querySelector('form'),
+      r = s.querySelector('input[type=email]'),
+      c = s.querySelector('.error'),
+      a = s.querySelector('button'),
+      d = a.textContent ?? 'Continue';
+    requestAnimationFrame(() => r.focus());
+    let u = (h) => {
+        ((c.textContent = h), r.setAttribute('aria-invalid', 'true'));
       },
-      S = () => {
-        ((a.textContent = ''), s.removeAttribute('aria-invalid'));
+      f = () => {
+        ((c.textContent = ''), r.removeAttribute('aria-invalid'));
       };
-    (s.addEventListener('input', S),
-      o.addEventListener('submit', async (T) => {
-        T.preventDefault();
-        let E = s.value.trim().toLowerCase();
-        if (!P.test(E)) {
+    (r.addEventListener('input', f),
+      o.addEventListener('submit', async (h) => {
+        h.preventDefault();
+        let b = r.value.trim().toLowerCase();
+        if (!F.test(b)) {
           u('Please enter a valid email address.');
           return;
         }
-        ((c.disabled = !0), (c.textContent = 'Loading\u2026'), S());
-        let b;
+        ((a.disabled = !0), (a.textContent = 'Loading\u2026'), f());
+        let m;
         try {
-          b = await e(E);
+          m = await e(b);
         } catch {
-          b = "We couldn't reach the server. Check your connection and try again.";
+          m = "We couldn't reach the server. Check your connection and try again.";
         }
-        if (b) {
-          ((c.disabled = !1), (c.textContent = d), u(b));
+        if (m) {
+          ((a.disabled = !1), (a.textContent = d), u(m));
           return;
         }
-        (r.remove(), t(E));
+        (i.remove(), n(b));
       }));
   });
 }
-function B(n) {
-  let e = n.gate.copy,
-    t = $(n.gate.brand.accentColor, '#1a8870'),
-    r = $(n.gate.brand.backgroundColor, '#faf7f1'),
-    i = { accentColor: t, backgroundColor: r };
+function W(t) {
+  let e = t.gate.copy,
+    n = N(t.gate.brand.accentColor, '#1a8870'),
+    i = N(t.gate.brand.backgroundColor, '#faf7f1'),
+    s = { accentColor: n, backgroundColor: i };
   return `
 <style>
   :host { all: initial; }
@@ -161,7 +161,7 @@ function B(n) {
     color: #1c1814;
   }
   .card {
-    background: ${i.backgroundColor};
+    background: ${s.backgroundColor};
     border-radius: 12px;
     box-shadow: 0 24px 64px -16px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.08);
     padding: 32px;
@@ -180,14 +180,14 @@ function B(n) {
     outline: none;
     transition: border-color 120ms;
   }
-  input[type=email]:focus { border-color: ${i.accentColor}; }
+  input[type=email]:focus { border-color: ${s.accentColor}; }
   input[aria-invalid="true"] { border-color: #b35314; }
   .error { color: #b35314; font-size: 13px; min-height: 18px; margin-top: 6px; }
   button {
     margin-top: 16px;
     width: 100%;
     padding: 11px 16px;
-    background: ${i.accentColor};
+    background: ${s.accentColor};
     color: #fff;
     border: none; border-radius: 6px;
     font-size: 15px; font-weight: 500;
@@ -208,172 +208,192 @@ function B(n) {
 </style>
 <div class="backdrop">
   <form class="card" novalidate>
-    <h2>${g(e.heading)}</h2>
-    <p class="subhead">${g(e.subhead)}</p>
+    <h2>${S(e.heading)}</h2>
+    <p class="subhead">${S(e.subhead)}</p>
     <label for="hr-email">Email</label>
-    <input id="hr-email" type="email" placeholder="${g(e.placeholder)}" required autocomplete="email" />
+    <input id="hr-email" type="email" placeholder="${S(e.placeholder)}" required autocomplete="email" />
     <div class="error" role="alert"></div>
-    <button type="submit">${g(e.buttonLabel)}</button>
-    <p class="privacy">${g(e.privacyNote)}</p>
+    <button type="submit">${S(e.buttonLabel)}</button>
+    <p class="privacy">${S(e.privacyNote)}</p>
     <div class="footer">Shared with <a href="https://htmlradar.com" target="_blank" rel="noopener">HTMLRadar</a></div>
   </form>
 </div>`;
 }
-function g(n) {
-  return n
+function S(t) {
+  return t
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-function $(n, e) {
-  return /^#[0-9a-fA-F]{3,8}$/.test(n) ||
-    /^rgba?\(\s*\d+(?:\s*,\s*\d+){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n) ||
-    /^hsla?\(\s*\d+(?:\s*,\s*[\d.]+%?){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n)
-    ? n
+function N(t, e) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(t) ||
+    /^rgba?\(\s*\d+(?:\s*,\s*\d+){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(t) ||
+    /^hsla?\(\s*\d+(?:\s*,\s*[\d.]+%?){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(t)
+    ? t
     : e;
 }
-var y = class {
+var T = class {
   constructor(e) {
     l(this, 'opts');
     l(this, 'sections', []);
-    l(this, 'currentId', null);
-    l(this, 'currentStartMs', null);
-    l(this, 'rafScheduled', !1);
     l(this, 'active', !1);
-    l(this, 'intersectionByElement', new WeakMap());
-    l(this, 'intersectionObserver', null);
-    l(this, 'onScroll', () => {
-      this.rafScheduled ||
-        ((this.rafScheduled = !0),
-        requestAnimationFrame(() => {
-          ((this.rafScheduled = !1), this.update(performance.now()));
-        }));
+    l(this, 'rafHandle', 0);
+    l(this, 'lastSampleTs', 0);
+    l(this, 'lastActivityTs', 0);
+    l(this, 'enteredOnce', new Set());
+    l(this, 'tick', (e) => {
+      if (!this.active) return;
+      let n = e - this.lastSampleTs;
+      (typeof document < 'u' &&
+        document.visibilityState === 'visible' &&
+        e - this.lastActivityTs < 5e3 &&
+        n >= 250 &&
+        ((this.lastSampleTs = e), this.sample(n)),
+        this.scheduleTick());
+    });
+    l(this, 'onActivity', () => {
+      this.lastActivityTs = x();
     });
     this.opts = e;
   }
   start() {
-    this.active ||
-      ((this.active = !0),
-      this.discoverSections(),
-      this.installObserver(),
-      window.addEventListener('scroll', this.onScroll, { passive: !0 }),
-      this.update(performance.now()));
+    if (this.active) return;
+    ((this.active = !0), this.discoverSections(), this.bindActivityListeners());
+    let e = x();
+    ((this.lastSampleTs = e), (this.lastActivityTs = e), this.scheduleTick());
   }
   stop() {
-    this.active &&
-      ((this.active = !1),
-      this.creditCurrent(performance.now()),
-      window.removeEventListener('scroll', this.onScroll),
-      this.intersectionObserver?.disconnect(),
-      (this.intersectionObserver = null));
+    this.active && ((this.active = !1), this.cancelTick(), this.unbindActivityListeners());
   }
   pause() {
-    (this.creditCurrent(performance.now()), (this.currentStartMs = null));
+    this.cancelTick();
   }
   resume() {
-    this.currentId !== null && (this.currentStartMs = performance.now());
+    if (!this.active || this.rafHandle) return;
+    let e = x();
+    ((this.lastSampleTs = e), (this.lastActivityTs = e));
+    for (let n of this.sections) n.continuousVisibleMs = 0;
+    this.scheduleTick();
   }
   snapshot() {
-    return (
-      this.creditCurrent(performance.now()),
-      this.currentId !== null && (this.currentStartMs = performance.now()),
-      this.sections
-        .filter((e) => e.accumulatedMs >= this.opts.minDwellMs)
-        .map((e) => ({
-          id: e.id,
-          title: e.title,
-          depth: e.depth,
-          ordinal: e.ordinal,
-          timeSeconds: e.accumulatedMs / 1e3,
-        }))
-    );
+    return this.sections
+      .filter((e) => e.qualifiedMs >= this.opts.minDwellMs)
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        depth: e.depth,
+        ordinal: e.ordinal,
+        timeSeconds: e.qualifiedMs / 1e3,
+      }));
+  }
+  scheduleTick() {
+    if (typeof requestAnimationFrame > 'u') {
+      this.rafHandle = setTimeout(() => this.tick(x()), 250);
+      return;
+    }
+    this.rafHandle = requestAnimationFrame(this.tick);
+  }
+  cancelTick() {
+    this.rafHandle &&
+      (typeof cancelAnimationFrame < 'u'
+        ? cancelAnimationFrame(this.rafHandle)
+        : clearTimeout(this.rafHandle),
+      (this.rafHandle = 0));
+  }
+  sample(e) {
+    let n = typeof window < 'u' ? window.visualViewport : null,
+      i = n?.height ?? (typeof window < 'u' ? window.innerHeight : 0),
+      s = n?.offsetTop ?? 0;
+    if (i <= 0) return;
+    let o = [],
+      r = 0;
+    for (let a of this.sections) {
+      let d = a.element.getBoundingClientRect(),
+        u = Math.max(d.top, s),
+        f = Math.min(d.bottom, s + i),
+        h = Math.max(0, f - u);
+      if (h <= 0 || (d.height > 0 ? h / d.height : 0) < 0.5) continue;
+      let m = h / i;
+      (o.push({ section: a, viewportShare: m }), (r += m));
+    }
+    if (r <= 0) {
+      for (let a of this.sections) a.continuousVisibleMs = 0;
+      return;
+    }
+    let c = new Set();
+    for (let { section: a, viewportShare: d } of o) {
+      c.add(a.id);
+      let u = d / r,
+        f = e * u;
+      ((a.totalMs += f),
+        (a.continuousVisibleMs += e),
+        this.enteredOnce.has(a.id) ||
+          (this.enteredOnce.add(a.id), this.opts.onSectionEnter?.(V(a))),
+        a.continuousVisibleMs >= 1e3 &&
+          ((a.qualifiedMs += f),
+          !a.hasReadFired &&
+            a.qualifiedMs >= this.opts.minDwellMs &&
+            ((a.hasReadFired = !0), this.opts.onSectionRead?.(V(a)))));
+    }
+    for (let a of this.sections) c.has(a.id) || (a.continuousVisibleMs = 0);
+  }
+  bindActivityListeners() {
+    typeof window > 'u' ||
+      (window.addEventListener('keydown', this.onActivity, { passive: !0 }),
+      window.addEventListener('mousedown', this.onActivity, { passive: !0 }),
+      window.addEventListener('touchstart', this.onActivity, { passive: !0 }),
+      window.addEventListener('scroll', this.onActivity, { passive: !0 }),
+      window.addEventListener('wheel', this.onActivity, { passive: !0 }));
+  }
+  unbindActivityListeners() {
+    typeof window > 'u' ||
+      (window.removeEventListener('keydown', this.onActivity),
+      window.removeEventListener('mousedown', this.onActivity),
+      window.removeEventListener('touchstart', this.onActivity),
+      window.removeEventListener('scroll', this.onActivity),
+      window.removeEventListener('wheel', this.onActivity));
   }
   discoverSections() {
-    let e = W(this.opts.selector),
-      t = new Map();
-    e.elements.forEach((r, i) => {
-      let o = r.id;
+    let e = B(this.opts.selector),
+      n = new Map();
+    e.elements.forEach((i, s) => {
+      let o = i.id;
       if (!o)
-        if (e.strategy === 'slides') o = `slide-${i + 1}`;
+        if (e.strategy === 'slides') o = `slide-${s + 1}`;
         else if (e.strategy === 'prose') {
-          let c = U((r.textContent ?? '').trim());
-          o = K(c) || `part-${i + 1}`;
-        } else o = K((r.textContent ?? '').trim()) || `section-${i + 1}`;
-      let s = (t.get(o) ?? 0) + 1;
-      (t.set(o, s), s > 1 && (o = `${o}-${s}`));
-      let a;
+          let a = D((i.textContent ?? '').trim());
+          o = q(a) || `part-${s + 1}`;
+        } else o = q((i.textContent ?? '').trim()) || `section-${s + 1}`;
+      let r = (n.get(o) ?? 0) + 1;
+      (n.set(o, r), r > 1 && (o = `${o}-${r}`));
+      let c;
       (e.strategy === 'slides'
-        ? (a = Q(r, i + 1))
+        ? (c = Z(i, s + 1))
         : e.strategy === 'prose'
-          ? (a = U((r.textContent ?? '').trim()) || `Part ${i + 1}`)
-          : (a = f(r.textContent ?? '').slice(0, 200) || `Section ${i + 1}`),
+          ? (c = D((i.textContent ?? '').trim()) || `Part ${s + 1}`)
+          : (c = p(i.textContent ?? '').slice(0, 200) || `Section ${s + 1}`),
         this.sections.push({
           id: o,
-          title: a,
-          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : G(r.tagName),
-          ordinal: i,
-          element: r,
-          accumulatedMs: 0,
+          title: c,
+          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : Y(i.tagName),
+          ordinal: s,
+          element: i,
+          totalMs: 0,
+          qualifiedMs: 0,
+          continuousVisibleMs: 0,
           hasReadFired: !1,
         }));
     });
   }
-  update(e) {
-    let t = this.computeCurrent();
-    if (
-      t !== this.currentId &&
-      (this.creditCurrent(e),
-      (this.currentId = t),
-      (this.currentStartMs = t === null ? null : e),
-      t !== null)
-    ) {
-      let r = this.sections.find((i) => i.id === t);
-      r && this.opts.onSectionEnter && this.opts.onSectionEnter(D(r));
-    }
-  }
-  creditCurrent(e) {
-    if (this.currentId === null || this.currentStartMs === null) return;
-    let t = e - this.currentStartMs;
-    if (t <= 0) return;
-    let r = this.sections.find((i) => i.id === this.currentId);
-    r &&
-      ((r.accumulatedMs += t),
-      !r.hasReadFired &&
-        r.accumulatedMs >= this.opts.minDwellMs &&
-        ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(D(r))));
-  }
-  installObserver() {
-    if (!(typeof IntersectionObserver > 'u')) {
-      this.intersectionObserver = new IntersectionObserver(
-        (e) => {
-          for (let t of e) this.intersectionByElement.set(t.target, t.intersectionRatio);
-          this.update(performance.now());
-        },
-        { threshold: [0, 0.1, 0.25, 0.5, 0.75, 0.95, 1] },
-      );
-      for (let e of this.sections) this.intersectionObserver.observe(e.element);
-    }
-  }
-  computeCurrent() {
-    let e = null,
-      t = 0,
-      r = !1;
-    for (let s of this.sections) {
-      let a = this.intersectionByElement.get(s.element);
-      a !== void 0 && ((r = !0), a > t && ((t = a), (e = s.id)));
-    }
-    if (r) return t > 0 ? e : null;
-    let i = this.opts.boundaryOffsetPx,
-      o = null;
-    for (let s of this.sections)
-      if (s.element.getBoundingClientRect().top - i <= 0) o = s.id;
-      else break;
-    return o;
-  }
 };
-function G(n) {
-  switch (n) {
+function x() {
+  return typeof performance < 'u' && typeof performance.now == 'function'
+    ? performance.now()
+    : Date.now();
+}
+function Y(t) {
+  switch (t) {
     case 'H1':
       return 1;
     case 'H2':
@@ -384,86 +404,98 @@ function G(n) {
       return 4;
   }
 }
-function W(n) {
-  let e = (i) => {
+function B(t) {
+  let e = (s) => {
       try {
-        let o = getComputedStyle(i).position;
+        let o = getComputedStyle(s).position;
         return o === 'fixed' || o === 'sticky';
       } catch {
         return !1;
       }
     },
-    t = Array.from(document.querySelectorAll(n)).filter((i) => !e(i) && !p(f(i.textContent ?? '')));
-  if (t.length >= 2) return { elements: t, strategy: 'configured' };
+    n = Array.from(document.querySelectorAll(t)).filter((s) => !e(s) && !g(p(s.textContent ?? '')));
+  if (n.length >= 2) return { elements: n, strategy: 'configured' };
   if (
-    ((t = Array.from(document.querySelectorAll('h1, h2, h3')).filter(
-      (i) => !e(i) && !p(f(i.textContent ?? '')),
+    ((n = Array.from(document.querySelectorAll('h1, h2, h3')).filter(
+      (s) => !e(s) && !g(p(s.textContent ?? '')),
     )),
-    t.length >= 2)
+    n.length >= 2)
   )
-    return { elements: t, strategy: 'headings' };
+    return { elements: n, strategy: 'headings' };
   if (
-    ((t = Y(
+    ((n = X(
       Array.from(
         document.querySelectorAll(
-          'section, article, [class*="slide"], [class*="page"], [data-slide], [data-page], [data-page-no], [data-page-number]',
+          [
+            'section',
+            'article',
+            '[class*="slide"]',
+            '[class*="page"]',
+            '[class~="day-section"]',
+            '[class~="chapter"]',
+            '[class~="step-section"]',
+            '[data-slide]',
+            '[data-page]',
+            '[data-page-no]',
+            '[data-page-number]',
+          ].join(', '),
         ),
-      ).filter((i) => !e(i)),
+      ).filter((s) => !e(s)),
     )),
-    t.length >= 2)
+    n.length >= 2)
   )
-    return { elements: t, strategy: 'slides' };
-  let r = J(e);
-  return r.length >= 2
-    ? { elements: r, strategy: 'prose' }
+    return { elements: n, strategy: 'slides' };
+  let i = Q(e);
+  return i.length >= 2
+    ? { elements: i, strategy: 'prose' }
     : { elements: [], strategy: 'configured' };
 }
-function Y(n) {
-  if (n.length < 2) return n;
-  let e = [...n].sort((r, i) => {
-      if (r === i) return 0;
-      let o = r.compareDocumentPosition(i);
+function X(t) {
+  if (t.length < 2) return t;
+  let e = [...t].sort((i, s) => {
+      if (i === s) return 0;
+      let o = i.compareDocumentPosition(s);
       return o & Node.DOCUMENT_POSITION_FOLLOWING
         ? -1
         : o & Node.DOCUMENT_POSITION_PRECEDING
           ? 1
           : 0;
     }),
-    t = [];
-  for (let r of e) t.some((o) => o !== r && o.contains(r)) || t.push(r);
-  return t;
+    n = [];
+  for (let i of e) n.some((o) => o !== i && o.contains(i)) || n.push(i);
+  return n;
 }
-var N = 8,
-  X = 40;
-function J(n) {
+var U = 8,
+  J = 40;
+function Q(t) {
   let e = Array.from(document.querySelectorAll('p, li, blockquote')).filter(
-    (i) =>
+    (s) =>
       !(
-        (i.textContent ?? '').trim().length < X ||
-        n(i) ||
-        i.closest(
+        (s.textContent ?? '').trim().length < J ||
+        t(s) ||
+        s.closest(
           'nav, footer, aside, header, [role="banner"], [role="navigation"], [role="contentinfo"], [aria-hidden="true"]',
         )
       ),
   );
   if (e.length === 0) return [];
-  if (e.length <= N) return e;
-  let t = Math.ceil(e.length / N),
-    r = [];
-  for (let i = 0; i < e.length; i += t) {
-    let o = e[i];
-    o && r.push(o);
+  if (e.length <= U) return e;
+  let n = Math.ceil(e.length / U),
+    i = [];
+  for (let s = 0; s < e.length; s += n) {
+    let o = e[s];
+    o && i.push(o);
   }
-  return r;
+  return i;
 }
-function U(n) {
-  let e = n.replace(/\s+/g, ' ').trim();
+function D(t) {
+  let e = t.replace(/\s+/g, ' ').trim();
   if (!e) return '';
-  let t = e.slice(0, 200).match(/^[\s\S]{1,120}?[.!?](?=\s|$)/);
-  return t ? t[0].trim() : e.length > 80 ? `${e.slice(0, 80)}\u2026` : e;
+  let n = e.slice(0, 200).match(/^[\s\S]{1,120}?[.!?](?=\s|$)/);
+  return n ? n[0].trim() : e.length > 80 ? `${e.slice(0, 80)}\u2026` : e;
 }
-function K(n) {
-  return n
+function q(t) {
+  return t
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
@@ -471,16 +503,16 @@ function K(n) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 }
-function Q(n, e) {
-  let t = n.matches('[data-section-title], [data-slide-title]')
-    ? n
-    : n.querySelector('[data-section-title], [data-slide-title]');
-  if (t) {
-    let d = t.getAttribute('data-section-title') ?? t.getAttribute('data-slide-title') ?? '',
-      u = f(d);
-    if (u && u.length >= 3 && !p(u)) return u.slice(0, 200);
+function Z(t, e) {
+  let n = t.matches('[data-section-title], [data-slide-title]')
+    ? t
+    : t.querySelector('[data-section-title], [data-slide-title]');
+  if (n) {
+    let d = n.getAttribute('data-section-title') ?? n.getAttribute('data-slide-title') ?? '',
+      u = p(d);
+    if (u && u.length >= 3 && !g(u)) return u.slice(0, 200);
   }
-  let r = [
+  let i = [
       '[class~="slide-label"]',
       '[class~="slide-title"]',
       '[class~="section-label"]',
@@ -490,21 +522,21 @@ function Q(n, e) {
       '[class~="hero-title"]',
       '[class~="card-title"]',
     ].join(', '),
-    i = n.querySelectorAll(r);
-  for (let d of i) {
-    let u = f(d.textContent ?? '');
-    if (u && u.length >= 3 && !p(u)) return u.slice(0, 200);
+    s = t.querySelectorAll(i);
+  for (let d of s) {
+    let u = p(d.textContent ?? '');
+    if (u && u.length >= 3 && !g(u)) return u.slice(0, 200);
   }
-  let o = n.querySelector('h1, h2, h3, h4, [role="heading"]'),
-    s = f(o?.textContent ?? '');
-  if (s && !p(s) && s.length >= 3) return s.slice(0, 200);
-  let a = Z(n);
-  if (a) return a.slice(0, 200);
-  let c = ee(n);
-  return c ? c.slice(0, 200) : `Slide ${e}`;
+  let o = t.querySelector('h1, h2, h3, h4, [role="heading"]'),
+    r = p(o?.textContent ?? '');
+  if (r && !g(r) && r.length >= 3) return r.slice(0, 200);
+  let c = ee(t);
+  if (c) return c.slice(0, 200);
+  let a = te(t);
+  return a ? a.slice(0, 200) : `Slide ${e}`;
 }
-function p(n) {
-  let e = n.trim();
+function g(t) {
+  let e = t.trim();
   return !!(
     !e ||
     /^\d{1,3}\s*[/—-]\s*\d{1,3}$/.test(e) ||
@@ -516,131 +548,131 @@ function p(n) {
     e.length <= 2
   );
 }
-function f(n) {
-  return n.replace(/\s+/g, ' ').trim();
+function p(t) {
+  return t.replace(/\s+/g, ' ').trim();
 }
-function Z(n) {
+function ee(t) {
   let e = 0,
-    t = null,
-    r = document.createTreeWalker(n, NodeFilter.SHOW_ELEMENT, null),
-    i = r.currentNode;
-  for (; i; ) {
-    let o = i;
+    n = null,
+    i = document.createTreeWalker(t, NodeFilter.SHOW_ELEMENT, null),
+    s = i.currentNode;
+  for (; s; ) {
+    let o = s;
     if (o.getAttribute('aria-hidden') === 'true') {
-      i = r.nextSibling();
+      s = i.nextSibling();
       continue;
     }
-    let s = '';
-    for (let c of o.childNodes) c.nodeType === 3 && (s += c.textContent ?? '');
-    let a = f(s);
-    if (a && a.length >= 3 && !p(a)) {
-      let c = 0;
+    let r = '';
+    for (let a of o.childNodes) a.nodeType === 3 && (r += a.textContent ?? '');
+    let c = p(r);
+    if (c && c.length >= 3 && !g(c)) {
+      let a = 0;
       try {
-        c = parseFloat(getComputedStyle(o).fontSize || '0');
+        a = parseFloat(getComputedStyle(o).fontSize || '0');
       } catch {
-        c = 0;
+        a = 0;
       }
-      (Number.isFinite(c) || (c = 0), c > e && ((e = c), (t = a)));
+      (Number.isFinite(a) || (a = 0), a > e && ((e = a), (n = c)));
     }
-    i = r.nextNode();
+    s = i.nextNode();
   }
-  return t;
+  return n;
 }
-function ee(n) {
-  let e = n.querySelectorAll('p, span, div, li');
-  for (let t of e) {
-    if (t.getAttribute('aria-hidden') === 'true') continue;
-    let r = f(t.textContent ?? '');
-    if (r && r.length >= 4 && !p(r)) return r;
+function te(t) {
+  let e = t.querySelectorAll('p, span, div, li');
+  for (let n of e) {
+    if (n.getAttribute('aria-hidden') === 'true') continue;
+    let i = p(n.textContent ?? '');
+    if (i && i.length >= 4 && !g(i)) return i;
   }
   return null;
 }
-function D(n) {
+function V(t) {
   return {
-    id: n.id,
-    title: n.title,
-    depth: n.depth,
-    ordinal: n.ordinal,
-    timeSeconds: n.accumulatedMs / 1e3,
+    id: t.id,
+    title: t.title,
+    depth: t.depth,
+    ordinal: t.ordinal,
+    timeSeconds: t.qualifiedMs / 1e3,
   };
 }
-var h = class extends Error {
-  constructor(t, r, i) {
-    super(r);
-    this.code = t;
-    this.httpStatus = i;
+var v = class extends Error {
+  constructor(n, i, s) {
+    super(i);
+    this.code = n;
+    this.httpStatus = s;
     this.name = 'RpcError';
   }
 };
-function v(n) {
-  let e = (s) => `${n.supabaseUrl}/rest/v1/rpc/${s}`,
-    t = (s = {}) => ({
-      apikey: n.anonKey,
-      Authorization: `Bearer ${n.anonKey}`,
+function w(t) {
+  let e = (r) => `${t.supabaseUrl}/rest/v1/rpc/${r}`,
+    n = (r = {}) => ({
+      apikey: t.anonKey,
+      Authorization: `Bearer ${t.anonKey}`,
       'Content-Type': 'application/json',
-      ...s,
+      ...r,
     });
-  async function r(s, a, c = !1) {
-    let d = await fetch(e(s), {
+  async function i(r, c, a = !1) {
+    let d = await fetch(e(r), {
       method: 'POST',
-      headers: t(),
-      body: JSON.stringify(a),
-      keepalive: c,
+      headers: n(),
+      body: JSON.stringify(c),
+      keepalive: a,
     });
     if (!d.ok) {
       let u = await d.text().catch(() => ''),
-        S = te(u) ?? `http_${d.status}`;
-      throw new h(S, u || d.statusText, d.status);
+        f = ne(u) ?? `http_${d.status}`;
+      throw new v(f, u || d.statusText, d.status);
     }
     return d.status === 204 ? null : await d.json();
   }
-  async function i(s) {
-    let a = await r('start_session', {
-      p_share_slug: s.shareSlug,
-      p_email: s.email,
-      p_fingerprint: s.fingerprint,
-      p_referrer: s.referrer,
-      p_user_agent: s.userAgent,
-      p_country_code: s.geo?.country ?? null,
-      p_city: s.geo?.city ?? null,
-      p_device_type: s.geo?.deviceType ?? null,
-      p_os: s.geo?.os ?? null,
-      p_browser: s.geo?.browser ?? null,
+  async function s(r) {
+    let c = await i('start_session', {
+      p_share_slug: r.shareSlug,
+      p_email: r.email,
+      p_fingerprint: r.fingerprint,
+      p_referrer: r.referrer,
+      p_user_agent: r.userAgent,
+      p_country_code: r.geo?.country ?? null,
+      p_city: r.geo?.city ?? null,
+      p_device_type: r.geo?.deviceType ?? null,
+      p_os: r.geo?.os ?? null,
+      p_browser: r.geo?.browser ?? null,
     });
     return {
-      sessionId: a.session_id,
-      token: a.token,
-      documentId: a.document_id,
-      documentVersion: a.document_version,
+      sessionId: c.session_id,
+      token: c.token,
+      documentId: c.document_id,
+      documentVersion: c.document_version,
     };
   }
-  async function o(s, a = !1) {
-    await r(
+  async function o(r, c = !1) {
+    await i(
       'update_session',
       {
-        p_session_id: s.sessionId,
-        p_token: s.token,
-        p_active_seconds: s.activeSeconds,
-        p_max_scroll: s.maxScrollDepth,
-        p_sections: s.sections,
+        p_session_id: r.sessionId,
+        p_token: r.token,
+        p_active_seconds: r.activeSeconds,
+        p_max_scroll: r.maxScrollDepth,
+        p_sections: r.sections,
       },
-      a,
+      c,
     );
   }
-  return { startSession: i, updateSession: o };
+  return { startSession: s, updateSession: o };
 }
-function te(n) {
+function ne(t) {
   try {
-    let e = JSON.parse(n);
+    let e = JSON.parse(t);
     if (e.code) return e.code;
     if (e.message) {
-      let t = /P\d{4}/.exec(e.message);
-      if (t) return t[0];
+      let n = /P\d{4}/.exec(e.message);
+      if (n) return n[0];
     }
   } catch {}
   return null;
 }
-var x = class {
+var E = class {
   constructor(e) {
     l(this, 'opts');
     l(this, 'transport');
@@ -678,11 +710,11 @@ var x = class {
         }));
     });
     ((this.opts = e),
-      (this.transport = v({
+      (this.transport = w({
         supabaseUrl: e.config.supabaseUrl,
         anonKey: e.config.supabaseAnonKey,
       })),
-      (this.sections = new y({
+      (this.sections = new T({
         selector: e.config.sections.selector,
         boundaryOffsetPx: e.config.sections.boundaryOffsetPx,
         minDwellMs: e.config.sections.minDwellMs,
@@ -693,8 +725,8 @@ var x = class {
   async start() {
     if (!this.opts.preStarted) {
       if (document.hidden) return null;
-      let t = 5e3;
-      if ((await new Promise((r) => setTimeout(r, t)), document.hidden)) return null;
+      let n = 5e3;
+      if ((await new Promise((i) => setTimeout(i, n)), document.hidden)) return null;
     }
     (document.hidden || (this.activeRunningSince = performance.now()),
       this.bindListeners(),
@@ -727,14 +759,14 @@ var x = class {
       this.flushing = !0;
       try {
         (this.tickActive(performance.now()), this.updateMaxScroll());
-        let t = this.sections.snapshot();
-        if (t.length === 0 && !this.dirty) return;
-        let r = {
+        let n = this.sections.snapshot();
+        if (n.length === 0 && !this.dirty) return;
+        let i = {
             sessionId: this.info.sessionId,
             token: this.token,
             activeSeconds: Math.round(this.activeMs / 1e3),
             maxScrollDepth: this.maxScroll,
-            sections: t.map((o) => ({
+            sections: n.map((o) => ({
               section_id: o.id,
               section_title: o.title,
               depth: o.depth,
@@ -742,14 +774,14 @@ var x = class {
               time_seconds: o.timeSeconds,
             })),
           },
-          i = this.opts.config.hooks.beforeFlush?.(r) ?? r;
-        if (i === !1) return;
-        (await this.transport.updateSession(i, e), (this.dirty = !1));
-      } catch (t) {
-        let r = t instanceof Error ? t : new Error(String(t));
-        (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', r),
-          this.opts.config.hooks.onFlushError?.(r),
-          t instanceof h && t.code === 'P0010' && this.stop());
+          s = this.opts.config.hooks.beforeFlush?.(i) ?? i;
+        if (s === !1) return;
+        (await this.transport.updateSession(s, e), (this.dirty = !1));
+      } catch (n) {
+        let i = n instanceof Error ? n : new Error(String(n));
+        (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', i),
+          this.opts.config.hooks.onFlushError?.(i),
+          n instanceof v && n.code === 'P0010' && this.stop());
       } finally {
         this.flushing = !1;
       }
@@ -793,34 +825,34 @@ var x = class {
       this.maxScroll < 1 && ((this.maxScroll = 1), (this.dirty = !0));
       return;
     }
-    let t = Math.max(
+    let n = Math.max(
         window.scrollY || 0,
         document.documentElement.scrollTop || 0,
         document.body.scrollTop || 0,
       ),
-      r = Math.max(0, Math.min(1, t / e));
-    r > this.maxScroll && ((this.maxScroll = r), (this.dirty = !0));
+      i = Math.max(0, Math.min(1, n / e));
+    i > this.maxScroll && ((this.maxScroll = i), (this.dirty = !0));
   }
   tickActive(e) {
     if (this.activeRunningSince === null) return;
-    let t = e - this.activeRunningSince;
-    (t > 0 && ((this.activeMs += t), (this.dirty = !0)), (this.activeRunningSince = e));
+    let n = e - this.activeRunningSince;
+    (n > 0 && ((this.activeMs += n), (this.dirty = !0)), (this.activeRunningSince = e));
   }
 };
-function q(n) {
+function K(t) {
   let e = {
-    version: n.version,
-    ready: n.ready,
-    flush: () => n.session.flush(),
+    version: t.version,
+    ready: t.ready,
+    flush: () => t.session.flush(),
     optOut: () => {
-      (R(), n.session.stop());
+      (R(), t.session.stop());
     },
   };
   return ((window.HTMLRadar = e), e);
 }
-function ne(n) {
-  if (n instanceof h)
-    switch (n.code) {
+function ie(t) {
+  if (t instanceof v)
+    switch (t.code) {
       case 'P0001':
         return 'Too many tries from this email. Wait a minute, then try again.';
       case 'P0002':
@@ -842,12 +874,12 @@ function ne(n) {
     }
   return "We couldn't reach the server. Check your connection and try again.";
 }
-var re = '0.1.0';
-ie();
-async function ie() {
-  if (_()) return;
-  let n = document.currentScript,
-    e = L(n);
+var se = '0.1.0';
+re();
+async function re() {
+  if (H()) return;
+  let t = document.currentScript,
+    e = _(t);
   if (!e) {
     typeof console < 'u' &&
       console.warn(
@@ -855,22 +887,22 @@ async function ie() {
       );
     return;
   }
-  let t = H(),
-    r = O(),
-    i = null,
+  let n = P(),
+    i = O(),
+    s = null,
     o;
-  if (e.email) ((i = e.email), i !== r && I(i));
+  if (e.email) ((s = e.email), s !== i && k(s));
   else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
-    if (r) i = r;
+    if (i) s = i;
     else {
-      let c = v({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
-      ((i = await F(e, async (d) => {
+      let a = w({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
+      ((s = await $(e, async (d) => {
         try {
           return (
-            (o = await c.startSession({
+            (o = await a.startSession({
               shareSlug: e.shareSlug,
               email: d,
-              fingerprint: t,
+              fingerprint: n,
               referrer: document.referrer ?? '',
               userAgent: navigator.userAgent ?? '',
               ...(e.geo ? { geo: e.geo } : {}),
@@ -878,15 +910,15 @@ async function ie() {
             null
           );
         } catch (u) {
-          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', u), ne(u));
+          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', u), ie(u));
         }
       })),
-        I(i));
+        k(s));
     }
-  let s = new x({ config: e, email: i, fingerprint: t, ...(o ? { preStarted: o } : {}) }),
-    a = s.start().catch((c) => {
-      throw (e.debug && console.warn('[HTMLRadar] session start failed', c), c);
+  let r = new E({ config: e, email: s, fingerprint: n, ...(o ? { preStarted: o } : {}) }),
+    c = r.start().catch((a) => {
+      throw (e.debug && console.warn('[HTMLRadar] session start failed', a), a);
     });
-  q({ session: s, ready: a, version: re });
+  K({ session: r, ready: c, version: se });
 }
 //# sourceMappingURL=tracker.js.map

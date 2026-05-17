@@ -36,7 +36,11 @@ export default async function DashboardPage() {
   if (shareIds.length > 0) {
     const [sessionsRes, viewersRes] = await Promise.all([
       supabase.from('sessions').select('share_id, started_at').in('share_id', shareIds),
-      supabase.from('viewers').select('share_id, email, first_seen').in('share_id', shareIds),
+      supabase
+        .from('viewers')
+        .select('share_id, email, first_seen')
+        .in('share_id', shareIds)
+        .eq('is_internal', false),
     ]);
     for (const s of sessionsRes.data ?? []) {
       const cur = stats.get(s.share_id) ?? { views: 0, lastSeen: null };

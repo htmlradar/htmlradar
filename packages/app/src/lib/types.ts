@@ -57,6 +57,7 @@ export interface Viewer {
   os: string | null;
   browser: string | null;
   referrer: string | null;
+  is_internal: boolean;
 }
 
 export interface Session {

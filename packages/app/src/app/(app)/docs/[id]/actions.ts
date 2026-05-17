@@ -694,3 +694,36 @@ export async function replaceDocumentAction(formData: FormData) {
   }
   redirect(`/docs/${documentId}?replaced=1`);
 }
+
+// Hide/unhide a viewer from the dashboard. Calls the toggle_viewer_internal
+// RPC (migration 012) which enforces ownership in the DB. The action is a
+// no-throw — UI shows nothing on success and surfaces hide_error on failure.
+export async function toggleViewerInternalAction(formData: FormData) {
+  const user = await requireUser();
+  const supabase = serverClient();
+  const viewerId = String(formData.get('viewer_id'));
+  const documentId = String(formData.get('document_id'));
+
+  let errorMessage: string | null = null;
+  try {
+    const { error: rpcErr } = await supabase.rpc('toggle_viewer_internal', {
+      p_viewer_id: viewerId,
+    });
+    if (rpcErr) throw new Error(rpcErr.message);
+
+    await captureServerEvent({
+      event: 'viewer.hidden_toggled',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { viewer_id: viewerId, document_id: documentId },
+    });
+
+    revalidatePath(`/docs/${documentId}`);
+  } catch (e) {
+    errorMessage = e instanceof Error ? e.message : 'Failed to update the viewer.';
+  }
+
+  if (errorMessage) {
+    redirect(`/docs/${documentId}?hide_error=${encodeURIComponent(errorMessage)}`);
+  }
+}

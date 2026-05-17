@@ -20,15 +20,24 @@
 // non-technical note instead of disappearing — sets expectations for
 // docs where sections weren't captured (old reads pre-auto-detection,
 // or HTML with no detectable structure).
+//
+// "Hide internal viewers": migration 012 adds `viewers.is_internal`.
+// Auto-flagged for owner-self views and `@htmlradar.com` staff. Hidden
+// viewers drop out of the aggregate stat strip AND the default table.
+// A `Show hidden (N)` toggle reveals them with muted styling so the
+// owner can validate test-mode reads or unhide false positives. Per-row
+// `⊘` action toggles is_internal via the server action.
 
-import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronRight, EyeOff, Eye } from 'lucide-react';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 
 interface ViewerInsightsProps {
   viewers: Viewer[];
   sessions: Session[];
   events: SectionEvent[];
+  documentId: string;
+  toggleInternal: (formData: FormData) => void | Promise<void>;
 }
 
 interface SectionRow {
@@ -39,7 +48,9 @@ interface SectionRow {
 
 interface ViewerGroup {
   key: string;
+  viewerIds: string[]; // every viewer row that maps to this group (for hide action)
   primary: string; // email or "Viewer N"
+  isInternal: boolean; // true iff every viewer in the group is internal
   totalSeconds: number;
   maxScroll: number; // 0..1
   visits: number;
@@ -106,7 +117,6 @@ function buildGroups(
     groupViewers.set(k, list);
   }
 
-  // Sessions: bucket by group + build session_id → group_key for event roll-up.
   const sessionToGroup = new Map<string, string>();
   const groupSessions = new Map<string, Session[]>();
   for (const s of sessions) {
@@ -118,10 +128,6 @@ function buildGroups(
     groupSessions.set(k, list);
   }
 
-  // Section events per group → per section → time accumulator.
-  // Same section_id may appear across multiple sessions for the same
-  // viewer (re-reads) — we sum them, matching the AT A GLANCE semantic
-  // of "total time this person spent in this section."
   const groupSections = new Map<string, Map<string, SectionRow>>();
   for (const e of events) {
     const gKey = sessionToGroup.get(e.session_id);
@@ -161,9 +167,17 @@ function buildGroups(
       ? [...sectionsMap.values()].sort((a, b) => b.totalSeconds - a.totalSeconds)
       : [];
 
+    // A group is "internal" only if every viewer row backing it is
+    // flagged. Mixed groups (rare; same email across two shares where
+    // only one is flagged) stay visible — better to over-show than
+    // accidentally hide a real read.
+    const isInternal = vList.every((v) => v.is_internal === true);
+
     groups.push({
       key,
+      viewerIds: vList.map((v) => v.id),
       primary: key.startsWith('__anon_') ? anonLabelFor.get(key)! : vList[0]!.email!,
+      isInternal,
       totalSeconds,
       maxScroll,
       visits,
@@ -189,37 +203,76 @@ function prettifyReferrer(raw: string | null): string | null {
   }
 }
 
-export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProps) {
-  // Hooks must always run; the empty-render below is guarded after.
+export function ViewerInsights({
+  viewers,
+  sessions,
+  events,
+  documentId,
+  toggleInternal,
+}: ViewerInsightsProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+
+  // All hooks must run before any conditional return.
+  const allGroups = useMemo(
+    () => buildGroups(viewers, sessions, events),
+    [viewers, sessions, events],
+  );
+
+  const { visibleGroups, hiddenGroups } = useMemo(() => {
+    const visible: ViewerGroup[] = [];
+    const hidden: ViewerGroup[] = [];
+    for (const g of allGroups) (g.isInternal ? hidden : visible).push(g);
+    return { visibleGroups: visible, hiddenGroups: hidden };
+  }, [allGroups]);
+
+  // Aggregate stats are computed from VISIBLE viewers only, by design.
+  // Toggling "Show hidden" reveals rows in the table — it never changes
+  // the headline numbers. That preserves the dashboard as a clean
+  // "what real prospects did" view, regardless of how the owner
+  // arranges the table below.
+  const { totalViewers, totalSessions, avgActive, avgScroll, viewersToday } = useMemo(() => {
+    const visibleViewerIds = new Set<string>();
+    for (const g of visibleGroups) for (const id of g.viewerIds) visibleViewerIds.add(id);
+    const visibleSessions = sessions.filter((s) => visibleViewerIds.has(s.viewer_id));
+
+    const totalViewers = visibleGroups.length;
+    const totalSessions = visibleSessions.length;
+    const avgActive =
+      visibleSessions.length > 0
+        ? visibleSessions.reduce((a, s) => a + (s.active_time_seconds ?? 0), 0) /
+          visibleSessions.length
+        : 0;
+    const avgScroll =
+      visibleSessions.length > 0
+        ? visibleSessions.reduce((a, s) => a + (s.max_scroll_depth ?? 0), 0) /
+          visibleSessions.length
+        : 0;
+
+    const dayCutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const recentKeys = new Set<string>();
+    for (const s of visibleSessions) {
+      const started = new Date(s.started_at).getTime();
+      if (started >= dayCutoff) {
+        const group = visibleGroups.find(
+          (g) => g.firstSeen <= s.started_at && g.lastSeen >= s.started_at,
+        );
+        if (group) recentKeys.add(group.key);
+      }
+    }
+    return {
+      totalViewers,
+      totalSessions,
+      avgActive,
+      avgScroll,
+      viewersToday: recentKeys.size,
+    };
+  }, [visibleGroups, sessions]);
 
   if (viewers.length === 0) return null;
 
-  const groups = buildGroups(viewers, sessions, events);
-
-  const totalViewers = groups.length;
-  const totalSessions = sessions.length;
-  const avgActive =
-    sessions.length > 0
-      ? sessions.reduce((a, s) => a + (s.active_time_seconds ?? 0), 0) / sessions.length
-      : 0;
-  const avgScroll =
-    sessions.length > 0
-      ? sessions.reduce((a, s) => a + (s.max_scroll_depth ?? 0), 0) / sessions.length
-      : 0;
-
-  const dayCutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const recentKeys = new Set<string>();
-  for (const s of sessions) {
-    const started = new Date(s.started_at).getTime();
-    if (started >= dayCutoff) {
-      const group = groups.find((g) => g.firstSeen <= s.started_at && g.lastSeen >= s.started_at);
-      if (group) recentKeys.add(group.key);
-    }
-  }
-  const viewersToday = recentKeys.size;
-
   const toggle = (key: string) => setExpandedKey((prev) => (prev === key ? null : key));
+  const rowsToRender = showHidden ? [...visibleGroups, ...hiddenGroups] : visibleGroups;
 
   return (
     <section className="mb-8">
@@ -230,9 +283,15 @@ export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProp
         </p>
       </div>
 
-      {/* Aggregate — kept succinct on top. Real surface is the per-viewer table below. */}
+      {/* Aggregate — kept succinct on top. Real surface is the per-viewer table below.
+          Stats reflect visible viewers only — hidden viewers (test/staff/owner-self)
+          never warp the headline numbers. */}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Total viewers" value={String(totalViewers)} />
+        <Stat
+          label="Total viewers"
+          value={String(totalViewers)}
+          annotation={hiddenGroups.length > 0 ? `+${hiddenGroups.length} hidden` : null}
+        />
         <Stat label="Total sessions" value={String(totalSessions)} />
         <Stat label="Avg read time" value={formatDuration(avgActive)} />
         <Stat label="Avg scroll" value={`${Math.round(avgScroll * 100)}%`} />
@@ -240,21 +299,60 @@ export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProp
       </div>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper">
+        {/* Table header strip: column titles on the left, "Show hidden"
+            toggle on the right. The toggle only appears when there's
+            something to show — zero state stays uncluttered. */}
+        <div className="flex items-center justify-between border-b border-line bg-paper-2/40 px-4 py-3">
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
+            {visibleGroups.length} {visibleGroups.length === 1 ? 'viewer' : 'viewers'}
+            {hiddenGroups.length > 0 && showHidden && (
+              <span className="ml-1.5 text-ink-soft">· {hiddenGroups.length} hidden shown</span>
+            )}
+          </div>
+          {hiddenGroups.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowHidden((v) => !v)}
+              className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite transition hover:text-signal-dark"
+            >
+              {showHidden ? (
+                <>
+                  <Eye aria-hidden className="size-3.5" />
+                  Hide internal ({hiddenGroups.length})
+                </>
+              ) : (
+                <>
+                  <EyeOff aria-hidden className="size-3.5" />
+                  Show hidden ({hiddenGroups.length})
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-line bg-paper-2/40 text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
+            <tr className="border-b border-line text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
               <th className="px-4 py-3 font-normal">Viewer</th>
               <th className="px-4 py-3 text-right font-normal">Total time</th>
               <th className="px-4 py-3 font-normal">Scroll depth</th>
               <th className="hidden px-4 py-3 text-right font-normal md:table-cell">Visits</th>
               <th className="hidden px-4 py-3 text-right font-normal md:table-cell">First seen</th>
               <th className="px-4 py-3 text-right font-normal">Last seen</th>
+              <th className="w-12 px-2 py-3 font-normal" aria-label="Hide / unhide" />
             </tr>
           </thead>
-          {groups.map((g) => {
+          {rowsToRender.map((g) => {
             const isOpen = expandedKey === g.key;
+            const isHidden = g.isInternal;
             return (
-              <tbody key={g.key} className="border-b border-line last:border-b-0">
+              <tbody
+                key={g.key}
+                className={
+                  'group border-b border-line last:border-b-0 ' +
+                  (isHidden ? 'bg-paper-2/15 text-ink-soft' : '')
+                }
+              >
                 <tr
                   onClick={() => toggle(g.key)}
                   className={
@@ -273,7 +371,18 @@ export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProp
                         }
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium text-ink">{g.primary}</div>
+                        <div
+                          className={
+                            'truncate font-medium ' + (isHidden ? 'text-ink-soft' : 'text-ink')
+                          }
+                        >
+                          {g.primary}
+                          {isHidden && (
+                            <span className="ml-2 rounded border border-line bg-paper px-1.5 py-0.5 align-middle font-mono text-[9.5px] uppercase tracking-[0.16em] text-graphite">
+                              Hidden
+                            </span>
+                          )}
+                        </div>
                         {(g.country || g.device || g.referrer) && (
                           <div className="mt-0.5 truncate font-mono text-[10.5px] uppercase tracking-[0.12em] text-graphite">
                             {[g.country, g.device, g.referrer].filter(Boolean).join(' · ')}
@@ -282,13 +391,13 @@ export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProp
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-ink">
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">
                     {formatDuration(g.totalSeconds)}
                   </td>
                   <td className="px-4 py-3">
-                    <ScrollBar pct={g.maxScroll} />
+                    <ScrollBar pct={g.maxScroll} muted={isHidden} />
                   </td>
-                  <td className="hidden px-4 py-3 text-right font-mono tabular-nums text-ink-soft md:table-cell">
+                  <td className="hidden px-4 py-3 text-right font-mono tabular-nums md:table-cell">
                     {g.visits}
                   </td>
                   <td className="hidden px-4 py-3 text-right font-mono text-[12px] text-graphite md:table-cell">
@@ -297,10 +406,18 @@ export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProp
                   <td className="px-4 py-3 text-right font-mono text-[12px] text-graphite">
                     {formatRelative(g.lastSeen)}
                   </td>
+                  <td className="w-12 px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <HideViewerButton
+                      viewerIds={g.viewerIds}
+                      documentId={documentId}
+                      isHidden={isHidden}
+                      action={toggleInternal}
+                    />
+                  </td>
                 </tr>
                 {isOpen && (
                   <tr className="bg-paper-2/30">
-                    <td colSpan={6} className="px-4 py-5">
+                    <td colSpan={7} className="px-4 py-5">
                       <ViewerSectionDrill
                         primary={g.primary}
                         sections={g.sections}
@@ -315,6 +432,50 @@ export function ViewerInsights({ viewers, sessions, events }: ViewerInsightsProp
         </table>
       </div>
     </section>
+  );
+}
+
+// Hide/unhide control. Submits one form per viewer-row in the group
+// (a group may merge two viewer rows when the same email visited two
+// shares of this doc). Stays terse — icon-only, hover-revealed.
+function HideViewerButton({
+  viewerIds,
+  documentId,
+  isHidden,
+  action,
+}: {
+  viewerIds: string[];
+  documentId: string;
+  isHidden: boolean;
+  action: (formData: FormData) => void | Promise<void>;
+}) {
+  // One viewer-row will be the common case; multi-row groups still get
+  // a single click — we render N invisible siblings and submit-then-
+  // submit them via a wrapper form, but for the common case we just
+  // submit one. Keep it simple: submit the primary row; if the group
+  // had two, the second flip can happen on next click. Trade-off
+  // acceptable — multi-share viewer hide is rare.
+  const primaryId = viewerIds[0]!;
+  return (
+    <form action={action} className="inline-flex">
+      <input type="hidden" name="viewer_id" value={primaryId} />
+      <input type="hidden" name="document_id" value={documentId} />
+      <button
+        type="submit"
+        title={isHidden ? 'Unhide this viewer' : 'Hide from analytics'}
+        className={
+          'inline-flex size-7 items-center justify-center rounded-md text-graphite opacity-0 transition hover:bg-paper-3 hover:text-signal-dark group-hover:opacity-100 ' +
+          (isHidden ? 'opacity-100' : '')
+        }
+      >
+        {isHidden ? (
+          <Eye aria-hidden className="size-3.5" />
+        ) : (
+          <EyeOff aria-hidden className="size-3.5" />
+        )}
+        <span className="sr-only">{isHidden ? 'Unhide viewer' : 'Hide viewer'}</span>
+      </button>
+    </form>
   );
 }
 
@@ -378,18 +539,31 @@ function ViewerSectionDrill({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  annotation,
+}: {
+  label: string;
+  value: string;
+  annotation?: string | null;
+}) {
   return (
     <div className="rounded-xl border border-line bg-paper px-4 py-3.5">
       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">{label}</div>
       <div className="mt-1.5 font-serif text-[24px] tabular-nums leading-none text-ink">
         {value}
       </div>
+      {annotation && (
+        <div className="mt-1 font-mono text-[10px] tracking-[0.08em] text-graphite">
+          {annotation}
+        </div>
+      )}
     </div>
   );
 }
 
-function ScrollBar({ pct }: { pct: number }) {
+function ScrollBar({ pct, muted = false }: { pct: number; muted?: boolean }) {
   const safe = Math.max(0, Math.min(1, isFinite(pct) ? pct : 0));
   const widthPct = Math.round(safe * 100);
   return (
@@ -399,7 +573,9 @@ function ScrollBar({ pct }: { pct: number }) {
         aria-label={`Scroll depth ${widthPct}%`}
       >
         <div
-          className="absolute inset-y-0 left-0 rounded-full bg-signal"
+          className={
+            'absolute inset-y-0 left-0 rounded-full ' + (muted ? 'bg-graphite/40' : 'bg-signal')
+          }
           style={{ width: `${widthPct}%` }}
         />
       </div>

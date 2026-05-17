@@ -25,6 +25,7 @@ import {
   uploadAttachmentsAction,
   deleteAttachmentAction,
   replaceDocumentAction,
+  toggleViewerInternalAction,
 } from './actions';
 import {
   DocumentShareManager,
@@ -53,6 +54,7 @@ export default async function DocumentPage({
     preview_error?: string;
     replace_error?: string;
     replaced?: string;
+    hide_error?: string;
   };
 }) {
   await requireUser();
@@ -71,6 +73,7 @@ export default async function DocumentPage({
     ? decodeURIComponent(searchParams.replace_error)
     : null;
   const replacedFlash = searchParams?.replaced === '1';
+  const hideError = searchParams?.hide_error ? decodeURIComponent(searchParams.hide_error) : null;
 
   const { data: doc } = await supabase
     .from('documents')
@@ -292,6 +295,14 @@ export default async function DocumentPage({
           Couldn't replace the document: {replaceError}
         </div>
       )}
+      {hideError && (
+        <div
+          role="alert"
+          className="mt-6 rounded-md border border-alert/40 bg-alert/5 px-4 py-3 text-[14px] leading-relaxed text-alert"
+        >
+          Couldn't update the viewer: {hideError}
+        </div>
+      )}
       {replacedFlash && (
         <div
           role="status"
@@ -315,7 +326,13 @@ export default async function DocumentPage({
             optional supplements, not a parallel concept. Empty state is
             a one-line CTA so the panel doesn't compete with the share
             manager for attention when the user has no attachments yet. */}
-        <ViewerInsights viewers={allViewers} sessions={allSessions} events={allEvents} />
+        <ViewerInsights
+          viewers={allViewers}
+          sessions={allSessions}
+          events={allEvents}
+          documentId={doc.id}
+          toggleInternal={toggleViewerInternalAction}
+        />
 
         <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
 

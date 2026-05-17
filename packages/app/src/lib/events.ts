@@ -34,6 +34,7 @@ export type AppEvent =
   | 'pricing.viewed'
   | 'free_tier.cap_hit'
   | 'share.first_view'
+  | 'viewer.hidden_toggled'
   | '$identify';
 
 interface CaptureOpts {

@@ -308,7 +308,7 @@ export default async function DocumentPage({
             optional supplements, not a parallel concept. Empty state is
             a one-line CTA so the panel doesn't compete with the share
             manager for attention when the user has no attachments yet. */}
-        <ViewerInsights viewers={allViewers} sessions={allSessions} />
+        <ViewerInsights viewers={allViewers} sessions={allSessions} events={allEvents} />
 
         <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
 

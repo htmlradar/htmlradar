@@ -138,6 +138,11 @@ export function SignInForm({
           </a>
           .
         </p>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-graphite">
+          On iPhone Safari, Google sometimes throws a 400 on the first try — tap{' '}
+          <span className="font-medium text-ink-soft">Continue with Google</span> again and it goes
+          through.
+        </p>
 
         <div className="my-7 flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
           <div className="h-px flex-1 bg-line" />

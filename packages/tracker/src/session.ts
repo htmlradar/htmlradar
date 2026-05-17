@@ -121,6 +121,12 @@ export class Session {
     this.flushing = true;
     try {
       this.tickActive(performance.now());
+      // Poll scroll position on every flush. The scroll-listener path
+      // covers normal scrolling, but smooth-scroll libraries and mobile
+      // momentum scrolls sometimes leave events un-fired while position
+      // does change — polling here makes max_scroll_depth eventually
+      // consistent with reality regardless of event firing.
+      this.updateMaxScroll();
       const sections: SectionInfo[] = this.sections.snapshot();
       if (sections.length === 0 && !this.dirty) {
         // Nothing changed and no sections to send.
@@ -239,7 +245,17 @@ export class Session {
       }
       return;
     }
-    const ratio = Math.max(0, Math.min(1, window.scrollY / docHeight));
+    // Robust scroll-position read: some mobile browsers / smooth-scroll
+    // libraries (Lenis) leave `window.scrollY` stale while
+    // `documentElement.scrollTop` updates, and vice versa on iOS Safari
+    // during momentum scrolls. Take the larger of the two so we don't
+    // silently report 0% on a deck where one of them isn't moving.
+    const scrolledPx = Math.max(
+      window.scrollY || 0,
+      document.documentElement.scrollTop || 0,
+      document.body.scrollTop || 0,
+    );
+    const ratio = Math.max(0, Math.min(1, scrolledPx / docHeight));
     if (ratio > this.maxScroll) {
       this.maxScroll = ratio;
       this.dirty = true;

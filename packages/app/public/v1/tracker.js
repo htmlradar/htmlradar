@@ -2,7 +2,7 @@ var z = Object.defineProperty;
 var j = (n, e, t) =>
   e in n ? z(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
 var l = (n, e, t) => (j(n, typeof e != 'symbol' ? e + '' : e, t), t);
-var p = {
+var f = {
   sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
   gate: {
@@ -31,15 +31,15 @@ function L(n) {
     supabaseUrl: r,
     supabaseAnonKey: i,
     shareSlug: s,
-    sections: { ...p.sections, ...(t.sections ?? {}) },
-    session: { ...p.session, ...(t.session ?? {}) },
+    sections: { ...f.sections, ...(t.sections ?? {}) },
+    session: { ...f.session, ...(t.session ?? {}) },
     gate: {
-      ...p.gate,
+      ...f.gate,
       ...(t.gate ?? {}),
-      brand: { ...p.gate.brand, ...(t.gate?.brand ?? {}) },
-      copy: { ...p.gate.copy, ...(t.gate?.copy ?? {}) },
+      brand: { ...f.gate.brand, ...(t.gate?.brand ?? {}) },
+      copy: { ...f.gate.copy, ...(t.gate?.copy ?? {}) },
     },
-    privacy: { ...p.privacy, ...(t.privacy ?? {}) },
+    privacy: { ...f.privacy, ...(t.privacy ?? {}) },
     hooks: t.hooks ?? {},
     debug: t.debug ?? !1,
   };
@@ -541,7 +541,7 @@ function D(n) {
     timeSeconds: n.accumulatedMs / 1e3,
   };
 }
-var f = class extends Error {
+var p = class extends Error {
   constructor(t, r, i) {
     super(r);
     this.code = t;
@@ -567,7 +567,7 @@ function v(n) {
     if (!u.ok) {
       let d = await u.text().catch(() => ''),
         S = te(d) ?? `http_${u.status}`;
-      throw new f(S, d || u.statusText, u.status);
+      throw new p(S, d || u.statusText, u.status);
     }
     return u.status === 204 ? null : await u.json();
   }
@@ -703,7 +703,7 @@ var x = class {
     if (!(this.flushing || !this.info || !this.token)) {
       this.flushing = !0;
       try {
-        this.tickActive(performance.now());
+        (this.tickActive(performance.now()), this.updateMaxScroll());
         let t = this.sections.snapshot();
         if (t.length === 0 && !this.dirty) return;
         let r = {
@@ -726,7 +726,7 @@ var x = class {
         let r = t instanceof Error ? t : new Error(String(t));
         (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', r),
           this.opts.config.hooks.onFlushError?.(r),
-          t instanceof f && t.code === 'P0010' && this.stop());
+          t instanceof p && t.code === 'P0010' && this.stop());
       } finally {
         this.flushing = !1;
       }
@@ -770,8 +770,13 @@ var x = class {
       this.maxScroll < 1 && ((this.maxScroll = 1), (this.dirty = !0));
       return;
     }
-    let t = Math.max(0, Math.min(1, window.scrollY / e));
-    t > this.maxScroll && ((this.maxScroll = t), (this.dirty = !0));
+    let t = Math.max(
+        window.scrollY || 0,
+        document.documentElement.scrollTop || 0,
+        document.body.scrollTop || 0,
+      ),
+      r = Math.max(0, Math.min(1, t / e));
+    r > this.maxScroll && ((this.maxScroll = r), (this.dirty = !0));
   }
   tickActive(e) {
     if (this.activeRunningSince === null) return;
@@ -791,7 +796,7 @@ function q(n) {
   return ((window.HTMLRadar = e), e);
 }
 function ne(n) {
-  if (n instanceof f)
+  if (n instanceof p)
     switch (n.code) {
       case 'P0001':
         return 'Too many tries from this email. Wait a minute, then try again.';

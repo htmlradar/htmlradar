@@ -51,7 +51,15 @@ interface ViewerGroup {
   viewerIds: string[]; // every viewer row that maps to this group (for hide action)
   primary: string; // email or "Viewer N"
   isInternal: boolean; // true iff every viewer in the group is internal
+  // Reading time = section dwell sum. This is the honest "engaged with
+  // content" number and the one we show prominently. It's bounded above
+  // by activeSeconds — you can't read more than the tab was open.
   totalSeconds: number;
+  // Tab-open time (sum of session.active_time_seconds). Inflates on
+  // mobile when a session stays foregrounded but the user isn't
+  // looking (no visibilitychange fires when a user app-switches on
+  // some Android/iOS versions). Shown as a secondary footnote.
+  activeSeconds: number;
   maxScroll: number; // 0..1
   visits: number;
   firstSeen: string;
@@ -146,7 +154,17 @@ function buildGroups(
   const groups: ViewerGroup[] = [];
   for (const [key, vList] of groupViewers.entries()) {
     const sList = groupSessions.get(key) ?? [];
-    const totalSeconds = sList.reduce((acc, s) => acc + (s.active_time_seconds ?? 0), 0);
+    const activeSeconds = sList.reduce((acc, s) => acc + (s.active_time_seconds ?? 0), 0);
+    const sectionsMapForReadingTime = groupSections.get(key);
+    const sectionsForReadingTime = sectionsMapForReadingTime
+      ? [...sectionsMapForReadingTime.values()]
+      : [];
+    // Reading time = section dwell sum, capped by active time. If no
+    // sections were captured (older sessions pre-IO tracker, or docs
+    // without detectable structure) we fall back to active time so
+    // the cell isn't blank.
+    const dwellSum = sectionsForReadingTime.reduce((acc, s) => acc + s.totalSeconds, 0);
+    const totalSeconds = dwellSum > 0 ? Math.min(dwellSum, activeSeconds) : activeSeconds;
     const maxScroll = sList.reduce((acc, s) => Math.max(acc, s.max_scroll_depth ?? 0), 0);
     const visits =
       sList.length > 0 ? sList.length : vList.reduce((acc, v) => acc + (v.visit_count ?? 1), 0);
@@ -179,6 +197,7 @@ function buildGroups(
       primary: key.startsWith('__anon_') ? anonLabelFor.get(key)! : vList[0]!.email!,
       isInternal,
       totalSeconds,
+      activeSeconds,
       maxScroll,
       visits,
       firstSeen,
@@ -238,10 +257,14 @@ export function ViewerInsights({
 
     const totalViewers = visibleGroups.length;
     const totalSessions = visibleSessions.length;
+    // Avg read time uses Reading time (section dwell), matching the
+    // per-row metric. This is the honest "engaged with content"
+    // average. Session active_time would inflate on idle-but-open
+    // mobile tabs (e.g. viewer2's 26m no-scroll background session)
+    // and make the average misleading.
     const avgActive =
-      visibleSessions.length > 0
-        ? visibleSessions.reduce((a, s) => a + (s.active_time_seconds ?? 0), 0) /
-          visibleSessions.length
+      visibleGroups.length > 0
+        ? visibleGroups.reduce((a, g) => a + g.totalSeconds, 0) / visibleGroups.length
         : 0;
     const avgScroll =
       visibleSessions.length > 0
@@ -334,7 +357,7 @@ export function ViewerInsights({
           <thead>
             <tr className="border-b border-line text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
               <th className="px-4 py-3 font-normal">Viewer</th>
-              <th className="px-4 py-3 text-right font-normal">Total time</th>
+              <th className="px-4 py-3 text-right font-normal">Reading time</th>
               <th className="px-4 py-3 font-normal">Scroll depth</th>
               <th className="hidden px-4 py-3 text-right font-normal md:table-cell">Visits</th>
               <th className="hidden px-4 py-3 text-right font-normal md:table-cell">First seen</th>
@@ -392,7 +415,19 @@ export function ViewerInsights({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">
-                    {formatDuration(g.totalSeconds)}
+                    <div>{formatDuration(g.totalSeconds)}</div>
+                    {g.activeSeconds > g.totalSeconds + 30 && (
+                      // Show "tab open" only when the gap is meaningful
+                      // (>30s). Otherwise it's noise. Larger gap = user
+                      // had the tab open without engaging — informative
+                      // signal but not the headline number.
+                      <div
+                        title="Total time the tab was open (active). Reading time above is the portion spent inside a section."
+                        className="mt-0.5 text-[10.5px] font-normal text-graphite"
+                      >
+                        tab: {formatDuration(g.activeSeconds)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <ScrollBar pct={g.maxScroll} muted={isHidden} />

@@ -1,472 +1,822 @@
-// Landing page. Server-rendered, animations are pure CSS via Reveal.
+// HTMLRadar landing v2 — adapted from a designer's reference + the v1
+// landing's stronger positioning beats pulled forward.
+//
+// Sections in order:
+//   1. Hero — v1's "Decks moved to HTML. Tracking should follow." positioning.
+//   2. The shift — manifesto paragraph (PDF→HTML) with a small chip
+//      transition visual at the bottom.
+//   3. Pitch — Marc/Seed Deck card + notification + pull-quote ("which
+//      sentence convinced them").
+//   4. Workflow — three-step diagram with animated packet flowing
+//      through dotted connectors (replaces the buggy horizontal swiper).
+//   5. What it does — four specific claims (per-share / versioning /
+//      dwell-threshold / attachments).
+//   6. Controls — 5-item grid with auto-demo cycling.
+//   7. Open source — v1's specific Cloudflare/Supabase phrasing.
+//   8. CTA — v1's "An email lands the moment a real read happens."
+//   9. Footer.
 
 import Link from 'next/link';
-import { serverClient } from '@/lib/supabase-server';
-import { NavBar } from '@/components/NavBar';
-import { Reveal } from '@/components/Reveal';
-import { ScrollProgress } from '@/components/ScrollProgress';
-import { CursorGlow } from '@/components/CursorGlow';
-import { HeroRadar } from '@/components/HeroRadar';
-import { SectionMark } from '@/components/SectionMark';
-import { DashboardMock } from '@/components/mocks/DashboardMock';
-import { ShareStack } from '@/components/mocks/ShareStack';
-import { VersionSwap } from '@/components/mocks/VersionSwap';
-import { DwellThreshold } from '@/components/mocks/DwellThreshold';
-import { EmailNotificationMock } from '@/components/mocks/EmailNotificationMock';
-import { RecipientFlow } from '@/components/mocks/RecipientFlow';
-import type { ReactNode } from 'react';
-import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { LandingEffects } from './LandingEffects';
+import './landing-v2.css';
 
 export const runtime = 'edge';
 
-export default async function LandingPage() {
-  // Read the session once at the top so the hero + close-block CTAs can
-  // route authed users straight to /docs. Without this, clicking "Start
-  // free" while already signed in kicks Supabase through a fresh OAuth
-  // round-trip whose PKCE verifier doesn't match the live session — that's
-  // the source of the "We couldn't complete the sign-in" callback error
-  // the gf hit when re-clicking the CTA after signing in.
-  const supabase = serverClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const isAuthed = !!user;
-
+export default function LandingV2() {
   return (
-    <>
-      <NavBar />
-      <ScrollProgress />
-      <main className="relative overflow-x-clip">
-        <CursorGlow />
-        <Hero isAuthed={isAuthed} />
-        <WhyThisExists />
-        <TheMoment />
-        <WhatWeBuilt />
-        <WhatRecipientSees />
-        <OpenSource />
-        <Close isAuthed={isAuthed} />
-        <Footer />
-      </main>
-    </>
-  );
-}
+    <div className="v2-root">
+      <LandingEffects />
 
-/* --------------------------------- Hero --------------------------------- */
-
-function Hero({ isAuthed }: { isAuthed: boolean }) {
-  return (
-    <section className="relative isolate overflow-hidden">
-      {/* radial bloom — barely perceptible warmth seated under the hero */}
-      <div aria-hidden className="hero-bloom pointer-events-none absolute inset-0" />
-
-      <div className="relative mx-auto max-w-6xl px-6 pb-28 pt-20 md:pb-36 md:pt-28">
-        {/* Watermark radar — visible on small + tablet, faded behind the
-            headline. Replaced by the large right-column radar on lg+. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute right-2 top-12 opacity-60 sm:right-4 sm:top-16 lg:hidden"
-        >
-          <HeroRadar size={200} />
+      {/* ─────────────────────── NAV ─────────────────────── */}
+      <nav className="v2-nav" id="v2-nav">
+        <div className="logo">
+          HTML<span className="ital">radar</span>
         </div>
-
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.25fr_1fr] lg:gap-10">
-          <div className="relative">
-            <Reveal reveal={false}>
-              <SectionMark>Open source. AGPL-3.0.</SectionMark>
-            </Reveal>
-
-            <Reveal reveal={false} delay={0.05}>
-              <h1 className="text-letterpress mt-8 max-w-[16ch] font-serif text-[44px] font-normal leading-[1.04] tracking-tightest text-ink md:text-[78px]">
-                Decks moved to HTML.
-                <br />
-                <span
-                  className="italic text-signal"
-                  style={{ fontVariationSettings: '"opsz" 144' }}
-                >
-                  Tracking should follow.
-                </span>
-              </h1>
-            </Reveal>
-
-            <Reveal reveal={false} delay={0.15}>
-              <p className="mt-8 max-w-[34rem] text-[19px] leading-relaxed text-ink-soft">
-                HTMLRadar is read tracking for the documents your work actually produces now — pitch
-                decks, design mocks, reports, investor updates. Upload a file or paste a URL, send a
-                tracked link, see who opened it and where they dwelled.
-              </p>
-            </Reveal>
-
-            <Reveal reveal={false} delay={0.22}>
-              <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4">
-                <Link
-                  href={isAuthed ? '/docs' : '/sign-in'}
-                  data-cta={isAuthed ? 'hero.open_dashboard' : 'hero.start_free'}
-                  className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
-                >
-                  {isAuthed ? 'Open dashboard' : 'Start free'}
-                  <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-                </Link>
-                <Link
-                  href="#the-moment"
-                  className="link-slide inline-flex items-center gap-1.5 py-2 text-[15px] text-ink-soft hover:text-signal-dark"
-                >
-                  See it work
-                  <ArrowRight className="size-4" />
-                </Link>
-              </div>
-            </Reveal>
-
-            <Reveal reveal={false} delay={0.3}>
-              <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-                No card needed. Open source under AGPL-3.0.
-              </p>
-            </Reveal>
-          </div>
-
-          {/* Right column — signature radar + a small mono readout
-              beneath. Reads as an instrument panel rather than a stock
-              illustration. Hidden on small screens, full on lg+. */}
-          <div className="pointer-events-none relative hidden h-[460px] flex-col items-center justify-center lg:flex">
-            <HeroRadar size={420} className="text-signal" />
-            <div className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-graphite">
-              <span className="relative flex size-1.5">
-                <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
-                <span className="relative size-1.5 rounded-full bg-signal" />
-              </span>
-              Tracker · 14&nbsp;KB · Live
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative mx-auto h-px max-w-6xl bg-gradient-to-r from-transparent via-line to-transparent" />
-    </section>
-  );
-}
-
-/* ----------------------------- Why this exists -------------------------- */
-
-function WhyThisExists() {
-  return (
-    <section id="why" className="relative">
-      <div className="mx-auto max-w-3xl px-6 py-24 md:py-32">
-        <Reveal>
-          <SectionMark>02 · The shift</SectionMark>
-        </Reveal>
-
-        <Reveal delay={0.06}>
-          <p className="text-letterpress mt-8 font-serif text-[28px] leading-[1.25] text-ink md:text-[34px]">
-            For two decades, the documents that mattered ended in .pdf. Investor decks, briefs,
-            board updates, research reports. Now they end in .html. The piece nobody built was the
-            one that tells you what happened after the link went out.
-          </p>
-        </Reveal>
-
-        <Reveal delay={0.14}>
-          <Link
-            href="/why"
-            className="mt-10 inline-flex items-center gap-1.5 text-[14px] text-ink-soft underline decoration-line decoration-2 underline-offset-[6px] transition hover:text-signal-dark hover:decoration-signal"
-          >
-            More on why this exists
-            <ArrowRight className="size-3.5" />
-          </Link>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------ The Moment ------------------------------ */
-
-function TheMoment() {
-  return (
-    <section id="the-moment" className="relative bg-paper-2/55">
-      <div className="mx-auto max-w-6xl px-6 py-28 md:py-36">
-        <Reveal>
-          <SectionMark>03 · The moment</SectionMark>
-        </Reveal>
-
-        <div className="mt-14 grid grid-cols-1 gap-16 lg:grid-cols-[1.4fr_1fr] lg:items-center">
-          <Reveal delay={0.1}>
-            <DashboardMock />
-          </Reveal>
-
-          <Reveal delay={0.2}>
-            <div className="space-y-9 lg:pl-2">
-              <EmailNotificationMock variant="card" />
-              <figure>
-                <blockquote className="text-letterpress relative font-serif text-[24px] leading-snug text-ink md:text-[28px]">
-                  <span aria-hidden className="absolute -left-3 top-0 text-graphite">
-                    "
-                  </span>
-                  Marc at Example Ventures opened it three times. Spent{' '}
-                  <em className="not-italic text-signal-dark">6m 14s.</em> Read the Ask, Team, and
-                  Traction sections. Skipped Market sizing.
-                  <span aria-hidden className="text-graphite">
-                    "
-                  </span>
-                </blockquote>
-                <figcaption className="mt-5 max-w-sm text-[14.5px] leading-relaxed text-ink-soft">
-                  Most analytics tell you that someone opened it. HTMLRadar tells you which sentence
-                  convinced them.
-                </figcaption>
-              </figure>
-            </div>
-          </Reveal>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------- What it does ---------------------------- */
-
-// Inline mock for the "Files" landing-page claim. Renders a static
-// preview of the recipient's Files pill + expanded panel from the
-// proxy injection. Pure markup; the real version in
-// packages/proxy/src/inject.ts materialsPanel() is what ships to
-// recipients. This is the marketing-page mirror.
-function MaterialsPanelMock() {
-  return (
-    <div className="relative mx-auto max-w-[360px] rounded-2xl border border-line bg-paper p-5 shadow-[0_18px_40px_-30px_rgba(31,17,8,0.18)]">
-      <div className="flex items-center justify-between border-b border-line pb-3">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-graphite">
-          Files
-        </span>
-        <span className="font-mono text-[10.5px] text-graphite">×</span>
-      </div>
-      <ul className="space-y-1 pt-2 text-[13.5px]">
-        {[
-          { name: 'Series A Deck.pdf', meta: 'PDF · 3.4 MB' },
-          { name: 'Cap Table v3.xlsx', meta: 'XLSX · 88 KB' },
-          { name: 'Product Demo.png', meta: 'PNG · 412 KB' },
-        ].map((f) => (
-          <li
-            key={f.name}
-            className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-paper-2/60"
-          >
-            <div className="min-w-0">
-              <div className="truncate font-medium text-ink">{f.name}</div>
-              <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">
-                {f.meta}
-              </div>
-            </div>
-            <span className="ml-3 text-signal" aria-hidden>
-              ↓
-            </span>
+        <ul>
+          <li>
+            <a href="#shift">Why</a>
           </li>
-        ))}
-      </ul>
-      <div className="mt-3 border-t border-line pt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">
-        Shared via HTMLRadar · every download tracked
-      </div>
-    </div>
-  );
-}
+          <li>
+            <a href="#features">What you see</a>
+          </li>
+          <li>
+            <a href="#how">How it works</a>
+          </li>
+          <li>
+            <Link href="/pricing">Pricing</Link>
+          </li>
+        </ul>
+        <Link href="/sign-in" className="nav-cta">
+          Get started
+        </Link>
+      </nav>
 
-function WhatWeBuilt() {
-  // Four product claims. Each rendered alongside its own mock in an
-  // alternating layout (text-left/mock-right, then mock-left/text-right).
-  // Voice: contractions, specifics, no meta-headline.
-  const claims: {
-    num: string;
-    title: string;
-    body: string;
-    mock: ReactNode;
-  }[] = [
-    {
-      num: '01',
-      title: 'Each recipient gets a unique link.',
-      body: 'One document, many shares. Each share carries its own email gate, password, expiry, and revocation. The dashboard tells you which one Marc opened, not "someone opened it."',
-      mock: <ShareStack />,
-    },
-    {
-      num: '02',
-      title: 'Replace the HTML, keep the link.',
-      body: "Re-upload after partner feedback. Every share you've already sent now points at v2. No re-sending. No broken URLs in inboxes.",
-      mock: <VersionSwap />,
-    },
-    {
-      num: '03',
-      title: 'Read, not "opened."',
-      body: "A three-second dwell threshold separates a real read from a scroll-past. Most analytics count both. HTMLRadar doesn't.",
-      mock: <DwellThreshold />,
-    },
-    {
-      num: '04',
-      title: 'Send the deck. Attach the diligence.',
-      body: 'Files ride along with the HTML deck — PDFs, cap tables, financial models, ZIPs. Toggle "Allow downloads" per share to decide whether this recipient sees a Files panel or not — when it’s off, they don’t even know they exist. Every download is logged with the recipient’s email and the moment it happened.',
-      mock: <MaterialsPanelMock />,
-    },
-  ];
+      {/* ─────────────────────── HERO ─────────────────────── */}
+      <section className="v2-hero">
+        <div className="v2-hero-grid">
+          <div className="v2-hero-left">
+            <div className="eyebrow">
+              <span className="dot" /> Open source · AGPL-3.0
+            </div>
+            <h1 className="v2-headline">
+              <span className="line">
+                <span className="word">
+                  <span>Decks</span>
+                </span>{' '}
+                <span className="word">
+                  <span>moved</span>
+                </span>{' '}
+                <span className="word">
+                  <span>to</span>
+                </span>{' '}
+                <span className="word">
+                  <span>HTML.</span>
+                </span>
+              </span>
+              <span className="line">
+                <span className="word">
+                  <span className="v2-em-italic">Tracking</span>
+                </span>{' '}
+                <span className="word">
+                  <span className="v2-em-italic">should</span>
+                </span>{' '}
+                <span className="word">
+                  <span className="v2-em-italic">follow.</span>
+                </span>
+              </span>
+            </h1>
+            <p className="lede">
+              Share any HTML document as a tracked link. Watch in real time who opened it, how long
+              they stayed, and where they dwelled — down to the section and the second.
+            </p>
 
-  return (
-    <section className="relative">
-      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-        <Reveal>
-          <SectionMark>04 · What it does</SectionMark>
-        </Reveal>
+            <div className="cta-row">
+              <Link href="/sign-in" className="v2-btn v2-btn-primary">
+                Start free
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </Link>
+            </div>
 
-        <div className="mt-14 space-y-20 md:space-y-24">
-          {claims.map((c, i) => {
-            const mockFirst = i % 2 === 1;
-            return (
-              <Reveal key={c.num} delay={0.06}>
-                <article className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
-                  <div className={mockFirst ? 'lg:order-2' : ''}>
-                    <h3 className="text-letterpress font-serif text-2xl leading-snug text-ink md:text-[32px]">
-                      {c.title}
-                    </h3>
-                    <p className="mt-5 max-w-prose text-[16px] leading-relaxed text-ink-soft">
-                      {c.body}
-                    </p>
-                  </div>
-                  <div className={mockFirst ? 'lg:order-1' : ''}>{c.mock}</div>
-                </article>
-              </Reveal>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------ What the recipient sees ----------------------- */
-
-function WhatRecipientSees() {
-  return (
-    <section className="relative bg-paper-2/55">
-      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-        <Reveal>
-          <SectionMark>05 · The loop</SectionMark>
-        </Reveal>
-
-        <Reveal delay={0.06}>
-          <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            Three frames. The sender's notification fires. The recipient lands at the email gate.
-            The document renders. Each frame is real product output, not a slide.
-          </p>
-        </Reveal>
-
-        <Reveal delay={0.12}>
-          <div className="mt-14">
-            <RecipientFlow />
+            <div className="v2-trust">
+              <span className="lbl">Built for</span>
+              <div className="logos">
+                <span>Investor decks</span>
+                <span className="dot-sep">·</span>
+                <span>Sales reports</span>
+                <span className="dot-sep">·</span>
+                <span>Design specs</span>
+                <span className="dot-sep">·</span>
+                <span>Proposals</span>
+              </div>
+            </div>
           </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
 
-/* ----------------------------- Open source ------------------------------ */
+          <div className="v2-hero-right">
+            <div className="v2-hero-stage">
+              <div className="v2-hero-glow" />
+              <div className="v2-radar">
+                <div className="ring" />
+                <div className="ring r2" />
+                <div className="ring r3" />
+                <div className="ring r4" />
+                <div className="sweep" />
+                <div className="blip b1" />
+                <div className="blip b2" />
+                <div className="blip b3" />
+              </div>
 
-function OpenSource() {
-  return (
-    <section className="relative">
-      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-        <Reveal>
-          <SectionMark>06 · Open source</SectionMark>
-        </Reveal>
+              <div className="v2-chip-float c1">
+                <div className="ic green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                  </svg>
+                </div>
+                <div className="meta">
+                  <div className="lab">Just opened</div>
+                  <div className="val">marc@partners.co</div>
+                </div>
+              </div>
 
-        <div className="mt-12 grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1fr] lg:gap-20">
-          <Reveal delay={0.05}>
-            <h2 className="text-letterpress font-serif text-4xl leading-[1.1] tracking-tight text-ink md:text-[52px]">
-              Open source under <span className="italic text-signal">AGPL-3.0.</span>
-            </h2>
-          </Reveal>
+              <div className="v2-chip-float c2 big-num">
+                <div className="ic ink">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+                <div className="meta">
+                  <div className="lab">Max scroll</div>
+                  <div className="val">100%</div>
+                </div>
+              </div>
 
-          <Reveal delay={0.12}>
-            <p className="text-[16px] leading-relaxed text-ink-soft">
-              The tracker, the proxy worker, the schema, the web app — all of it lives on{' '}
-              <a
-                href="https://github.com/htmlradar/htmlradar"
-                className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
+              <div className="v2-chip-float c3">
+                <div className="ic pop">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </div>
+                <div className="meta">
+                  <div className="lab">Active read</div>
+                  <div className="val">
+                    <span id="v2-heroTick">14s</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v2-chip-float c4">
+                <div className="ic brand">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                </div>
+                <div className="meta">
+                  <div className="lab">New session</div>
+                  <div className="val">+1 viewer</div>
+                </div>
+              </div>
+
+              <div className="v2-chip-float c5 section-time">
+                <div className="head">
+                  <span>
+                    <span className="dot" />
+                    &nbsp;Section time
+                  </span>
+                  <span className="right">3 of 14</span>
+                </div>
+                <div className="bars">
+                  <div className="row">
+                    <span className="n">Intro</span>
+                    <span className="ln">
+                      <b style={{ ['--w' as never]: '42%' }} />
+                    </span>
+                    <span className="t">24s</span>
+                  </div>
+                  <div className="row peak">
+                    <span className="n">Why now</span>
+                    <span className="ln">
+                      <b style={{ ['--w' as never]: '100%' }} />
+                    </span>
+                    <span className="t">1m 02s</span>
+                  </div>
+                  <div className="row">
+                    <span className="n">Outlook</span>
+                    <span className="ln">
+                      <b style={{ ['--w' as never]: '38%' }} />
+                    </span>
+                    <span className="t">19s</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v2-hero-dash">
+                <div className="bar">
+                  <div className="lights">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <div className="u">series-a-memo.html · v4 · shared with 3</div>
+                </div>
+                <div className="v2-slide-doc">
+                  <div className="doc-head">
+                    <span className="brand-tag">Series A Memo · Q1</span>
+                    <span>03 / 14</span>
+                  </div>
+                  <h3>
+                    Active read time
+                    <br />
+                    that actually <em>matters</em>.
+                  </h3>
+                  <p className="sub">
+                    The dashboard you&apos;re looking at is generated automatically the moment a
+                    recipient opens your file.
+                  </p>
+                  <div className="v2-doc-chart">
+                    <div className="bars">
+                      <div className="col">
+                        <span>WEEK 1</span>
+                      </div>
+                      <div className="col">
+                        <span>WEEK 2</span>
+                      </div>
+                      <div className="col">
+                        <span>WEEK 3</span>
+                      </div>
+                      <div className="col">
+                        <span>WEEK 4</span>
+                      </div>
+                    </div>
+                    <div className="chart-cap">
+                      <span>Active read · sec / opener</span>
+                      <span className="up">+186%</span>
+                    </div>
+                  </div>
+                  <div className="v2-doc-foot">
+                    <span>htmlradar.com / r / memo</span>
+                    <span>Confidential</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────── THE SHIFT ─────────────────────── */}
+      <section className="v2-shift" id="shift">
+        <div className="head">
+          <span className="kicker">The shift</span>
+          <p className="v2-reveal">
+            The documents that matter used to end in <em>.pdf</em>. Frozen, mobile-hostile,
+            invisible to every model your reader runs against them. Now they end in <em>.html</em> —
+            readable by LLMs natively, responsive on every device, capable of holding a live
+            dashboard inside the page. The tracking nobody built was the one that matches the
+            medium.
+          </p>
+        </div>
+        <div className="v2-shift-visual v2-reveal d2">
+          <span className="v2-shift-chip old">deck.pdf</span>
+          <span className="v2-shift-arrow" />
+          <span className="v2-shift-chip new">deck.html</span>
+        </div>
+      </section>
+
+      {/* ─────────────────────── PITCH STORY ─────────────────────── */}
+      <section className="v2-pitch" id="features">
+        <div className="head">
+          <div className="v2-kicker v2-reveal">What HTMLRadar actually shows</div>
+          <h2 className="v2-reveal d1">
+            Not just opens — <em>the moment that&nbsp;matters</em>.
+          </h2>
+        </div>
+        <div className="v2-pitch-grid">
+          <div className="v2-pitch-card v2-reveal">
+            <div className="v2-pcd-head">
+              <span>htmlradar.com / r / swift-falcon-a3f2</span>
+              <span className="last">
+                <i /> Last open · 4h ago
+              </span>
+            </div>
+            <h3 className="v2-pcd-title">Seed Deck. Q2.</h3>
+            <div className="v2-pcd-divider" />
+            <div className="v2-pcd-recipient">
+              <div className="who-row">
+                <div className="avatar">M</div>
+                <div className="who">
+                  <span className="lbl">Recipient</span>
+                  <span className="name">Marc · Partner</span>
+                </div>
+              </div>
+              <div className="metrics">
+                <div>
+                  <span className="lbl">Opens</span>
+                  <span className="val">3</span>
+                </div>
+                <div>
+                  <span className="lbl">Active read</span>
+                  <span className="val">6m 14s</span>
+                </div>
+              </div>
+            </div>
+            <div className="v2-pcd-divider" />
+            <div className="v2-pcd-week">
+              <div>
+                <span className="lbl">Opens · last 7 days</span>
+                <div className="days">
+                  <span>Mon</span>
+                  <span>Tue</span>
+                  <span>Wed</span>
+                  <span>Thu</span>
+                  <span>Fri</span>
+                  <span>Sat</span>
+                  <span>Sun</span>
+                </div>
+              </div>
+              <div className="weekbars">
+                <i className="off" />
+                <i className="off" />
+                <i style={{ ['--h' as never]: '35%' }} />
+                <i className="off" />
+                <i style={{ ['--h' as never]: '55%' }} />
+                <i className="off" />
+                <i style={{ ['--h' as never]: '95%' }} />
+              </div>
+            </div>
+            <div className="v2-pcd-sections">
+              <div className="lbl">Time spent per section</div>
+              <div className="rows">
+                <div className="srow" style={{ ['--w' as never]: '100%' }}>
+                  <span>The Ask</span>
+                  <b>
+                    <i />
+                  </b>
+                  <span className="t">2m 41s</span>
+                </div>
+                <div className="srow" style={{ ['--w' as never]: '74%' }}>
+                  <span>Team</span>
+                  <b>
+                    <i />
+                  </b>
+                  <span className="t">1m 58s</span>
+                </div>
+                <div className="srow" style={{ ['--w' as never]: '58%' }}>
+                  <span>Traction</span>
+                  <b>
+                    <i />
+                  </b>
+                  <span className="t">1m 35s</span>
+                </div>
+                <div className="srow soft" style={{ ['--w' as never]: '8%' }}>
+                  <span>Problem</span>
+                  <b>
+                    <i />
+                  </b>
+                  <span className="t">12s</span>
+                </div>
+                <div className="srow none" style={{ ['--w' as never]: '0%' }}>
+                  <span>Market sizing</span>
+                  <b>
+                    <i />
+                  </b>
+                  <span className="t">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="v2-pitch-right">
+            <div className="v2-notif v2-reveal d1">
+              <div className="ic">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                >
+                  <path d="M7 13a5 5 0 0 1 0-7" />
+                  <path d="M3 16a9 9 0 0 1 0-13" />
+                  <path d="M17 13a5 5 0 0 0 0-7" />
+                  <path d="M21 16a9 9 0 0 0 0-13" />
+                  <circle cx="12" cy="9.5" r="1.6" fill="currentColor" />
+                  <line x1="12" y1="13" x2="12" y2="21" />
+                  <line x1="9" y1="21" x2="15" y2="21" />
+                </svg>
+              </div>
+              <div className="body">
+                <div className="nrow">
+                  <span className="brand-tag">HTMLRADAR</span>
+                  <span>4m ago</span>
+                </div>
+                <div className="msg">Marc just opened Seed Deck, Q2.</div>
+                <div className="sub">2m 41s on §03 The Ask · still active</div>
+                <div className="divider" />
+                <Link className="link" href="/sign-in">
+                  View analytics{' '}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
+            <blockquote className="v2-pull-quote v2-reveal d2">
+              &ldquo;Marc opened it three times. Spent <em>6m 14s</em>. Read the Ask, Team, and
+              Traction sections. Skipped Market sizing.&rdquo;
+            </blockquote>
+            <p className="v2-kicker-text v2-reveal d3">
+              Most analytics tell you someone opened it. HTMLRadar tells you which sentence
+              convinced them — with a three-second dwell floor so scroll-pasts don&apos;t count as
+              reads.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────── WORKFLOW (vertical timeline) ─────────────────────── */}
+      <section className="v2-flow" id="how">
+        <div className="head">
+          <div className="v2-kicker v2-reveal">How it works</div>
+          <h2 className="v2-reveal d1">
+            From file to <em>insight</em> in sixty seconds.
+          </h2>
+        </div>
+        {/* Flat grid — each row pairs ONE step with ONE mock so they
+         * vertically align. Stage CSS handles the 3-row layout +
+         * connector line + animated packet. */}
+        <div className="v2-flow-stage">
+          {/* Row 1 — Upload */}
+          <div className="v2-flow-step v2-reveal">
+            <span className="dot" />
+            <span className="kicker">Upload</span>
+            <div className="body">
+              <h3>
+                Drop your <em>HTML</em>.
+              </h3>
+              <p>
+                Single file or full system. We host it for you, version every replacement. Old links
+                keep working.
+              </p>
+            </div>
+          </div>
+          <div className="v2-flow-mock v2-mock-upload v2-reveal d1">
+            <div className="mock-kicker">/ new</div>
+            <div className="zone">
+              <div className="file-ico">
+                <div className="l" />
+                <div className="l s" />
+                <div className="l" />
+              </div>
+              <div className="info">
+                <div className="name">series-a-memo.html</div>
+                <div className="size">38 KB · uploaded</div>
+              </div>
+            </div>
+            <div className="progress">
+              <div className="bar" />
+            </div>
+          </div>
+
+          {/* Row 2 — Share */}
+          <div className="v2-flow-step v2-reveal">
+            <span className="dot" />
+            <span className="kicker">Share</span>
+            <div className="body">
+              <h3>
+                Send a <em>tracked link</em>.
+              </h3>
+              <p>
+                Each recipient gets a unique link. Email gate, expiry, password, download lock — set
+                per share. Files (PDFs, cap tables, ZIPs) ride along with the doc; every download is
+                logged with the recipient&apos;s email.
+              </p>
+            </div>
+          </div>
+          <div className="v2-flow-mock v2-mock-share v2-reveal d1">
+            <div className="mock-kicker">/ share</div>
+            <div className="url-row">
+              <span className="url">htmlradar.com/r/swift-falcon</span>
+              <span className="copy">Copy</span>
+            </div>
+            <div className="toggles">
+              <div className="toggle-row">
+                <span className="l">Email gate</span>
+                <span className="pill on" />
+              </div>
+              <div className="toggle-row">
+                <span className="l">Auto-expiry — 7 days</span>
+                <span className="pill on" />
+              </div>
+              <div className="toggle-row">
+                <span className="l">Download lock</span>
+                <span className="pill" />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3 — Read */}
+          <div className="v2-flow-step v2-reveal">
+            <span className="dot" />
+            <span className="kicker">Read</span>
+            <div className="body">
+              <h3>
+                The radar <em>lights up</em>.
+              </h3>
+              <p>
+                Sub-second. Active time, scroll depth, time-per-section, device, browser. A live
+                dashboard, not an email digest.
+              </p>
+            </div>
+          </div>
+          <div className="v2-flow-mock v2-mock-live v2-reveal d1">
+            <div className="live-bar">
+              <span>/ live</span>
+              <span className="now">Now · 2 reading</span>
+            </div>
+            <div className="row active">
+              <span className="name">marc@partners.co</span>
+              <span className="stat">6m 14s · 98%</span>
+            </div>
+            <div className="row quiet">
+              <span className="name">jen@firm.co</span>
+              <span className="stat">3m 04s · 78%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The "Four things every other tracker gets wrong" section used
+       * to live here. Half of its claims duplicated Workflow + Controls
+       * (unique link, version-keep-link), so the section was cut. The
+       * two genuinely-distinct points are folded in elsewhere: the
+       * three-second dwell threshold is now in the Pitch kicker, the
+       * attachments line is now in the Workflow "Share" body. */}
+
+      {/* ─────────────────────── CONTROLS ─────────────────────── */}
+      <section className="v2-controls" id="controls">
+        <div className="head">
+          <div className="v2-kicker v2-reveal">Per-share controls</div>
+          <h2 className="v2-reveal d1">
+            Set the rules. <em>Every share</em>.
+          </h2>
+          <p className="lede v2-reveal d2">
+            Five gates per link. Flip any of them off the moment you change your mind.
+          </p>
+        </div>
+        <div className="v2-ctrl-grid">
+          <div className="v2-ctrl-left">
+            <div className="v2-ctrl-item">
+              <div className="ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <div>
+                <h4>Authentication</h4>
+                <p>Email gate, password, or both — recipient verifies before the doc renders.</p>
+              </div>
+            </div>
+            <div className="v2-ctrl-item">
+              <div className="ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </div>
+              <div>
+                <h4>Download lock</h4>
+                <p>Block saving the page. Cmd+S, right-click save — nothing reaches their disk.</p>
+              </div>
+            </div>
+            <div className="v2-ctrl-item">
+              <div className="ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <div>
+                <h4>Auto-expiry</h4>
+                <p>Set a date and the link returns 403 after that moment. Extend any time.</p>
+              </div>
+            </div>
+            <div className="v2-ctrl-item">
+              <div className="ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <div>
+                <h4>Domain &amp; email allowlist</h4>
+                <p>Restrict by domain, exact email, or both. Everyone else gets blocked.</p>
+              </div>
+            </div>
+            <div className="v2-ctrl-item">
+              <div className="ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                </svg>
+              </div>
+              <div>
+                <h4>Revoke any time</h4>
+                <p>One toggle kills a link instantly. Past read history stays in the dashboard.</p>
+              </div>
+            </div>
+          </div>
+          <div className="v2-ctrl-left">
+            <div
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 18,
+                padding: '24px 26px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                boxShadow: '0 24px 60px -16px rgba(42,24,18,0.14)',
+                position: 'sticky',
+                top: 120,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingBottom: 8,
+                  borderBottom: '1px solid var(--line)',
+                }}
               >
-                GitHub
-              </a>
-              . The hosted version at htmlradar.com is for people who'd rather not run their own
+                <span style={{ color: 'var(--ink)' }}>Share · marc@partners.co</span>
+                <span style={{ color: 'var(--good)' }}>● Saved</span>
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 12.5,
+                  color: 'var(--ink-2)',
+                  background: '#FBF9F3',
+                  border: '1px solid var(--line)',
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                htmlradar.com/r/swift-falcon-a3f2
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  color: 'var(--ink-2)',
+                }}
+              >
+                Every share is its own gated channel. The dashboard updates the moment a recipient
+                opens the link.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────── OPEN SOURCE ─────────────────────── */}
+      <section className="v2-os">
+        <div className="v2-os-card v2-reveal">
+          <div>
+            <div className="kicker">Built in the open</div>
+            <h2>
+              Open source under <em>AGPL-3.0</em>.
+            </h2>
+            <p>
+              The tracker, the proxy worker, the schema, the web app — all of it lives on GitHub.
+              The hosted version at htmlradar.com is for people who&apos;d rather not run their own
               Cloudflare and Supabase. Both options run the same code.
             </p>
-          </Reveal>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------- Close --------------------------------- */
-
-function Close({ isAuthed }: { isAuthed: boolean }) {
-  return (
-    <section className="relative">
-      <div className="mx-auto max-w-6xl px-6 py-28 md:py-36">
-        <Reveal>
-          <div className="text-center">
-            <SectionMark>07</SectionMark>
-            <h2 className="text-letterpress mx-auto mt-8 max-w-4xl text-balance font-serif text-[40px] font-normal leading-[1.12] tracking-tightest text-ink md:text-[60px]">
-              Sign in. Drop the HTML. Send the link.
-              <br />
-              <span className="italic text-signal">
-                An email lands the moment a real read happens.
-              </span>
-            </h2>
-            <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-              <Link
-                href={isAuthed ? '/docs' : '/sign-in'}
-                data-cta={isAuthed ? 'close.open_dashboard' : 'close.start_free'}
-                className="group inline-flex items-center gap-2 rounded-md bg-signal px-7 py-3.5 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
-              >
-                {isAuthed ? 'Open dashboard' : 'Start free'}
-                <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-              </Link>
-              <a
-                href="https://github.com/htmlradar/htmlradar"
-                className="inline-flex items-center gap-1.5 text-[15px] text-ink-soft underline decoration-line decoration-2 underline-offset-[6px] transition hover:text-signal-dark hover:decoration-signal"
-              >
-                Read the source
-                <ArrowUpRight className="size-4" />
-              </a>
-            </div>
+            <a
+              className="repo"
+              href="https://github.com/htmlradar/htmlradar"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.16-.02-2.11-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.73-1.53-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.1 11.1 0 015.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.83 1.18 3.09 0 4.42-2.69 5.4-5.25 5.68.41.35.78 1.04.78 2.1 0 1.52-.01 2.74-.01 3.11 0 .3.21.66.8.55C20.21 21.39 23.5 17.08 23.5 12c0-6.35-5.15-11.5-11.5-11.5z" />
+              </svg>
+              github.com/htmlradar/htmlradar
+            </a>
           </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------- Footer -------------------------------- */
-
-function Footer() {
-  return (
-    <footer className="border-t border-line">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
-        <div className="font-mono text-[12px] tracking-wide text-graphite">
-          HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
+          <ul>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M9 12l2 2 4-4" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+              <span>
+                <b>Audit the data path.</b> Recipients can see exactly what&apos;s being tracked.
+                Closed-source competitors can&apos;t offer that.
+              </span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M9 12l2 2 4-4" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+              <span>
+                <b>Self-host for compliance.</b> Banks, healthcare, M&amp;A teams that can&apos;t
+                use SaaS run the same stack on their own Cloudflare and Supabase.
+              </span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M9 12l2 2 4-4" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+              <span>
+                <b>AGPL.</b> Anyone can fork — but improvements have to come back. Keeps the project
+                from being swallowed by a larger SaaS.
+              </span>
+            </li>
+          </ul>
         </div>
-        <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
-          <Link href="/why" className="link-slide hover:text-signal-dark">
-            Why this exists
-          </Link>
-          <Link href="/blog" className="link-slide hover:text-signal-dark">
-            Blog
+      </section>
+
+      {/* ─────────────────────── CTA ─────────────────────── */}
+      <section className="v2-cta" id="cta">
+        <h2>
+          Sign in. Drop the HTML.
+          <br />
+          <em>Send the link.</em>
+        </h2>
+        <p>
+          An email lands the moment a real read happens. Free for 10 documents — no card needed.
+        </p>
+        <div className="row">
+          <Link href="/sign-in" className="v2-btn v2-btn-primary">
+            Start free
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
           </Link>
           <a
             href="https://github.com/htmlradar/htmlradar"
-            className="link-slide hover:text-signal-dark"
             target="_blank"
-            rel="noopener"
+            rel="noopener noreferrer"
+            className="v2-btn v2-btn-ghost"
+          >
+            Read the source
+          </a>
+        </div>
+      </section>
+
+      {/* ─────────────────────── FOOTER ─────────────────────── */}
+      <footer className="v2-foot">
+        <div>
+          HTML
+          <span
+            style={{
+              color: 'var(--brand)',
+              fontFamily: 'var(--serif)',
+              fontStyle: 'italic',
+            }}
+          >
+            radar
+          </span>
+          {' · Document tracking for HTML. Open source · AGPL-3.0.'}
+        </div>
+        <div style={{ display: 'flex', gap: 24 }}>
+          <Link href="/why">Why</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/privacy">Privacy</Link>
+          <a
+            href="https://github.com/htmlradar/htmlradar"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             GitHub
           </a>
-          <Link href="/pricing" className="link-slide hover:text-signal-dark">
-            Pricing
-          </Link>
-          <Link href="/privacy" className="link-slide hover:text-signal-dark">
-            Privacy
-          </Link>
-        </nav>
-      </div>
-    </footer>
+          <Link href="/sign-in">Sign in</Link>
+        </div>
+      </footer>
+    </div>
   );
 }

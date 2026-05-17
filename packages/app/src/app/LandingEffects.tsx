@@ -19,7 +19,7 @@
 
 import { useEffect } from 'react';
 
-export function V2Effects() {
+export function LandingEffects() {
   useEffect(() => {
     // Reveal observer. threshold:0 + no rootMargin means the moment ANY
     // part of an element enters the viewport, it animates. The previous

@@ -31,6 +31,12 @@ const nextConfig = {
     // 100 MB request body, so we have headroom.
     serverActions: { bodySizeLimit: '30mb' },
   },
+  // /v2 was the staging URL for the redesigned landing while iterating.
+  // Now the redesign lives at /. Permanent redirect catches any
+  // bookmarks pointing at the staging path.
+  async redirects() {
+    return [{ source: '/v2', destination: '/', permanent: true }];
+  },
 };
 
 export default nextConfig;

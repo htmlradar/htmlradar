@@ -211,6 +211,133 @@ describe('SectionTracker', () => {
     expect(ids).toEqual(['slide-1', 'slide-2', 'slide-3']);
   });
 
+  it('rejects page-number patterns and prefers actual title text (the company deck case)', () => {
+    // Mimics a real-world deck where each slide has a big title in a
+    // styled div (NOT a semantic h1) plus a small "01 / 14" footer.
+    // Old naive extractSlideTitle returned the footer; new logic must
+    // return the styled title via font-size detection.
+    setupDom(`
+      <section class="slide">
+        <div style="font-size: 64px">The Model</div>
+        <span style="font-size: 12px">01 / 14</span>
+      </section>
+      <section class="slide">
+        <div style="font-size: 64px">The Vision</div>
+        <span style="font-size: 12px">02 / 14</span>
+      </section>
+      <section class="slide">
+        <span style="font-size: 12px">03 / 14</span>
+      </section>
+    `);
+    const t = new SectionTracker({
+      selector: 'h1, h2, h3',
+      boundaryOffsetPx: 100,
+      minDwellMs: 1,
+    });
+    t.start();
+    const snap = walkThrough(t, 'section');
+    const titles = snap.map((s) => s.title);
+    expect(titles).toContain('The Model');
+    expect(titles).toContain('The Vision');
+    // Third slide has only the page number → falls all the way to "Slide N".
+    expect(titles).toContain('Slide 3');
+    // None of the titles should be page-number text.
+    for (const t of titles) {
+      expect(t).not.toMatch(/^\d+\s*\/\s*\d+$/);
+    }
+  });
+
+  it('rejects various meta-text patterns as section titles', () => {
+    setupDom(`
+      <section><span style="font-size: 24px">Page 5 of 12</span></section>
+      <section><span style="font-size: 24px">1 of 14</span></section>
+      <section><span style="font-size: 24px">•</span></section>
+      <section><span style="font-size: 24px">42</span></section>
+    `);
+    const t = new SectionTracker({
+      selector: 'h1, h2, h3',
+      boundaryOffsetPx: 100,
+      minDwellMs: 1,
+    });
+    t.start();
+    const titles = walkThrough(t, 'section').map((s) => s.title);
+    // All four should fall back to "Slide N" because every text node
+    // is a meta-pattern.
+    for (const t of titles) {
+      expect(t).toMatch(/^Slide \d+$/);
+    }
+  });
+
+  it('de-nests slide-container matches (the company deck: 14 slides + 14 .slide-num + 14 .slide-label)', () => {
+    // Reproduces the actual pattern the user hit: every slide is
+    // <div class="slide"> with children <div class="slide-num"> and
+    // <div class="slide-label">. The substring selector [class*="slide"]
+    // matches all 42 (14 × 3). Without de-nesting, the dashboard shows
+    // 42 phantom sections instead of 14 real ones.
+    setupDom(`
+      <div class="deck">
+        ${Array.from(
+          { length: 4 },
+          (_, i) => `
+          <div class="slide">
+            <div class="slide-num">${String(i + 1).padStart(2, '0')} / 04</div>
+            <div class="slide-label">${['Cover', 'The Model', 'The Vision', 'The Ask'][i]}</div>
+            <p>Some content for slide ${i + 1}.</p>
+          </div>
+        `,
+        ).join('')}
+      </div>
+    `);
+    const t = new SectionTracker({
+      selector: 'h1, h2, h3',
+      boundaryOffsetPx: 100,
+      minDwellMs: 1,
+    });
+    t.start();
+    // After de-nesting, only the 4 outer `.slide` divs should be
+    // discovered — not 12 (4 × 3).
+    const ids = walkThrough(t, '.slide')
+      .map((s) => s.id)
+      .sort();
+    expect(ids.length).toBe(4);
+    // None of the ids should be slug of "01 / 04" or "slide-num"
+    // class artifacts — the title extraction picks up "Cover", "The
+    // Model", etc. via the .slide-label content.
+    for (const id of ids) {
+      expect(id).not.toMatch(/^\d/); // not just a page-number slug
+    }
+  });
+
+  it('skips headings containing only page-number text and falls through to slide containers', () => {
+    // Realistic the company-deck pathology: each slide has an h2 with the
+    // page indicator AND a big styled div for the actual title. The
+    // heading strategy must reject the page-number h2s entirely so
+    // slide-container strategy kicks in and font-size detection wins.
+    setupDom(`
+      <section>
+        <h2>01 / 14</h2>
+        <div style="font-size: 48px">Actual Title Here</div>
+      </section>
+      <section>
+        <h2>02 / 14</h2>
+        <div style="font-size: 48px">Second Real Title</div>
+      </section>
+    `);
+    const t = new SectionTracker({
+      selector: 'h1, h2, h3',
+      boundaryOffsetPx: 100,
+      minDwellMs: 1,
+    });
+    t.start();
+    const titles = walkThrough(t, 'section').map((s) => s.title);
+    expect(titles).toContain('Actual Title Here');
+    expect(titles).toContain('Second Real Title');
+    // None of the titles should be the page-number text.
+    for (const t of titles) {
+      expect(t).not.toMatch(/^\d+\s*\/\s*\d+$/);
+    }
+  });
+
   it('prefers headings strategy when both headings AND slide containers exist', () => {
     setupDom(`
       <section class="slide">

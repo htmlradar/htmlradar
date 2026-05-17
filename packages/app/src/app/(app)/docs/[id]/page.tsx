@@ -14,6 +14,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, FileText, Link2 } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
+import { isMetaSectionTitle } from '@/lib/section-filter';
 import {
   createShareAction,
   toggleShareAction,
@@ -120,7 +121,13 @@ export default async function DocumentPage({
         .select('section_id, section_title, time_seconds, session_id')
         .in('session_id', sessionIds)
     : { data: [] as SectionEvent[] };
-  const allEvents = (eventsRes.data ?? []) as SectionEvent[];
+  // Belt-and-suspenders alongside migration 011: if a viewer is still on
+  // a cached old tracker bundle, any meta-text rows they POST get
+  // filtered at read time. Once the migration runs and all caches
+  // expire, this filter is a no-op.
+  const allEvents = ((eventsRes.data ?? []) as SectionEvent[]).filter(
+    (e) => !isMetaSectionTitle(e.section_title, e.section_id),
+  );
 
   // Pre-compute everything per share so the client component just renders.
   const sessionToShare = new Map<string, string>(allSessions.map((s) => [s.id, s.share_id]));

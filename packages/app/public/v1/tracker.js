@@ -1,7 +1,7 @@
-var q = Object.defineProperty;
-var N = (n, e, t) =>
-  e in n ? q(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
-var a = (n, e, t) => (N(n, typeof e != 'symbol' ? e + '' : e, t), t);
+var z = Object.defineProperty;
+var j = (n, e, t) =>
+  e in n ? z(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
+var a = (n, e, t) => (j(n, typeof e != 'symbol' ? e + '' : e, t), t);
 var f = {
   sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
@@ -20,17 +20,17 @@ var f = {
   hooks: {},
   debug: !1,
 };
-function M(n) {
-  let e = n ? j(n) : {},
+function L(n) {
+  let e = n ? V(n) : {},
     t = window.HTMLRadarConfig ?? {},
     r = t.supabaseUrl ?? e.supabaseUrl,
     i = t.supabaseAnonKey ?? e.supabaseAnonKey,
-    o = t.shareSlug ?? e.shareSlug;
-  if (!r || !i || !o) return null;
-  let s = {
+    s = t.shareSlug ?? e.shareSlug;
+  if (!r || !i || !s) return null;
+  let o = {
     supabaseUrl: r,
     supabaseAnonKey: i,
-    shareSlug: o,
+    shareSlug: s,
     sections: { ...f.sections, ...(t.sections ?? {}) },
     session: { ...f.session, ...(t.session ?? {}) },
     gate: {
@@ -43,9 +43,9 @@ function M(n) {
     hooks: t.hooks ?? {},
     debug: t.debug ?? !1,
   };
-  return (t.email && (s.email = t.email), t.geo && (s.geo = t.geo), s);
+  return (t.email && (o.email = t.email), t.geo && (o.geo = t.geo), o);
 }
-function j(n) {
+function V(n) {
   let e = {};
   return (
     n.dataset.supabaseUrl && (e.supabaseUrl = n.dataset.supabaseUrl),
@@ -54,45 +54,45 @@ function j(n) {
     e
   );
 }
-var w = 'htmlradar:',
-  T = `${w}fp`,
-  E = `${w}email`,
-  I = `${w}optout`;
+var M = 'htmlradar:',
+  E = `${M}fp`,
+  k = `${M}email`,
+  _ = `${M}optout`;
 function A() {
   try {
-    return localStorage.getItem(I) === '1';
+    return localStorage.getItem(_) === '1';
   } catch {
     return !1;
   }
 }
-function _() {
-  try {
-    (localStorage.setItem(I, '1'), localStorage.removeItem(T), localStorage.removeItem(E));
-  } catch {}
-}
-function L() {
-  try {
-    let n = localStorage.getItem(T);
-    if (n) return n;
-    let e = C();
-    return (localStorage.setItem(T, e), e);
-  } catch {
-    return C();
-  }
-}
 function R() {
   try {
-    return localStorage.getItem(E);
+    (localStorage.setItem(_, '1'), localStorage.removeItem(E), localStorage.removeItem(k));
+  } catch {}
+}
+function P() {
+  try {
+    let n = localStorage.getItem(E);
+    if (n) return n;
+    let e = I();
+    return (localStorage.setItem(E, e), e);
+  } catch {
+    return I();
+  }
+}
+function H() {
+  try {
+    return localStorage.getItem(k);
   } catch {
     return null;
   }
 }
-function k(n) {
+function C(n) {
   try {
-    localStorage.setItem(E, n);
+    localStorage.setItem(k, n);
   } catch {}
 }
-function C() {
+function I() {
   return typeof crypto < 'u' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (n) => {
@@ -100,54 +100,54 @@ function C() {
         return (n === 'x' ? e : (e & 3) | 8).toString(16);
       });
 }
-var P = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function O(n, e) {
+var O = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function F(n, e) {
   return new Promise((t) => {
     let r = document.createElement('div');
     ((r.id = 'htmlradar-gate'),
       (r.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
       document.body.appendChild(r));
     let i = r.attachShadow({ mode: 'closed' });
-    i.innerHTML = z(n);
-    let o = i.querySelector('form'),
-      s = i.querySelector('input[type=email]'),
+    i.innerHTML = G(n);
+    let s = i.querySelector('form'),
+      o = i.querySelector('input[type=email]'),
       c = i.querySelector('.error'),
       l = i.querySelector('button'),
       u = l.textContent ?? 'Continue';
-    requestAnimationFrame(() => s.focus());
-    let d = (v) => {
-        ((c.textContent = v), s.setAttribute('aria-invalid', 'true'));
+    requestAnimationFrame(() => o.focus());
+    let d = (T) => {
+        ((c.textContent = T), o.setAttribute('aria-invalid', 'true'));
       },
-      m = () => {
-        ((c.textContent = ''), s.removeAttribute('aria-invalid'));
+      S = () => {
+        ((c.textContent = ''), o.removeAttribute('aria-invalid'));
       };
-    (s.addEventListener('input', m),
-      o.addEventListener('submit', async (v) => {
-        v.preventDefault();
-        let x = s.value.trim().toLowerCase();
-        if (!P.test(x)) {
+    (o.addEventListener('input', S),
+      s.addEventListener('submit', async (T) => {
+        T.preventDefault();
+        let w = o.value.trim().toLowerCase();
+        if (!O.test(w)) {
           d('Please enter a valid email address.');
           return;
         }
-        ((l.disabled = !0), (l.textContent = 'Loading\u2026'), m());
-        let g;
+        ((l.disabled = !0), (l.textContent = 'Loading\u2026'), S());
+        let y;
         try {
-          g = await e(x);
+          y = await e(w);
         } catch {
-          g = "We couldn't reach the server. Check your connection and try again.";
+          y = "We couldn't reach the server. Check your connection and try again.";
         }
-        if (g) {
-          ((l.disabled = !1), (l.textContent = u), d(g));
+        if (y) {
+          ((l.disabled = !1), (l.textContent = u), d(y));
           return;
         }
-        (r.remove(), t(x));
+        (r.remove(), t(w));
       }));
   });
 }
-function z(n) {
+function G(n) {
   let e = n.gate.copy,
-    t = H(n.gate.brand.accentColor, '#1a8870'),
-    r = H(n.gate.brand.backgroundColor, '#faf7f1'),
+    t = $(n.gate.brand.accentColor, '#1a8870'),
+    r = $(n.gate.brand.backgroundColor, '#faf7f1'),
     i = { accentColor: t, backgroundColor: r };
   return `
 <style>
@@ -226,14 +226,14 @@ function h(n) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-function H(n, e) {
+function $(n, e) {
   return /^#[0-9a-fA-F]{3,8}$/.test(n) ||
     /^rgba?\(\s*\d+(?:\s*,\s*\d+){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n) ||
     /^hsla?\(\s*\d+(?:\s*,\s*[\d.]+%?){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(n)
     ? n
     : e;
 }
-var S = class {
+var b = class {
   constructor(e) {
     a(this, 'opts');
     a(this, 'sections', []);
@@ -285,28 +285,28 @@ var S = class {
     );
   }
   discoverSections() {
-    let e = G(this.opts.selector),
+    let e = B(this.opts.selector),
       t = new Map();
     e.elements.forEach((r, i) => {
-      let o = r.id;
-      if (!o)
-        if (e.strategy === 'slides') o = `slide-${i + 1}`;
+      let s = r.id;
+      if (!s)
+        if (e.strategy === 'slides') s = `slide-${i + 1}`;
         else if (e.strategy === 'prose') {
-          let l = F((r.textContent ?? '').trim());
-          o = U(l) || `part-${i + 1}`;
-        } else o = U((r.textContent ?? '').trim()) || `section-${i + 1}`;
-      let s = (t.get(o) ?? 0) + 1;
-      (t.set(o, s), s > 1 && (o = `${o}-${s}`));
+          let l = U((r.textContent ?? '').trim());
+          s = K(l) || `part-${i + 1}`;
+        } else s = K((r.textContent ?? '').trim()) || `section-${i + 1}`;
+      let o = (t.get(s) ?? 0) + 1;
+      (t.set(s, o), o > 1 && (s = `${s}-${o}`));
       let c;
       (e.strategy === 'slides'
-        ? (c = W(r, i + 1))
+        ? (c = Q(r, i + 1))
         : e.strategy === 'prose'
-          ? (c = F((r.textContent ?? '').trim()) || `Part ${i + 1}`)
+          ? (c = U((r.textContent ?? '').trim()) || `Part ${i + 1}`)
           : (c = (r.textContent ?? '').trim().slice(0, 200)),
         this.sections.push({
-          id: o,
+          id: s,
           title: c,
-          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : V(r.tagName),
+          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : W(r.tagName),
           ordinal: i,
           element: r,
           accumulatedMs: 0,
@@ -324,7 +324,7 @@ var S = class {
       t !== null)
     ) {
       let r = this.sections.find((i) => i.id === t);
-      r && this.opts.onSectionEnter && this.opts.onSectionEnter(K(r));
+      r && this.opts.onSectionEnter && this.opts.onSectionEnter(D(r));
     }
   }
   creditCurrent(e) {
@@ -336,7 +336,7 @@ var S = class {
       ((r.accumulatedMs += t),
       !r.hasReadFired &&
         r.accumulatedMs >= this.opts.minDwellMs &&
-        ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(K(r))));
+        ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(D(r))));
   }
   computeCurrent() {
     let e = this.opts.boundaryOffsetPx,
@@ -347,7 +347,7 @@ var S = class {
     return t;
   }
 };
-function V(n) {
+function W(n) {
   switch (n) {
     case 'H1':
       return 1;
@@ -359,42 +359,62 @@ function V(n) {
       return 4;
   }
 }
-function G(n) {
+function B(n) {
   let e = (i) => {
       try {
-        let o = getComputedStyle(i).position;
-        return o === 'fixed' || o === 'sticky';
+        let s = getComputedStyle(i).position;
+        return s === 'fixed' || s === 'sticky';
       } catch {
         return !1;
       }
     },
-    t = Array.from(document.querySelectorAll(n)).filter((i) => !e(i));
+    t = Array.from(document.querySelectorAll(n)).filter((i) => !e(i) && !m(g(i.textContent ?? '')));
   if (t.length >= 2) return { elements: t, strategy: 'configured' };
   if (
-    ((t = Array.from(document.querySelectorAll('h1, h2, h3')).filter((i) => !e(i))), t.length >= 2)
+    ((t = Array.from(document.querySelectorAll('h1, h2, h3')).filter(
+      (i) => !e(i) && !m(g(i.textContent ?? '')),
+    )),
+    t.length >= 2)
   )
     return { elements: t, strategy: 'headings' };
   if (
-    ((t = Array.from(
-      document.querySelectorAll(
-        'section, article, [class*="slide"], [class*="page"], [data-slide], [data-page]',
-      ),
-    ).filter((i) => !e(i))),
+    ((t = Y(
+      Array.from(
+        document.querySelectorAll(
+          'section, article, [class*="slide"], [class*="page"], [data-slide], [data-page], [data-page-no], [data-page-number]',
+        ),
+      ).filter((i) => !e(i)),
+    )),
     t.length >= 2)
   )
     return { elements: t, strategy: 'slides' };
-  let r = Y(e);
+  let r = J(e);
   return r.length >= 2
     ? { elements: r, strategy: 'prose' }
     : { elements: [], strategy: 'configured' };
 }
-var $ = 8,
-  B = 40;
 function Y(n) {
+  if (n.length < 2) return n;
+  let e = [...n].sort((r, i) => {
+      if (r === i) return 0;
+      let s = r.compareDocumentPosition(i);
+      return s & Node.DOCUMENT_POSITION_FOLLOWING
+        ? -1
+        : s & Node.DOCUMENT_POSITION_PRECEDING
+          ? 1
+          : 0;
+    }),
+    t = [];
+  for (let r of e) t.some((s) => s !== r && s.contains(r)) || t.push(r);
+  return t;
+}
+var N = 8,
+  X = 40;
+function J(n) {
   let e = Array.from(document.querySelectorAll('p, li, blockquote')).filter(
     (i) =>
       !(
-        (i.textContent ?? '').trim().length < B ||
+        (i.textContent ?? '').trim().length < X ||
         n(i) ||
         i.closest(
           'nav, footer, aside, header, [role="banner"], [role="navigation"], [role="contentinfo"], [aria-hidden="true"]',
@@ -402,22 +422,22 @@ function Y(n) {
       ),
   );
   if (e.length === 0) return [];
-  if (e.length <= $) return e;
-  let t = Math.ceil(e.length / $),
+  if (e.length <= N) return e;
+  let t = Math.ceil(e.length / N),
     r = [];
   for (let i = 0; i < e.length; i += t) {
-    let o = e[i];
-    o && r.push(o);
+    let s = e[i];
+    s && r.push(s);
   }
   return r;
 }
-function F(n) {
+function U(n) {
   let e = n.replace(/\s+/g, ' ').trim();
   if (!e) return '';
   let t = e.slice(0, 200).match(/^[\s\S]{1,120}?[.!?](?=\s|$)/);
   return t ? t[0].trim() : e.length > 80 ? `${e.slice(0, 80)}\u2026` : e;
 }
-function U(n) {
+function K(n) {
   return n
     .toLowerCase()
     .normalize('NFKD')
@@ -426,15 +446,68 @@ function U(n) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 }
-function W(n, e) {
-  let r = n.querySelector('h1, h2, h3, [role="heading"]')?.textContent?.trim();
-  if (r) return r.slice(0, 200);
-  let o = n.querySelector('p, span')?.textContent?.trim();
-  if (o) return o.slice(0, 200);
-  let s = (n.textContent ?? '').trim();
-  return s ? (s.length > 80 ? `${s.slice(0, 80)}\u2026` : s) : `Slide ${e}`;
+function Q(n, e) {
+  let t = n.querySelector('h1, h2, h3, h4, [role="heading"]'),
+    r = g(t?.textContent ?? '');
+  if (r && !m(r) && r.length >= 3) return r.slice(0, 200);
+  let i = Z(n);
+  if (i) return i.slice(0, 200);
+  let s = ee(n);
+  return s ? s.slice(0, 200) : `Slide ${e}`;
 }
-function K(n) {
+function m(n) {
+  let e = n.trim();
+  return !!(
+    !e ||
+    /^\d{1,3}\s*[/—-]\s*\d{1,3}$/.test(e) ||
+    /^page\s+\d{1,3}(\s*(of|\/|—|-)\s*\d{1,3})?$/i.test(e) ||
+    /^slide\s+\d{1,3}(\s*(of|\/|—|-)\s*\d{1,3})?$/i.test(e) ||
+    /^\d{1,3}\s+of\s+\d{1,3}$/i.test(e) ||
+    /^\d{1,3}$/.test(e) ||
+    /^[•·▶▸→⟶←⟵·.\-—]+$/.test(e) ||
+    e.length <= 2
+  );
+}
+function g(n) {
+  return n.replace(/\s+/g, ' ').trim();
+}
+function Z(n) {
+  let e = 0,
+    t = null,
+    r = document.createTreeWalker(n, NodeFilter.SHOW_ELEMENT, null),
+    i = r.currentNode;
+  for (; i; ) {
+    let s = i;
+    if (s.getAttribute('aria-hidden') === 'true') {
+      i = r.nextSibling();
+      continue;
+    }
+    let o = '';
+    for (let l of s.childNodes) l.nodeType === 3 && (o += l.textContent ?? '');
+    let c = g(o);
+    if (c && c.length >= 3 && !m(c)) {
+      let l = 0;
+      try {
+        l = parseFloat(getComputedStyle(s).fontSize || '0');
+      } catch {
+        l = 0;
+      }
+      (Number.isFinite(l) || (l = 0), l > e && ((e = l), (t = c)));
+    }
+    i = r.nextNode();
+  }
+  return t;
+}
+function ee(n) {
+  let e = n.querySelectorAll('p, span, div, li');
+  for (let t of e) {
+    if (t.getAttribute('aria-hidden') === 'true') continue;
+    let r = g(t.textContent ?? '');
+    if (r && r.length >= 4 && !m(r)) return r;
+  }
+  return null;
+}
+function D(n) {
   return {
     id: n.id,
     title: n.title,
@@ -451,16 +524,16 @@ var p = class extends Error {
     this.name = 'RpcError';
   }
 };
-function y(n) {
-  let e = (s) => `${n.supabaseUrl}/rest/v1/rpc/${s}`,
-    t = (s = {}) => ({
+function v(n) {
+  let e = (o) => `${n.supabaseUrl}/rest/v1/rpc/${o}`,
+    t = (o = {}) => ({
       apikey: n.anonKey,
       Authorization: `Bearer ${n.anonKey}`,
       'Content-Type': 'application/json',
-      ...s,
+      ...o,
     });
-  async function r(s, c, l = !1) {
-    let u = await fetch(e(s), {
+  async function r(o, c, l = !1) {
+    let u = await fetch(e(o), {
       method: 'POST',
       headers: t(),
       body: JSON.stringify(c),
@@ -468,23 +541,23 @@ function y(n) {
     });
     if (!u.ok) {
       let d = await u.text().catch(() => ''),
-        m = X(d) ?? `http_${u.status}`;
-      throw new p(m, d || u.statusText, u.status);
+        S = te(d) ?? `http_${u.status}`;
+      throw new p(S, d || u.statusText, u.status);
     }
     return u.status === 204 ? null : await u.json();
   }
-  async function i(s) {
+  async function i(o) {
     let c = await r('start_session', {
-      p_share_slug: s.shareSlug,
-      p_email: s.email,
-      p_fingerprint: s.fingerprint,
-      p_referrer: s.referrer,
-      p_user_agent: s.userAgent,
-      p_country_code: s.geo?.country ?? null,
-      p_city: s.geo?.city ?? null,
-      p_device_type: s.geo?.deviceType ?? null,
-      p_os: s.geo?.os ?? null,
-      p_browser: s.geo?.browser ?? null,
+      p_share_slug: o.shareSlug,
+      p_email: o.email,
+      p_fingerprint: o.fingerprint,
+      p_referrer: o.referrer,
+      p_user_agent: o.userAgent,
+      p_country_code: o.geo?.country ?? null,
+      p_city: o.geo?.city ?? null,
+      p_device_type: o.geo?.deviceType ?? null,
+      p_os: o.geo?.os ?? null,
+      p_browser: o.geo?.browser ?? null,
     });
     return {
       sessionId: c.session_id,
@@ -493,22 +566,22 @@ function y(n) {
       documentVersion: c.document_version,
     };
   }
-  async function o(s, c = !1) {
+  async function s(o, c = !1) {
     await r(
       'update_session',
       {
-        p_session_id: s.sessionId,
-        p_token: s.token,
-        p_active_seconds: s.activeSeconds,
-        p_max_scroll: s.maxScrollDepth,
-        p_sections: s.sections,
+        p_session_id: o.sessionId,
+        p_token: o.token,
+        p_active_seconds: o.activeSeconds,
+        p_max_scroll: o.maxScrollDepth,
+        p_sections: o.sections,
       },
       c,
     );
   }
-  return { startSession: i, updateSession: o };
+  return { startSession: i, updateSession: s };
 }
-function X(n) {
+function te(n) {
   try {
     let e = JSON.parse(n);
     if (e.code) return e.code;
@@ -519,7 +592,7 @@ function X(n) {
   } catch {}
   return null;
 }
-var b = class {
+var x = class {
   constructor(e) {
     a(this, 'opts');
     a(this, 'transport');
@@ -557,11 +630,11 @@ var b = class {
         }));
     });
     ((this.opts = e),
-      (this.transport = y({
+      (this.transport = v({
         supabaseUrl: e.config.supabaseUrl,
         anonKey: e.config.supabaseAnonKey,
       })),
-      (this.sections = new S({
+      (this.sections = new b({
         selector: e.config.sections.selector,
         boundaryOffsetPx: e.config.sections.boundaryOffsetPx,
         minDwellMs: e.config.sections.minDwellMs,
@@ -613,12 +686,12 @@ var b = class {
             token: this.token,
             activeSeconds: Math.round(this.activeMs / 1e3),
             maxScrollDepth: this.maxScroll,
-            sections: t.map((o) => ({
-              section_id: o.id,
-              section_title: o.title,
-              depth: o.depth,
-              ordinal: o.ordinal,
-              time_seconds: o.timeSeconds,
+            sections: t.map((s) => ({
+              section_id: s.id,
+              section_title: s.title,
+              depth: s.depth,
+              ordinal: s.ordinal,
+              time_seconds: s.timeSeconds,
             })),
           },
           i = this.opts.config.hooks.beforeFlush?.(r) ?? r;
@@ -681,18 +754,18 @@ var b = class {
     (t > 0 && ((this.activeMs += t), (this.dirty = !0)), (this.activeRunningSince = e));
   }
 };
-function D(n) {
+function q(n) {
   let e = {
     version: n.version,
     ready: n.ready,
     flush: () => n.session.flush(),
     optOut: () => {
-      (_(), n.session.stop());
+      (R(), n.session.stop());
     },
   };
   return ((window.HTMLRadar = e), e);
 }
-function J(n) {
+function ne(n) {
   if (n instanceof p)
     switch (n.code) {
       case 'P0001':
@@ -716,12 +789,12 @@ function J(n) {
     }
   return "We couldn't reach the server. Check your connection and try again.";
 }
-var Q = '0.1.0';
-Z();
-async function Z() {
+var re = '0.1.0';
+ie();
+async function ie() {
   if (A()) return;
   let n = document.currentScript,
-    e = M(n);
+    e = L(n);
   if (!e) {
     typeof console < 'u' &&
       console.warn(
@@ -729,19 +802,19 @@ async function Z() {
       );
     return;
   }
-  let t = L(),
-    r = R(),
+  let t = P(),
+    r = H(),
     i = null,
-    o;
-  if (e.email) ((i = e.email), i !== r && k(i));
+    s;
+  if (e.email) ((i = e.email), i !== r && C(i));
   else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
     if (r) i = r;
     else {
-      let l = y({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
-      ((i = await O(e, async (u) => {
+      let l = v({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
+      ((i = await F(e, async (u) => {
         try {
           return (
-            (o = await l.startSession({
+            (s = await l.startSession({
               shareSlug: e.shareSlug,
               email: u,
               fingerprint: t,
@@ -752,15 +825,15 @@ async function Z() {
             null
           );
         } catch (d) {
-          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), J(d));
+          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), ne(d));
         }
       })),
-        k(i));
+        C(i));
     }
-  let s = new b({ config: e, email: i, fingerprint: t, ...(o ? { preStarted: o } : {}) }),
-    c = s.start().catch((l) => {
+  let o = new x({ config: e, email: i, fingerprint: t, ...(s ? { preStarted: s } : {}) }),
+    c = o.start().catch((l) => {
       throw (e.debug && console.warn('[HTMLRadar] session start failed', l), l);
     });
-  D({ session: s, ready: c, version: Q });
+  q({ session: o, ready: c, version: re });
 }
 //# sourceMappingURL=tracker.js.map

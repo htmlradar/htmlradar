@@ -237,16 +237,19 @@ function pickCandidates(configured: string): { elements: HTMLElement[]; strategy
   };
 
   // Strategy 1: explicit configured selector.
+  // Filter out meta-text candidates — a heading that just says "01 / 14"
+  // is not a real section title. Without this filter, Strategy 1 wins
+  // with garbage anchors and downstream extraction never gets a shot.
   let elements = Array.from(document.querySelectorAll<HTMLElement>(configured)).filter(
-    (el) => !isAnchored(el),
+    (el) => !isAnchored(el) && !isMetaPattern(cleanWhitespace(el.textContent ?? '')),
   );
   if (elements.length >= 2) {
     return { elements, strategy: 'configured' };
   }
 
-  // Strategy 2: any heading regardless of id.
+  // Strategy 2: any heading regardless of id (same meta filter).
   elements = Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3')).filter(
-    (el) => !isAnchored(el),
+    (el) => !isAnchored(el) && !isMetaPattern(cleanWhitespace(el.textContent ?? '')),
   );
   if (elements.length >= 2) {
     return { elements, strategy: 'headings' };
@@ -255,11 +258,28 @@ function pickCandidates(configured: string): { elements: HTMLElement[]; strategy
   // Strategy 3: slide / page containers — covers Reveal.js / Slidev / PDF
   // exports / custom decks. We deliberately do NOT include bare `div`s
   // here; that would over-match on most content pages.
-  elements = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      'section, article, [class*="slide"], [class*="page"], [data-slide], [data-page]',
-    ),
-  ).filter((el) => !isAnchored(el));
+  //
+  // The `[class*="slide"]` selector is necessarily loose — it has to
+  // catch `.slide`, `.reveal-slide`, `.slidev-page`, etc. — so it WILL
+  // also match nested decoration like `.slide-num`, `.slide-label`,
+  // `.slide-footer`. De-nest after collection: a candidate that's a
+  // descendant of another candidate is a child decoration, not a real
+  // slide container. Keep only the outermost matches.
+  elements = dedupeNested(
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        // Slide / page containers spanning every exporter we've seen:
+        //   • Reveal.js / Slidev / hand-coded: <section>, <article>
+        //   • Substring-class names: .slide, .reveal-slide, .slidev-page,
+        //     .pitch-slide, .page, ._page_abc (Canva exports)
+        //   • Data attrs: [data-slide], [data-page] (custom decks)
+        //   • PDF exporters: pdf2htmlEX uses .pf + [data-page-no];
+        //     PDF.js uses [data-page-number]. Adding both keeps PDF-
+        //     to-HTML docs from falling through to prose fallback.
+        'section, article, [class*="slide"], [class*="page"], [data-slide], [data-page], [data-page-no], [data-page-number]',
+      ),
+    ).filter((el) => !isAnchored(el)),
+  );
   if (elements.length >= 2) {
     return { elements, strategy: 'slides' };
   }
@@ -280,6 +300,31 @@ function pickCandidates(configured: string): { elements: HTMLElement[]; strategy
   }
 
   return { elements: [], strategy: 'configured' };
+}
+
+// Filter out candidates that are DOM descendants of other candidates
+// in the same set. After this pass only "outermost" matches remain —
+// which is what we want for slide containers, where the real slide is
+// always the outermost element. The the company deck would otherwise
+// return 14 real `<div class="slide">` blocks PLUS 14 `.slide-num`
+// PLUS 14 `.slide-label` children = 42 phantom sections.
+function dedupeNested(elements: HTMLElement[]): HTMLElement[] {
+  if (elements.length < 2) return elements;
+  // Sort by DOM position so ancestors come before descendants.
+  const sorted = [...elements].sort((a, b) => {
+    if (a === b) return 0;
+    const pos = a.compareDocumentPosition(b);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+  const kept: HTMLElement[] = [];
+  for (const el of sorted) {
+    // Skip if any already-kept element contains this one.
+    const isNested = kept.some((k) => k !== el && k.contains(el));
+    if (!isNested) kept.push(el);
+  }
+  return kept;
 }
 
 // Collects up to 8 anchor paragraphs for the prose strategy. Real text
@@ -344,23 +389,128 @@ function slugify(s: string): string {
     .slice(0, 80);
 }
 
-// For slide-container strategy: try heading text first (the most
-// reliable signal), then first paragraph/span, finally the first
-// 80 chars of any text in the slide, finally fall back to "Slide N".
+// Extract a slide's title from its DOM subtree.
+//
+// The old "first heading → first paragraph → first text" cascade fell
+// apart on real-world decks where the title isn't in a semantic <h1>
+// (think: Canva exports, Figma-to-HTML, hand-styled `<div>` headings).
+// The fallback would grab the page-number indicator ("01 / 14") because
+// that was the first text node it found.
+//
+// New algorithm, in priority order:
+//   1. Semantic heading (h1-h4, [role="heading"]), filtered against
+//      meta-text patterns (page numbers, slide counters).
+//   2. Largest-font-size text in the slide. In any designed deck the
+//      title IS visually the biggest text — this is the most reliable
+//      signal across slide engines (Reveal.js, Slidev, Canva, Figma,
+//      hand-rolled HTML).
+//   3. First non-meta text element of meaningful length.
+//   4. Positional fallback: "Slide N" — never lets us return a page
+//      number or empty string.
+//
+// Meta-text rejection covers "01 / 14", "1/14", "Page 1 of 14",
+// "Slide 3", pure digits, bullet glyphs, and very-short fragments.
 function extractSlideTitle(el: HTMLElement, ord: number): string {
-  const heading = el.querySelector<HTMLElement>('h1, h2, h3, [role="heading"]');
-  const headingText = heading?.textContent?.trim();
-  if (headingText) return headingText.slice(0, 200);
-
-  const para = el.querySelector<HTMLElement>('p, span');
-  const paraText = para?.textContent?.trim();
-  if (paraText) return paraText.slice(0, 200);
-
-  const allText = (el.textContent ?? '').trim();
-  if (allText) {
-    return allText.length > 80 ? `${allText.slice(0, 80)}…` : allText;
+  // 1. Semantic heading, if it isn't itself a page-number.
+  const heading = el.querySelector<HTMLElement>('h1, h2, h3, h4, [role="heading"]');
+  const headingText = cleanWhitespace(heading?.textContent ?? '');
+  if (headingText && !isMetaPattern(headingText) && headingText.length >= 3) {
+    return headingText.slice(0, 200);
   }
+
+  // 2. Largest visible text by computed font-size.
+  const largest = findLargestVisibleText(el);
+  if (largest) return largest.slice(0, 200);
+
+  // 3. First non-meta text element of meaningful length.
+  const fallback = findFirstMeaningfulText(el);
+  if (fallback) return fallback.slice(0, 200);
+
+  // 4. Positional last resort.
   return `Slide ${ord}`;
+}
+
+// Page numbers, slide counters, navigation labels — anything that's
+// structurally NOT a title. Returns true if the text should be
+// rejected as a section title candidate.
+function isMetaPattern(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  // "01 / 14", "1/14", "01 — 14", "01-14"
+  if (/^\d{1,3}\s*[/—-]\s*\d{1,3}$/.test(t)) return true;
+  // "Page 1", "Page 1 of 14", "Page 1/14"
+  if (/^page\s+\d{1,3}(\s*(of|\/|—|-)\s*\d{1,3})?$/i.test(t)) return true;
+  // "Slide 1", "Slide 1 of 14"
+  if (/^slide\s+\d{1,3}(\s*(of|\/|—|-)\s*\d{1,3})?$/i.test(t)) return true;
+  // "1 of 14"
+  if (/^\d{1,3}\s+of\s+\d{1,3}$/i.test(t)) return true;
+  // Pure digits or short numeric strings.
+  if (/^\d{1,3}$/.test(t)) return true;
+  // Bullet glyphs / single-punctuation runs.
+  if (/^[•·▶▸→⟶←⟵·.\-—]+$/.test(t)) return true;
+  // One- or two-character strings (likely glyphs, not titles).
+  if (t.length <= 2) return true;
+  return false;
+}
+
+function cleanWhitespace(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+// Walks the slide's element subtree, computes each element's OWN text
+// (excluding descendant element text) and font-size, returns the text
+// of the element with the largest font. Filters meta patterns + too-
+// short fragments. Returns null if no candidate qualifies.
+function findLargestVisibleText(root: HTMLElement): string | null {
+  let bestSize = 0;
+  let bestText: string | null = null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  let node: Node | null = walker.currentNode;
+  while (node) {
+    const el = node as HTMLElement;
+    // Aria-hidden subtree skipped entirely.
+    if (el.getAttribute('aria-hidden') === 'true') {
+      node = walker.nextSibling();
+      continue;
+    }
+    // Own-text only: sum direct text-node children, exclude descendant element text.
+    let ownText = '';
+    for (const child of el.childNodes) {
+      if (child.nodeType === 3 /* TEXT_NODE */) {
+        ownText += child.textContent ?? '';
+      }
+    }
+    const clean = cleanWhitespace(ownText);
+    if (clean && clean.length >= 3 && !isMetaPattern(clean)) {
+      let fs = 0;
+      try {
+        fs = parseFloat(getComputedStyle(el).fontSize || '0');
+      } catch {
+        fs = 0;
+      }
+      if (!Number.isFinite(fs)) fs = 0;
+      if (fs > bestSize) {
+        bestSize = fs;
+        bestText = clean;
+      }
+    }
+    node = walker.nextNode();
+  }
+  return bestText;
+}
+
+// Last meaningful-text fallback. Scans p/span/div in DOM order, picks
+// the first that's non-meta and has real length. Caps at 200 chars.
+function findFirstMeaningfulText(root: HTMLElement): string | null {
+  const candidates = root.querySelectorAll<HTMLElement>('p, span, div, li');
+  for (const c of candidates) {
+    if (c.getAttribute('aria-hidden') === 'true') continue;
+    const text = cleanWhitespace(c.textContent ?? '');
+    if (text && text.length >= 4 && !isMetaPattern(text)) {
+      return text;
+    }
+  }
+  return null;
 }
 
 function toInfo(s: Section): SectionInfo {

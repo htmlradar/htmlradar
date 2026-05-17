@@ -2658,45 +2658,43 @@
   color: var(--brand);
   font-weight: 600;
 }
+/* Stage = 3-row, 2-col grid. Each row pairs ONE timeline step with
+ * its matching mock so the columns align row-by-row (left text never
+ * drifts past the right visual). Connector line + animated packet
+ * are positioned absolutely against the stage so they span all rows
+ * seamlessly. */
 .v2-flow-stage {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 56px;
-  align-items: start;
+  gap: 32px 56px;
+  padding-left: 36px;
 }
 @media (max-width: 900px) {
   .v2-flow-stage {
     grid-template-columns: 1fr;
-    gap: 36px;
+    gap: 20px;
+    padding-left: 32px;
   }
 }
-
-/* Left — vertical timeline */
-.v2-flow-steps {
-  position: relative;
-  padding-left: 36px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-.v2-flow-steps::before {
-  /* Connector line */
+.v2-flow-stage::before {
+  /* Connector line spanning the full stage */
   content: '';
   position: absolute;
   left: 11px;
-  top: 12px;
-  bottom: 12px;
+  top: 24px;
+  bottom: 24px;
   width: 1px;
   background-image: linear-gradient(to bottom, var(--line-2) 50%, transparent 50%);
   background-size: 1px 6px;
   background-repeat: repeat-y;
 }
-.v2-flow-steps::after {
-  /* Animated packet traveling the line */
+.v2-flow-stage::after {
+  /* Animated packet traveling top→bottom of the stage */
   content: '';
   position: absolute;
   left: 7px;
-  top: 0;
+  top: 24px;
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -2720,12 +2718,16 @@
     opacity: 0;
   }
 }
+/* Each timeline step is one grid child in column 1. Centers
+ * vertically against its paired mock in column 2 so the eye walks
+ * row-by-row left↔right. */
 .v2-flow-step {
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 14px;
   align-items: flex-start;
+  align-self: center;
 }
 .v2-flow-step .dot {
   position: absolute;
@@ -2779,17 +2781,11 @@
   gap: 4px;
 }
 
-/* Right — three small mocks stacked to align with each timeline step.
- * Each mock is a different snapshot of the product, so the right
- * column visually narrates the same story the left timeline tells.
+/* Each mock is a direct grid child in column 2, one per row.
  * Critically: NOT the same Seed Deck dashboard from the pitch section
- * above — that would be redundant. */
-.v2-flow-mocks {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.v2-flow-mocks > .mock {
+ * above (that would be redundant). Each row gets its own purpose-built
+ * snapshot — upload form, share toggles, live readers. */
+.v2-flow-mock {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -2799,7 +2795,7 @@
   gap: 10px;
   box-shadow: 0 14px 28px -14px rgba(42, 24, 18, 0.12);
 }
-.v2-flow-mocks > .mock .mock-kicker {
+.v2-flow-mock .mock-kicker {
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.18em;
@@ -2807,7 +2803,6 @@
   text-transform: uppercase;
   font-weight: 700;
 }
-
 /* Mock 1: upload — file dropping into a zone */
 .v2-mock-upload .zone {
   border: 1.5px dashed var(--line-2);
@@ -3044,11 +3039,9 @@
   color: var(--pop);
 }
 
-/* Old mock retained for backwards compat — display:none so the new
- * structure is the only thing rendered. */
-.v2-flow-mock {
-  display: none;
-}
+/* The old single-mock variant was replaced by per-step mocks above.
+ * No display:none override here — the new .v2-flow-mock styles at
+ * the top of the section are the truth. */
 .v2-flow-mock .mock-head {
   font-family: var(--mono);
   font-size: 10.5px;

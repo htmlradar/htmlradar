@@ -445,106 +445,104 @@ export default function LandingV2() {
             From file to <em>insight</em> in sixty seconds.
           </h2>
         </div>
+        {/* Flat grid — each row pairs ONE step with ONE mock so they
+         * vertically align. Stage CSS handles the 3-row layout +
+         * connector line + animated packet. */}
         <div className="v2-flow-stage">
-          <div className="v2-flow-steps">
-            <div className="v2-flow-step v2-reveal">
-              <span className="dot" />
-              <span className="kicker">Upload</span>
-              <div className="body">
-                <h3>
-                  Drop your <em>HTML</em>.
-                </h3>
-                <p>
-                  Single file or full system. We host it for you, version every replacement. Old
-                  links keep working.
-                </p>
+          {/* Row 1 — Upload */}
+          <div className="v2-flow-step v2-reveal">
+            <span className="dot" />
+            <span className="kicker">Upload</span>
+            <div className="body">
+              <h3>
+                Drop your <em>HTML</em>.
+              </h3>
+              <p>
+                Single file or full system. We host it for you, version every replacement. Old links
+                keep working.
+              </p>
+            </div>
+          </div>
+          <div className="v2-flow-mock v2-mock-upload v2-reveal d1">
+            <div className="mock-kicker">/ new</div>
+            <div className="zone">
+              <div className="file-ico">
+                <div className="l" />
+                <div className="l s" />
+                <div className="l" />
+              </div>
+              <div className="info">
+                <div className="name">series-a-memo.html</div>
+                <div className="size">38 KB · uploaded</div>
               </div>
             </div>
-            <div className="v2-flow-step v2-reveal d1">
-              <span className="dot" />
-              <span className="kicker">Share</span>
-              <div className="body">
-                <h3>
-                  Send a <em>tracked link</em>.
-                </h3>
-                <p>
-                  Each recipient gets a unique link. Email gate, expiry, password, download lock —
-                  set per share.
-                </p>
-              </div>
+            <div className="progress">
+              <div className="bar" />
             </div>
-            <div className="v2-flow-step v2-reveal d2">
-              <span className="dot" />
-              <span className="kicker">Read</span>
-              <div className="body">
-                <h3>
-                  The radar <em>lights up</em>.
-                </h3>
-                <p>
-                  Sub-second. Active time, scroll depth, time-per-section, device, browser. A live
-                  dashboard, not an email digest.
-                </p>
+          </div>
+
+          {/* Row 2 — Share */}
+          <div className="v2-flow-step v2-reveal">
+            <span className="dot" />
+            <span className="kicker">Share</span>
+            <div className="body">
+              <h3>
+                Send a <em>tracked link</em>.
+              </h3>
+              <p>
+                Each recipient gets a unique link. Email gate, expiry, password, download lock — set
+                per share.
+              </p>
+            </div>
+          </div>
+          <div className="v2-flow-mock v2-mock-share v2-reveal d1">
+            <div className="mock-kicker">/ share</div>
+            <div className="url-row">
+              <span className="url">htmlradar.com/r/swift-falcon</span>
+              <span className="copy">Copy</span>
+            </div>
+            <div className="toggles">
+              <div className="toggle-row">
+                <span className="l">Email gate</span>
+                <span className="pill on" />
+              </div>
+              <div className="toggle-row">
+                <span className="l">Auto-expiry — 7 days</span>
+                <span className="pill on" />
+              </div>
+              <div className="toggle-row">
+                <span className="l">Download lock</span>
+                <span className="pill" />
               </div>
             </div>
           </div>
 
-          <div className="v2-flow-mocks v2-reveal d1">
-            {/* Mock 1 — upload */}
-            <div className="mock v2-mock-upload">
-              <div className="mock-kicker">/ new</div>
-              <div className="zone">
-                <div className="file-ico">
-                  <div className="l" />
-                  <div className="l s" />
-                  <div className="l" />
-                </div>
-                <div className="info">
-                  <div className="name">series-a-memo.html</div>
-                  <div className="size">38 KB · uploaded</div>
-                </div>
-              </div>
-              <div className="progress">
-                <div className="bar" />
-              </div>
+          {/* Row 3 — Read */}
+          <div className="v2-flow-step v2-reveal">
+            <span className="dot" />
+            <span className="kicker">Read</span>
+            <div className="body">
+              <h3>
+                The radar <em>lights up</em>.
+              </h3>
+              <p>
+                Sub-second. Active time, scroll depth, time-per-section, device, browser. A live
+                dashboard, not an email digest.
+              </p>
             </div>
-
-            {/* Mock 2 — share settings */}
-            <div className="mock v2-mock-share">
-              <div className="mock-kicker">/ share</div>
-              <div className="url-row">
-                <span className="url">htmlradar.com/r/swift-falcon</span>
-                <span className="copy">Copy</span>
-              </div>
-              <div className="toggles">
-                <div className="toggle-row">
-                  <span className="l">Email gate</span>
-                  <span className="pill on" />
-                </div>
-                <div className="toggle-row">
-                  <span className="l">Auto-expiry — 7 days</span>
-                  <span className="pill on" />
-                </div>
-                <div className="toggle-row">
-                  <span className="l">Download lock</span>
-                  <span className="pill" />
-                </div>
-              </div>
+          </div>
+          <div className="v2-flow-mock v2-mock-live v2-reveal d1">
+            <div className="live-bar">
+              <span>/ live</span>
+              <span className="now">Now · 2 reading</span>
             </div>
-
-            {/* Mock 3 — live readers */}
-            <div className="mock v2-mock-live">
-              <div className="live-bar">
-                <span>/ live</span>
-                <span className="now">Now · 2 reading</span>
-              </div>
-              <div className="row active">
-                <span className="name">marc@partners.co</span>
-                <span className="stat">6m 14s · 98%</span>
-              </div>
-              <div className="row quiet">
-                <span className="name">jen@firm.co</span>
-                <span className="stat">3m 04s · 78%</span>
-              </div>
+            <div className="row active">
+              <span className="name">marc@partners.co</span>
+              <span className="stat">6m 14s · 98%</span>
+            </div>
+            <div className="row quiet">
+              <span className="name">jen@firm.co</span>
+              <span className="stat">3m 04s · 78%</span>
             </div>
           </div>
         </div>

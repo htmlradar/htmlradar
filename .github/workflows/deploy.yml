@@ -1,0 +1,82 @@
+name: Deploy
+
+# Auto-deploy the Next.js app to Cloudflare Pages on every push to main.
+# Gated on lint + typecheck + test passing in the CI workflow. Today's
+# bug (commits sitting unpublished for hours because deploys were
+# manual via `wrangler pages deploy`) doesn't happen here — every
+# successful push to main becomes a prod deploy.
+#
+# Secrets required on the repo:
+#   - CLOUDFLARE_API_TOKEN — created at dash.cloudflare.com → My Profile
+#                            → API Tokens → "Edit Cloudflare Workers"
+#                            template (includes Pages:Edit)
+#   - CLOUDFLARE_ACCOUNT_ID — REDACTED_CLOUDFLARE_ACCOUNT_ID
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false # don't kill a deploy in flight — let it finish
+
+jobs:
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    # Only deploy if CI passed AND we're on a push to main (not a PR
+    # workflow_run, which has head_branch=feature-branch).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the exact commit CI tested — not the latest main,
+          # which could have moved since CI started.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build tracker
+        run: pnpm --filter @htmlradar/tracker build
+
+      - name: Copy tracker into app's public/v1
+        run: cp packages/tracker/dist/tracker.js packages/app/public/v1/tracker.js
+
+      - name: Build app for Cloudflare Pages
+        run: cd packages/app && pnpm exec next-on-pages
+        env:
+          # Build-time env vars. Next.js inlines NEXT_PUBLIC_* into the
+          # client bundle, so they have to be present here. Anon key is
+          # safe in client code; service role is server-only and the app
+          # reads it from a Pages environment variable at runtime.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy packages/app/.vercel/output/static
+            --project-name=htmlradar
+            --branch=main
+            --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
+            --commit-dirty=false

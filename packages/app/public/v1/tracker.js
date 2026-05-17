@@ -1,8 +1,8 @@
 var z = Object.defineProperty;
 var j = (n, e, t) =>
   e in n ? z(n, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : (n[e] = t);
-var a = (n, e, t) => (j(n, typeof e != 'symbol' ? e + '' : e, t), t);
-var f = {
+var l = (n, e, t) => (j(n, typeof e != 'symbol' ? e + '' : e, t), t);
+var p = {
   sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
   gate: {
@@ -31,15 +31,15 @@ function L(n) {
     supabaseUrl: r,
     supabaseAnonKey: i,
     shareSlug: s,
-    sections: { ...f.sections, ...(t.sections ?? {}) },
-    session: { ...f.session, ...(t.session ?? {}) },
+    sections: { ...p.sections, ...(t.sections ?? {}) },
+    session: { ...p.session, ...(t.session ?? {}) },
     gate: {
-      ...f.gate,
+      ...p.gate,
       ...(t.gate ?? {}),
-      brand: { ...f.gate.brand, ...(t.gate?.brand ?? {}) },
-      copy: { ...f.gate.copy, ...(t.gate?.copy ?? {}) },
+      brand: { ...p.gate.brand, ...(t.gate?.brand ?? {}) },
+      copy: { ...p.gate.copy, ...(t.gate?.copy ?? {}) },
     },
-    privacy: { ...f.privacy, ...(t.privacy ?? {}) },
+    privacy: { ...p.privacy, ...(t.privacy ?? {}) },
     hooks: t.hooks ?? {},
     debug: t.debug ?? !1,
   };
@@ -55,7 +55,7 @@ function V(n) {
   );
 }
 var M = 'htmlradar:',
-  E = `${M}fp`,
+  w = `${M}fp`,
   k = `${M}email`,
   _ = `${M}optout`;
 function A() {
@@ -67,17 +67,17 @@ function A() {
 }
 function R() {
   try {
-    (localStorage.setItem(_, '1'), localStorage.removeItem(E), localStorage.removeItem(k));
+    (localStorage.setItem(_, '1'), localStorage.removeItem(w), localStorage.removeItem(k));
   } catch {}
 }
-function P() {
+function O() {
   try {
-    let n = localStorage.getItem(E);
+    let n = localStorage.getItem(w);
     if (n) return n;
-    let e = I();
-    return (localStorage.setItem(E, e), e);
+    let e = C();
+    return (localStorage.setItem(w, e), e);
   } catch {
-    return I();
+    return C();
   }
 }
 function H() {
@@ -87,12 +87,12 @@ function H() {
     return null;
   }
 }
-function C(n) {
+function I(n) {
   try {
     localStorage.setItem(k, n);
   } catch {}
 }
-function I() {
+function C() {
   return typeof crypto < 'u' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (n) => {
@@ -100,7 +100,7 @@ function I() {
         return (n === 'x' ? e : (e & 3) | 8).toString(16);
       });
 }
-var O = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var P = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function F(n, e) {
   return new Promise((t) => {
     let r = document.createElement('div');
@@ -108,43 +108,43 @@ function F(n, e) {
       (r.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
       document.body.appendChild(r));
     let i = r.attachShadow({ mode: 'closed' });
-    i.innerHTML = G(n);
+    i.innerHTML = B(n);
     let s = i.querySelector('form'),
       o = i.querySelector('input[type=email]'),
-      c = i.querySelector('.error'),
-      l = i.querySelector('button'),
-      u = l.textContent ?? 'Continue';
+      a = i.querySelector('.error'),
+      c = i.querySelector('button'),
+      u = c.textContent ?? 'Continue';
     requestAnimationFrame(() => o.focus());
     let d = (T) => {
-        ((c.textContent = T), o.setAttribute('aria-invalid', 'true'));
+        ((a.textContent = T), o.setAttribute('aria-invalid', 'true'));
       },
       S = () => {
-        ((c.textContent = ''), o.removeAttribute('aria-invalid'));
+        ((a.textContent = ''), o.removeAttribute('aria-invalid'));
       };
     (o.addEventListener('input', S),
       s.addEventListener('submit', async (T) => {
         T.preventDefault();
-        let w = o.value.trim().toLowerCase();
-        if (!O.test(w)) {
+        let E = o.value.trim().toLowerCase();
+        if (!P.test(E)) {
           d('Please enter a valid email address.');
           return;
         }
-        ((l.disabled = !0), (l.textContent = 'Loading\u2026'), S());
-        let y;
+        ((c.disabled = !0), (c.textContent = 'Loading\u2026'), S());
+        let b;
         try {
-          y = await e(w);
+          b = await e(E);
         } catch {
-          y = "We couldn't reach the server. Check your connection and try again.";
+          b = "We couldn't reach the server. Check your connection and try again.";
         }
-        if (y) {
-          ((l.disabled = !1), (l.textContent = u), d(y));
+        if (b) {
+          ((c.disabled = !1), (c.textContent = u), d(b));
           return;
         }
-        (r.remove(), t(w));
+        (r.remove(), t(E));
       }));
   });
 }
-function G(n) {
+function B(n) {
   let e = n.gate.copy,
     t = $(n.gate.brand.accentColor, '#1a8870'),
     r = $(n.gate.brand.backgroundColor, '#faf7f1'),
@@ -233,15 +233,17 @@ function $(n, e) {
     ? n
     : e;
 }
-var b = class {
+var y = class {
   constructor(e) {
-    a(this, 'opts');
-    a(this, 'sections', []);
-    a(this, 'currentId', null);
-    a(this, 'currentStartMs', null);
-    a(this, 'rafScheduled', !1);
-    a(this, 'active', !1);
-    a(this, 'onScroll', () => {
+    l(this, 'opts');
+    l(this, 'sections', []);
+    l(this, 'currentId', null);
+    l(this, 'currentStartMs', null);
+    l(this, 'rafScheduled', !1);
+    l(this, 'active', !1);
+    l(this, 'intersectionByElement', new WeakMap());
+    l(this, 'intersectionObserver', null);
+    l(this, 'onScroll', () => {
       this.rafScheduled ||
         ((this.rafScheduled = !0),
         requestAnimationFrame(() => {
@@ -254,6 +256,7 @@ var b = class {
     this.active ||
       ((this.active = !0),
       this.discoverSections(),
+      this.installObserver(),
       window.addEventListener('scroll', this.onScroll, { passive: !0 }),
       this.update(performance.now()));
   }
@@ -261,7 +264,9 @@ var b = class {
     this.active &&
       ((this.active = !1),
       this.creditCurrent(performance.now()),
-      window.removeEventListener('scroll', this.onScroll));
+      window.removeEventListener('scroll', this.onScroll),
+      this.intersectionObserver?.disconnect(),
+      (this.intersectionObserver = null));
   }
   pause() {
     (this.creditCurrent(performance.now()), (this.currentStartMs = null));
@@ -285,28 +290,28 @@ var b = class {
     );
   }
   discoverSections() {
-    let e = B(this.opts.selector),
+    let e = W(this.opts.selector),
       t = new Map();
     e.elements.forEach((r, i) => {
       let s = r.id;
       if (!s)
         if (e.strategy === 'slides') s = `slide-${i + 1}`;
         else if (e.strategy === 'prose') {
-          let l = U((r.textContent ?? '').trim());
-          s = K(l) || `part-${i + 1}`;
+          let c = U((r.textContent ?? '').trim());
+          s = K(c) || `part-${i + 1}`;
         } else s = K((r.textContent ?? '').trim()) || `section-${i + 1}`;
       let o = (t.get(s) ?? 0) + 1;
       (t.set(s, o), o > 1 && (s = `${s}-${o}`));
-      let c;
+      let a;
       (e.strategy === 'slides'
-        ? (c = Q(r, i + 1))
+        ? (a = Q(r, i + 1))
         : e.strategy === 'prose'
-          ? (c = U((r.textContent ?? '').trim()) || `Part ${i + 1}`)
-          : (c = (r.textContent ?? '').trim().slice(0, 200)),
+          ? (a = U((r.textContent ?? '').trim()) || `Part ${i + 1}`)
+          : (a = (r.textContent ?? '').trim().slice(0, 200)),
         this.sections.push({
           id: s,
-          title: c,
-          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : W(r.tagName),
+          title: a,
+          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : G(r.tagName),
           ordinal: i,
           element: r,
           accumulatedMs: 0,
@@ -338,16 +343,36 @@ var b = class {
         r.accumulatedMs >= this.opts.minDwellMs &&
         ((r.hasReadFired = !0), this.opts.onSectionRead && this.opts.onSectionRead(D(r))));
   }
+  installObserver() {
+    if (!(typeof IntersectionObserver > 'u')) {
+      this.intersectionObserver = new IntersectionObserver(
+        (e) => {
+          for (let t of e) this.intersectionByElement.set(t.target, t.intersectionRatio);
+          this.update(performance.now());
+        },
+        { threshold: [0, 0.1, 0.25, 0.5, 0.75, 0.95, 1] },
+      );
+      for (let e of this.sections) this.intersectionObserver.observe(e.element);
+    }
+  }
   computeCurrent() {
-    let e = this.opts.boundaryOffsetPx,
-      t = null;
-    for (let r of this.sections)
-      if (r.element.getBoundingClientRect().top - e <= 0) t = r.id;
+    let e = null,
+      t = 0,
+      r = !1;
+    for (let o of this.sections) {
+      let a = this.intersectionByElement.get(o.element);
+      a !== void 0 && ((r = !0), a > t && ((t = a), (e = o.id)));
+    }
+    if (r) return t > 0 ? e : null;
+    let i = this.opts.boundaryOffsetPx,
+      s = null;
+    for (let o of this.sections)
+      if (o.element.getBoundingClientRect().top - i <= 0) s = o.id;
       else break;
-    return t;
+    return s;
   }
 };
-function W(n) {
+function G(n) {
   switch (n) {
     case 'H1':
       return 1;
@@ -359,7 +384,7 @@ function W(n) {
       return 4;
   }
 }
-function B(n) {
+function W(n) {
   let e = (i) => {
       try {
         let s = getComputedStyle(i).position;
@@ -483,16 +508,16 @@ function Z(n) {
       continue;
     }
     let o = '';
-    for (let l of s.childNodes) l.nodeType === 3 && (o += l.textContent ?? '');
-    let c = g(o);
-    if (c && c.length >= 3 && !m(c)) {
-      let l = 0;
+    for (let c of s.childNodes) c.nodeType === 3 && (o += c.textContent ?? '');
+    let a = g(o);
+    if (a && a.length >= 3 && !m(a)) {
+      let c = 0;
       try {
-        l = parseFloat(getComputedStyle(s).fontSize || '0');
+        c = parseFloat(getComputedStyle(s).fontSize || '0');
       } catch {
-        l = 0;
+        c = 0;
       }
-      (Number.isFinite(l) || (l = 0), l > e && ((e = l), (t = c)));
+      (Number.isFinite(c) || (c = 0), c > e && ((e = c), (t = a)));
     }
     i = r.nextNode();
   }
@@ -516,7 +541,7 @@ function D(n) {
     timeSeconds: n.accumulatedMs / 1e3,
   };
 }
-var p = class extends Error {
+var f = class extends Error {
   constructor(t, r, i) {
     super(r);
     this.code = t;
@@ -532,22 +557,22 @@ function v(n) {
       'Content-Type': 'application/json',
       ...o,
     });
-  async function r(o, c, l = !1) {
+  async function r(o, a, c = !1) {
     let u = await fetch(e(o), {
       method: 'POST',
       headers: t(),
-      body: JSON.stringify(c),
-      keepalive: l,
+      body: JSON.stringify(a),
+      keepalive: c,
     });
     if (!u.ok) {
       let d = await u.text().catch(() => ''),
         S = te(d) ?? `http_${u.status}`;
-      throw new p(S, d || u.statusText, u.status);
+      throw new f(S, d || u.statusText, u.status);
     }
     return u.status === 204 ? null : await u.json();
   }
   async function i(o) {
-    let c = await r('start_session', {
+    let a = await r('start_session', {
       p_share_slug: o.shareSlug,
       p_email: o.email,
       p_fingerprint: o.fingerprint,
@@ -560,13 +585,13 @@ function v(n) {
       p_browser: o.geo?.browser ?? null,
     });
     return {
-      sessionId: c.session_id,
-      token: c.token,
-      documentId: c.document_id,
-      documentVersion: c.document_version,
+      sessionId: a.session_id,
+      token: a.token,
+      documentId: a.document_id,
+      documentVersion: a.document_version,
     };
   }
-  async function s(o, c = !1) {
+  async function s(o, a = !1) {
     await r(
       'update_session',
       {
@@ -576,7 +601,7 @@ function v(n) {
         p_max_scroll: o.maxScrollDepth,
         p_sections: o.sections,
       },
-      c,
+      a,
     );
   }
   return { startSession: i, updateSession: s };
@@ -594,21 +619,21 @@ function te(n) {
 }
 var x = class {
   constructor(e) {
-    a(this, 'opts');
-    a(this, 'transport');
-    a(this, 'sections');
-    a(this, 'info', null);
-    a(this, 'token', null);
-    a(this, 'activeMs', 0);
-    a(this, 'activeRunningSince', null);
-    a(this, 'maxScroll', 0);
-    a(this, 'heartbeatTimer', null);
-    a(this, 'maxSessionTimer', null);
-    a(this, 'flushing', !1);
-    a(this, 'dirty', !1);
-    a(this, 'rafScrollScheduled', !1);
-    a(this, 'boundCount', 0);
-    a(this, 'onVisibility', () => {
+    l(this, 'opts');
+    l(this, 'transport');
+    l(this, 'sections');
+    l(this, 'info', null);
+    l(this, 'token', null);
+    l(this, 'activeMs', 0);
+    l(this, 'activeRunningSince', null);
+    l(this, 'maxScroll', 0);
+    l(this, 'heartbeatTimer', null);
+    l(this, 'maxSessionTimer', null);
+    l(this, 'flushing', !1);
+    l(this, 'dirty', !1);
+    l(this, 'rafScrollScheduled', !1);
+    l(this, 'boundCount', 0);
+    l(this, 'onVisibility', () => {
       document.hidden
         ? (this.tickActive(performance.now()),
           (this.activeRunningSince = null),
@@ -616,13 +641,13 @@ var x = class {
           this.flush())
         : ((this.activeRunningSince = performance.now()), this.sections.resume());
     });
-    a(this, 'onPageHide', () => {
+    l(this, 'onPageHide', () => {
       (this.tickActive(performance.now()),
         (this.activeRunningSince = null),
         this.sections.pause(),
         this.flush(!0));
     });
-    a(this, 'onScroll', () => {
+    l(this, 'onScroll', () => {
       this.rafScrollScheduled ||
         ((this.rafScrollScheduled = !0),
         requestAnimationFrame(() => {
@@ -634,7 +659,7 @@ var x = class {
         supabaseUrl: e.config.supabaseUrl,
         anonKey: e.config.supabaseAnonKey,
       })),
-      (this.sections = new b({
+      (this.sections = new y({
         selector: e.config.sections.selector,
         boundaryOffsetPx: e.config.sections.boundaryOffsetPx,
         minDwellMs: e.config.sections.minDwellMs,
@@ -701,7 +726,7 @@ var x = class {
         let r = t instanceof Error ? t : new Error(String(t));
         (this.opts.config.debug && console.warn('[HTMLRadar] flush failed', r),
           this.opts.config.hooks.onFlushError?.(r),
-          t instanceof p && t.code === 'P0010' && this.stop());
+          t instanceof f && t.code === 'P0010' && this.stop());
       } finally {
         this.flushing = !1;
       }
@@ -766,7 +791,7 @@ function q(n) {
   return ((window.HTMLRadar = e), e);
 }
 function ne(n) {
-  if (n instanceof p)
+  if (n instanceof f)
     switch (n.code) {
       case 'P0001':
         return 'Too many tries from this email. Wait a minute, then try again.';
@@ -802,19 +827,19 @@ async function ie() {
       );
     return;
   }
-  let t = P(),
+  let t = O(),
     r = H(),
     i = null,
     s;
-  if (e.email) ((i = e.email), i !== r && C(i));
+  if (e.email) ((i = e.email), i !== r && I(i));
   else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
     if (r) i = r;
     else {
-      let l = v({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
+      let c = v({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
       ((i = await F(e, async (u) => {
         try {
           return (
-            (s = await l.startSession({
+            (s = await c.startSession({
               shareSlug: e.shareSlug,
               email: u,
               fingerprint: t,
@@ -828,12 +853,12 @@ async function ie() {
           return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', d), ne(d));
         }
       })),
-        C(i));
+        I(i));
     }
   let o = new x({ config: e, email: i, fingerprint: t, ...(s ? { preStarted: s } : {}) }),
-    c = o.start().catch((l) => {
-      throw (e.debug && console.warn('[HTMLRadar] session start failed', l), l);
+    a = o.start().catch((c) => {
+      throw (e.debug && console.warn('[HTMLRadar] session start failed', c), c);
     });
-  q({ session: o, ready: c, version: re });
+  q({ session: o, ready: a, version: re });
 }
 //# sourceMappingURL=tracker.js.map

@@ -132,14 +132,23 @@ export default async function DocumentPage({
     (e) => !isMetaSectionTitle(e.section_title, e.section_id),
   );
 
-  // Pre-compute everything per share so the client component just renders.
-  const sessionToShare = new Map<string, string>(allSessions.map((s) => [s.id, s.share_id]));
+  // Per-share buckets feed the Sessions list, share row "view count",
+  // and the section roll-up under each share tile. These surfaces are
+  // for "real" prospects only — internal viewers (test reads, owner-
+  // self, staff) get filtered out here so they don't clutter the
+  // session log, view counter, or section dwell numbers under each
+  // share. The top ViewerInsights table still receives all viewers
+  // and handles the "Show hidden (N)" toggle locally.
+  const internalViewerIds = new Set(allViewers.filter((v) => v.is_internal).map((v) => v.id));
+  const visibleViewers = allViewers.filter((v) => !internalViewerIds.has(v.id));
+  const visibleSessions = allSessions.filter((s) => !internalViewerIds.has(s.viewer_id));
+  const sessionToShare = new Map<string, string>(visibleSessions.map((s) => [s.id, s.share_id]));
   const viewersByShare: Record<string, Viewer[]> = {};
-  for (const v of allViewers) {
+  for (const v of visibleViewers) {
     (viewersByShare[v.share_id] ??= []).push(v);
   }
   const sessionsByShare: Record<string, Session[]> = {};
-  for (const s of allSessions) {
+  for (const s of visibleSessions) {
     (sessionsByShare[s.share_id] ??= []).push(s);
   }
 

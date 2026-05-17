@@ -726,4 +726,11 @@ export async function toggleViewerInternalAction(formData: FormData) {
   if (errorMessage) {
     redirect(`/docs/${documentId}?hide_error=${encodeURIComponent(errorMessage)}`);
   }
+  // Force a fresh navigation. Without this the form submission returns
+  // void and Next.js's edge runtime + revalidatePath sometimes leaves
+  // the client showing stale data until a hard refresh — the user has
+  // to wonder whether the click did anything. The redirect-to-same-URL
+  // pattern is what `toggleShareAction` already does for the same
+  // reason.
+  redirect(`/docs/${documentId}`);
 }

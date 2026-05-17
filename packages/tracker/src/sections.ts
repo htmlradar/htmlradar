@@ -32,6 +32,18 @@ export class SectionTracker {
   private currentStartMs: number | null = null;
   private rafScheduled = false;
   private active = false;
+  // Live intersection ratios — updated by IntersectionObserver callbacks.
+  // The element with the highest ratio at any moment is the "current"
+  // section. This is independent of scroll events, so it works on
+  // swipe-based decks (mobile pitch decks, Reveal.js with transforms),
+  // transform-driven slide changes, and traditional vertical scroll
+  // alike. The old scroll-listener-with-bounding-rect approach silently
+  // failed on swipe decks: no scroll events meant no current-section
+  // updates, leaving all session time credited to whatever was current
+  // when the page first loaded (often slide 1) — that's the "stats
+  // don't add up" / "0% scroll on 26m session" bug from launch QA.
+  private readonly intersectionByElement = new WeakMap<HTMLElement, number>();
+  private intersectionObserver: IntersectionObserver | null = null;
 
   constructor(opts: Options) {
     this.opts = opts;
@@ -41,6 +53,11 @@ export class SectionTracker {
     if (this.active) return;
     this.active = true;
     this.discoverSections();
+    this.installObserver();
+    // Scroll listener is still useful as a fallback signal — some
+    // intersection callbacks don't fire on initial layout, and a
+    // synthetic scroll tick after start ensures we credit the
+    // first-visible section immediately.
     window.addEventListener('scroll', this.onScroll, { passive: true });
     this.update(performance.now());
   }
@@ -50,6 +67,8 @@ export class SectionTracker {
     this.active = false;
     this.creditCurrent(performance.now());
     window.removeEventListener('scroll', this.onScroll);
+    this.intersectionObserver?.disconnect();
+    this.intersectionObserver = null;
   }
 
   pause(): void {
@@ -190,11 +209,71 @@ export class SectionTracker {
     }
   }
 
-  // `this.sections` is populated by `querySelectorAll` in DOM order, so we
-  // can walk it linearly and bail at the first heading that's still below
-  // the boundary. Sticky/fixed headings break this assumption — filtered
-  // out at discovery (see `discoverSections`).
+  // Install an IntersectionObserver over every discovered section.
+  // Each entry's intersectionRatio is stored in `intersectionByElement`.
+  // The IO callback also triggers `update()` so transitions happen the
+  // moment a section's visibility changes — no waiting for the next
+  // scroll event. This is the path that makes swipe decks work: when
+  // slide 2's CSS transform brings it into the viewport, IO fires with
+  // ratio > 0, slide 1's ratio drops to 0, and computeCurrent picks
+  // slide 2 immediately.
+  private installObserver(): void {
+    if (typeof IntersectionObserver === 'undefined') {
+      // Old browsers (or jsdom without the polyfill) — fall back to the
+      // scroll-listener path. computeCurrent will use the rect-based
+      // heuristic below.
+      return;
+    }
+    this.intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          this.intersectionByElement.set(entry.target as HTMLElement, entry.intersectionRatio);
+        }
+        this.update(performance.now());
+      },
+      // Multi-threshold gives smooth updates as the slide enters/exits.
+      // Without these, IO only fires when the element crosses the
+      // root/0% boundary, and we'd miss "this is now the most-visible"
+      // transitions on swipe decks where slides overlap mid-transition.
+      { threshold: [0, 0.1, 0.25, 0.5, 0.75, 0.95, 1.0] },
+    );
+    for (const section of this.sections) {
+      this.intersectionObserver.observe(section.element);
+    }
+  }
+
+  // Pick the "current" section. Strategy:
+  //   1. If the IntersectionObserver has reported ratios, pick the
+  //      section with the highest ratio (must be > 0). This works on
+  //      every layout — vertical scroll, horizontal swipe, transform-
+  //      driven, even animated slide-in.
+  //   2. If no IO data yet (very early in start(), or no IO support),
+  //      fall back to the rect-based boundary walk used by the old
+  //      tracker. Same semantics as before: last section whose top
+  //      crossed the configured boundary line.
+  //
+  // Ties (rare — two sections with equal ratio) go to the earlier
+  // section in DOM order, matching reading direction.
   private computeCurrent(): string | null {
+    let bestId: string | null = null;
+    let bestRatio = 0;
+    let anyIntersectionSeen = false;
+    for (const section of this.sections) {
+      const ratio = this.intersectionByElement.get(section.element);
+      if (ratio === undefined) continue;
+      anyIntersectionSeen = true;
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestId = section.id;
+      }
+    }
+    if (anyIntersectionSeen) {
+      // Ratio of 0 means nothing is in viewport — return null so we
+      // don't credit time to a section the reader isn't looking at.
+      return bestRatio > 0 ? bestId : null;
+    }
+
+    // Fallback path: no IO data. Use the rect-based heuristic.
     const boundary = this.opts.boundaryOffsetPx;
     let current: string | null = null;
     for (const section of this.sections) {

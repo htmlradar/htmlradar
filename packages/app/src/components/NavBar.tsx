@@ -26,9 +26,13 @@ export async function NavBar() {
             <Link href="/docs" className="text-ink-soft hover:text-signal-dark">
               Documents
             </Link>
-            <Link href="/dashboard" className="text-ink-soft hover:text-signal-dark">
-              Analytics
-            </Link>
+            {/* Analytics tab removed 2026-05-17 — was a flat list of all
+             * shares (view counts, last-seen). Strictly redundant with
+             * the per-doc /docs/[id] dashboard which shows the same data
+             * with more depth. The /dashboard route still exists in the
+             * codebase and a redirect to /docs keeps stale bookmarks
+             * working. Resurrect by re-adding this link if a real user
+             * asks for cross-doc rollup. */}
             <Link href="/settings" className="text-graphite hover:text-signal-dark">
               {user.email}
             </Link>

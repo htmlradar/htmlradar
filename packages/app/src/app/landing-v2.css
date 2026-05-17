@@ -3256,3 +3256,669 @@
 .v2-foot a {
   font-size: 10px;
 }
+
+/* ============================================================
+ * MOBILE BREAKPOINTS — comprehensive pass.
+ *
+ * Three tiers:
+ *   • <= 980px (existing): hero + pitch stack vertically.
+ *   • <= 760px: nav compresses, hero loses the tilted dashboard
+ *     (which doesn't fit at all + clipping is ugly), floating chips
+ *     hide (decorative on desktop, noise on phone), section paddings
+ *     drop to 20px lateral, all headlines tighten.
+ *   • <= 420px (iPhone SE / fold): even tighter type, more breathing.
+ *
+ * Strategy: on phone, the hero's job is "land the positioning + the
+ * CTA"; the dashboard mock + floating chips are visual scaffolding
+ * for desktop. Phone users see a clean, fast-loading hero with the
+ * headline + lede + CTA, then scroll into the content where the
+ * actual product cards (Seed Deck, workflow mocks, etc.) live.
+ * ============================================================ */
+
+@media (max-width: 760px) {
+  /* NAV — hide menu links on phone, keep logo + CTA. Pill stops
+   * overflowing the viewport. */
+  .v2-nav {
+    padding: 7px 7px 7px 16px;
+    gap: 4px;
+  }
+  .v2-nav ul {
+    display: none;
+  }
+  .v2-nav .logo {
+    margin-right: 0;
+    font-size: 14px;
+  }
+  .v2-nav .logo .ital {
+    font-size: 15px;
+  }
+  .v2-nav .nav-cta {
+    margin-left: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* HERO — drop the tilted dashboard, kill floating chips. They
+   * overlap badly at narrow widths. The hero on phone is the
+   * headline + lede + CTA + trust row. */
+  .v2-hero {
+    padding: 90px 20px 32px;
+  }
+  .v2-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+    min-height: 0;
+  }
+  .v2-hero-right {
+    display: none;
+  }
+  .v2-headline {
+    font-size: clamp(32px, 9vw, 44px);
+  }
+  .v2-headline .line {
+    white-space: normal; /* allow wrap on narrow phones */
+  }
+  .v2-hero .lede {
+    font-size: 15px;
+    margin-top: 22px;
+  }
+  .v2-hero .cta-row {
+    margin-top: 26px;
+  }
+  .v2-trust {
+    margin-top: 32px;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .v2-trust .logos {
+    font-size: 13px;
+    gap: 10px;
+  }
+
+  /* THE SHIFT */
+  .v2-shift {
+    padding: 60px 20px 50px;
+  }
+  .v2-shift p {
+    font-size: 18px;
+    max-width: none;
+  }
+  .v2-shift-visual {
+    margin-left: 0;
+    margin-top: 32px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* PITCH */
+  .v2-pitch {
+    padding: 70px 20px;
+  }
+  .v2-pitch h2 {
+    font-size: clamp(26px, 7vw, 36px);
+  }
+  .v2-pitch-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .v2-pitch-card {
+    padding: 22px 20px;
+    gap: 18px;
+  }
+  .v2-pcd-title {
+    font-size: clamp(24px, 7vw, 36px);
+  }
+  .v2-pcd-recipient {
+    gap: 14px;
+  }
+  .v2-pcd-recipient .metrics {
+    gap: 24px;
+  }
+  .v2-pcd-recipient .metrics .val {
+    font-size: 22px;
+  }
+  .v2-pcd-sections .srow {
+    grid-template-columns: 100px 1fr 56px;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .v2-pcd-week {
+    gap: 14px;
+  }
+  .v2-pull-quote {
+    font-size: 19px;
+  }
+
+  /* WORKFLOW — keep the vertical timeline, just tighten padding */
+  .v2-flow {
+    padding: 60px 20px;
+  }
+  .v2-flow h2 {
+    font-size: clamp(24px, 7vw, 32px);
+  }
+  .v2-flow-stage {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-left: 28px;
+  }
+  .v2-flow-stage::before {
+    left: 9px;
+  }
+  .v2-flow-stage::after {
+    left: 5px;
+  }
+  .v2-flow-step {
+    align-self: flex-start;
+  }
+  .v2-flow-step .dot {
+    left: -26px;
+  }
+  .v2-flow-step h3 {
+    font-size: 17px;
+  }
+  .v2-flow-step p {
+    font-size: 13px;
+    max-width: none;
+  }
+  .v2-flow-mock {
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+
+  /* CONTROLS */
+  .v2-controls {
+    padding: 70px 20px;
+  }
+  .v2-controls h2 {
+    font-size: clamp(26px, 7vw, 36px);
+  }
+  .v2-controls .lede {
+    font-size: 15.5px;
+  }
+  .v2-ctrl-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 32px;
+  }
+  .v2-ctrl-item {
+    padding: 18px 20px;
+    gap: 14px;
+  }
+  .v2-ctrl-item h4 {
+    font-size: 17px;
+  }
+  .v2-ctrl-item p {
+    font-size: 13px;
+  }
+
+  /* OPEN SOURCE */
+  .v2-os {
+    padding: 60px 20px;
+  }
+  .v2-os-card {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 28px 22px;
+  }
+  .v2-os h2 {
+    font-size: clamp(22px, 6vw, 30px);
+  }
+  .v2-os p {
+    font-size: 14px;
+  }
+  .v2-os ul li {
+    font-size: 13.5px;
+  }
+
+  /* CTA */
+  .v2-cta {
+    padding: 80px 20px;
+  }
+  .v2-cta h2 {
+    font-size: clamp(30px, 9vw, 54px);
+  }
+  .v2-cta p {
+    font-size: 15.5px;
+    margin: 24px auto 30px;
+  }
+
+  /* FOOTER */
+  .v2-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 24px 20px;
+  }
+  .v2-foot > div:last-child {
+    flex-wrap: wrap;
+    gap: 14px !important;
+  }
+  .v2-foot::before {
+    width: 220px;
+    height: 220px;
+    right: -100px;
+    bottom: -100px;
+  }
+}
+
+@media (max-width: 420px) {
+  /* iPhone SE / fold-class screens — push everything just a touch
+   * tighter so the page never feels like it's bursting at the
+   * seams. Mostly type-scale tweaks. */
+  .v2-hero {
+    padding: 80px 16px 28px;
+  }
+  .v2-headline {
+    font-size: clamp(28px, 9vw, 36px);
+  }
+  .v2-hero .lede {
+    font-size: 14.5px;
+  }
+  .v2-shift,
+  .v2-pitch,
+  .v2-flow,
+  .v2-controls,
+  .v2-os,
+  .v2-cta {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .v2-pitch-card,
+  .v2-flow-mock,
+  .v2-ctrl-item,
+  .v2-os-card {
+    padding: 16px 16px;
+  }
+  .v2-shift p {
+    font-size: 17px;
+  }
+  .v2-cta h2 {
+    font-size: clamp(28px, 8.5vw, 42px);
+  }
+}
+
+/* PRICING — its grid mobile rules are inline but tighten paddings */
+@media (max-width: 760px) {
+  /* The pricing page reuses .v2-root + landing-v2.css; its sections
+   * declare their own padding inline, so we override by re-targeting
+   * the inline styled hero / tier section. */
+  .v2-root section[style*='1180'] {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+
+/* MOBILE GAP FIX — first-fold + inter-section gaps were ugly because
+ * (a) .v2-hero kept min-height: 100vh from its base rule even after
+ *     we hid .v2-hero-right, leaving a viewport-tall gap;
+ * (b) section paddings 60-80px top/bottom are too generous for phone.
+ * Tightening both. */
+@media (max-width: 760px) {
+  .v2-hero {
+    min-height: 0;
+    padding: 72px 20px 24px;
+  }
+  .v2-shift {
+    padding: 40px 20px 32px;
+  }
+  .v2-pitch {
+    padding: 48px 20px;
+  }
+  .v2-flow {
+    padding: 40px 20px;
+  }
+  .v2-controls {
+    padding: 48px 20px;
+  }
+  .v2-os {
+    padding: 40px 20px;
+  }
+  .v2-cta {
+    padding: 56px 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .v2-hero {
+    padding: 64px 16px 20px;
+  }
+  .v2-shift,
+  .v2-pitch,
+  .v2-flow,
+  .v2-controls,
+  .v2-os {
+    padding-top: 36px;
+    padding-bottom: 30px;
+  }
+  .v2-cta {
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+}
+
+/* ============================================================
+ * MOBILE HERO VISUAL — compact radar + single live chip below CTA
+ *
+ * Hidden on desktop (.v2-hero-right has the full stage). Shows
+ * only on phones (≤ 760px) where .v2-hero-right is display:none.
+ * Gives the mobile hero a brand signature without the overlap +
+ * clipping problems of the full desktop stage.
+ * ============================================================ */
+.v2-hero-mobile-visual {
+  display: none;
+}
+@media (max-width: 760px) {
+  .v2-hero-mobile-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    margin-top: 40px;
+    margin-bottom: 8px;
+    position: relative;
+    width: 100%;
+    padding: 12px 0;
+  }
+
+  .v2-hero-mobile-visual .radar-mini {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    flex-shrink: 0;
+  }
+  .v2-hero-mobile-visual .radar-mini .ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--line-2);
+    border-radius: 50%;
+  }
+  .v2-hero-mobile-visual .radar-mini .ring.r2 {
+    inset: 18%;
+  }
+  .v2-hero-mobile-visual .radar-mini .ring.r3 {
+    inset: 36%;
+  }
+  .v2-hero-mobile-visual .radar-mini .sweep {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 300deg,
+      rgba(107, 30, 44, 0.28) 350deg,
+      rgba(107, 30, 44, 0) 360deg
+    );
+    animation: v2-sweep 6s linear infinite;
+  }
+  .v2-hero-mobile-visual .radar-mini .blip {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 0 5px rgba(107, 30, 44, 0.16);
+  }
+  .v2-hero-mobile-visual .radar-mini .b1 {
+    top: 28%;
+    left: 64%;
+    animation: v2-blink 3.4s infinite 0.4s;
+  }
+  .v2-hero-mobile-visual .radar-mini .b2 {
+    top: 60%;
+    left: 38%;
+    animation: v2-blink 3.4s infinite 1.4s;
+  }
+  .v2-hero-mobile-visual .radar-mini .b3 {
+    top: 42%;
+    left: 72%;
+    background: var(--pop-ink);
+    animation: v2-blink 3.4s infinite 2.2s;
+  }
+  .v2-hero-mobile-visual .radar-mini .glow {
+    position: absolute;
+    inset: -10%;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at center,
+      rgba(107, 30, 44, 0.15) 0%,
+      rgba(107, 30, 44, 0) 60%
+    );
+    z-index: -1;
+    filter: blur(16px);
+    animation: v2-glow-pulse 6s ease-in-out infinite;
+  }
+
+  .v2-hero-mobile-visual .chip {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 9px 14px;
+    box-shadow: 0 14px 28px rgba(14, 14, 12, 0.08);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--ink);
+    white-space: nowrap;
+    animation: v2-chip-pop 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both;
+  }
+  .v2-hero-mobile-visual .chip .ic {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(31, 122, 58, 0.12);
+    color: var(--good);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .v2-hero-mobile-visual .chip .ic svg {
+    width: 11px;
+    height: 11px;
+    stroke-width: 2;
+  }
+  .v2-hero-mobile-visual .chip .meta .lab {
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .v2-hero-mobile-visual .chip .meta .val {
+    font-weight: 700;
+    font-size: 12.5px;
+    line-height: 1.1;
+  }
+}
+
+/* ============================================================
+ * RADAR POLISH PASS — warmer, brand-coherent, more sonar than
+ * "wireframe rings + ghost sweep".
+ *
+ * Tuning the existing .v2-radar rather than rewriting it, so every
+ * keyframe + structural rule above this point still applies. We just
+ * override colors + add ping echos.
+ * ============================================================ */
+
+/* Rings: switch from neutral beige to faint oxblood — radar feels
+ * coherent with brand instead of "free-tier wireframe template". */
+.v2-radar .ring {
+  border-color: rgba(107, 30, 44, 0.18);
+}
+
+/* Sweep cone: longer trail + warmer leading edge. Was transparent →
+ * 22% oxblood (looked cool/washed). Now transparent → 50% oxblood →
+ * 12% pop cream → 0% — reads as a real sonar light beam. */
+.v2-radar .sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 280deg,
+    rgba(107, 30, 44, 0.08) 310deg,
+    rgba(107, 30, 44, 0.5) 354deg,
+    rgba(235, 217, 181, 0.35) 358deg,
+    rgba(107, 30, 44, 0) 360deg
+  );
+  filter: blur(0.4px);
+}
+
+/* Center anchor — small oxblood core dot at the radar's centroid.
+ * Gives the composition something to land on; without it the radar
+ * reads as a hollow target. */
+.v2-radar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 3px rgba(107, 30, 44, 0.12),
+    0 0 14px rgba(107, 30, 44, 0.4);
+  animation: v2-pulse-warm-core 2.4s ease-in-out infinite;
+  z-index: 1;
+}
+@keyframes v2-pulse-warm-core {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(107, 30, 44, 0.12),
+      0 0 14px rgba(107, 30, 44, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(107, 30, 44, 0.16),
+      0 0 22px rgba(107, 30, 44, 0.55);
+  }
+}
+
+/* Sonar ping rings — each blip emits an expanding ring on its blink
+ * cycle. The ::before on .blip pulses out from each location, like a
+ * real radar return. Adds the actual motion vocabulary of "something
+ * just got detected." */
+.v2-radar .blip {
+  /* Make the blip itself a touch warmer */
+  background: var(--brand);
+  box-shadow:
+    0 0 0 6px rgba(107, 30, 44, 0.18),
+    0 0 12px rgba(107, 30, 44, 0.4);
+}
+.v2-radar .blip::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(107, 30, 44, 0.6);
+  animation: v2-sonar-ping 3.4s ease-out infinite;
+  pointer-events: none;
+  opacity: 0;
+}
+.v2-radar .b1::before {
+  animation-delay: 0.4s;
+}
+.v2-radar .b2::before {
+  animation-delay: 1.2s;
+}
+.v2-radar .b3::before {
+  animation-delay: 2s;
+}
+@keyframes v2-sonar-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Warmer glow behind the whole radar — replaces the cool low-alpha
+ * one that was reading slightly cold. */
+.v2-hero-glow {
+  background: radial-gradient(
+    circle at center,
+    rgba(107, 30, 44, 0.22) 0%,
+    rgba(235, 217, 181, 0.18) 35%,
+    rgba(107, 30, 44, 0) 65%
+  );
+  filter: blur(28px);
+}
+
+/* Same warmer treatment on the mobile mini-radar */
+@media (max-width: 760px) {
+  .v2-hero-mobile-visual .radar-mini .ring {
+    border-color: rgba(107, 30, 44, 0.18);
+  }
+  .v2-hero-mobile-visual .radar-mini .sweep {
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 280deg,
+      rgba(107, 30, 44, 0.1) 310deg,
+      rgba(107, 30, 44, 0.55) 354deg,
+      rgba(235, 217, 181, 0.4) 358deg,
+      rgba(107, 30, 44, 0) 360deg
+    );
+  }
+  .v2-hero-mobile-visual .radar-mini .blip::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.2px solid rgba(107, 30, 44, 0.55);
+    animation: v2-sonar-ping 3.4s ease-out infinite;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .v2-hero-mobile-visual .radar-mini .b1::before {
+    animation-delay: 0.4s;
+  }
+  .v2-hero-mobile-visual .radar-mini .b2::before {
+    animation-delay: 1.4s;
+  }
+  .v2-hero-mobile-visual .radar-mini .b3::before {
+    animation-delay: 2.2s;
+  }
+}
+
+/* Center core + warmer blip on the mobile mini-radar too, so the
+ * mobile hero visual matches the desktop radar's character. */
+@media (max-width: 760px) {
+  .v2-hero-mobile-visual .radar-mini {
+    /* center core dot */
+    position: relative;
+  }
+  .v2-hero-mobile-visual .radar-mini::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--brand);
+    transform: translate(-50%, -50%);
+    box-shadow:
+      0 0 0 2.5px rgba(107, 30, 44, 0.12),
+      0 0 10px rgba(107, 30, 44, 0.4);
+    animation: v2-pulse-warm-core 2.4s ease-in-out infinite;
+    z-index: 1;
+  }
+  .v2-hero-mobile-visual .radar-mini .blip {
+    background: var(--brand);
+    box-shadow:
+      0 0 0 4px rgba(107, 30, 44, 0.18),
+      0 0 10px rgba(107, 30, 44, 0.4);
+  }
+}

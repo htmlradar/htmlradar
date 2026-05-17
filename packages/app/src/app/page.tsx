@@ -112,6 +112,38 @@ export default function LandingV2() {
                 <span>Proposals</span>
               </div>
             </div>
+
+            {/* Mobile-only hero signature — appears below the CTA + trust
+             * row on phones (≤ 760px). The full desktop stage on the
+             * right is display:none on mobile because the tilted
+             * dashboard + 5 floating chips overlap badly at narrow
+             * widths. This compact radar + single "Just opened" chip
+             * keeps the brand-motion signal without the overflow.
+             * Hidden on desktop via .v2-hero-mobile-visual { display:none }. */}
+            <div className="v2-hero-mobile-visual">
+              <div className="radar-mini">
+                <div className="glow" />
+                <div className="ring" />
+                <div className="ring r2" />
+                <div className="ring r3" />
+                <div className="sweep" />
+                <div className="blip b1" />
+                <div className="blip b2" />
+                <div className="blip b3" />
+              </div>
+              <div className="chip">
+                <div className="ic">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                  </svg>
+                </div>
+                <div className="meta">
+                  <div className="lab">Just opened</div>
+                  <div className="val">marc@partners.co</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="v2-hero-right">

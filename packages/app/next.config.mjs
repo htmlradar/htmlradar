@@ -31,11 +31,17 @@ const nextConfig = {
     // 100 MB request body, so we have headroom.
     serverActions: { bodySizeLimit: '30mb' },
   },
-  // /v2 was the staging URL for the redesigned landing while iterating.
-  // Now the redesign lives at /. Permanent redirect catches any
-  // bookmarks pointing at the staging path.
+  // /v2: redesigned landing was staged here while iterating; now at /.
+  // /dashboard: cross-doc Analytics tab removed 2026-05-17 — strictly
+  //             redundant with /docs/[id]. Route file kept in repo
+  //             (resurrection ready) but the redirect points stale
+  //             bookmarks at the canonical Documents list.
   async redirects() {
-    return [{ source: '/v2', destination: '/', permanent: true }];
+    return [
+      { source: '/v2', destination: '/', permanent: true },
+      { source: '/dashboard', destination: '/docs', permanent: false },
+      { source: '/dashboard/:slug', destination: '/docs', permanent: false },
+    ];
   },
 };
 

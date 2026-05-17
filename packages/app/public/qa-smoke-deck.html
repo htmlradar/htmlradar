@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QA Smoke Test Deck</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          system-ui,
+          sans-serif;
+        background: #fbf1e8;
+        color: #1f1108;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 20px 80px;
+      }
+      section {
+        min-height: 70vh;
+        padding: 56px 0 24px;
+        border-bottom: 1px solid #e8d9ca;
+      }
+      section:last-child {
+        border-bottom: 0;
+      }
+      h1 {
+        font-family: Georgia, 'Hoefler Text', Charter, serif;
+        font-size: 40px;
+        line-height: 1.1;
+        margin: 0 0 16px;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-family: Georgia, 'Hoefler Text', Charter, serif;
+        font-size: 28px;
+        line-height: 1.2;
+        margin: 0 0 12px;
+        letter-spacing: -0.005em;
+      }
+      .kicker {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #876959;
+        margin: 0 0 8px;
+      }
+      p {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #4b2d1e;
+        margin: 0 0 14px;
+      }
+      .slide-num {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: #876959;
+        margin-top: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <p class="kicker">Cover</p>
+        <h1>QA Smoke Test Deck</h1>
+        <p>
+          This is a stable HTML document used by HTMLRadar's pre-deploy smoke test. The structure is
+          deliberately simple — 5 clearly-titled sections, vertical scroll, no swipe transforms — so
+          we can assert detection works against a known-good baseline.
+        </p>
+        <p class="slide-num">01 / 05</p>
+      </section>
+
+      <section>
+        <p class="kicker">Section A</p>
+        <h2>Why we test</h2>
+        <p>
+          Real prospects open decks on phones. Real phones do momentum scrolls, swipe gestures, and
+          background tabs. Real browsers cache 410 responses heuristically. Real Cloudflare edges
+          serve stale bundles. None of that shows up in jsdom unit tests.
+        </p>
+        <p>
+          This deck exists so a Playwright session in a mobile viewport can walk through 5 sections
+          at a known cadence and the smoke test can assert that the dashboard reports back the same
+          shape — total reading time matches the dwell sum, scroll depth crossed at least 80%, every
+          section title is non-meta.
+        </p>
+        <p class="slide-num">02 / 05</p>
+      </section>
+
+      <section>
+        <p class="kicker">Section B</p>
+        <h2>What "passes" means</h2>
+        <p>
+          The smoke test passes when: (1) the recipient flow shows the deck on mobile without
+          console errors, (2) all 5 sections are detected by title, (3) reading time stays bounded
+          above by tab-open time, (4) max scroll depth crosses 0.5, (5) the hide-viewer button on
+          the owner dashboard reflects state inside two seconds.
+        </p>
+        <p>
+          Any one of those failing means a regression we shipped today would have stopped at the
+          test gate instead of reaching a real recipient.
+        </p>
+        <p class="slide-num">03 / 05</p>
+      </section>
+
+      <section>
+        <p class="kicker">Section C</p>
+        <h2>Why this content matters</h2>
+        <p>
+          Section detection in HTMLRadar's tracker relies on visible heading text, font-size
+          hierarchy, and slide-container heuristics. A real-world fixture stresses each one. This
+          deck uses semantic h2 headings, so Strategy 1 (configured selector) should win — the
+          simplest happy path.
+        </p>
+        <p>
+          If detection ever falls through to Strategy 4 (prose buckets) on this deck, something has
+          regressed in heading discovery — and the smoke test will fail loudly.
+        </p>
+        <p class="slide-num">04 / 05</p>
+      </section>
+
+      <section>
+        <p class="kicker">Closing</p>
+        <h2>The end of the test deck</h2>
+        <p>
+          If you got here scrolling, the test recipient flow worked. Reading time should be roughly
+          equal to the time the Playwright session dwelled, scroll depth should approach 100%, and
+          the owner dashboard should show one new viewer with five sections read.
+        </p>
+        <p>
+          If any of that diverges by more than the test tolerances, the smoke test fails and tells
+          you which assertion broke.
+        </p>
+        <p class="slide-num">05 / 05</p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -40,6 +40,7 @@ coverage/
 playwright-report/
 test-results/
 .nyc_output/
+e2e/.auth/
 
 # Cloudflare
 .wrangler/

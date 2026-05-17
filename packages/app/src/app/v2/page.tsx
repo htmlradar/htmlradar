@@ -488,44 +488,62 @@ export default function LandingV2() {
             </div>
           </div>
 
-          <div className="v2-flow-mock v2-reveal d1">
-            <div className="mock-head">
-              <span>htmlradar.com / r / swift-falcon</span>
-              <span className="live">Live</span>
-            </div>
-            <div className="doc-card">
-              <div className="title">Seed Deck. Q2.</div>
-              <div className="url">series-a-memo.html · v4</div>
-            </div>
-            <div className="live-row">
-              <span className="who">marc@partners.co</span>
-              <span className="stat">6m 14s · 98%</span>
-            </div>
-            <div className="quiet-row">
-              <span>jen@firm.co</span>
-              <span>3m 04s · 78%</span>
-            </div>
-            <div className="bars">
-              <div className="bar">
-                <span className="l">The Ask</span>
-                <span className="track">
-                  <i style={{ ['--w' as never]: '100%' }} />
-                </span>
-                <span className="v">2m 41s</span>
+          <div className="v2-flow-mocks v2-reveal d1">
+            {/* Mock 1 — upload */}
+            <div className="mock v2-mock-upload">
+              <div className="mock-kicker">/ new</div>
+              <div className="zone">
+                <div className="file-ico">
+                  <div className="l" />
+                  <div className="l s" />
+                  <div className="l" />
+                </div>
+                <div className="info">
+                  <div className="name">series-a-memo.html</div>
+                  <div className="size">38 KB · uploaded</div>
+                </div>
               </div>
-              <div className="bar">
-                <span className="l">Team</span>
-                <span className="track">
-                  <i style={{ ['--w' as never]: '74%' }} />
-                </span>
-                <span className="v">1m 58s</span>
+              <div className="progress">
+                <div className="bar" />
               </div>
-              <div className="bar">
-                <span className="l">Traction</span>
-                <span className="track">
-                  <i style={{ ['--w' as never]: '58%' }} />
-                </span>
-                <span className="v">1m 35s</span>
+            </div>
+
+            {/* Mock 2 — share settings */}
+            <div className="mock v2-mock-share">
+              <div className="mock-kicker">/ share</div>
+              <div className="url-row">
+                <span className="url">htmlradar.com/r/swift-falcon</span>
+                <span className="copy">Copy</span>
+              </div>
+              <div className="toggles">
+                <div className="toggle-row">
+                  <span className="l">Email gate</span>
+                  <span className="pill on" />
+                </div>
+                <div className="toggle-row">
+                  <span className="l">Auto-expiry — 7 days</span>
+                  <span className="pill on" />
+                </div>
+                <div className="toggle-row">
+                  <span className="l">Download lock</span>
+                  <span className="pill" />
+                </div>
+              </div>
+            </div>
+
+            {/* Mock 3 — live readers */}
+            <div className="mock v2-mock-live">
+              <div className="live-bar">
+                <span>/ live</span>
+                <span className="now">Now · 2 reading</span>
+              </div>
+              <div className="row active">
+                <span className="name">marc@partners.co</span>
+                <span className="stat">6m 14s · 98%</span>
+              </div>
+              <div className="row quiet">
+                <span className="name">jen@firm.co</span>
+                <span className="stat">3m 04s · 78%</span>
               </div>
             </div>
           </div>

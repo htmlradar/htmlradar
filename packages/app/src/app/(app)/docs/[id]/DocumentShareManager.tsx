@@ -544,7 +544,7 @@ function ShareToggle({
     <form
       onSubmit={handle}
       className="flex flex-col items-end gap-1"
-      title="Switches recipient access on or off. Past read history is preserved either way."
+      title="On / Off kill-switch for this share. Independent of any expiry date — flip it off to revoke immediately, flip it back on whenever. Past read history stays intact either way."
     >
       <div className="flex items-center gap-2.5">
         <input type="hidden" name="share_id" value={shareId} />
@@ -851,7 +851,7 @@ function ShareSettingsForm({
           label="Allowed email domains"
           hint={
             requireEmail
-              ? 'Comma- or newline-separated. Any address at these domains passes the gate. Leave blank to allow any domain.'
+              ? 'Comma- or newline-separated. Addresses at these domains pass; everyone else is blocked. Leave blank if you want any domain to pass.'
               : 'Turn on "Require email" above to use this.'
           }
           optional

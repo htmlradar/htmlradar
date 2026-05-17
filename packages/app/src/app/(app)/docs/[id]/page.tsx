@@ -55,6 +55,7 @@ export default async function DocumentPage({
     replace_error?: string;
     replaced?: string;
     hide_error?: string;
+    edited?: string;
   };
 }) {
   await requireUser();
@@ -74,6 +75,10 @@ export default async function DocumentPage({
     : null;
   const replacedFlash = searchParams?.replaced === '1';
   const hideError = searchParams?.hide_error ? decodeURIComponent(searchParams.hide_error) : null;
+  // ?edited=<shareId> is set by editShareAction on success. Page renders
+  // a brief "Share updated" banner so the user knows the save took
+  // effect — without it, edit + save felt like a no-op (QA2 #8).
+  const editedShareId = searchParams?.edited ?? null;
 
   const { data: doc } = await supabase
     .from('documents')
@@ -318,6 +323,14 @@ export default async function DocumentPage({
           className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark"
         >
           New version saved. All existing share links now serve v{doc.current_version}.
+        </div>
+      )}
+      {editedShareId && (
+        <div
+          role="status"
+          className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark"
+        >
+          Share settings updated. The next visitor to this link sees the new rules.
         </div>
       )}
       {searchParams?.attachment_error && (

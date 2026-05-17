@@ -276,7 +276,21 @@ ${FONTS_LINK}
 </div>
 </body>
 </html>`,
-    { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    {
+      status,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        // Explicit no-cache. Without this, 410 (expired) and 404 (not
+        // found) are heuristically cacheable per RFC 7234 — browsers
+        // AND Cloudflare's edge cache them by default. When the sender
+        // extends an expiry or unrevokes a share, the recipient hits
+        // their own cached error page and concludes "still expired".
+        // This was QA2 #4. Same reasoning applies to the gate forms —
+        // a stale cached form would carry an old CSRF posture and
+        // confuse error-state rendering. no-store covers both.
+        'Cache-Control': 'private, no-store, max-age=0',
+      },
+    },
   );
 
 export const notFound = (): Response =>
@@ -293,7 +307,7 @@ export const revoked = (): Response =>
   SHELL(
     'Access revoked',
     `<h1>Access revoked.</h1>
-     <p class="lede">The sender removed access to this document. Get in touch with them for a new link.</p>`,
+     <p class="lede">The sender switched this link off. If you still need to read the document, reply to them and ask for a new link.</p>`,
     403,
     'Revoked by sender',
   );
@@ -302,7 +316,7 @@ export const expired = (): Response =>
   SHELL(
     'Link expired',
     `<h1>Link expired.</h1>
-     <p class="lede">This link's window has closed. The sender can issue a fresh one whenever they like.</p>`,
+     <p class="lede">This link's window has closed. Reply to the sender and ask them to extend the expiry or send a fresh link — both take a second.</p>`,
     410,
     'Past expiry',
   );

@@ -105,7 +105,8 @@ export function SignInForm({
           Sign in.
         </h1>
         <p className="mt-3 text-[15px] text-ink-soft">
-          Continue with Google or get a magic link in your inbox.
+          Continue with Google, or enter your email and we'll send you a one-click sign-in link — no
+          password to remember.
         </p>
 
         {error && !sent && (

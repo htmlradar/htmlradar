@@ -54,21 +54,30 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Preflight — refuse to build if .env.production is missing required keys
+      - name: Preflight — verify required secrets are set, then write .env.production
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           set -e
-          ENVFILE="packages/app/.env.production"
-          if [ ! -f "$ENVFILE" ]; then
-            echo "::error::$ENVFILE missing — required for build-time NEXT_PUBLIC_* inlining."
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+            echo "::error::Secret NEXT_PUBLIC_SUPABASE_URL is not set on the repository."
             exit 1
           fi
-          for key in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
-            if ! grep -qE "^${key}=." "$ENVFILE"; then
-              echo "::error::$ENVFILE missing or empty: $key"
-              exit 1
-            fi
-          done
-          echo "Preflight OK."
+          if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Secret NEXT_PUBLIC_SUPABASE_ANON_KEY is not set on the repository."
+            exit 1
+          fi
+          # Write a runner-local .env.production. This file lives only on
+          # the ephemeral GitHub Actions runner — never committed to the
+          # repo. Next.js auto-loads it during the build so NEXT_PUBLIC_*
+          # values get inlined into the client bundle. After the build
+          # the runner is destroyed and the file is gone.
+          cat > packages/app/.env.production <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+          EOF
+          echo "Preflight OK — .env.production written for build."
 
       - name: Build tracker
         run: pnpm --filter @htmlradar/tracker build

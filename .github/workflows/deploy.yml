@@ -257,3 +257,43 @@ jobs:
             echo "::warning::Proxy returned 404 but body looks unusual — manual check recommended."
           fi
           echo "Proxy verified — /r/* path returns 404 for missing slug as expected."
+
+      # Purge Cloudflare edge cache after every successful deploy.
+      # Belt-and-suspenders: static assets use hashed filenames so a
+      # new build is referenced by new URLs anyway, but if any HTML
+      # response was opportunistically cached, this clears it. The
+      # 2026-05-18 /docs/[id] incident took an extra hard-refresh
+      # cycle to confirm — automated purge removes that variable
+      # from future incident diagnosis.
+      #
+      # `continue-on-error: true` — the existing CLOUDFLARE_API_TOKEN
+      # is scoped to Pages:Edit + Workers:Edit; it may NOT have
+      # zone-level Cache:Purge. If the call returns 403/Auth 10000
+      # we treat as a benign no-op rather than failing the deploy
+      # (the deploy already succeeded by this point). To make the
+      # purge load-bearing, widen the token to include the zone's
+      # Cache Purge:Edit permission.
+      #
+      # Requires CLOUDFLARE_ZONE_ID secret on the repo. If missing,
+      # the step skips itself rather than erroring.
+      - name: Purge Cloudflare edge cache
+        continue-on-error: true
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          if [ -z "$CF_ZONE_ID" ]; then
+            echo "::warning::CLOUDFLARE_ZONE_ID secret not set — skipping cache purge."
+            exit 0
+          fi
+          response=$(curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}')
+          echo "$response"
+          if echo "$response" | grep -q '"success":true'; then
+            echo "Cache purged successfully."
+          else
+            echo "::warning::Cache purge did not return success — token may lack Cache Purge:Edit on the zone."
+          fi

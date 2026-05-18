@@ -226,6 +226,17 @@ export default async function DocumentPage({
     return hb > 0 && now - hb < 60_000;
   }).length;
 
+  // Inline hero stat strip — the headline numbers the sender wants to
+  // glance at without scrolling. Visible-only semantics (hidden/internal
+  // viewers excluded) so it matches the glance grid below in the
+  // analytics section.
+  const totalSessions = visibleSessions.length;
+  const totalViewers = new Set(visibleViewers.map((v) => v.email?.toLowerCase() ?? v.id)).size;
+  const avgScroll =
+    visibleSessions.length > 0
+      ? visibleSessions.reduce((a, s) => a + (s.max_scroll_depth ?? 0), 0) / visibleSessions.length
+      : 0;
+
   return (
     <div className="py-8">
       {/* Breadcrumb — replaces the old "← All documents" link. Editorial
@@ -275,6 +286,31 @@ export default async function DocumentPage({
             <Chip>v{doc.current_version}</Chip>
             <LiveRefresh />
           </div>
+          {/* Inline stat strip — gives the sender headline numbers at a
+              glance without scrolling. Mirrors the glance grid in the
+              analytics column below; same visible-only semantics. */}
+          {totalSessions > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-graphite">
+              <span>
+                <span className="font-semibold text-ink-soft">{totalSessions}</span>{' '}
+                {totalSessions === 1 ? 'session' : 'sessions'}
+              </span>
+              <span aria-hidden className="opacity-40">
+                ·
+              </span>
+              <span>
+                <span className="font-semibold text-ink-soft">{totalViewers}</span>{' '}
+                {totalViewers === 1 ? 'viewer' : 'viewers'}
+              </span>
+              <span aria-hidden className="opacity-40">
+                ·
+              </span>
+              <span>
+                <span className="font-semibold text-ink-soft">{Math.round(avgScroll * 100)}%</span>{' '}
+                avg scroll
+              </span>
+            </div>
+          )}
           {doc.source_type === 'url' && doc.source_url && (
             <a
               href={doc.source_url}
@@ -372,24 +408,15 @@ export default async function DocumentPage({
         </div>
       )}
 
-      <div className="mt-8 space-y-8">
-        {/* Order matters: HTML doc + its shares are the primary surface.
-            Attachments are deliberately demoted to the bottom — they're
-            optional supplements, not a parallel concept. Empty state is
-            a one-line CTA so the panel doesn't compete with the share
-            manager for attention when the user has no attachments yet. */}
-        <ViewerInsights
-          viewers={allViewers}
-          sessions={allSessions}
-          events={allEvents}
-          documentId={doc.id}
-          shareSlugs={Object.fromEntries(shareList.map((s) => [s.id, s.slug]))}
-          toggleInternal={toggleViewerInternalAction}
-        />
-
-        <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
-
-        <section className="mb-8">
+      {/* Two-column master-detail body on lg+ (Mock B). Shares column on
+          the left so the primary action (edit / copy / revoke) is one
+          short scroll away — fixes a designer QA3's "two scrolls to edit"
+          complaint. Analytics on the right is monitored, not acted on.
+          Below lg the page stacks: Shares above Analytics (Mock A flow). */}
+      <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.25fr] lg:items-start lg:gap-12">
+        {/* LEFT — Shares column. Sticky-positioned on lg+ so it stays
+            visible while the analytics column scrolls independently. */}
+        <section className="lg:sticky lg:top-6">
           <SectionHead
             title="Shares."
             hint={`${shares.length} ${shares.length === 1 ? 'link' : 'links'} · per-recipient settings`}
@@ -406,6 +433,28 @@ export default async function DocumentPage({
           />
         </section>
 
+        {/* RIGHT — Analytics column. ViewerInsights renders its own
+            "Who's reading." header + glance grid + viewer table + drill.
+            SharesTable goes below it (only renders when 2+ shares — same
+            anti-clutter rule as before). */}
+        <section className="space-y-8">
+          <ViewerInsights
+            viewers={allViewers}
+            sessions={allSessions}
+            events={allEvents}
+            documentId={doc.id}
+            shareSlugs={Object.fromEntries(shareList.map((s) => [s.id, s.slug]))}
+            toggleInternal={toggleViewerInternalAction}
+          />
+          <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
+        </section>
+      </div>
+
+      {/* Attachments stay full-width below the two-column body. Doc-level
+          asset; not specific to a single share. (Batch A will rework the
+          attachments UX itself — recipient-side pill + per-viewer
+          download tracking — but the layout placement stays here.) */}
+      <div className="mt-12">
         <AttachmentsPanel
           documentId={doc.id}
           attachments={attachments}

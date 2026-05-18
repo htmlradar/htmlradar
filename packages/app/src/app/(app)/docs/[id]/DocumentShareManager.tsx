@@ -154,7 +154,12 @@ export function DocumentShareManager({
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[300px_1fr] lg:items-start lg:gap-8">
+    // 2xl-only inner master-detail. The outer page is already 2-col at
+    // lg+ (Shares left, Analytics right), so this component is INSIDE
+    // a narrower column and stacks its rail+panel by default. Only
+    // very wide viewports (≥1536px) where the outer Shares column is
+    // wide enough to host rail-beside-panel get the side-by-side view.
+    <div className="grid gap-5 2xl:grid-cols-[280px_1fr] 2xl:items-start 2xl:gap-8">
       <ShareRail
         shares={shares}
         analyticsByShareId={analyticsByShareId}
@@ -243,8 +248,13 @@ function ShareRail({
   // redundant.
   const showEmptyPlaceholder = shares.length === 0 && selection.mode !== 'new';
 
+  // Stickiness flipped from lg→2xl: at lg the OUTER page is 2-col
+  // with the Shares column already sticky, so inner stickiness would
+  // compound weirdly. Only at 2xl+ — where this component is rendered
+  // side-by-side as a real master-detail — does the inner sticky rail
+  // make sense again.
   return (
-    <aside className="flex flex-col gap-2 lg:sticky lg:top-24">
+    <aside className="flex flex-col gap-2 2xl:sticky 2xl:top-24">
       {/* "+ New share" pill — dashed border, no fill. Matches a designer
           ref's transparent-rail composition. When the new-share form is
           open in the right pane, the pill goes signal-tinted so the

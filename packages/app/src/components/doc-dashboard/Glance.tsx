@@ -95,13 +95,18 @@ export function GlanceGrid({ feature, cards, className }: GlanceGridProps) {
   return (
     <div
       className={cn(
-        // 4-col on desktop with the feature card slightly wider; collapses
-        // to 2-col on tablet (feature spans both), single col on mobile.
-        'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr]',
+        // Responsive grid tuned for two contexts:
+        //   • Standalone (full page width): 4 cards across at xl+.
+        //   • Inside the Mock B analytics column (narrower): 2 cards
+        //     per row until xl, then 4 cards across.
+        // Breakpoint moved from lg→xl so a 1024-1280px viewport that
+        // hosts the 2-col page layout doesn't try to cram 4 cards into
+        // a ~520px column.
+        'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr]',
         className,
       )}
     >
-      <div className="sm:col-span-2 lg:col-span-1">
+      <div className="sm:col-span-2 xl:col-span-1">
         <FeatureStatCard {...feature} />
       </div>
       {cards.map((c) => (

@@ -752,14 +752,25 @@ function PreviewAsYouButton({
   // the doc. Returning the URL and navigating client-side bypasses Next
   // entirely; the browser hits the Worker route directly.
   const onClick = () => {
+    // Open the preview in a new tab so the sender's dashboard stays
+    // put. window.open must be called synchronously here — popup
+    // blockers reject calls from inside the async startTransition
+    // callback below. Placeholder about:blank gets its real URL once
+    // the server action returns.
+    const previewTab = window.open('about:blank', '_blank', 'noopener');
     startTransition(async () => {
       const fd = new FormData();
       fd.set('share_id', shareId);
       fd.set('document_id', documentId);
       const res = await action(fd);
       if (res.ok) {
-        window.location.href = res.url;
+        if (previewTab && !previewTab.closed) {
+          previewTab.location.href = res.url;
+        } else {
+          window.location.href = res.url;
+        }
       } else {
+        previewTab?.close();
         window.location.href = `/docs/${documentId}?share_error=${encodeURIComponent(res.error)}`;
       }
     });

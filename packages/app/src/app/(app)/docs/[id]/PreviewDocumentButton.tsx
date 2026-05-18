@@ -20,17 +20,28 @@ export function PreviewDocumentButton({
   const [isPending, startTransition] = useTransition();
 
   const onClick = () => {
+    // Open the preview in a NEW tab so the dashboard tab stays put.
+    // window.open must fire synchronously from the click handler —
+    // popup blockers reject calls made from inside an async callback.
+    // We open about:blank as a placeholder, then set its location once
+    // the server action returns the signed proxy URL. If the action
+    // errors, the placeholder tab is closed and the error surfaces on
+    // the current page.
+    const previewTab = window.open('about:blank', '_blank', 'noopener');
     startTransition(async () => {
       const fd = new FormData();
       fd.set('document_id', documentId);
       const res = await action(fd);
       if (res.ok) {
-        // Hard navigation. Browser GETs the proxy URL directly,
-        // bypassing the Next.js router.
-        window.location.href = res.url;
+        if (previewTab && !previewTab.closed) {
+          previewTab.location.href = res.url;
+        } else {
+          // Popup blocked or already closed — fall back to same-tab
+          // navigation so the user still sees the preview.
+          window.location.href = res.url;
+        }
       } else {
-        // Surface the action's error via the same URL-param channel the
-        // page already renders into a banner.
+        previewTab?.close();
         window.location.href = `/docs/${documentId}?preview_error=${encodeURIComponent(res.error)}`;
       }
     });

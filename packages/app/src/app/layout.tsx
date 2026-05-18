@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   title: { default: 'HTMLRadar — Document tracking for HTML', template: '%s · HTMLRadar' },
   description:
     'Open-source read tracking for HTML decks, briefs, and proposals. Upload a file or paste a URL, send a tracked link, see who opened it and where they dwelled.',
-  metadataBase: new URL(process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://htmlradar.com'),
+  metadataBase: new URL('https://htmlradar.com'),
   applicationName: 'HTMLRadar',
   authors: [{ name: 'HTMLRadar' }],
   keywords: [
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     description:
       'The deck moved to HTML. Tracking should follow. Open-source read tracking for HTML decks, mocks, briefs, and updates. AGPL-3.0.',
     siteName: 'HTMLRadar',
-    url: process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://htmlradar.com',
+    url: 'https://htmlradar.com',
   },
   twitter: {
     card: 'summary_large_image',

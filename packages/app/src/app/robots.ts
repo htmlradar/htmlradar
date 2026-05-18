@@ -5,8 +5,11 @@
 
 import type { MetadataRoute } from 'next';
 
+// See sitemap.ts for why we hardcode rather than read NEXT_PUBLIC_APP_URL.
+const SITE_URL = 'https://htmlradar.com';
+
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://htmlradar.com';
+  const baseUrl = SITE_URL;
 
   return {
     rules: [

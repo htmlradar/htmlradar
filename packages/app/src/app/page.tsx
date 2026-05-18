@@ -325,11 +325,11 @@ export default async function LandingV2() {
         <div className="head">
           <span className="kicker">The shift</span>
           <p className="v2-reveal">
-            The documents that matter used to end in <em>.pdf</em>. Frozen, mobile-hostile,
-            invisible to every model your reader runs against them. Now they end in <em>.html</em> —
-            readable by LLMs natively, responsive on every device, capable of holding a live
-            dashboard inside the page. The tracking nobody built was the one that matches the
-            medium.
+            The documents that matter increasingly end in <em>.html</em>. Live where you want them
+            live, responsive on every screen, readable by both the people you sent them to and the
+            AI tools they bring with them. PDF served the print era. HTML fits how decks actually
+            get read now: on phones, in inboxes, with an AI tool open in the next tab. HTMLRadar is
+            the tracking layer for the new medium.
           </p>
         </div>
         <div className="v2-shift-visual v2-reveal d2">

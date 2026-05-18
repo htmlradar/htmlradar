@@ -17,21 +17,37 @@
 //   9. Footer.
 
 import Link from 'next/link';
+import { serverClient } from '@/lib/supabase-server';
+import { Logo } from '@/components/Logo';
 import { LandingEffects } from './LandingEffects';
 import './landing-v2.css';
 
 export const runtime = 'edge';
 
-export default function LandingV2() {
+export default async function LandingV2() {
+  // Auth-aware nav + CTAs: signed-in users see "Open dashboard"
+  // instead of "Get started" / "Start free". The landing stays
+  // accessible (no auto-redirect) so signed-in users can re-read
+  // the pitch or share the link with someone. Just the calls-to-
+  // action change so a returning user isn't told to "get started"
+  // with a product they're already inside.
+  const supabase = serverClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const ctaHref = user ? '/docs' : '/sign-in';
+  const navCtaLabel = user ? 'Open dashboard' : 'Get started';
+  const heroCtaLabel = user ? 'Open dashboard' : 'Start free';
+
   return (
     <div className="v2-root">
       <LandingEffects />
 
       {/* ─────────────────────── NAV ─────────────────────── */}
       <nav className="v2-nav" id="v2-nav">
-        <div className="logo">
-          HTML<span className="ital">radar</span>
-        </div>
+        {/* Logo is the shared <Logo /> component so the brand mark is
+            identical to NavBar (used on /docs, /sign-in, /pricing). */}
+        <Logo href="/" />
         <ul>
           <li>
             <a href="#shift">Why</a>
@@ -46,8 +62,12 @@ export default function LandingV2() {
             <Link href="/pricing">Pricing</Link>
           </li>
         </ul>
-        <Link href="/sign-in" className="nav-cta">
-          Get started
+        {/* When signed in: "Open dashboard" → /docs. Otherwise the
+            same "Get started" CTA we've always had, routing to
+            /sign-in (which handles both new accounts and returning
+            users via Google OAuth + magic link). */}
+        <Link href={ctaHref} className="nav-cta">
+          {navCtaLabel}
         </Link>
       </nav>
 
@@ -91,8 +111,8 @@ export default function LandingV2() {
             </p>
 
             <div className="cta-row">
-              <Link href="/sign-in" className="v2-btn v2-btn-primary">
-                Start free
+              <Link href={ctaHref} className="v2-btn v2-btn-primary">
+                {heroCtaLabel}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="12 5 19 12 12 19" />
@@ -802,8 +822,8 @@ export default function LandingV2() {
           An email lands the moment a real read happens. Free for 10 documents — no card needed.
         </p>
         <div className="row">
-          <Link href="/sign-in" className="v2-btn v2-btn-primary">
-            Start free
+          <Link href={ctaHref} className="v2-btn v2-btn-primary">
+            {heroCtaLabel}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
@@ -822,18 +842,9 @@ export default function LandingV2() {
 
       {/* ─────────────────────── FOOTER ─────────────────────── */}
       <footer className="v2-foot">
-        <div>
-          HTML
-          <span
-            style={{
-              color: 'var(--brand)',
-              fontFamily: 'var(--serif)',
-              fontStyle: 'italic',
-            }}
-          >
-            radar
-          </span>
-          {' · Document tracking for HTML. Open source · AGPL-3.0.'}
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <Logo size="sm" />
+          <span>· Document tracking for HTML. Open source · AGPL-3.0.</span>
         </div>
         <div style={{ display: 'flex', gap: 24 }}>
           <Link href="/why">Why</Link>

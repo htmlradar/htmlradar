@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import { serverClient } from '@/lib/supabase-server';
+import { Logo } from './Logo';
 
 export async function NavBar() {
   const supabase = serverClient();
@@ -18,9 +19,9 @@ export async function NavBar() {
   return (
     <header className="sticky top-0 z-30 border-b border-line/60 bg-paper/85 backdrop-blur-md backdrop-saturate-150">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href={user ? '/docs' : '/'} className="font-mono text-sm tracking-wide text-ink">
-          HTML<span className="text-signal">Radar</span>
-        </Link>
+        {/* Single source of truth for the wordmark — used here AND in
+            the landing nav so the brand mark is consistent everywhere. */}
+        <Logo href={user ? '/docs' : '/'} />
         {user ? (
           <nav className="flex items-center gap-7 text-sm">
             <Link href="/docs" className="text-ink-soft hover:text-signal-dark">

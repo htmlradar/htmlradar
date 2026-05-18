@@ -15,6 +15,7 @@
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CopySlugButton } from '@/components/CopySlugButton';
+import { formatTimestamp } from '@/lib/format-timestamp';
 import type { Viewer, Session } from '@/lib/types';
 
 interface SectionRow {
@@ -100,7 +101,11 @@ export function ShareAnalytics({
         >
           {sessions.map((s) => {
             const v = viewers.find((x) => x.id === s.viewer_id);
-            const ago = relativeFrom(s.started_at);
+            // Hybrid format: relative under 24h, absolute beyond.
+            // Session-started timestamps share the same "first-seen"
+            // semantics as the viewer table — when did this session
+            // begin? Worth pinning as a date once it's older than a day.
+            const ts = formatTimestamp(s.started_at, 'auto');
             return (
               <li
                 key={s.id}
@@ -123,7 +128,9 @@ export function ShareAnalytics({
                       .join(' · ') || '—'}
                   </div>
                 </div>
-                <div className="font-mono text-[11.5px] text-graphite">{ago}</div>
+                <div className="font-mono text-[11.5px] text-graphite" title={ts.full}>
+                  {ts.display}
+                </div>
                 <div className="font-mono text-[12.5px] font-semibold tabular-nums text-signal-dark">
                   {formatDuration(s.active_time_seconds)}
                 </div>
@@ -230,22 +237,6 @@ function Stat({
       </div>
     </div>
   );
-}
-
-// "5m ago" / "3h ago" / "2d ago" — short relative timestamp for the
-// sessions list. Mirrors the formatter ViewerInsights uses so the two
-// surfaces stay consistent.
-function relativeFrom(iso: string): string {
-  const then = new Date(iso).getTime();
-  const diff = Math.max(0, Date.now() - then);
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 function WaitingState({

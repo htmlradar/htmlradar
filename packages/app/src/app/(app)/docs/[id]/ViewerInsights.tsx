@@ -34,6 +34,7 @@ import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { GlanceGrid, sparklineFromSessionStarts } from '@/components/doc-dashboard/Glance';
 import { PulsingDot } from '@/components/doc-dashboard/PulsingDot';
 import { SectionHead } from '@/components/doc-dashboard/SectionHead';
+import { formatTimestamp } from '@/lib/format-timestamp';
 
 interface ViewerInsightsProps {
   viewers: Viewer[];
@@ -108,20 +109,10 @@ function formatDurationParts(seconds: number): { value: string; unit: string } {
   return { value: v.endsWith('.0') ? v.slice(0, -2) : v, unit: 'h' };
 }
 
-function formatRelative(iso: string | undefined | null): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diff = Math.max(0, now - then);
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
+// (formatRelative removed 2026-05-18 — superseded by formatTimestamp
+// from @/lib/format-timestamp. Both call sites now use the shared
+// formatter so the hybrid recency/absolute display + hover tooltip
+// is consistent across ViewerInsights and ShareAnalytics.)
 
 function buildGroups(
   viewers: Viewer[],
@@ -547,10 +538,25 @@ export function ViewerInsights({
                   <td className="hidden px-4 py-4 text-right font-mono tabular-nums md:table-cell">
                     {g.visits}
                   </td>
-                  <td className="hidden px-4 py-4 text-right font-mono text-[12px] text-graphite md:table-cell">
-                    {formatRelative(g.firstSeen)}
+                  {/* First seen — "auto" mode: relative under 24h
+                      (e.g. "6h ago" when fresh), absolute date once
+                      older ("May 17", or "May 17, 2025" if a different
+                      calendar year). The entry-into-funnel date is a
+                      fact worth pinning, not a moving target. Hover
+                      always reveals the full timestamp. */}
+                  <td
+                    className="hidden px-4 py-4 text-right font-mono text-[12px] text-graphite md:table-cell"
+                    title={formatTimestamp(g.firstSeen, 'auto').full}
+                  >
+                    {formatTimestamp(g.firstSeen, 'auto').display}
                   </td>
-                  <td className="px-4 py-4 text-right font-mono text-[12px] text-graphite">
+                  {/* Last seen — always relative ("recent" mode). Recency
+                      is the question; "23d ago" reads as "this lead is
+                      cold" better than a stale calendar date would. */}
+                  <td
+                    className="px-4 py-4 text-right font-mono text-[12px] text-graphite"
+                    title={formatTimestamp(g.lastSeen, 'recent').full}
+                  >
                     <div className="inline-flex items-center justify-end gap-1.5">
                       {/* Pulsing dot when this viewer heart-beated in
                           the last 60s — "actively reading right now"
@@ -559,7 +565,7 @@ export function ViewerInsights({
                       {g.lastHeartbeatMs > 0 && Date.now() - g.lastHeartbeatMs < 60_000 && (
                         <PulsingDot tone="good" />
                       )}
-                      {formatRelative(g.lastSeen)}
+                      {formatTimestamp(g.lastSeen, 'recent').display}
                     </div>
                   </td>
                   <td className="w-14 px-2 py-4 text-right" onClick={(e) => e.stopPropagation()}>

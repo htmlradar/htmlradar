@@ -209,6 +209,21 @@ jobs:
           workingDirectory: packages/proxy
           command: deploy
 
+      # Monitor cron worker (packages/monitor) — same pattern as the
+      # proxy step. Same continue-on-error rationale: wrangler may
+      # error on a follow-up routes/triggers API call our token can't
+      # touch; the worker upload itself uses the Account-scope token
+      # which works. Without this step the cron monitor sits at
+      # whatever version was last manually deployed.
+      - name: Deploy monitor worker (packages/monitor)
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/monitor
+          command: deploy
+
       # Independent verification that the proxy IS serving a recent
       # version, regardless of the above step's exit code. If this
       # check fails it means the worker upload itself broke (a real

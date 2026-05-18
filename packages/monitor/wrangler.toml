@@ -1,0 +1,21 @@
+name = "htmlradar-monitor"
+main = "src/index.ts"
+compatibility_date = "2026-05-18"
+compatibility_flags = []
+workers_dev = false  # cron-only worker, no HTTP entrypoint exposed
+
+# Every 5 minutes. Cheapest possible cadence that still catches a
+# 15-min-or-less regression before the founder checks email.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Non-sensitive config travels in [vars] so they're visible in the
+# wrangler.toml diff. Secrets (SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY)
+# are set via `wrangler secret put ...` and never enter the repo.
+[vars]
+SUPABASE_URL = "https://ewennjnxuqjzsgawbzur.supabase.co"
+RESEND_FROM = "HTMLRadar <hello@htmlradar.com>"
+ALERT_TO = "hello@htmlradar.com"
+
+[observability]
+enabled = true

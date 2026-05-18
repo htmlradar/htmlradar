@@ -125,28 +125,45 @@ jobs:
           echo "preview_url=$URL" >> "$GITHUB_OUTPUT"
           echo "Preview deployed to: $URL"
 
+      # Brief cold-start grace — CF Pages preview deploys race ahead of
+      # full edge propagation; the very first request to a fresh URL
+      # occasionally returns a stale/empty body for one path before
+      # settling. 8 seconds is enough in practice and trivial in cost.
+      - name: Preview warm-up wait
+        run: sleep 8
+
       - name: Smoke test the preview deploy
         env:
           PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
         run: |
           set -e
           fail=0
+          # Per-check retry: up to 3 attempts, 2s back-off. Eliminates
+          # transient cold-start flakes (the kind that nuked the
+          # ac1144e deploy with a false-negative on /robots.txt) without
+          # masking real regressions — a genuinely broken bundle fails
+          # all 3 attempts.
           check() {
             local path="$1"
             local expect="$2"
+            local attempt
             local code
-            code=$(curl -sL -o /tmp/page -w "%{http_code}" "${PREVIEW_URL}${path}")
+            for attempt in 1 2 3; do
+              code=$(curl -sL -o /tmp/page -w "%{http_code}" "${PREVIEW_URL}${path}")
+              if [ "$code" = "200" ] && { [ -z "$expect" ] || grep -q "$expect" /tmp/page; }; then
+                echo "  ✓ ${path}"
+                return
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                sleep 2
+              fi
+            done
             if [ "$code" != "200" ]; then
-              echo "::error::${path} returned HTTP ${code} (expected 200)"
-              fail=$((fail + 1))
-              return
-            fi
-            if [ -n "$expect" ] && ! grep -q "$expect" /tmp/page; then
-              echo "::error::${path} returned 200 but body missing expected '${expect}'"
-              fail=$((fail + 1))
+              echo "::error::${path} returned HTTP ${code} (expected 200) after 3 attempts"
             else
-              echo "  ✓ ${path}"
+              echo "::error::${path} returned 200 but body missing expected '${expect}' after 3 attempts"
             fi
+            fail=$((fail + 1))
           }
 
           echo "Smoke testing preview: $PREVIEW_URL"

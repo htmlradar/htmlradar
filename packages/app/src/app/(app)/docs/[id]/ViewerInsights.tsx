@@ -31,6 +31,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, EyeOff, Eye } from 'lucide-react';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
+import { GlanceGrid, sparklineFromSessionStarts } from '@/components/doc-dashboard/Glance';
 
 interface ViewerInsightsProps {
   viewers: Viewer[];
@@ -76,6 +77,22 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return s === 0 ? `${m}m` : `${m}m ${s}s`;
+}
+
+// Split a duration into (display value, unit) so the feature stat card
+// can render the number big and the unit small. Picks the largest
+// natural unit that keeps the value readable:
+//   <60s   → "47" / "s"
+//   <60m   → "12" / "m"
+//   >=1h   → "1.2" / "h"
+function formatDurationParts(seconds: number): { value: string; unit: string } {
+  if (!seconds || seconds < 1) return { value: '0', unit: 's' };
+  if (seconds < 60) return { value: String(Math.round(seconds)), unit: 's' };
+  if (seconds < 3600) return { value: String(Math.floor(seconds / 60)), unit: 'm' };
+  // Hours with one decimal; trim ".0" so a clean hour renders bare.
+  const hours = seconds / 3600;
+  const v = hours >= 10 ? hours.toFixed(0) : hours.toFixed(1);
+  return { value: v.endsWith('.0') ? v.slice(0, -2) : v, unit: 'h' };
 }
 
 function formatRelative(iso: string | undefined | null): string {
@@ -250,27 +267,30 @@ export function ViewerInsights({
   // the headline numbers. That preserves the dashboard as a clean
   // "what real prospects did" view, regardless of how the owner
   // arranges the table below.
-  const { totalViewers, totalSessions, avgActive, avgScroll, viewersToday } = useMemo(() => {
+  const aggregates = useMemo(() => {
     const visibleViewerIds = new Set<string>();
     for (const g of visibleGroups) for (const id of g.viewerIds) visibleViewerIds.add(id);
     const visibleSessions = sessions.filter((s) => visibleViewerIds.has(s.viewer_id));
 
     const totalViewers = visibleGroups.length;
     const totalSessions = visibleSessions.length;
-    // Avg read time uses Reading time (section dwell), matching the
-    // per-row metric. This is the honest "engaged with content"
-    // average. Session active_time would inflate on idle-but-open
-    // mobile tabs (e.g. viewer2's 26m no-scroll background session)
-    // and make the average misleading.
-    const avgActive =
-      visibleGroups.length > 0
-        ? visibleGroups.reduce((a, g) => a + g.totalSeconds, 0) / visibleGroups.length
-        : 0;
-    const avgScroll =
-      visibleSessions.length > 0
-        ? visibleSessions.reduce((a, s) => a + (s.max_scroll_depth ?? 0), 0) /
-          visibleSessions.length
-        : 0;
+    // CRITICAL: total + avg active times BOTH source from per-viewer
+    // section dwell (g.totalSeconds), NOT session.active_time_seconds.
+    // The latter inflates on idle-but-foregrounded mobile tabs (the
+    // idle-foreground-tab incident). Section dwell is the honest
+    // "engaged with content" number — what we surface as "Reading time"
+    // in the per-row drill.
+    const totalActiveSeconds = visibleGroups.reduce((a, g) => a + g.totalSeconds, 0);
+    const avgActive = totalViewers > 0 ? totalActiveSeconds / totalViewers : 0;
+    // Avg seconds per SESSION (not per viewer) — surfaces as the
+    // delta annotation under the Sessions card.
+    const avgPerSession = totalSessions > 0 ? totalActiveSeconds / totalSessions : 0;
+    // Single best scroll across all visible sessions — a designer's
+    // reference shows the headline "max scroll" not "avg scroll"
+    // because the average gets pulled down by the inevitable 5%
+    // bounce-rate sessions. Max is the more interesting signal:
+    // "did anyone actually read to the end?"
+    const maxScroll = visibleSessions.reduce((m, s) => Math.max(m, s.max_scroll_depth ?? 0), 0);
 
     const dayCutoff = Date.now() - 24 * 60 * 60 * 1000;
     const recentKeys = new Set<string>();
@@ -283,12 +303,31 @@ export function ViewerInsights({
         if (group) recentKeys.add(group.key);
       }
     }
+
+    // Live readers: anyone heartbeating within the last 60s.
+    const liveCutoff = Date.now() - 60_000;
+    const liveReaders = visibleSessions.filter((s) => {
+      const hb = s.last_heartbeat_at ? new Date(s.last_heartbeat_at).getTime() : 0;
+      return hb > liveCutoff;
+    }).length;
+
+    // 12 buckets x 2h each → 24h sparkline.
+    const sparkline = sparklineFromSessionStarts(
+      visibleSessions.map((s) => s.started_at),
+      12,
+      24,
+    );
+
     return {
       totalViewers,
       totalSessions,
+      totalActiveSeconds,
       avgActive,
-      avgScroll,
+      avgPerSession,
+      maxScroll,
       viewersToday: recentKeys.size,
+      liveReaders,
+      sparkline,
     };
   }, [visibleGroups, sessions]);
 
@@ -306,19 +345,53 @@ export function ViewerInsights({
         </p>
       </div>
 
-      {/* Aggregate — kept succinct on top. Real surface is the per-viewer table below.
-          Stats reflect visible viewers only — hidden viewers (test/staff/owner-self)
-          never warp the headline numbers. */}
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat
-          label="Total viewers"
-          value={String(totalViewers)}
-          annotation={hiddenGroups.length > 0 ? `+${hiddenGroups.length} hidden` : null}
+      {/* Glance grid — 1 feature card (dark, big number + sparkline) +
+          3 paper cards. Replaces the prior 5-card paper-only strip per
+          a designer's 2026-05-18 redesign. Every metric still reflects
+          VISIBLE viewers only (hidden viewers stay out of the headline
+          numbers regardless of the table's show-hidden toggle).
+          Critical: feature value derives from section dwell SUM, NOT
+          session.active_time — see comment above on aggregates. */}
+      <div className="mt-5">
+        <GlanceGrid
+          feature={{
+            label: 'Total active read time',
+            ...formatDurationParts(aggregates.totalActiveSeconds),
+            liveReaders: aggregates.liveReaders,
+            sparkline: aggregates.sparkline,
+          }}
+          cards={[
+            {
+              label: 'Viewers',
+              value: String(aggregates.totalViewers),
+              delta:
+                aggregates.viewersToday > 0
+                  ? `↑ ${aggregates.viewersToday} today`
+                  : hiddenGroups.length > 0
+                    ? `${hiddenGroups.length} hidden`
+                    : 'No reads today',
+            },
+            {
+              label: 'Sessions',
+              value: String(aggregates.totalSessions),
+              delta:
+                aggregates.totalSessions > 0
+                  ? `Avg ${formatDuration(aggregates.avgPerSession)} per session`
+                  : 'No sessions yet',
+            },
+            {
+              label: 'Max scroll',
+              value: `${Math.round(aggregates.maxScroll * 100)}`,
+              unit: '%',
+              delta:
+                aggregates.maxScroll >= 0.99
+                  ? 'Someone read to the bottom'
+                  : aggregates.maxScroll > 0
+                    ? `Deepest read this far`
+                    : null,
+            },
+          ]}
         />
-        <Stat label="Total sessions" value={String(totalSessions)} />
-        <Stat label="Avg read time" value={formatDuration(avgActive)} />
-        <Stat label="Avg scroll" value={`${Math.round(avgScroll * 100)}%`} />
-        <Stat label="Viewers today" value={String(viewersToday)} />
       </div>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper">
@@ -570,30 +643,6 @@ function ViewerSectionDrill({
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  annotation,
-}: {
-  label: string;
-  value: string;
-  annotation?: string | null;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-paper px-4 py-3.5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">{label}</div>
-      <div className="mt-1.5 font-serif text-[24px] tabular-nums leading-none text-ink">
-        {value}
-      </div>
-      {annotation && (
-        <div className="mt-1 font-mono text-[10px] tracking-[0.08em] text-graphite">
-          {annotation}
-        </div>
-      )}
     </div>
   );
 }

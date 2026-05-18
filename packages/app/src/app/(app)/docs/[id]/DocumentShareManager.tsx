@@ -768,37 +768,27 @@ function ShareSettingsForm({
           />
         </div>
 
-        {/* Supporting materials permission. Always visible so the sender
-            knows the option exists; disabled when the parent document has
-            no attachments, with copy that explains where to add them. */}
-        {attachmentCount > 0 ? (
-          <CheckboxRow
-            name="allow_download"
-            label={`Allow recipient to download files (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'})`}
-            checked={allowDownload}
-            onChange={setAllowDownload}
-            hint="Off by default. When on, a download panel appears in the recipient's view. Every download is tracked. When off, the recipient sees the deck only and has no signal that files exist."
-          />
-        ) : (
-          <div className="rounded-xl border border-dashed border-line bg-paper-2/30 p-4">
-            <div className="flex items-start gap-3">
-              <span
-                aria-hidden
-                className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-line bg-paper-2/60"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-medium text-ink-soft">
-                  Allow recipient to download files
-                </p>
-                <p className="mt-1 text-[12.5px] leading-relaxed text-graphite">
-                  No files attached to this document yet. Add some in the{' '}
-                  <span className="font-medium text-ink-soft">Files</span> section below the share
-                  list (PDF, Excel, ZIP, images, Office docs), then flip this on per share.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Download permission. Single toggle governs BOTH the
+            supporting-materials panel (when attachments exist) and the
+            screenshot/print/save guard on the main HTML. Default OFF
+            means: recipient cannot save/print/right-click, gets a faint
+            email watermark on every page, and the materials panel is
+            hidden. Default ON gives full access in both directions. */}
+        <CheckboxRow
+          name="allow_download"
+          label={
+            attachmentCount > 0
+              ? `Allow downloads (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'} + main doc save/print)`
+              : 'Allow downloads (save / print / right-click)'
+          }
+          checked={allowDownload}
+          onChange={setAllowDownload}
+          hint={
+            attachmentCount > 0
+              ? "Off by default. When OFF, save/print/right-click are blocked, the recipient's email is faintly watermarked across each page, and the attached files are hidden. When ON, downloads are allowed everywhere (every file click is still tracked)."
+              : "Off by default. When OFF, save/print/right-click are blocked and the recipient's email is faintly watermarked across each page. When ON, the recipient can save and print this deck freely."
+          }
+        />
 
         <Field
           label="Password"

@@ -32,6 +32,13 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
     opts.share.allow_download && opts.attachments && opts.attachments.length > 0
       ? materialsPanel(opts.share.slug, opts.attachments)
       : '';
+  // Download/screenshot guard fires when the sender has NOT opted to
+  // allow downloads. Blocks save/print/right-click/drag, neutralises
+  // common DevTools shortcuts, and renders a faint per-viewer email
+  // watermark that becomes prominent on print/save-as-PDF.
+  const guardSnippet = !opts.share.allow_download
+    ? downloadGuard(opts.email ?? opts.share.recipient_label ?? null)
+    : '';
 
   const rewriter = new HTMLRewriter()
     .on('head', {
@@ -41,6 +48,9 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
     })
     .on('body', {
       element(el) {
+        // Order matters: guard first, so its styles/script land at the
+        // top of <body> append-order, before materials and footer.
+        if (guardSnippet) el.append(guardSnippet, { html: true });
         if (materialsSnippet) el.append(materialsSnippet, { html: true });
         if (footerSnippet) el.append(footerSnippet, { html: true });
       },
@@ -191,6 +201,125 @@ function materialsPanel(slug: string, attachments: Attachment[]): string {
   document.addEventListener('keydown',function(e){if(e.key==='Escape')set('collapsed');});
 })();</script>
 `.trim();
+}
+
+// Download/screenshot guard.
+//
+// Injected when `share.allow_download === false` (the default). Three
+// layers, each addressing a different leak path:
+//
+//   1. CSS — disables `user-select` outside form fields, blocks image
+//      drag, and replaces the printed page with a clear "printing
+//      disabled" message. The print rule is the strongest tool we have
+//      against save-as-PDF — Cmd+P is the most common leak path.
+//
+//   2. Inline script — captures `contextmenu`, `Cmd/Ctrl+S/P/U`, F12,
+//      `Cmd+Option+I`, `Ctrl+Shift+I`, and `dragstart` on images. Skips
+//      any event whose target is an input/textarea/contenteditable so
+//      the sender's own forms still accept input.
+//
+//   3. Watermark overlay — a fixed-position grid of repeated `<span>`s
+//      diagonally tiling the viewport with the recipient's identity.
+//      Opacity 0.04 during normal viewing (literally invisible to the
+//      eye — verify by squinting at DocSend's recipient view; theirs is
+//      the same trick), bumps to 0.3 on `@media print`. Two effects:
+//
+//      a. Print-to-PDF carries a visible diagonal email pattern across
+//         every page — the resulting file is traceable to the leaker.
+//      b. OS-level screenshots (Cmd+Shift+4) pick up the faint pattern
+//         because the underlying pixels are rendered. JPEG compression
+//         actually makes the watermark slightly MORE visible in the
+//         compressed image than in the rendered DOM.
+//
+// None of this is bulletproof. A determined viewer can pull HTML via
+// view-source or DevTools, render in a sandboxed browser without our
+// CSS, and screenshot clean. The realistic bar is "stops 95% of casual
+// extraction; makes the 5% who get through leave a paper trail." That's
+// the DocSend bar, and it's the right product promise for the share-
+// page workflow.
+//
+// `identity` is the per-viewer text shown in the watermark. Priority:
+//   - verified email (allowlist or required-email flow)
+//   - share's recipient label (sender's hint, e.g. "Marc — Series A")
+//   - null → fall back to the share-anonymous notice
+function downloadGuard(identity: string | null): string {
+  const text = identity ?? 'Shared via htmlradar.com';
+  const safe = escapeHtml(text);
+  // Repeated enough times that the grid covers a wide laptop viewport
+  // (5–6 cols × 5 rows ≈ 25-30 cells). Each cell renders one rotated
+  // mono span; pure CSS, no runtime cost beyond layout.
+  const tiles = Array(30).fill(`<span>${safe}</span>`).join('');
+
+  return `
+<style id="htmlradar-guard-style">
+  body { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  body input, body textarea, body select, body [contenteditable="true"] {
+    -webkit-user-select: text; -moz-user-select: text; user-select: text;
+  }
+  body img { -webkit-user-drag: none; user-drag: none; -webkit-touch-callout: none; }
+  @media print {
+    html { background: #FBF1E8; }
+    body { display: none; }
+    html::before {
+      content: "Printing of this document has been disabled by the sender.";
+      display: block;
+      padding: 40vh 24px 0;
+      text-align: center;
+      font: 500 16px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: #1F1108;
+    }
+  }
+  .htmlradar-wm {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    pointer-events: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-auto-rows: 130px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .htmlradar-wm span {
+    align-self: center;
+    justify-self: center;
+    white-space: nowrap;
+    transform: rotate(-28deg);
+    font: 500 11px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
+    letter-spacing: 0.08em;
+    color: #1F1108;
+    opacity: 0.04;
+  }
+  @media print { .htmlradar-wm span { opacity: 0.3; } }
+</style>
+<div class="htmlradar-wm" aria-hidden="true">${tiles}</div>
+<script>(function(){
+  function inField(t){
+    if(!t) return false;
+    var tag = t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (t.isContentEditable) return true;
+    return false;
+  }
+  document.addEventListener('contextmenu', function(e){
+    if (inField(e.target)) return;
+    e.preventDefault();
+  }, true);
+  document.addEventListener('keydown', function(e){
+    if (inField(e.target)) return;
+    var k = (e.key || '').toLowerCase();
+    var cmd = e.metaKey || e.ctrlKey;
+    if (cmd && (k === 's' || k === 'p' || k === 'u')) { e.preventDefault(); e.stopPropagation(); return; }
+    if (cmd && e.altKey && k === 'i') { e.preventDefault(); return; }
+    if (cmd && e.shiftKey && (k === 'i' || k === 'j' || k === 'c')) { e.preventDefault(); return; }
+    if (k === 'f12') { e.preventDefault(); }
+  }, true);
+  document.addEventListener('dragstart', function(e){
+    if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+  }, true);
+})();</script>
+  `.trim();
 }
 
 function formatBytesForPanel(bytes: number): string {

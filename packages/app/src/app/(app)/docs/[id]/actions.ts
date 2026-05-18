@@ -86,15 +86,19 @@ export async function createShareAction(formData: FormData) {
     const createdId =
       (Array.isArray(created) ? created[0]?.id : (created as { id?: string } | null)?.id) ?? null;
 
-    // Surgical follow-up: set allow_download via the dedicated RPC so the
+    // Surgical follow-up: set lock_deck via the dedicated RPC so the
     // create_share signature stays narrow (otherwise adding/removing
     // per-share toggles forces another DROP+CREATE on the big RPC every
-    // time). Skipped if the toggle wasn't on (DB default is false).
-    const allowDownload = formData.get('allow_download') === 'on';
-    if (createdId && allowDownload) {
-      const { error: toggleErr } = await supabase.rpc('set_share_allow_download', {
+    // time). Skipped when toggle is OFF since the DB default is true
+    // (lock the deck by default — safest posture).
+    //
+    // Form field name swapped from `allow_download` to `lock_deck` to
+    // match the renamed column + the user-facing label "Lock the deck".
+    const lockDeck = formData.get('lock_deck') === 'on';
+    if (createdId && !lockDeck) {
+      const { error: toggleErr } = await supabase.rpc('set_share_lock_deck', {
         p_share_id: createdId,
-        p_allow_download: true,
+        p_lock_deck: false,
       });
       if (toggleErr) throw new Error(toggleErr.message);
     }
@@ -214,13 +218,14 @@ export async function editShareAction(formData: FormData) {
     });
     if (error) throw new Error(error.message);
 
-    // Apply the allow_download toggle separately (see createShareAction
-    // for rationale). Always called on edit — including for the OFF
-    // case — so unchecking the box flips the column to false.
-    const allowDownload = formData.get('allow_download') === 'on';
-    const { error: toggleErr } = await supabase.rpc('set_share_allow_download', {
+    // Apply the lock_deck toggle separately (see createShareAction for
+    // rationale). Always called on edit — including for the OFF case —
+    // so unchecking the box (= "don't lock") flips the column to false.
+    // Form field renamed from allow_download → lock_deck (migration 015).
+    const lockDeck = formData.get('lock_deck') === 'on';
+    const { error: toggleErr } = await supabase.rpc('set_share_lock_deck', {
       p_share_id: shareId,
-      p_allow_download: allowDownload,
+      p_lock_deck: lockDeck,
     });
     if (toggleErr) throw new Error(toggleErr.message);
 

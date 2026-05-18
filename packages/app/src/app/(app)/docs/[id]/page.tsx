@@ -169,9 +169,13 @@ export default async function DocumentPage({
     // form can pre-fill them without an extra query round-trip.
     allowed_email_domains: (s.allowed_email_domains as string[] | null) ?? null,
     allowed_emails: (s.allowed_emails as string[] | null) ?? null,
-    // Per-share download permission for supporting materials (Sprint B).
-    // Defaults to false in the DB; the share form's checkbox controls it.
-    allow_download: Boolean(s.allow_download),
+    // Per-share lock-the-deck flag. Defaults to TRUE in the DB
+    // (post migration 015 — flipped semantic). When true: deck
+    // save/print/screenshot blocked + per-viewer watermark applied
+    // by the proxy. When false: deck saveable. Attachments are NOT
+    // gated by this flag — they're always available to the recipient
+    // when present.
+    lock_deck: Boolean(s.lock_deck ?? true),
     expires_at: s.expires_at,
     revoked_at: s.revoked_at,
     viewCount: sessionsByShare[s.id]?.length ?? 0,

@@ -53,7 +53,11 @@ export interface ShareRow {
   // Per-share permission to download supporting materials (Sprint B).
   // Default false. When false the recipient sees NO materials panel —
   // they have no signal that attachments exist on this doc.
-  allow_download: boolean;
+  // Renamed from allow_download (migration 015) with flipped semantic:
+  //   true  → deck is LOCKED (save/print blocked, watermark on)
+  //   false → deck is open (save/print allowed)
+  // Attachments are no longer gated by this flag.
+  lock_deck: boolean;
   expires_at: string | null;
   revoked_at: string | null;
   viewCount: number;
@@ -574,12 +578,14 @@ function buildGateTags(share: ShareRow): ReactNode[] {
       </GateTag>,
     );
   }
-  // Download / screenshot protection — default OFF means guard is
-  // active. Surfaced because it's the highest-friction default and
-  // worth advertising prominently to the sender.
+  // Deck lock state. Default is locked (save/print/screenshot blocked
+  // + watermark). Worth surfacing prominently — it's the highest-
+  // friction default. The Download icon now refers to deck saving;
+  // attachments have their own implicit "always available when
+  // present" semantic and are surfaced via the attachments panel.
   tags.push(
-    <GateTag key="download" icon={<Download className="size-3" />}>
-      {share.allow_download ? 'Download allowed' : 'Download blocked'}
+    <GateTag key="lock-deck" icon={<Download className="size-3" />}>
+      {share.lock_deck ? 'Deck locked' : 'Deck saveable'}
     </GateTag>,
   );
   return tags;
@@ -776,9 +782,11 @@ function ShareSettingsForm({
   const [isPending, startTransition] = useTransition();
   const [requireEmail, setRequireEmail] = useState(initial?.require_email ?? true);
   const [requirePassword, setRequirePassword] = useState(initial?.require_password ?? false);
-  // allow_download starts from the existing share value on edit, or
-  // false on create. Default-false is the privacy-by-default position.
-  const [allowDownload, setAllowDownload] = useState(initial?.allow_download ?? false);
+  // lock_deck starts from the existing share value on edit, or true
+  // on create. Default-true is the safe posture — deck locked +
+  // watermarked unless the sender explicitly unlocks. Attachments are
+  // no longer gated by this flag (2026-05-19 design call).
+  const [lockDeck, setLockDeck] = useState(initial?.lock_deck ?? true);
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [allowedDomains, setAllowedDomains] = useState(
@@ -878,25 +886,29 @@ function ShareSettingsForm({
           />
         </div>
 
-        {/* Download permission. Single toggle governs BOTH the
-            supporting-materials panel (when attachments exist) and the
-            screenshot/print/save guard on the main HTML. Default OFF
-            means: recipient cannot save/print/right-click, gets a faint
-            email watermark on every page, and the materials panel is
-            hidden. Default ON gives full access in both directions. */}
+        {/* Deck-lock toggle. Single decision governs the HTML deck's
+            save/print/screenshot posture. Attachments are SEPARATE:
+            they're always available to the recipient when present
+            (the toggle has no effect on them).
+
+            On by default (lock posture is the privacy-by-default
+            position). Inverted vs the old "Allow downloads" semantic
+            — the form field name + the underlying lock_deck column
+            were both renamed in migration 015.
+
+            Sender's mental model:
+              ☑ Lock the deck → recipient can't save/print/screenshot
+                                cleanly; their email is watermarked
+              ☐ Lock the deck → recipient can save the deck freely. */}
         <CheckboxRow
-          name="allow_download"
-          label={
-            attachmentCount > 0
-              ? `Allow downloads (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'} + main doc save/print)`
-              : 'Allow downloads (save / print / right-click)'
-          }
-          checked={allowDownload}
-          onChange={setAllowDownload}
+          name="lock_deck"
+          label="Lock the deck"
+          checked={lockDeck}
+          onChange={setLockDeck}
           hint={
             attachmentCount > 0
-              ? "Off by default. When OFF, save/print/right-click are blocked, the recipient's email is faintly watermarked across each page, and the attached files are hidden. When ON, downloads are allowed everywhere (every file click is still tracked)."
-              : "Off by default. When OFF, save/print/right-click are blocked and the recipient's email is faintly watermarked across each page. When ON, the recipient can save and print this deck freely."
+              ? `On by default. When ON, save/print/screenshot are blocked on the main deck and the recipient's email is faintly watermarked across each page. Attached files (${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'}) stay downloadable either way.`
+              : "On by default. When ON, save/print/screenshot are blocked on the deck and the recipient's email is faintly watermarked across each page. When OFF, the recipient can save and print this deck freely."
           }
         />
 

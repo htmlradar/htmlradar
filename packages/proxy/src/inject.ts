@@ -28,15 +28,20 @@ interface InjectOptions {
 export function injectTracker(html: Response, opts: InjectOptions): Response {
   const headSnippet = headInjection(opts);
   const footerSnippet = opts.tier === 'free' ? chromeFooter() : '';
+  // Attachments are ALWAYS surfaced to the recipient when present, per
+  // the 2026-05-19 design call: "if you don't want a file shared,
+  // don't attach it." The recipient view shows a corner pill + side
+  // drawer regardless of lock_deck — the lock_deck toggle controls the
+  // DECK's save/print posture, not the attachments.
   const materialsSnippet =
-    opts.share.allow_download && opts.attachments && opts.attachments.length > 0
-      ? materialsPanel(opts.share.slug, opts.attachments)
+    opts.attachments && opts.attachments.length > 0
+      ? attachmentsPanel(opts.share.slug, opts.attachments)
       : '';
-  // Download/screenshot guard fires when the sender has NOT opted to
-  // allow downloads. Blocks save/print/right-click/drag, neutralises
-  // common DevTools shortcuts, and renders a faint per-viewer email
-  // watermark that becomes prominent on print/save-as-PDF.
-  const guardSnippet = !opts.share.allow_download
+  // Download/screenshot guard fires when the sender has chosen to LOCK
+  // the deck. Blocks save/print/right-click/drag, neutralises common
+  // DevTools shortcuts, and renders a faint per-viewer email watermark
+  // that becomes prominent on print/save-as-PDF.
+  const guardSnippet = opts.share.lock_deck
     ? downloadGuard(opts.email ?? opts.share.recipient_label ?? null)
     : '';
 
@@ -96,109 +101,136 @@ function headInjection(opts: InjectOptions): string {
   ].join('');
 }
 
-// Supporting-materials panel. Injected before </body> when the share has
-// allow_download = true AND attachments exist. Renders as a compact
-// pinned button at the bottom-right of the viewport that expands to a
-// file list with Download links.
+// Attachments panel — recipient-side UI for files attached to a share.
 //
-// All styles are inline + scoped under unique class names so they can't
-// collide with the host document's CSS. The toggle uses a tiny inline
-// script (no external deps). The download links point at the proxy's
-// /r/{slug}/m/{att_id} route — every click cookie-gated + logged.
-function materialsPanel(slug: string, attachments: Attachment[]): string {
+// Replaces the prior bottom-right floating "materials panel" with a
+// less intrusive pattern (QA3 feedback 2026-05-19):
+//   • A small `📎 N` pill in the TOP-right corner of the viewport,
+//     pulses gently twice on first load to surface its existence,
+//     then settles.
+//   • Click → a side drawer slides in from the right. Doesn't block
+//     the deck (overlays the right gutter via fixed-positioning).
+//   • Click the X button, the overlay backdrop, or press Escape →
+//     drawer collapses back to the pill.
+//
+// Per the 2026-05-19 design decision: attachments are ALWAYS shown
+// when present, regardless of lock_deck state. The deck's lock toggle
+// controls save/print/screenshot — it doesn't hide attachments.
+//
+// All styles and script are inline + scoped under unique class names
+// so they can't collide with the host document's CSS or JS. Download
+// links point at /r/{slug}/m/{att_id}, which the proxy gates by
+// session cookie AND logs to the new `attachment_downloads` table
+// (migration 016) for per-viewer attribution.
+function attachmentsPanel(slug: string, attachments: Attachment[]): string {
   const items = attachments
     .map((a) => {
       const safeName = escapeHtml(a.filename);
-      const safeKb = formatBytesForPanel(a.size_bytes);
-      const safeExt = (extOf(a.filename) || a.mime_type.split('/').pop() || 'file').toUpperCase();
+      const safeSize = escapeHtml(formatBytesForPanel(a.size_bytes));
+      const safeExt = (extOf(a.filename) || a.mime_type.split('/').pop() || 'file')
+        .toUpperCase()
+        .slice(0, 4);
       const href = `/r/${escapeHtml(slug)}/m/${escapeHtml(a.id)}`;
       return `
-        <li class="htmlradar-mat-item">
-          <span class="htmlradar-mat-meta">${escapeHtml(safeExt)} · ${escapeHtml(safeKb)}</span>
-          <a href="${href}" class="htmlradar-mat-link" download="${safeName}">
-            <span class="htmlradar-mat-name">${safeName}</span>
-            <span class="htmlradar-mat-dl" aria-hidden="true">↓</span>
+        <li class="hr-att-item">
+          <a href="${href}" class="hr-att-link" download="${safeName}">
+            <span class="hr-att-icon" aria-hidden="true">${escapeHtml(safeExt)}</span>
+            <span class="hr-att-text">
+              <span class="hr-att-name">${safeName}</span>
+              <span class="hr-att-meta">${escapeHtml(safeExt)} · ${safeSize}</span>
+            </span>
+            <span class="hr-att-dl" aria-hidden="true">↓</span>
           </a>
         </li>`;
     })
     .join('');
 
   const count = attachments.length;
+  const fileWord = count === 1 ? 'file' : 'files';
   return `
-<div class="htmlradar-mat-root" data-state="collapsed">
-  <button type="button" class="htmlradar-mat-toggle" aria-expanded="false" aria-controls="htmlradar-mat-list">
-    <span class="htmlradar-mat-toggle-icon" aria-hidden="true">📎</span>
-    Files
-    <span class="htmlradar-mat-toggle-count">${count}</span>
-  </button>
-  <div class="htmlradar-mat-panel" id="htmlradar-mat-list" role="region" aria-label="Files">
-    <div class="htmlradar-mat-header">
-      <span>Files</span>
-      <button type="button" class="htmlradar-mat-close" aria-label="Close files">×</button>
+<button type="button" class="hr-att-pill" aria-label="${count} attached ${fileWord}" aria-expanded="false" aria-controls="hr-att-drawer">
+  <span class="hr-att-pill-ic" aria-hidden="true">📎</span>
+  Files
+  <span class="hr-att-pill-count">${count}</span>
+</button>
+<div class="hr-att-bg" aria-hidden="true"></div>
+<aside class="hr-att-drawer" id="hr-att-drawer" role="region" aria-label="Files in this share">
+  <div class="hr-att-head">
+    <div>
+      <div class="hr-att-title">Files in this share</div>
+      <div class="hr-att-sub">${count} attached · downloads tracked</div>
     </div>
-    <ul class="htmlradar-mat-list">
-      ${items}
-    </ul>
-    <div class="htmlradar-mat-footer">Shared via HTMLRadar · every download tracked</div>
+    <button type="button" class="hr-att-close" aria-label="Close">×</button>
   </div>
-</div>
+  <ul class="hr-att-list">${items}</ul>
+  <div class="hr-att-foot">Shared via HTMLRadar · downloads attributed to your email</div>
+</aside>
 <style>
-.htmlradar-mat-root{position:fixed;right:16px;bottom:48px;z-index:2147483645;
-  font:13px/1.45 -apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;
-  color:#1F1108}
-.htmlradar-mat-root *{box-sizing:border-box}
-.htmlradar-mat-toggle{display:inline-flex;align-items:center;gap:8px;
+.hr-att-pill,.hr-att-drawer,.hr-att-bg,.hr-att-pill *,.hr-att-drawer *{box-sizing:border-box}
+.hr-att-pill{position:fixed;top:18px;right:18px;z-index:2147483645;
+  display:inline-flex;align-items:center;gap:8px;padding:8px 14px 8px 12px;
   background:#FBF1E8;color:#1F1108;border:1px solid #E8D5BD;border-radius:999px;
-  padding:8px 14px;font:inherit;cursor:pointer;box-shadow:0 2px 8px rgba(31,17,8,.08);
-  transition:background-color 120ms ease,border-color 120ms ease}
-.htmlradar-mat-toggle:hover{background:#F4E1CB;border-color:#7A1F2E}
-.htmlradar-mat-toggle-icon{font-size:14px}
-.htmlradar-mat-toggle-count{display:inline-flex;align-items:center;justify-content:center;
-  min-width:18px;padding:0 6px;font:500 10px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
-  color:#FBF1E8;background:#7A1F2E;border-radius:999px}
-.htmlradar-mat-panel{display:none;margin-top:10px;width:min(360px,calc(100vw - 32px));
-  background:#FBF1E8;border:1px solid #E8D5BD;border-radius:14px;
-  box-shadow:0 8px 32px rgba(31,17,8,.12);overflow:hidden}
-.htmlradar-mat-root[data-state="open"] .htmlradar-mat-panel{display:block}
-.htmlradar-mat-header{display:flex;align-items:center;justify-content:space-between;
-  padding:14px 16px 10px;font:500 11px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
-  text-transform:uppercase;letter-spacing:.16em;color:#876959;border-bottom:1px solid #E8D5BD}
-.htmlradar-mat-close{background:transparent;border:0;color:#876959;font-size:18px;line-height:1;
-  cursor:pointer;padding:0 4px}
-.htmlradar-mat-close:hover{color:#5A1521}
-.htmlradar-mat-list{list-style:none;margin:0;padding:6px 0;max-height:min(420px,60vh);overflow:auto}
-.htmlradar-mat-item{padding:0}
-.htmlradar-mat-link{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:10px 16px;text-decoration:none;color:#1F1108;transition:background-color 120ms ease}
-.htmlradar-mat-link:hover{background:#F4E1CB}
-.htmlradar-mat-name{display:block;font-weight:500;font-size:13.5px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}
-.htmlradar-mat-meta{display:block;padding:4px 16px 0;font:500 10px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
-  text-transform:uppercase;letter-spacing:.14em;color:#876959}
-.htmlradar-mat-dl{color:#7A1F2E;font:500 16px/1 system-ui}
-.htmlradar-mat-footer{padding:10px 16px;font:500 10px/1.4 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
-  text-transform:uppercase;letter-spacing:.14em;color:#876959;border-top:1px solid #E8D5BD}
-@media (prefers-reduced-motion: reduce){.htmlradar-mat-toggle,.htmlradar-mat-link{transition:none}}
+  font:500 12.5px/1 -apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;
+  cursor:pointer;box-shadow:0 4px 14px rgba(31,17,8,.10);
+  transition:background-color 120ms,border-color 120ms,transform 120ms,box-shadow 120ms;
+  animation:hr-att-pulse 1.6s cubic-bezier(0.4,0,0.6,1) 2}
+.hr-att-pill:hover{background:#F4E1CB;border-color:#7A1F2E;transform:translateY(-1px)}
+.hr-att-pill-ic{font-size:14px}
+.hr-att-pill-count{display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;padding:0 6px;font:600 10.5px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  letter-spacing:0;color:#FBF1E8;background:#7A1F2E;border-radius:999px}
+@keyframes hr-att-pulse{
+  0%,100%{box-shadow:0 4px 14px rgba(31,17,8,.10)}
+  50%{box-shadow:0 4px 14px rgba(31,17,8,.10),0 0 0 8px rgba(122,31,46,.10)}}
+@media (prefers-reduced-motion: reduce){.hr-att-pill{animation:none}}
+.hr-att-bg{position:fixed;inset:0;background:rgba(31,17,8,.05);backdrop-filter:blur(2px);
+  opacity:0;pointer-events:none;transition:opacity 180ms;z-index:2147483646}
+.hr-att-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:calc(100vw - 32px);
+  background:#FBF1E8;border-left:1px solid #E8D5BD;box-shadow:-16px 0 40px rgba(31,17,8,.10);
+  transform:translateX(100%);transition:transform 220ms cubic-bezier(0.2,0.8,0.2,1);
+  z-index:2147483647;display:flex;flex-direction:column;
+  font:13px/1.45 -apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;color:#1F1108}
+body.hr-att-open .hr-att-bg{opacity:1;pointer-events:auto}
+body.hr-att-open .hr-att-drawer{transform:translateX(0)}
+.hr-att-head{display:flex;align-items:baseline;justify-content:space-between;padding:22px 22px 12px}
+.hr-att-title{font:400 22px/1.15 Georgia,'Hoefler Text',Charter,serif;letter-spacing:-.025em;color:#1F1108}
+.hr-att-sub{margin-top:6px;font:500 10.5px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  letter-spacing:.18em;text-transform:uppercase;color:#876959}
+.hr-att-close{background:transparent;border:0;color:#876959;font-size:20px;line-height:1;
+  cursor:pointer;padding:4px 8px;border-radius:6px}
+.hr-att-close:hover{background:rgba(232,213,189,.6);color:#1F1108}
+.hr-att-list{list-style:none;margin:0;padding:8px 0;flex:1;overflow-y:auto}
+.hr-att-item{padding:0}
+.hr-att-link{display:grid;grid-template-columns:40px 1fr auto;gap:14px;align-items:center;
+  padding:14px 22px;text-decoration:none;color:#1F1108;transition:background-color 120ms}
+.hr-att-link:hover{background:#F4E1CB}
+.hr-att-icon{width:40px;height:40px;border-radius:10px;background:rgba(232,213,189,.5);
+  display:grid;place-items:center;font:600 10.5px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  letter-spacing:.08em;color:#7A1F2E}
+.hr-att-text{min-width:0;display:block}
+.hr-att-name{display:block;font-weight:500;font-size:14.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.hr-att-meta{display:block;margin-top:2px;font:500 10.5px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  letter-spacing:.14em;text-transform:uppercase;color:#876959}
+.hr-att-dl{color:#7A1F2E;font:600 16px/1 system-ui;flex-shrink:0}
+.hr-att-foot{padding:14px 22px;border-top:1px solid #E8D5BD;
+  font:500 10px/1.4 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;
+  letter-spacing:.14em;text-transform:uppercase;color:#876959}
 </style>
 <script>(function(){
-  var root=document.currentScript&&document.currentScript.previousElementSibling;
-  // currentScript may not be reachable in all renderers — fall back to
-  // a queryselector. The class name is unique enough to be safe.
-  if(!root||!root.classList||!root.classList.contains('htmlradar-mat-root')){
-    root=document.querySelector('.htmlradar-mat-root');
+  var pill=document.querySelector('.hr-att-pill');
+  var drawer=document.querySelector('.hr-att-drawer');
+  var bg=document.querySelector('.hr-att-bg');
+  var closeBtn=drawer&&drawer.querySelector('.hr-att-close');
+  if(!pill||!drawer||!bg)return;
+  function set(open){
+    document.body.classList.toggle('hr-att-open',open);
+    pill.setAttribute('aria-expanded',open?'true':'false');
   }
-  if(!root)return;
-  var toggle=root.querySelector('.htmlradar-mat-toggle');
-  var closeBtn=root.querySelector('.htmlradar-mat-close');
-  function set(state){
-    root.setAttribute('data-state',state);
-    if(toggle)toggle.setAttribute('aria-expanded',state==='open'?'true':'false');
-  }
-  if(toggle)toggle.addEventListener('click',function(){
-    set(root.getAttribute('data-state')==='open'?'collapsed':'open');
-  });
-  if(closeBtn)closeBtn.addEventListener('click',function(){set('collapsed');});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape')set('collapsed');});
+  pill.addEventListener('click',function(){set(!document.body.classList.contains('hr-att-open'));});
+  if(closeBtn)closeBtn.addEventListener('click',function(){set(false);});
+  bg.addEventListener('click',function(){set(false);});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});
 })();</script>
 `.trim();
 }

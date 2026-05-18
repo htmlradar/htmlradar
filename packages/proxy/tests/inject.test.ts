@@ -97,19 +97,19 @@ function makeShare(overrides: Partial<Share> = {}): Share {
     require_password: false,
     allowed_email_domains: null,
     allowed_emails: null,
-    allow_download: false,
+    lock_deck: true,
     expires_at: null,
     revoked_at: null,
     ...overrides,
   };
 }
 
-function inject(opts: { allowDownload: boolean; email?: string; recipientLabel?: string | null }) {
+function inject(opts: { lockDeck: boolean; email?: string; recipientLabel?: string | null }) {
   const res = injectTracker(
     new Response('<!doctype html><html><head></head><body></body></html>'),
     {
       share: makeShare({
-        allow_download: opts.allowDownload,
+        lock_deck: opts.lockDeck,
         ...(opts.recipientLabel !== undefined ? { recipient_label: opts.recipientLabel } : {}),
       }),
       tier: 'pro', // skip chrome footer so we don't fight with it in assertions
@@ -122,9 +122,9 @@ function inject(opts: { allowDownload: boolean; email?: string; recipientLabel?:
   return res.text();
 }
 
-describe('download/screenshot guard injection', () => {
-  it('injects the guard when allow_download = false (default share posture)', async () => {
-    const html = await inject({ allowDownload: false });
+describe('download/screenshot guard injection (lock_deck semantic)', () => {
+  it('injects the guard when lock_deck = true (default share posture)', async () => {
+    const html = await inject({ lockDeck: true });
     expect(html).toContain('htmlradar-guard-style');
     expect(html).toContain('htmlradar-wm');
     expect(html).toContain('@media print');
@@ -132,15 +132,15 @@ describe('download/screenshot guard injection', () => {
     expect(html).toContain('Printing of this document has been disabled');
   });
 
-  it('does NOT inject the guard when allow_download = true', async () => {
-    const html = await inject({ allowDownload: true });
+  it('does NOT inject the guard when lock_deck = false', async () => {
+    const html = await inject({ lockDeck: false });
     expect(html).not.toContain('htmlradar-guard-style');
     expect(html).not.toContain('htmlradar-wm');
     expect(html).not.toContain('Printing of this document has been disabled');
   });
 
   it('uses the recipient email in the watermark when present', async () => {
-    const html = await inject({ allowDownload: false, email: 'marc@acme.com' });
+    const html = await inject({ lockDeck: true, email: 'marc@acme.com' });
     expect(html).toContain('marc@acme.com');
     // Watermark span should appear many times (tiled grid).
     const count = (html.match(/marc@acme\.com/g) ?? []).length;
@@ -148,18 +148,18 @@ describe('download/screenshot guard injection', () => {
   });
 
   it('falls back to recipient_label when no email is present', async () => {
-    const html = await inject({ allowDownload: false, recipientLabel: 'Marc — Series A' });
+    const html = await inject({ lockDeck: true, recipientLabel: 'Marc — Series A' });
     expect(html).toContain('Marc — Series A');
   });
 
   it('falls back to a generic anon notice when neither email nor label is present', async () => {
-    const html = await inject({ allowDownload: false, recipientLabel: null });
+    const html = await inject({ lockDeck: true, recipientLabel: null });
     expect(html).toContain('Shared via htmlradar.com');
   });
 
   it('html-escapes the watermark identity so a label with HTML cannot break out', async () => {
     const html = await inject({
-      allowDownload: false,
+      lockDeck: true,
       recipientLabel: '<script>alert(1)</script>',
     });
     expect(html).not.toContain('<script>alert(1)</script>');
@@ -167,7 +167,7 @@ describe('download/screenshot guard injection', () => {
   });
 
   it('does not block keyboard input on form fields (allows recipient to type in sender forms)', async () => {
-    const html = await inject({ allowDownload: false });
+    const html = await inject({ lockDeck: true });
     // The script body itself must reference INPUT/TEXTAREA/SELECT — that's
     // how we know the in-field bypass exists.
     expect(html).toContain("'INPUT'");
@@ -175,15 +175,14 @@ describe('download/screenshot guard injection', () => {
     expect(html).toContain('isContentEditable');
   });
 
-  it('guard sits BEFORE the materials panel in body append order', async () => {
-    // Even with allow_download true we still inject materials only when
-    // attachments exist. Use a false case to verify guard is present
-    // and check ordering with a tier=free chrome footer (free tier
-    // appends a watermark-adjacent footer; guard must still come first).
+  it('guard sits BEFORE the chrome footer in body append order', async () => {
+    // Free tier ALSO injects a "Powered by" chrome footer. Order
+    // matters: guard styles + watermark must be in the DOM before the
+    // footer so the footer is also covered by the protection layer.
     const res = injectTracker(
       new Response('<!doctype html><html><head></head><body></body></html>'),
       {
-        share: makeShare({ allow_download: false }),
+        share: makeShare({ lock_deck: true }),
         tier: 'free',
         trackerUrl: 'https://htmlradar.com/v1/tracker.js',
         supabaseUrl: 'https://example.supabase.co',
@@ -196,5 +195,100 @@ describe('download/screenshot guard injection', () => {
     expect(guardIdx).toBeGreaterThan(0);
     expect(footerIdx).toBeGreaterThan(0);
     expect(guardIdx).toBeLessThan(footerIdx);
+  });
+});
+
+// New tests for the corner-pill attachments UI introduced in Batch A.
+describe('attachments panel — corner pill UI', () => {
+  function injectWithAttachments(args: {
+    lockDeck: boolean;
+    attachments: Array<{ id: string; filename: string; mime_type: string; size_bytes: number }>;
+  }) {
+    const res = injectTracker(
+      new Response('<!doctype html><html><head></head><body></body></html>'),
+      {
+        share: makeShare({ lock_deck: args.lockDeck }),
+        tier: 'pro',
+        trackerUrl: 'https://htmlradar.com/v1/tracker.js',
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon-key',
+        attachments: args.attachments.map((a) => ({
+          id: a.id,
+          filename: a.filename,
+          mime_type: a.mime_type,
+          size_bytes: a.size_bytes,
+          document_id: 'doc-1',
+          r2_key: 'k',
+          created_at: '2026-05-18',
+        })),
+      },
+    );
+    return res.text();
+  }
+
+  const sample = [
+    {
+      id: 'a1',
+      filename: 'Financials_v3.pdf',
+      mime_type: 'application/pdf',
+      size_bytes: 1_800_000,
+    },
+    {
+      id: 'a2',
+      filename: 'Cap_table.xlsx',
+      mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      size_bytes: 84_000,
+    },
+  ];
+
+  it('injects the pill + drawer when attachments are present (regardless of lock_deck)', async () => {
+    const html = await injectWithAttachments({ lockDeck: true, attachments: sample });
+    expect(html).toContain('hr-att-pill');
+    expect(html).toContain('hr-att-drawer');
+    expect(html).toContain('Files in this share');
+    expect(html).toContain('Financials_v3.pdf');
+    expect(html).toContain('Cap_table.xlsx');
+  });
+
+  it('also injects the panel when lock_deck = false (decoupled from deck-lock)', async () => {
+    const html = await injectWithAttachments({ lockDeck: false, attachments: sample });
+    expect(html).toContain('hr-att-pill');
+    expect(html).toContain('Financials_v3.pdf');
+  });
+
+  it('renders the file count badge accurately', async () => {
+    const html = await injectWithAttachments({ lockDeck: true, attachments: sample });
+    // Pill badge shows the count.
+    expect(html).toContain('hr-att-pill-count">2');
+    // Drawer subheading: "2 attached"
+    expect(html).toContain('2 attached');
+  });
+
+  it('does NOT inject pill or drawer when there are zero attachments', async () => {
+    const html = await injectWithAttachments({ lockDeck: true, attachments: [] });
+    expect(html).not.toContain('hr-att-pill');
+    expect(html).not.toContain('hr-att-drawer');
+  });
+
+  it('download links route to /r/{slug}/m/{attachment_id}', async () => {
+    const html = await injectWithAttachments({ lockDeck: true, attachments: sample });
+    expect(html).toContain('/r/abc123/m/a1');
+    expect(html).toContain('/r/abc123/m/a2');
+  });
+
+  it('escapes filenames so a malicious attachment name cannot inject markup', async () => {
+    const html = await injectWithAttachments({
+      lockDeck: true,
+      attachments: [
+        {
+          id: 'evil',
+          filename: '<script>alert(1)</script>.pdf',
+          mime_type: 'application/pdf',
+          size_bytes: 100,
+        },
+      ],
+    });
+    expect(html).not.toContain('<script>alert(1)</script>.pdf');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;.pdf');
   });
 });

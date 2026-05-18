@@ -22,7 +22,12 @@ export interface Share {
   // the proxy returns 404 for the download endpoint AND skips injecting
   // the materials panel into the recipient's view — they have no signal
   // that attachments exist on this doc.
-  allow_download: boolean;
+  // Renamed from `allow_download` (migration 015). Semantic flipped:
+  //   true  → deck save/print/screenshot blocked + per-viewer watermark
+  //   false → deck saveable + printable + no watermark
+  // Attachments are now ALWAYS visible to recipients when present —
+  // not gated by this flag. Per 2026-05-19 design decision.
+  lock_deck: boolean;
   expires_at: string | null;
   revoked_at: string | null;
 }
@@ -94,6 +99,12 @@ export async function listAttachmentsForDocument(
 
 // Log a successful download. Fire-and-forget; failure here must not
 // break the user-visible download.
+//
+// New columns from migration 016 (viewer_id, session_id, filename,
+// size_bytes) — populated whenever the proxy can resolve them. When
+// the share is anonymous and we have no email cookie, viewer_id stays
+// null and the row still represents "someone with this fingerprint
+// downloaded at this time" via session_id (when we have it).
 export async function logAttachmentDownload(
   env: Env,
   payload: {
@@ -103,10 +114,36 @@ export async function logAttachmentDownload(
     country_code: string | null;
     device_type: string | null;
     user_agent: string | null;
+    viewer_id: string | null;
+    session_id: string | null;
+    filename: string | null;
+    size_bytes: number | null;
   },
 ): Promise<void> {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/attachment_downloads`);
   await call(env, url, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+// Resolve viewer_id by share + email. Used at attachment-download time
+// to attribute the download to the specific viewer row the recipient
+// already created when they hit the email gate or first scrolled the
+// share. Returns null if no viewer row matches yet (recipient is
+// downloading before the tracker established their viewer record —
+// race we ignore; the row will still link via session_id).
+export async function getViewerIdByShareEmail(
+  env: Env,
+  shareId: string,
+  email: string,
+): Promise<string | null> {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/viewers`);
+  url.searchParams.set('share_id', `eq.${shareId}`);
+  url.searchParams.set('email', `eq.${email.toLowerCase()}`);
+  url.searchParams.set('select', 'id');
+  url.searchParams.set('limit', '1');
+  const res = await call(env, url);
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ id: string }>;
+  return rows[0]?.id ?? null;
 }
 
 export async function getDocument(env: Env, id: string): Promise<Document | null> {

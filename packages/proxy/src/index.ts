@@ -18,6 +18,7 @@ import {
   getAttachment,
   listAttachmentsForDocument,
   logAttachmentDownload,
+  getViewerIdByShareEmail,
   verifySharePassword,
   type Attachment,
   type Share,
@@ -82,13 +83,13 @@ export default {
     //   GET /r/{slug}/m/{attachment_id}
     // Gate sequence (must pass IN ORDER, just like the doc route):
     //   1. share exists, not revoked, not expired
-    //   2. share.allow_download is true (otherwise 404 — never leak that
-    //      attachments exist for a share the sender didn't intend to
-    //      share them on)
-    //   3. password cookie (if require_password)
-    //   4. email cookie (if require_email)
-    //   5. attachment exists AND attachment.document_id matches the
+    //   2. password cookie (if require_password)
+    //   3. email cookie (if require_email)
+    //   4. attachment exists AND attachment.document_id matches the
     //      share's document_id (defends against cross-doc enumeration)
+    // Note: attachments are no longer gated by lock_deck (2026-05-19
+    // design call — if the sender uploaded files, recipients can
+    // download them; lock_deck only controls deck save/print).
     // On success: stream the R2 object with Content-Disposition: attachment
     // and a sanitised filename, log the download event, return.
     const downloadMatch = /^\/r\/([a-z0-9-]+)\/m\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
@@ -185,13 +186,13 @@ export default {
     const tier = await getProfileTier(env, doc.owner_id);
     const geo = geoFromRequest(request);
 
-    // Materials panel: only loaded when this share permits downloads.
-    // If allow_download is false (default) we skip the DB call entirely
-    // AND don't inject anything — the recipient has no signal that
-    // attachments exist on this doc. Owner-preview mode also skips this
-    // (the sender is checking the deck, not the recipient experience).
+    // Attachments are ALWAYS surfaced to the recipient when they exist
+    // (2026-05-19 design call). The pill + drawer UI lives in the
+    // corner; clicking expands the file list. Owner-preview still
+    // skips the DB call — the sender is checking deck-render, not
+    // attachments which they themselves uploaded.
     let attachments: Attachment[] = [];
-    if (share.allow_download && !isOwnerPreview) {
+    if (!isOwnerPreview) {
       attachments = await listAttachmentsForDocument(env, doc.id);
     }
 
@@ -289,7 +290,10 @@ async function handleAttachmentDownload(
   if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
     return notFound();
   }
-  if (!share.allow_download) return notFound();
+  // Attachments are NO LONGER gated by lock_deck (2026-05-19). They're
+  // a separate access surface — if the sender uploaded them, recipients
+  // can download. Sender's only way to "hide" an attachment is to not
+  // attach it. Lock_deck remains for deck save/print posture only.
 
   // Re-apply the same gate cookies the doc-serve path enforces. Without
   // this, a recipient could craft a download URL even before they pass
@@ -315,17 +319,34 @@ async function handleAttachmentDownload(
   const obj = await env.DOCS_BUCKET.get(attachment.r2_key);
   if (!obj) return notFound();
 
-  // Fire-and-forget download log. We never block the response on this;
-  // if Supabase is slow or down the recipient still gets their file.
+  // Fire-and-forget download log with per-viewer attribution. We never
+  // block the response on this; if Supabase is slow or down the
+  // recipient still gets their file.
+  //
+  // Viewer lookup: when we have a verified email, we resolve the
+  // existing viewers row by (share_id, email). When we don't (anonymous
+  // share), viewer_id stays null and the row attributes via session_id
+  // (set client-side by the tracker; we don't see it here without a
+  // separate lookup, so for v1 we leave it null too — the recipient_email
+  // + ip_hint + timestamp are usually enough).
   const geo = geoFromRequest(request);
-  void logAttachmentDownload(env, {
-    attachment_id: attachment.id,
-    share_id: share.id,
-    recipient_email: recipientEmail,
-    country_code: geo?.country ?? null,
-    device_type: null,
-    user_agent: request.headers.get('User-Agent'),
-  });
+  void (async () => {
+    const viewerId = recipientEmail
+      ? await getViewerIdByShareEmail(env, share.id, recipientEmail)
+      : null;
+    await logAttachmentDownload(env, {
+      attachment_id: attachment.id,
+      share_id: share.id,
+      recipient_email: recipientEmail,
+      country_code: geo?.country ?? null,
+      device_type: null,
+      user_agent: request.headers.get('User-Agent'),
+      viewer_id: viewerId,
+      session_id: null,
+      filename: attachment.filename,
+      size_bytes: attachment.size_bytes,
+    });
+  })();
 
   // Force download: Content-Disposition: attachment with the sanitised
   // filename. The filename was already sanitised at upload time

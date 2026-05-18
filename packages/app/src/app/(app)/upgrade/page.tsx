@@ -14,19 +14,25 @@
 
 import Link from 'next/link';
 import { ArrowRight, ArrowLeft, Check, AlertCircle } from 'lucide-react';
-import { requireUser } from '@/lib/supabase-server';
+import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
+import { readQuota } from '@/lib/quota';
 
 export const runtime = 'edge';
 
-export default async function UpgradePage() {
+type SearchParams = Promise<{ reason?: string }>;
+
+export default async function UpgradePage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireUser();
-  // Fire on every render. Free-tier cap-hit users land here as the
-  // intended conversion moment; we want to count every view.
+  const reason = (await searchParams).reason;
+  const quota = await readQuota(serverClient(), user.id);
+  const isQuotaTrigger = reason === 'quota' || quota.atCap;
+
   void captureServerEvent({
     event: 'upgrade.viewed',
     distinctId: user.id,
     userId: user.id,
+    properties: { reason: reason ?? 'direct', at_cap: quota.atCap },
   });
   const rawCheckoutUrl = process.env['STRIPE_PAYMENT_LINK_URL'];
   const checkoutAvailable =
@@ -46,15 +52,30 @@ export default async function UpgradePage() {
     <div className="mx-auto max-w-2xl space-y-8 py-8">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
-          Free tier cap reached
+          {isQuotaTrigger ? 'Free tier cap reached' : 'Upgrade to Pro'}
         </p>
         <h1 className="text-letterpress mt-4 font-serif text-[36px] font-normal leading-[1.08] tracking-tightest text-ink md:text-[44px]">
-          Pro <span className="italic text-signal">unlocks the rest.</span>
+          {isQuotaTrigger ? (
+            <>
+              Ten uploads in. <span className="italic text-signal">Pro removes the ceiling.</span>
+            </>
+          ) : (
+            <>
+              Pro <span className="italic text-signal">unlocks the rest.</span>
+            </>
+          )}
         </h1>
         <p className="mt-5 max-w-lg text-[16px] leading-relaxed text-ink-soft">
-          Free covers ten documents lifetime, total. Move to Pro for unlimited documents and the
-          presentation features that make HTMLRadar look like yours.
+          {isQuotaTrigger
+            ? 'You hit the lifetime free cap. Your existing documents and analytics stay exactly where they are — upgrading just lifts the limit on new uploads.'
+            : 'Free covers ten documents lifetime, total. Move to Pro for unlimited documents and the presentation features that make HTMLRadar look like yours.'}
         </p>
+        {quota.tier === 'free' ? (
+          <div className="mt-6 inline-flex items-center gap-3 rounded-full border border-line bg-paper px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite">
+            <span className="text-ink tabular-nums">{quota.used}</span>
+            <span>of {quota.cap} lifetime uploads used</span>
+          </div>
+        ) : null}
       </header>
 
       <article className="rounded-2xl border border-signal/40 bg-paper p-8 shadow-[0_30px_60px_-30px_rgba(122,31,46,0.25)]">

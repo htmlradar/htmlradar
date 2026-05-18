@@ -178,6 +178,54 @@ export async function toggleShareAction(formData: FormData) {
   }
 }
 
+// Permanently delete a share — a designer QA3 #6. Pair to revoke (which
+// is a reversible pause). Delete here is unrecoverable: the share row
+// goes away, the slug is freed, and anyone with the old URL gets a
+// 404 (NOT 403/expired). Used only when the sender explicitly wants
+// the link destroyed forever — not just paused.
+//
+// The server action requires a typed-confirmation hidden field
+// (matches the client modal which makes the sender type DELETE) so
+// a stray POST can't accidentally trigger destruction.
+export async function deleteShareAction(formData: FormData) {
+  const user = await requireUser();
+  const supabase = serverClient();
+  const shareId = String(formData.get('share_id'));
+  const docId = String(formData.get('document_id'));
+  const confirmation = String(formData.get('confirmation') ?? '');
+
+  let errorMessage: string | null = null;
+  try {
+    // Normalize so case + whitespace matches the client's `canDestroy`
+    // check (DocumentShareManager.tsx). Without this, typing "delete"
+    // enables the button on the client but the server rejects it.
+    if (confirmation.trim().toUpperCase() !== 'DELETE') {
+      throw new Error('Type DELETE to confirm — we need the exact word.');
+    }
+    // Hard delete. ON DELETE CASCADE on document_attachments + viewers +
+    // sessions + section_events does the right cleanup. attachment_downloads
+    // also cascades via the share_id FK.
+    const { error: delErr } = await supabase.from('document_shares').delete().eq('id', shareId);
+    if (delErr) throw new Error(delErr.message);
+
+    await captureServerEvent({
+      event: 'share.deleted',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { share_id: shareId, document_id: docId },
+    });
+    revalidatePath(`/docs/${docId}`);
+  } catch (e) {
+    errorMessage = e instanceof Error ? e.message : 'Failed to delete the share.';
+  }
+
+  if (errorMessage) {
+    redirect(`/docs/${docId}?share_error=${encodeURIComponent(errorMessage)}`);
+  } else {
+    redirect(`/docs/${docId}?share_deleted=1`);
+  }
+}
+
 // Edit an existing share's settings without revoke + recreate. Mirrors
 // createShareAction's input shape; goes through the update_share RPC
 // (migration 007) which enforces ownership + password hashing + length
@@ -681,6 +729,21 @@ export async function replaceDocumentAction(formData: FormData) {
       .eq('id', doc.id)
       .eq('owner_id', user.id);
     if (updateErr) throw new Error(updateErr.message);
+
+    // Append to the version history (schema 018). Awaited because the
+    // Edge runtime can terminate after redirect, dropping unawaited
+    // promises. History-write failure is logged and swallowed — a
+    // successful replace shouldn't roll back over a missed history row.
+    const { error: versionErr } = await supabase.from('document_versions').insert({
+      document_id: doc.id,
+      version: nextVersion,
+      filename: file.name || null,
+      bytes: file.size,
+      source_type: 'upload',
+      r2_key: newKey,
+      replaced_by: user.id,
+    });
+    if (versionErr) console.warn('[version-history] replace insert failed:', versionErr.message);
 
     await captureServerEvent({
       event: 'document.replaced',

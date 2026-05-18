@@ -21,6 +21,7 @@ import {
   createShareAction,
   toggleShareAction,
   deleteDocumentAction,
+  deleteShareAction,
   editShareAction,
   previewShareAction,
   previewDocumentAction,
@@ -41,6 +42,7 @@ import { LiveRefresh } from './LiveRefresh';
 import { SharesTable } from './SharesTable';
 import { ViewerInsights } from './ViewerInsights';
 import { AttachmentsPanel, type AttachmentRow } from './AttachmentsPanel';
+import { VersionHistoryPopover, type DocumentVersionRow } from './VersionHistoryPopover';
 
 export const runtime = 'edge';
 
@@ -58,6 +60,7 @@ export default async function DocumentPage({
     replaced?: string;
     hide_error?: string;
     edited?: string;
+    share_deleted?: string;
   };
 }) {
   await requireUser();
@@ -90,9 +93,25 @@ export default async function DocumentPage({
     .single();
   if (!doc) notFound();
 
-  // Parallelise the share + attachment queries — they're independent and
-  // both feed the page render.
-  const [sharesRes, attachmentsRes] = await Promise.all([
+  // Clear the "new activity since last visit" dot on the /docs list
+  // (a designer QA3 #9). Updating last_viewed_by_owner_at to now()
+  // means a subsequent /docs query sees no sessions-after-this-stamp
+  // and the dot disappears for this doc.
+  //
+  // Awaited because Edge runtime can terminate the worker as soon as
+  // the response is built, dropping unawaited promises — that left the
+  // dot stuck-on for some docs in dev. A single indexed UPDATE-by-id
+  // is sub-10ms; the cost is negligible vs. correctness.
+  await supabase
+    .from('documents')
+    .update({ last_viewed_by_owner_at: new Date().toISOString() })
+    .eq('id', params.id)
+    .eq('owner_id', doc.owner_id);
+
+  // Parallelise the share + attachment + version-history queries —
+  // they're independent and all feed the page render. Version history
+  // backs the v{n} chip popover in the hero.
+  const [sharesRes, attachmentsRes, versionsRes] = await Promise.all([
     supabase
       .from('document_shares')
       .select('*')
@@ -103,9 +122,15 @@ export default async function DocumentPage({
       .select('id, filename, mime_type, size_bytes, created_at')
       .eq('document_id', params.id)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('document_versions')
+      .select('id, version, filename, bytes, source_type, source_url, replaced_at')
+      .eq('document_id', params.id)
+      .order('version', { ascending: false }),
   ]);
   const rawShares = sharesRes.data;
   const attachments: AttachmentRow[] = (attachmentsRes.data ?? []) as AttachmentRow[];
+  const versions: DocumentVersionRow[] = (versionsRes.data ?? []) as DocumentVersionRow[];
 
   const shareList = rawShares ?? [];
   const shareIds = shareList.map((s) => s.id);
@@ -287,7 +312,7 @@ export default async function DocumentPage({
             >
               {doc.source_type === 'upload' ? 'Uploaded HTML' : 'URL source'}
             </Chip>
-            <Chip>v{doc.current_version}</Chip>
+            <VersionHistoryPopover currentVersion={doc.current_version} versions={versions} />
             <LiveRefresh />
           </div>
           {/* Inline stat strip — gives the sender headline numbers at a
@@ -400,7 +425,15 @@ export default async function DocumentPage({
           role="status"
           className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark"
         >
-          Share settings updated. The next visitor to this link sees the new rules.
+          Share settings updated. All visitors to this link now see the new rules.
+        </div>
+      )}
+      {searchParams?.share_deleted === '1' && (
+        <div
+          role="status"
+          className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark"
+        >
+          Share deleted. The URL now returns Not Found.
         </div>
       )}
       {searchParams?.attachment_error && (
@@ -432,6 +465,7 @@ export default async function DocumentPage({
             createShare={createShareAction}
             toggleShare={toggleShareAction}
             editShare={editShareAction}
+            deleteShare={deleteShareAction}
             previewShare={previewShareAction}
             attachmentCount={attachments.length}
           />

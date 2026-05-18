@@ -50,7 +50,11 @@ export async function middleware(req: NextRequest) {
 
   if (!user) {
     const signInUrl = new URL('/sign-in', req.url);
-    signInUrl.searchParams.set('next', pathname);
+    // Preserve the original querystring on the `next` so post-sign-in
+    // redirects land back on /upgrade?reason=quota (etc.) with the
+    // contextual headline intact. Without `req.nextUrl.search` the
+    // post-auth landing dropped to the generic Pro headline.
+    signInUrl.searchParams.set('next', pathname + (req.nextUrl.search ?? ''));
     return NextResponse.redirect(signInUrl);
   }
 

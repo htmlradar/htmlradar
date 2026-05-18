@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
+import { readQuota } from '@/lib/quota';
 import { SectionMark } from '@/components/SectionMark';
 import { ArrowRight, LogOut } from 'lucide-react';
 import Link from 'next/link';
@@ -40,6 +41,7 @@ export default async function SettingsPage() {
   const user = await requireUser();
   const supabase = serverClient();
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const quota = await readQuota(supabase, user.id);
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
   const accountCreated = new Date(profile?.created_at ?? user.created_at).toLocaleDateString(
@@ -76,7 +78,10 @@ export default async function SettingsPage() {
                   <span className="rounded-full bg-paper-3 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
                     Free
                   </span>
-                  <span className="text-[13px] text-ink-soft">10 documents lifetime</span>
+                  <span className="text-[13px] text-ink-soft">
+                    <span className="tabular-nums">{quota.used}</span> of {quota.cap} lifetime
+                    uploads used
+                  </span>
                 </span>
               )
             }

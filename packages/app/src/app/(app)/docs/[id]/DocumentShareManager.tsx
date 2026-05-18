@@ -29,6 +29,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
@@ -81,6 +82,10 @@ interface DocumentShareManagerProps {
   createShare: (formData: FormData) => Promise<void>;
   toggleShare: (formData: FormData) => Promise<void>;
   editShare: (formData: FormData) => Promise<void>;
+  // Permanent destroy — separate from toggleShare (which is the
+  // reversible Revoke pause). Used only from the typed-confirmation
+  // modal inside the Edit pane.
+  deleteShare: (formData: FormData) => Promise<void>;
   previewShare: (
     formData: FormData,
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
@@ -112,6 +117,7 @@ export function DocumentShareManager({
   createShare,
   toggleShare,
   editShare,
+  deleteShare,
   previewShare,
   attachmentCount,
 }: DocumentShareManagerProps) {
@@ -204,6 +210,7 @@ export function DocumentShareManager({
                   mode="edit"
                   documentId={documentId}
                   action={editShare}
+                  deleteAction={deleteShare}
                   attachmentCount={attachmentCount}
                   initial={share}
                   onCancel={() => setSelection({ mode: 'share', id: share.id })}
@@ -477,8 +484,8 @@ function SharePane({
           </p>
           <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-soft">
             {isRevoked
-              ? 'Recipients see a 403 page. Flip the switch above to make the link live again — past read history stays intact.'
-              : 'The expiry date passed and the link returned a 403 from that point on. To re-share with this recipient, create a new share from the left rail.'}
+              ? "Recipients see a polite 'sender turned this link off' notice. Flip the switch above to bring it back — past read history stays intact."
+              : 'The expiry date passed; recipients now see an Expired notice. Extend the date below or create a new share from the left rail to re-share.'}
           </p>
         </div>
       )}
@@ -660,7 +667,7 @@ function ShareToggle({
     <form
       onSubmit={handle}
       className="flex flex-col items-end gap-1"
-      title="On / Off kill-switch for this share. Independent of any expiry date — flip it off to revoke immediately, flip it back on whenever. Past read history stays intact either way."
+      title="Reversible pause. Flip OFF to revoke instantly — the recipient sees a polite 'sender turned this off' notice from that moment on. Flip ON whenever you want to bring the link back; past read history stays intact either way. For a permanent destroy, use Delete share in Edit settings."
     >
       <div className="flex items-center gap-2.5">
         <input type="hidden" name="share_id" value={shareId} />
@@ -768,6 +775,7 @@ function ShareSettingsForm({
   mode,
   documentId,
   action,
+  deleteAction,
   initial,
   onCancel,
   attachmentCount,
@@ -775,6 +783,9 @@ function ShareSettingsForm({
   mode: 'create' | 'edit';
   documentId: string;
   action: (formData: FormData) => Promise<void>;
+  // Optional — only passed in edit mode. Powers the "Delete share"
+  // affordance + its typed-DELETE confirmation modal.
+  deleteAction?: (formData: FormData) => Promise<void>;
   initial?: ShareRow;
   onCancel?: () => void;
   attachmentCount: number;
@@ -1027,7 +1038,11 @@ function ShareSettingsForm({
           />
         </Field>
 
-        <Field label="Expires" hint="After this moment, the share returns 403." optional>
+        <Field
+          label="Expires"
+          hint="After this moment, anyone opening the link sees an Expired notice instead of the deck. You can extend the expiry from this form at any time — past read history stays intact."
+          optional
+        >
           <input
             name="expires_at"
             type="datetime-local"
@@ -1063,7 +1078,160 @@ function ShareSettingsForm({
           )}
         </div>
       </form>
+
+      {isEdit && initial && deleteAction ? (
+        <DangerZone documentId={documentId} share={initial} deleteAction={deleteAction} />
+      ) : null}
     </section>
+  );
+}
+
+// Permanent destroy. Visually separate from the form's Save row so it
+// reads as a different category of action — "this is not just settings,
+// this is destruction." Click "Delete share" → modal asks for typed
+// confirmation ("DELETE"). The action itself also re-validates that
+// string server-side, so the modal isn't load-bearing for safety —
+// it's load-bearing for "you can't fat-finger this".
+function DangerZone({
+  documentId,
+  share,
+  deleteAction,
+}: {
+  documentId: string;
+  share: ShareRow;
+  deleteAction: (formData: FormData) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="mt-8 rounded-2xl border border-alert/30 bg-alert/5 p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-alert">
+              Danger zone
+            </p>
+            <h3 className="mt-2 font-serif text-[18px] leading-snug text-ink">
+              Delete this share.
+            </h3>
+            <p className="mt-2 max-w-md text-[13px] leading-relaxed text-ink-soft">
+              Permanently destroys the link and all of its read history. The URL returns Not Found
+              from that moment on. Want to pause access instead? Use the Active toggle in the share
+              panel — it's reversible.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-alert/40 bg-paper px-3.5 py-2 text-[13px] font-medium text-alert transition hover:border-alert hover:bg-alert/5"
+          >
+            <Trash2 aria-hidden className="size-3.5" />
+            Delete share
+          </button>
+        </div>
+      </div>
+      {open ? (
+        <DeleteShareModal
+          documentId={documentId}
+          share={share}
+          deleteAction={deleteAction}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function DeleteShareModal({
+  documentId,
+  share,
+  deleteAction,
+  onClose,
+}: {
+  documentId: string;
+  share: ShareRow;
+  deleteAction: (formData: FormData) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [typed, setTyped] = useState('');
+  const [isPending, startTransition] = useTransition();
+  const canDestroy = typed.trim().toUpperCase() === 'DELETE';
+
+  // Close on Escape — basic dialog ergonomics. Click-outside also closes.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isPending) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isPending, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 backdrop-blur-sm"
+      onClick={() => {
+        if (!isPending) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-share-title"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-alert/30 bg-paper p-6 shadow-[0_30px_60px_-20px_rgba(31,17,8,0.35)] md:p-7"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-alert">
+          Permanent action
+        </p>
+        <h3
+          id="delete-share-title"
+          className="text-letterpress mt-2 font-serif text-[24px] leading-snug text-ink"
+        >
+          Delete this share?
+        </h3>
+        <p className="mt-3 text-[13.5px] leading-relaxed text-ink-soft">
+          The URL <span className="font-mono text-ink">/r/{share.slug}</span> will start returning
+          Not Found. Sessions, viewers, and section dwell tied to this share are removed too. This
+          can't be undone.
+        </p>
+        <form action={(fd) => startTransition(() => deleteAction(fd))} className="mt-5 space-y-4">
+          <input type="hidden" name="share_id" value={share.id} />
+          <input type="hidden" name="document_id" value={documentId} />
+          <div>
+            <label className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+              Type <span className="text-alert">DELETE</span> to confirm
+            </label>
+            <input
+              type="text"
+              name="confirmation"
+              autoFocus
+              autoComplete="off"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder="DELETE"
+              className="mt-2 w-full rounded-md border border-line bg-paper px-4 py-3 font-mono text-[15px] tracking-[0.18em] text-ink outline-none transition placeholder:text-graphite/60 focus:border-alert focus:shadow-[0_0_0_3px_rgba(189,52,52,0.08)]"
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isPending}
+              className="inline-flex items-center rounded-md border border-line bg-paper px-4 py-2.5 text-[13.5px] text-ink-soft transition hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!canDestroy || isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-alert px-4 py-2.5 text-[13.5px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-alert/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 aria-hidden className="size-3.5" />
+              {isPending ? 'Deleting…' : 'Permanently delete'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

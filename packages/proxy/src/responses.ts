@@ -293,12 +293,28 @@ ${FONTS_LINK}
     },
   );
 
+// Common footer for all error shells. One soft "what is this?" link
+// — recipients are often opening their first HTMLRadar link ever and
+// landing on an error page; without context the page reads like a
+// dead end. We don't say "contact support@htmlradar.com" because the
+// fix is almost always on the sender's side, not ours; we point the
+// recipient there instead.
+const ERROR_FOOTER = `
+<div style="margin-top:32px;padding-top:24px;border-top:1px dashed var(--line);">
+  <p style="margin:0 0 14px 0;font-size:13.5px;line-height:1.55;color:var(--graphite);">
+    Need a fresh link? Reply to the person who sent this to you — they can
+    update or re-send in a few seconds.
+  </p>
+  <a href="https://htmlradar.com" style="display:inline-block;color:#7A1F2E;text-decoration:none;border-bottom:1px dotted currentColor;font-size:13.5px;padding:4px 0;">What is HTMLRadar? &rarr;</a>
+</div>
+`.trim();
+
 export const notFound = (): Response =>
   SHELL(
     'Share not found',
-    `<h1>Share not found.</h1>
-     <p class="lede">The link may have been deleted, or it never existed. Check with the person who sent it to you.</p>
-     <p style="margin-top:28px;"><a href="https://htmlradar.com" style="display:inline-block;color:#7A1F2E;text-decoration:none;border-bottom:1px dotted currentColor;font-size:14.5px;padding:6px 0;">What is HTMLRadar? &rarr;</a></p>`,
+    `<h1>This link doesn't open anything.</h1>
+     <p class="lede">It may have been deleted, or it never existed. The person who sent it to you can confirm — and re-share if needed.</p>
+     ${ERROR_FOOTER}`,
     404,
     'No record',
   );
@@ -306,8 +322,9 @@ export const notFound = (): Response =>
 export const revoked = (): Response =>
   SHELL(
     'Access revoked',
-    `<h1>Access revoked.</h1>
-     <p class="lede">The sender switched this link off. If you still need to read the document, reply to them and ask for a new link.</p>`,
+    `<h1>The sender turned this link off.</h1>
+     <p class="lede">It's a pause, not a delete — the sender can switch it back on at any time. If you still need to read the document, reply to them.</p>
+     ${ERROR_FOOTER}`,
     403,
     'Revoked by sender',
   );
@@ -315,8 +332,9 @@ export const revoked = (): Response =>
 export const expired = (): Response =>
   SHELL(
     'Link expired',
-    `<h1>Link expired.</h1>
-     <p class="lede">This link's window has closed. Reply to the sender and ask them to extend the expiry or send a fresh link — both take a second.</p>`,
+    `<h1>This link's window has closed.</h1>
+     <p class="lede">The sender set an expiry on this share and it's past. Ask them to extend the expiry or send a fresh link — either takes a second.</p>
+     ${ERROR_FOOTER}`,
     410,
     'Past expiry',
   );
@@ -324,8 +342,9 @@ export const expired = (): Response =>
 export const sourceUnreachable = (): Response =>
   SHELL(
     'Document unavailable',
-    `<h1>Document unavailable.</h1>
-     <p class="lede">The sender's source didn't respond. They've been notified — try again in a moment, or reach out directly.</p>`,
+    `<h1>The document didn't load.</h1>
+     <p class="lede">The sender's source didn't respond just now. Try again in a moment — it usually clears up on its own. If it doesn't, reach out to them directly.</p>
+     ${ERROR_FOOTER}`,
     502,
     'Source error',
   );

@@ -3,6 +3,12 @@ import { NavBar } from '@/components/NavBar';
 
 export const runtime = 'edge';
 
+export const metadata = {
+  title: 'HTMLRadar vs Papermark',
+  description:
+    'A fair comparison of HTMLRadar and Papermark. HTML-first vs PDF-first, but the same open-source AGPL playbook and the same flat-pricing posture.',
+};
+
 export default function ComparePapermarkPage() {
   return (
     <>

@@ -29,18 +29,22 @@ export async function createDocument(formData: FormData) {
     .eq('id', user.id)
     .single();
   if (profile?.tier !== 'pro') {
+    // Lifetime cap — count deleted rows too. Must match the trigger in
+    // schema/003_triggers.sql (which counts ALL documents, including
+    // soft-deleted). Earlier the UI filtered by deleted_at IS NULL,
+    // which let the action pass the check then the trigger reject the
+    // INSERT — a confusing 500 instead of a clean /upgrade redirect.
     const { count } = await supabase
       .from('documents')
       .select('id', { count: 'exact', head: true })
-      .eq('owner_id', user.id)
-      .is('deleted_at', null);
+      .eq('owner_id', user.id);
     if ((count ?? 0) >= FREE_TIER_CAP) {
       await captureServerEvent({
         event: 'free_tier.cap_hit',
         distinctId: user.id,
         userId: user.id,
       });
-      redirect('/upgrade');
+      redirect('/upgrade?reason=quota');
     }
   }
 
@@ -59,6 +63,23 @@ export async function createDocument(formData: FormData) {
       source_url: sourceUrl,
     });
     if (error) throw new Error(error.message);
+
+    // Seed version history (schema 018) with v1 for URL-source docs.
+    // Awaited because the Edge runtime is free to terminate the worker
+    // after redirect; fire-and-forget would drop the write. Swallow any
+    // error — history-write failure should not surface as an upload
+    // failure to the user, but logging it would help debug RLS issues.
+    const { error: versionErr } = await supabase.from('document_versions').insert({
+      document_id: docId,
+      version: 1,
+      filename: null,
+      bytes: null,
+      source_type: 'url',
+      source_url: sourceUrl,
+      r2_key: null,
+      replaced_by: user.id,
+    });
+    if (versionErr) console.warn('[version-history] v1 insert failed:', versionErr.message);
   } else {
     const file = formData.get('file') as File | null;
     if (!file || file.size === 0) throw new Error('No file uploaded');
@@ -81,6 +102,21 @@ export async function createDocument(formData: FormData) {
       await supabase.from('documents').delete().eq('id', docId);
       throw err;
     }
+
+    // Seed version history (schema 018) with v1 for upload docs. Captures
+    // the original local filename + size for the version-history popover.
+    // Awaited for the same Edge-runtime reason as the URL branch above.
+    const { error: versionErr } = await supabase.from('document_versions').insert({
+      document_id: docId,
+      version: 1,
+      filename: file.name || null,
+      bytes: file.size,
+      source_type: 'upload',
+      source_url: null,
+      r2_key: key,
+      replaced_by: user.id,
+    });
+    if (versionErr) console.warn('[version-history] v1 insert failed:', versionErr.message);
   }
 
   await captureServerEvent({

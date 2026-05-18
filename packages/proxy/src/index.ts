@@ -174,6 +174,18 @@ export default {
         env.SESSION_SECRET,
       );
       if (!cookie) return emailGateForm(slug);
+      // QA3 #5 fix (2026-05-19): re-check the cookie's email against
+      // the share's CURRENT allowlist on every request — not just at
+      // gate-submission time. If the sender tightened the allowlist
+      // after the cookie was issued, the recipient's stale cookie
+      // must NOT bypass the new rule.
+      //
+      // isEmailAllowed returns true for shares with no allowlist
+      // (so vanilla require_email shares keep working), and for the
+      // owner-preview path which already short-circuits above.
+      if (!isEmailAllowed(share, cookie.email)) {
+        return emailGateForm(slug, 'This document is no longer shared with your address.');
+      }
       verifiedEmail = cookie.email;
     }
 
@@ -306,6 +318,13 @@ async function handleAttachmentDownload(
   if (share.require_email) {
     const cookie = await verifyEmailCookie(request.headers.get('cookie'), slug, env.SESSION_SECRET);
     if (!cookie) return notFound();
+    // QA3 #5: same fresh-allowlist check as the doc-serve path. A
+    // stale email cookie must NOT bypass a tightened allowlist on the
+    // attachment route either. 404 here (not "your email's not on the
+    // list") because attachments are quieter than the gate page — we
+    // don't want to confirm what attachments exist behind a closed
+    // gate.
+    if (!isEmailAllowed(share, cookie.email)) return notFound();
     recipientEmail = cookie.email;
   }
 

@@ -44,7 +44,7 @@ export default async function DocumentsPage() {
   const [docsRes, sharesRes] = await Promise.all([
     supabase
       .from('documents')
-      .select('id, title, source_type, current_version, created_at')
+      .select('id, title, source_type, current_version, created_at, last_viewed_by_owner_at')
       .is('deleted_at', null)
       .order('created_at', { ascending: false }),
     supabase
@@ -111,13 +111,21 @@ export default async function DocumentsPage() {
       weeklySessions.length
     : 0;
 
-  // A doc is "active" if it has had at least one read in the last 24h.
-  const dayCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  // A doc shows a "new activity" dot if any session started AFTER the
+  // owner last visited that doc's detail page. `last_viewed_by_owner_at`
+  // is bumped on every /docs/[id] render (fire-and-forget), so the dot
+  // self-clears as soon as the owner opens the doc — no animation, no
+  // 24h ticking window, no "still showing yesterday's pulse" feel.
+  const lastViewedByDoc = new Map<string, number>();
+  for (const d of docs) {
+    lastViewedByDoc.set(d.id, new Date(d.last_viewed_by_owner_at ?? d.created_at).getTime());
+  }
   const activeDocIds = new Set<string>();
   for (const sess of recentSessions) {
-    if (new Date(sess.started_at).getTime() < dayCutoff) continue;
     const docId = shareToDoc.get(sess.share_id);
-    if (docId) activeDocIds.add(docId);
+    if (!docId) continue;
+    const cutoff = lastViewedByDoc.get(docId) ?? 0;
+    if (new Date(sess.started_at).getTime() > cutoff) activeDocIds.add(docId);
   }
 
   const hasDocs = totalDocs > 0;
@@ -173,12 +181,10 @@ export default async function DocumentsPage() {
                       )}
                       {isActive && (
                         <span
-                          aria-label="Activity in the last 24 hours"
-                          className="absolute -right-0.5 -top-0.5 flex size-2.5"
-                        >
-                          <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
-                          <span className="relative inline-flex size-2.5 rounded-full bg-signal" />
-                        </span>
+                          aria-label="New activity since your last visit"
+                          title="New activity since your last visit"
+                          className="absolute -right-0.5 -top-0.5 inline-flex size-2.5 rounded-full bg-signal ring-2 ring-paper"
+                        />
                       )}
                     </span>
                     <div className="min-w-0 flex-1">

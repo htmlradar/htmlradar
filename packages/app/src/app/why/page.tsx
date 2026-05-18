@@ -13,6 +13,12 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 export const runtime = 'edge';
 
+export const metadata = {
+  title: 'Why HTMLRadar',
+  description:
+    'The longer essay. Why HTML — not PDF — is the right format for the documents that actually matter, and what HTMLRadar does with that idea.',
+};
+
 export default function WhyPage() {
   return (
     <>

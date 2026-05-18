@@ -10,9 +10,6 @@
 
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
-const accessKeyId = process.env['CLOUDFLARE_R2_ACCESS_KEY_ID']!;
-const secretAccessKey = process.env['CLOUDFLARE_R2_SECRET_ACCESS_KEY']!;
-
 // Endpoint resolution — supports two env var shapes so users who pasted
 // the full endpoint URL (`https://<acct>.r2.cloudflarestorage.com`) and
 // users who pasted just the account ID both work:
@@ -20,8 +17,6 @@ const secretAccessKey = process.env['CLOUDFLARE_R2_SECRET_ACCESS_KEY']!;
 //   2. CLOUDFLARE_ACCOUNT_ID — we construct the URL ourselves
 // Strips stray protocol prefixes / paths the user may have included by
 // mistake (Cloudflare's UI is inconsistent about which form it shows).
-const endpoint = resolveEndpoint();
-
 function resolveEndpoint(): string {
   const explicit = process.env['CLOUDFLARE_R2_ENDPOINT'];
   if (explicit) return explicit.replace(/\/+$/, '');
@@ -39,11 +34,25 @@ function resolveEndpoint(): string {
   return `https://${accountId}.r2.cloudflarestorage.com`;
 }
 
-const client = new S3Client({
-  region: 'auto',
-  endpoint,
-  credentials: { accessKeyId, secretAccessKey },
-});
+// Lazy-init the S3 client. We used to construct it at module load, which
+// failed any build that didn't have R2 env vars set — and CI deliberately
+// doesn't expose them. Deferring to first use means import is side-effect-
+// free; only a request that ACTUALLY uploads/deletes pays the env check.
+let clientInstance: S3Client | null = null;
+function getClient(): S3Client {
+  if (clientInstance) return clientInstance;
+  const accessKeyId = process.env['CLOUDFLARE_R2_ACCESS_KEY_ID'];
+  const secretAccessKey = process.env['CLOUDFLARE_R2_SECRET_ACCESS_KEY'];
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('R2 not configured: set CLOUDFLARE_R2_ACCESS_KEY_ID + _SECRET_ACCESS_KEY');
+  }
+  clientInstance = new S3Client({
+    region: 'auto',
+    endpoint: resolveEndpoint(),
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  return clientInstance;
+}
 
 const bucket = process.env['CLOUDFLARE_R2_BUCKET'] ?? 'htmlradar-docs';
 
@@ -52,7 +61,7 @@ export function r2Key(userId: string, docId: string, version: number): string {
 }
 
 export async function uploadHtml(key: string, body: Uint8Array): Promise<void> {
-  await client.send(
+  await getClient().send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -73,7 +82,7 @@ export async function uploadAttachment(
   body: Uint8Array,
   contentType: string,
 ): Promise<void> {
-  await client.send(
+  await getClient().send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -92,7 +101,7 @@ export async function uploadAttachment(
  * DB row pointing to nothing.
  */
 export async function deleteR2Object(key: string): Promise<void> {
-  await client.send(
+  await getClient().send(
     new DeleteObjectCommand({
       Bucket: bucket,
       Key: key,

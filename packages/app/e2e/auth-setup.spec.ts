@@ -104,6 +104,7 @@ test('auth-setup: password sign-in, save storageState', async ({ context }) => {
       `Auth cookie didn't authenticate — landed on ${finalUrl}. Cookie format may have changed.`,
     );
   }
+  // eslint-disable-next-line no-console -- this is an e2e setup script; the line is intentional output for the test runner.
   console.log(
     `storageState saved to ${outPath} | /docs status ${docsRes?.status()} | final URL ${finalUrl}`,
   );

@@ -11,10 +11,11 @@
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, FileText, Link2 } from 'lucide-react';
+import { ChevronRight, FileText, Link2 } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { isMetaSectionTitle } from '@/lib/section-filter';
+import { Chip } from '@/components/doc-dashboard/Chip';
 import {
   createShareAction,
   toggleShareAction,
@@ -213,55 +214,83 @@ export default async function DocumentPage({
     };
   }
 
+  // "Reading now" — anyone heartbeated within the last 60s? Uses the
+  // FULL session list (not visibleSessions) on purpose: a sender's own
+  // test-read should also surface the live chip so they can verify the
+  // share is working. internal-viewer filtering only matters for the
+  // aggregate stat strip + viewer table.
+  const now = Date.now();
+  const liveReaders = allSessions.filter((s) => {
+    const hb = s.last_heartbeat_at ? new Date(s.last_heartbeat_at).getTime() : 0;
+    return hb > 0 && now - hb < 60_000;
+  }).length;
+
   return (
     <div className="py-8">
-      <Link
-        href="/docs"
-        className="link-slide inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
+      {/* Breadcrumb — replaces the old "← All documents" link. Editorial
+          slash-separator pattern matches the rest of the dashboard's
+          mono-kicker treatment. Visually quieter than a back-arrow so
+          the hero title gets the eye first. */}
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite"
       >
-        <ArrowLeft className="size-3.5" />
-        All documents
-      </Link>
+        <Link href="/docs" className="hover:text-signal-dark">
+          Documents
+        </Link>
+        <ChevronRight aria-hidden className="size-3 opacity-50" />
+        <span className="max-w-[40ch] truncate normal-case tracking-normal text-ink-soft">
+          {doc.title}
+        </span>
+      </nav>
 
-      <header className="mt-6 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
+      {/* Hero. Editorial-press composition: oversized serif title, mono
+          kicker chips below, action cluster on the right. The Live chip
+          (pistachio + pulsing dot) only renders when at least one
+          recipient is actively heartbeating — silent the rest of the
+          time so the chip row doesn't have a permanent attention-grabber. */}
+      <header className="mt-6 flex flex-col gap-7 border-b border-line pb-8 md:flex-row md:items-end md:justify-between md:gap-10">
         <div className="min-w-0 flex-1">
-          <h1 className="text-letterpress break-words font-serif text-[34px] font-normal leading-[1.06] tracking-tightest text-ink md:text-[42px]">
+          <h1 className="text-letterpress break-words font-serif text-[44px] font-normal leading-[1.02] tracking-tightest text-ink md:text-[64px] lg:text-[72px]">
             {doc.title}
           </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-            <span className="inline-flex items-center gap-1.5">
-              {doc.source_type === 'upload' ? (
-                <FileText aria-hidden className="size-3.5 text-signal-dark" />
-              ) : (
-                <Link2 aria-hidden className="size-3.5 text-signal-dark" />
-              )}
-              {doc.source_type === 'upload' ? 'Uploaded HTML' : 'URL source'}
-            </span>
-            <span aria-hidden>·</span>
-            <span>v{doc.current_version}</span>
-            <span aria-hidden>·</span>
-            <LiveRefresh />
-            {doc.source_type === 'url' && doc.source_url && (
-              <>
-                <span aria-hidden>·</span>
-                <a
-                  href={doc.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="max-w-[40ch] truncate normal-case tracking-normal text-signal-dark underline decoration-line decoration-2 underline-offset-2 hover:decoration-signal"
-                >
-                  {doc.source_url}
-                </a>
-              </>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {liveReaders > 0 && (
+              <Chip variant="live">
+                {liveReaders} reading {liveReaders === 1 ? 'now' : 'now'}
+              </Chip>
             )}
+            <Chip
+              icon={
+                doc.source_type === 'upload' ? (
+                  <FileText className="size-3 text-signal-dark" />
+                ) : (
+                  <Link2 className="size-3 text-signal-dark" />
+                )
+              }
+            >
+              {doc.source_type === 'upload' ? 'Uploaded HTML' : 'URL source'}
+            </Chip>
+            <Chip>v{doc.current_version}</Chip>
+            <LiveRefresh />
           </div>
+          {doc.source_type === 'url' && doc.source_url && (
+            <a
+              href={doc.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-block max-w-[60ch] truncate font-mono text-[12px] text-signal-dark underline decoration-line decoration-2 underline-offset-2 hover:decoration-signal"
+            >
+              {doc.source_url}
+            </a>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* "Preview document" — sender-side raw-doc preview, no share.
-              Sits left of Delete so the destructive action is last in the
-              tab order and visually. Only useful for upload-type docs;
-              for URL-type docs we surface the source URL inline above
-              instead (clicking it opens the source directly). */}
+          {/* Action cluster. PreviewDocumentButton stays the visual
+              primary (filled), ReplaceDocumentButton is ghost, Delete is
+              text — same order as a designer's ref but using the existing
+              component implementations to avoid regressing their server-
+              action wiring and confirmation flows. */}
           {doc.source_type === 'upload' && (
             <>
               <PreviewDocumentButton documentId={doc.id} action={previewDocumentAction} />

@@ -17,6 +17,12 @@ const config: Config = {
         graphite: '#876959',
         signal: { DEFAULT: '#7A1F2E', dark: '#5A1521' },
         'signal-soft': '#D9B5B0',
+        // Pistachio pop — accent reserved for live indicators and a
+        // single "headline stat" highlight per dashboard. Used very
+        // sparingly; cream + oxblood remain the default palette.
+        // Introduced 2026-05-18 with a designer's /docs/[id] redesign.
+        pop: { DEFAULT: '#C9E4A5', ink: '#2F4118' },
+        good: '#1F7A3A',
         line: '#E8D5BD',
         alert: '#5A1521',
       },
@@ -38,6 +44,12 @@ const config: Config = {
           '0%, 100%': { opacity: '0.6', transform: 'scale(0.96)' },
           '50%': { opacity: '1', transform: 'scale(1.02)' },
         },
+        // Live-indicator pulse — used by the Live chip and "currently
+        // reading" status dots on /docs/[id]. Soft halo grow/fade.
+        'live-pulse': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(31, 122, 58, 0.4)' },
+          '50%': { boxShadow: '0 0 0 6px rgba(31, 122, 58, 0)' },
+        },
       },
       animation: {
         // 700ms ease-out with `both` fill-mode so the element starts at the
@@ -46,6 +58,7 @@ const config: Config = {
         // before the delay starts.
         'reveal-up': 'reveal-up 700ms cubic-bezier(0.16, 1, 0.3, 1) both',
         'radar-pulse': 'radar-pulse 3s ease-in-out infinite',
+        'live-pulse': 'live-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },

@@ -12,10 +12,9 @@
 //     live share URL highlighted (NOT a sample dashboard — that would
 //     confuse a sender who has a real share that nobody has opened yet).
 
-import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CopySlugButton } from '@/components/CopySlugButton';
-import { formatTimestamp } from '@/lib/format-timestamp';
+import { SessionsList } from '@/components/SessionsList';
 import type { Viewer, Session } from '@/lib/types';
 
 interface SectionRow {
@@ -36,6 +35,12 @@ export interface ShareAnalyticsProps {
   // ViewerInsights strip is the canonical rollup). Default = false
   // (the standalone /dashboard/[slug] page wants the stats).
   hideStatRow?: boolean;
+  // Hide the sessions list when the caller renders a richer
+  // viewer-grouped table elsewhere on the page. On /docs/[id] with a
+  // single share, ViewerInsights below already shows all the same
+  // session data grouped by viewer with a drill-down — repeating
+  // the flat sessions list here is just clutter.
+  hideSessions?: boolean;
   // Visual variant. 'default' keeps the cream cards used on
   // /dashboard/[slug]; 'panel-mini' uses the pop-accented mini-grid
   // tuned for the SharePane on /docs/[id]. Pure styling difference.
@@ -56,6 +61,7 @@ export function ShareAnalytics({
   sessions,
   sections,
   hideStatRow = false,
+  hideSessions = false,
   variant = 'default',
 }: ShareAnalyticsProps) {
   if (sessions.length === 0) {
@@ -89,71 +95,9 @@ export function ShareAnalytics({
         </div>
       )}
 
-      <section>
-        <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-          Sessions
-        </h3>
-        <ul
-          className={cn(
-            'mt-3 overflow-hidden rounded-xl border border-line bg-paper',
-            isPanel ? 'divide-y divide-line/70' : 'divide-y divide-line',
-          )}
-        >
-          {sessions.map((s) => {
-            const v = viewers.find((x) => x.id === s.viewer_id);
-            // Hybrid format: relative under 24h, absolute beyond.
-            // Session-started timestamps share the same "first-seen"
-            // semantics as the viewer table — when did this session
-            // begin? Worth pinning as a date once it's older than a day.
-            const ts = formatTimestamp(s.started_at, 'auto');
-            return (
-              <li
-                key={s.id}
-                className={cn(
-                  'grid items-center gap-3 px-4 py-3.5 text-[13.5px]',
-                  // 5-col on desktop: who / when / time / scroll bar / chevron.
-                  // Mobile collapses to 1-col (label rows).
-                  isPanel
-                    ? 'sm:grid-cols-[2fr_1fr_auto_1.2fr_auto]'
-                    : 'sm:grid-cols-[2fr_1fr_auto_1.2fr_auto]',
-                )}
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-[14px] font-medium text-ink">
-                    {v?.email ?? 'Anonymous'}
-                  </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] uppercase tracking-[0.1em] text-graphite">
-                    {[v?.city ?? v?.country_code, v?.device_type, v?.os, v?.browser]
-                      .filter(Boolean)
-                      .join(' · ') || '—'}
-                  </div>
-                </div>
-                <div className="font-mono text-[11.5px] text-graphite" title={ts.full}>
-                  {ts.display}
-                </div>
-                <div className="font-mono text-[12.5px] font-semibold tabular-nums text-signal-dark">
-                  {formatDuration(s.active_time_seconds)}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-2/70 sm:max-w-[120px]"
-                    aria-label={`${Math.round(s.max_scroll_depth * 100)}% scroll`}
-                  >
-                    <div
-                      className="h-full rounded-full bg-ink"
-                      style={{ width: `${Math.round(s.max_scroll_depth * 100)}%` }}
-                    />
-                  </div>
-                  <span className="font-mono text-[11px] tabular-nums text-graphite">
-                    {Math.round(s.max_scroll_depth * 100)}%
-                  </span>
-                </div>
-                <ChevronRight aria-hidden className="size-4 text-graphite/60" />
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      {!hideSessions && (
+        <SessionsList sessions={sessions} viewers={viewers} variant={variant} initialLimit={5} />
+      )}
 
       {/* Sections roll-up is intentionally NOT shown when this lives
           inside the SharePane on /docs[id] — the per-viewer drill in

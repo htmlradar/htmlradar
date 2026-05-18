@@ -225,11 +225,6 @@ export function DocumentShareManager({
                 toggleShare={toggleShare}
                 previewShare={previewShare}
                 onEdit={() => handleEditShare(share.id)}
-                // When there's only one share, the per-doc ViewerInsights
-                // strip above is identical to the share-level numbers.
-                // We pass shareCount so SharePane can hide its duplicate
-                // stat cards in that case.
-                shareCount={shares.length}
               />
             );
           })()
@@ -359,7 +354,7 @@ function ShareRail({
                           </div>
                           {identity.secondary && (
                             <div className="mt-0.5 truncate text-[11.5px] text-graphite">
-                              Labelled {identity.secondary}
+                              {identity.secondary}
                             </div>
                           )}
                           <div className="mt-1 truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
@@ -392,7 +387,6 @@ function SharePane({
   toggleShare,
   previewShare,
   onEdit,
-  shareCount,
 }: {
   documentId: string;
   share: ShareRow;
@@ -402,15 +396,17 @@ function SharePane({
     formData: FormData,
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   onEdit: () => void;
-  // Total shares on the parent doc. Used to suppress duplicate stat
-  // cards when this is the only share (the per-doc ViewerInsights
-  // strip above shows identical numbers).
-  shareCount: number;
 }) {
   const isRevoked = !!share.revoked_at;
   const isExpired = !!share.expires_at && new Date(share.expires_at) < new Date();
   const isLive = !isRevoked && !isExpired;
   const fullUrl = `https://htmlradar.com/r/${share.slug}`;
+
+  // Use the same identity resolver as the rail + tables so the
+  // SharePane heading reads consistently across the page. Without
+  // this, a label-less share showed "Unlabeled" here while the rail
+  // showed the viewer email — same share, two different identities.
+  const identity = resolveRecipientIdentity(share, analytics?.viewers ?? []);
 
   const gateTags = buildGateTags(share);
 
@@ -423,11 +419,20 @@ function SharePane({
               Share
             </p>
             <h2
-              title={share.recipient_label ?? 'Unlabeled'}
+              title={
+                identity.secondary
+                  ? `${identity.primary} — ${identity.secondary}`
+                  : identity.primary
+              }
               className="text-letterpress mt-2 truncate font-serif text-[28px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[34px]"
             >
-              {share.recipient_label ?? 'Unlabeled'}
+              {identity.primary}
             </h2>
+            {identity.secondary && (
+              <p className="mt-1 truncate font-mono text-[11.5px] uppercase tracking-[0.14em] text-graphite">
+                {identity.secondary}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <PreviewAsYouButton shareId={share.id} documentId={documentId} action={previewShare} />
@@ -504,12 +509,14 @@ function SharePane({
           // headline and rebuilds the sessions row as a 5-col grid;
           // /dashboard/[slug] keeps the default variant.
           variant="panel-mini"
-          // When this is the only share on the doc, the per-doc
-          // ViewerInsights strip already shows the same Viewers /
-          // Sessions / Avg active / Max scroll numbers. Suppress the
-          // duplicate stat row inside ShareAnalytics so the page stops
-          // triple-stacking the same data.
-          hideStatRow={shareCount === 1}
+          // ViewerInsights below ALWAYS shows the canonical glance
+          // grid + viewer-grouped drill. The SharePane stat row +
+          // sessions list would duplicate it, so we suppress both
+          // here unconditionally. /dashboard/[slug] uses the same
+          // ShareAnalytics component without these hides because it
+          // is the standalone view with no ViewerInsights companion.
+          hideStatRow
+          hideSessions
         />
       ) : isLive ? (
         <WaitingInline shareSlug={share.slug} recipientLabel={share.recipient_label} />
@@ -601,7 +608,13 @@ function buildGateTags(share: ShareRow): ReactNode[] {
   return tags;
 }
 
-function WaitingInline({ shareSlug }: { shareSlug: string; recipientLabel: string | null }) {
+function WaitingInline({
+  shareSlug,
+  recipientLabel,
+}: {
+  shareSlug: string;
+  recipientLabel: string | null;
+}) {
   return (
     <div className="space-y-4 rounded-xl border border-dashed border-signal/30 bg-paper-2/30 px-5 py-6">
       <div>
@@ -609,7 +622,9 @@ function WaitingInline({ shareSlug }: { shareSlug: string; recipientLabel: strin
           Waiting for first read
         </p>
         <h3 className="mt-2 font-serif text-[20px] leading-snug text-ink md:text-[22px]">
-          Send this link, watch this space.
+          {recipientLabel
+            ? `Send the link to ${recipientLabel}. Watch this space.`
+            : 'Send this link, watch this space.'}
         </h3>
         <p className="mt-2 max-w-md text-[13.5px] leading-relaxed text-ink-soft">
           Sessions, section dwell, and devices populate here the moment the recipient opens the link

@@ -77,7 +77,7 @@ export function LiveRefresh() {
           }
         />
       </span>
-      Live · 30s
+      {active ? 'Live' : 'Paused'}
     </span>
   );
 }

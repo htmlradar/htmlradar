@@ -255,17 +255,6 @@ export default async function DocumentPage({
     return hb > 0 && now - hb < 60_000;
   }).length;
 
-  // Inline hero stat strip — the headline numbers the sender wants to
-  // glance at without scrolling. Visible-only semantics (hidden/internal
-  // viewers excluded) so it matches the glance grid below in the
-  // analytics section.
-  const totalSessions = visibleSessions.length;
-  const totalViewers = new Set(visibleViewers.map((v) => v.email?.toLowerCase() ?? v.id)).size;
-  const avgScroll =
-    visibleSessions.length > 0
-      ? visibleSessions.reduce((a, s) => a + (s.max_scroll_depth ?? 0), 0) / visibleSessions.length
-      : 0;
-
   return (
     <div className="py-8">
       {/* Breadcrumb — replaces the old "← All documents" link. Editorial
@@ -292,7 +281,10 @@ export default async function DocumentPage({
           time so the chip row doesn't have a permanent attention-grabber. */}
       <header className="mt-6 flex flex-col gap-7 border-b border-line pb-8 md:flex-row md:items-end md:justify-between md:gap-10">
         <div className="min-w-0 flex-1">
-          <h1 className="text-letterpress break-words font-serif text-[44px] font-normal leading-[1.02] tracking-tightest text-ink md:text-[64px] lg:text-[72px]">
+          <h1
+            title={doc.title}
+            className="text-letterpress truncate font-serif text-[44px] font-normal leading-[1.02] tracking-tightest text-ink md:text-[64px] lg:text-[72px]"
+          >
             {doc.title}
           </h1>
           <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -315,31 +307,11 @@ export default async function DocumentPage({
             <VersionHistoryPopover currentVersion={doc.current_version} versions={versions} />
             <LiveRefresh />
           </div>
-          {/* Inline stat strip — gives the sender headline numbers at a
-              glance without scrolling. Mirrors the glance grid in the
-              analytics column below; same visible-only semantics. */}
-          {totalSessions > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-graphite">
-              <span>
-                <span className="font-semibold text-ink-soft">{totalSessions}</span>{' '}
-                {totalSessions === 1 ? 'session' : 'sessions'}
-              </span>
-              <span aria-hidden className="opacity-40">
-                ·
-              </span>
-              <span>
-                <span className="font-semibold text-ink-soft">{totalViewers}</span>{' '}
-                {totalViewers === 1 ? 'viewer' : 'viewers'}
-              </span>
-              <span aria-hidden className="opacity-40">
-                ·
-              </span>
-              <span>
-                <span className="font-semibold text-ink-soft">{Math.round(avgScroll * 100)}%</span>{' '}
-                avg scroll
-              </span>
-            </div>
-          )}
+          {/* Hero stat strip was deliberately removed — the ViewerInsights
+              glance grid below shows the same numbers with richer framing
+              and visible-only semantics. Duplicating them in the hero
+              created two read-time numbers on the same eye-line (avg here
+              vs max below) that fought each other. */}
           {doc.source_type === 'url' && doc.source_url && (
             <a
               href={doc.source_url}
@@ -456,7 +428,7 @@ export default async function DocumentPage({
         <section>
           <SectionHead
             title="Shares."
-            hint={`${shares.length} ${shares.length === 1 ? 'link' : 'links'} · per-recipient settings`}
+            hint={`${shares.length} ${shares.length === 1 ? 'share' : 'shares'} · per-recipient settings`}
           />
           <DocumentShareManager
             documentId={doc.id}
@@ -478,6 +450,7 @@ export default async function DocumentPage({
             events={allEvents}
             documentId={doc.id}
             shareSlugs={Object.fromEntries(shareList.map((s) => [s.id, s.slug]))}
+            shareLabels={Object.fromEntries(shareList.map((s) => [s.id, s.recipient_label]))}
             toggleInternal={toggleViewerInternalAction}
           />
           <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />

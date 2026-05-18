@@ -1,36 +1,44 @@
-// Recipient identity resolution for list views (AT A GLANCE, left rail,
-// global /dashboard). One source of truth so the three views can't drift.
+// Recipient identity resolution for list views (left rail, viewer
+// table, global /dashboard). One source of truth so the three views
+// can't drift.
 //
-// Why this exists: `recipient_label` is the SENDER's free-form note for
-// their own bookkeeping ("Alex", "Marc at Example Ventures", "Someone else").
-// When the share is actually opened by a recipient, the dashboard should
-// surface WHO opened it — typically the email they entered at the gate —
-// not the label the sender wrote weeks earlier.
+// Rule, simple version: the sender's `recipient_label` ALWAYS wins
+// as the primary identifier when it exists. That's what the sender
+// chose; the dashboard should respect their choice. The viewer
+// emails go on the secondary line so the sender can still see who
+// opened it.
 //
-// Rules, in priority order:
+// Why this is the right hierarchy:
+//   - A label like "Investor list" or "Marc at Example Ventures" is a
+//     deliberate group/person identifier. Demoting it under
+//     "first-viewer-email +N" reads as the dashboard ignoring the
+//     sender's own taxonomy, especially when the share went to a
+//     group where no individual viewer is "more important".
+//   - When the sender did NOT label the share, viewer emails (or
+//     "Viewer N" fallbacks) take over the primary line.
+//   - The viewer email information is never lost — it's either
+//     primary (no label) or secondary (label present).
 //
-//   1. If the share is email-gated AND ≥1 viewer entered an email, show
-//      that email (or "first@x.com +N" when several entered).
-//   2. If viewers exist but none have an email (no_email gate), show
-//      "Viewer 1", "Viewer 2", … assigned by `first_seen` order. The
-//      caller passes a stable index per share so the numbering matches
-//      across renders.
-//   3. If no viewers yet, fall back to the sender's `recipient_label`
-//      (still useful — that's what the sender wrote it for).
-//   4. Last resort: "Unlabeled".
+// Rules in priority order:
 //
-// The label is preserved as a SECONDARY line when it exists and the
-// primary line wound up being a viewer email or "Viewer N" — so the
-// sender's own context isn't lost.
+//   1. If a recipient_label exists, primary = label.
+//      Secondary lines based on viewer count:
+//        - 0 viewers: secondary = null ("not opened yet")
+//        - 1 viewer with email: secondary = that email
+//        - N viewers with email: secondary = "first@x.com +N-1"
+//        - N viewers no email: secondary = "N viewers"
+//      Exception: when label matches the only viewer's email
+//      case-insensitively, drop secondary to avoid duplication.
+//
+//   2. If no label:
+//        - 0 viewers: primary = "Unlabeled", secondary = null
+//        - ≥1 viewer with email: primary = email or "first +N-1"
+//        - ≥1 viewer no email: primary = "Viewer 1" or "Viewer 1 +N-1"
 
 import type { Viewer } from './types';
 
 export interface RecipientIdentity {
-  // The primary line shown in the table / rail.
   primary: string;
-  // Optional second line — the sender's own label, only when distinct
-  // from `primary` (i.e. when `primary` is a viewer email or "Viewer N").
-  // Null when the label *is* the primary.
   secondary: string | null;
 }
 
@@ -42,40 +50,53 @@ export function resolveRecipientIdentity(
   viewers: Pick<Viewer, 'email' | 'first_seen'>[],
 ): RecipientIdentity {
   const label = share.recipient_label?.trim() || null;
-
-  // Viewers sorted by first_seen so the "Viewer N" assignment is stable
-  // across re-renders. The list comes from the server already filtered
-  // to this share's id, but we don't assume sort order.
   const sortedViewers = [...viewers].sort((a, b) =>
     (a.first_seen ?? '').localeCompare(b.first_seen ?? ''),
   );
   const withEmail = sortedViewers.filter((v) => !!v.email?.trim());
+  const totalViewers = sortedViewers.length;
 
-  // Email-gated path: prefer the actual emails the recipients typed.
-  if (share.require_email && withEmail.length > 0) {
+  // Label-driven path: sender's choice wins.
+  if (label) {
+    if (totalViewers === 0) {
+      return { primary: label, secondary: null };
+    }
+    if (withEmail.length > 0) {
+      const first = withEmail[0]!.email!;
+      // If the label is just the same email, suppress the redundant
+      // secondary line.
+      if (label.toLowerCase() === first.toLowerCase()) {
+        const extra = withEmail.length - 1;
+        return {
+          primary: extra > 0 ? `${first} +${extra}` : first,
+          secondary: null,
+        };
+      }
+      const extra = withEmail.length - 1;
+      const secondary = extra > 0 ? `${first} +${extra}` : first;
+      return { primary: label, secondary };
+    }
+    // Viewers exist but none with email yet — show count.
+    return {
+      primary: label,
+      secondary: totalViewers === 1 ? '1 viewer' : `${totalViewers} viewers`,
+    };
+  }
+
+  // No label — fall back to viewer info as primary.
+  if (withEmail.length > 0) {
     const first = withEmail[0]!.email!;
     const extra = withEmail.length - 1;
-    const primary = extra > 0 ? `${first} +${extra}` : first;
     return {
-      primary,
-      secondary: label && label.toLowerCase() !== first.toLowerCase() ? label : null,
+      primary: extra > 0 ? `${first} +${extra}` : first,
+      secondary: null,
     };
   }
-
-  // No-email gate (or email gate that nobody has filled yet) with at
-  // least one anonymous viewer.
-  if (sortedViewers.length > 0) {
-    const primary =
-      sortedViewers.length === 1 ? 'Viewer 1' : `Viewer 1 +${sortedViewers.length - 1}`;
+  if (totalViewers > 0) {
     return {
-      primary,
-      secondary: label,
+      primary: totalViewers === 1 ? 'Viewer 1' : `Viewer 1 +${totalViewers - 1}`,
+      secondary: null,
     };
   }
-
-  // No viewers yet — fall through to whatever the sender labelled.
-  return {
-    primary: label ?? 'Unlabeled',
-    secondary: null,
-  };
+  return { primary: 'Unlabeled', secondary: null };
 }

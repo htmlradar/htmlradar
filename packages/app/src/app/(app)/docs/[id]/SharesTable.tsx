@@ -101,6 +101,15 @@ export function SharesTable({
               const analytics = analyticsByShareId[share.id];
               const sessions = analytics?.sessions ?? [];
               const viewers = analytics?.viewers ?? [];
+              // Dedupe viewers by email (case-insensitive) and drop
+              // internal rows so the count matches ViewerInsights' glance
+              // grid above. Without this, the same person opening from
+              // two devices reads as "2 viewers" here and "1 viewer"
+              // there — same page, contradicting numbers.
+              const visibleViewers = viewers.filter((v) => !v.is_internal);
+              const dedupedViewerCount = new Set(
+                visibleViewers.map((v) => v.email?.trim().toLowerCase() || v.id),
+              ).size;
               const sessionCount = sessions.length;
               const avgActive =
                 sessionCount > 0
@@ -133,7 +142,7 @@ export function SharesTable({
                     </Link>
                     {identity.secondary && (
                       <div className="mt-0.5 truncate text-[11.5px] text-graphite">
-                        Labelled <span className="text-ink-soft">{identity.secondary}</span>
+                        {identity.secondary}
                       </div>
                     )}
                     <div className="mt-0.5 truncate font-mono text-[10.5px] text-graphite">
@@ -144,7 +153,7 @@ export function SharesTable({
                     <StatusDot status={status} />
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums text-ink-soft">
-                    {viewers.length}
+                    {dedupedViewerCount}
                   </td>
                   <td className="hidden px-4 py-3 text-right font-mono tabular-nums text-ink-soft md:table-cell">
                     {sessionCount}

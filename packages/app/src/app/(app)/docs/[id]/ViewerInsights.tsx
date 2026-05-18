@@ -45,6 +45,10 @@ interface ViewerInsightsProps {
   // a viewer came through. When a single email opened multiple shares
   // (rare, e.g. forwarded link), we render "N shares" instead.
   shareSlugs?: Record<string, string>;
+  // Map of share_id → recipient_label. Surfaces the sender's chosen
+  // label under the slug ("Investor list", "Marc at Example Ventures"), so the
+  // viewer row ties back to the same share-identity the rail uses.
+  shareLabels?: Record<string, string | null>;
   toggleInternal: (formData: FormData) => void | Promise<void>;
 }
 
@@ -262,6 +266,7 @@ export function ViewerInsights({
   events,
   documentId,
   shareSlugs,
+  shareLabels,
   toggleInternal,
 }: ViewerInsightsProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -442,7 +447,7 @@ export function ViewerInsights({
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-line text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
-              <th className="px-6 py-3.5 font-normal">Recipient</th>
+              <th className="px-6 py-3.5 font-normal">Viewer</th>
               <th className="px-4 py-3.5 text-right font-normal">Reading time</th>
               <th className="px-4 py-3.5 font-normal">Scroll depth</th>
               <th className="hidden px-4 py-3.5 text-right font-normal md:table-cell">Visits</th>
@@ -500,8 +505,15 @@ export function ViewerInsights({
                             case) get the URL; multi-share viewers
                             (rare) get "N shares" instead. */}
                         {g.shareIds.length === 1 && shareSlugs?.[g.shareIds[0]!] && (
-                          <div className="mt-0.5 truncate font-mono text-[11px] text-graphite">
-                            /r/{shareSlugs[g.shareIds[0]!]}
+                          <div className="mt-0.5 space-y-0.5">
+                            <div className="truncate font-mono text-[11px] text-graphite">
+                              /r/{shareSlugs[g.shareIds[0]!]}
+                            </div>
+                            {shareLabels?.[g.shareIds[0]!] && (
+                              <div className="truncate text-[11.5px] text-ink-soft">
+                                {shareLabels[g.shareIds[0]!]}
+                              </div>
+                            )}
                           </div>
                         )}
                         {g.shareIds.length > 1 && (

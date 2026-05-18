@@ -80,7 +80,7 @@ export function DeleteDocumentButton({
         )}
       >
         <AlertTriangle aria-hidden className="size-3.5" />
-        {isPending ? 'Deleting…' : armed ? 'Confirm delete' : 'Delete'}
+        {isPending ? 'Deleting…' : armed ? 'Confirm delete' : 'Delete document'}
       </button>
     </form>
   );

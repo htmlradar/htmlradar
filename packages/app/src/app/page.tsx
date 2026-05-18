@@ -125,6 +125,8 @@ export default async function LandingV2() {
               <div className="logos">
                 <span>Investor decks</span>
                 <span className="dot-sep">·</span>
+                <span>Diligence packets</span>
+                <span className="dot-sep">·</span>
                 <span>Sales reports</span>
                 <span className="dot-sep">·</span>
                 <span>Design specs</span>
@@ -543,9 +545,9 @@ export default async function LandingV2() {
                 Send a <em>tracked link</em>.
               </h3>
               <p>
-                Each recipient gets a unique link. Email gate, expiry, password, download lock — set
-                per share. Files (PDFs, cap tables, ZIPs) ride along with the doc; every download is
-                logged with the recipient&apos;s email.
+                Each recipient gets a unique link. Email gate, expiry, password, and download lock
+                are all set per share. The whole packet rides under one tracked link: PDFs, cap
+                tables, ZIPs alongside the deck, with each download tagged to the recipient.
               </p>
             </div>
           </div>
@@ -656,7 +658,9 @@ export default async function LandingV2() {
               </div>
               <div>
                 <h4>Auto-expiry</h4>
-                <p>Set a date and the link returns 403 after that moment. Extend any time.</p>
+                <p>
+                  Set a date. The link starts showing an Expired notice after it. Extend any time.
+                </p>
               </div>
             </div>
             <div className="v2-ctrl-item">

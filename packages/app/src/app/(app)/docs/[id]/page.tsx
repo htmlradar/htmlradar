@@ -382,6 +382,7 @@ export default async function DocumentPage({
           sessions={allSessions}
           events={allEvents}
           documentId={doc.id}
+          shareSlugs={Object.fromEntries(shareList.map((s) => [s.id, s.slug]))}
           toggleInternal={toggleViewerInternalAction}
         />
 

@@ -32,12 +32,17 @@ import { useMemo, useState } from 'react';
 import { ChevronRight, EyeOff, Eye } from 'lucide-react';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { GlanceGrid, sparklineFromSessionStarts } from '@/components/doc-dashboard/Glance';
+import { PulsingDot } from '@/components/doc-dashboard/PulsingDot';
 
 interface ViewerInsightsProps {
   viewers: Viewer[];
   sessions: Session[];
   events: SectionEvent[];
   documentId: string;
+  // Map of share_id → slug. Lets the viewer row surface the share URL
+  // a viewer came through. When a single email opened multiple shares
+  // (rare, e.g. forwarded link), we render "N shares" instead.
+  shareSlugs?: Record<string, string>;
   toggleInternal: (formData: FormData) => void | Promise<void>;
 }
 
@@ -65,9 +70,16 @@ interface ViewerGroup {
   visits: number;
   firstSeen: string;
   lastSeen: string;
+  // Distinct share_ids touched by this viewer group. Common case is 1;
+  // multiple means the same email opened multiple shares of this doc
+  // (forwarded link, sender re-shared with a new slug).
+  shareIds: string[];
   country: string | null;
   device: string | null;
   referrer: string | null;
+  // Most-recent session's last_heartbeat_at (ms epoch). Drives the live
+  // status pulse on the row: < 60s ago = "actively reading right now".
+  lastHeartbeatMs: number;
   sections: SectionRow[]; // per-viewer section dwell, sorted desc
 }
 
@@ -208,6 +220,17 @@ function buildGroups(
     // accidentally hide a real read.
     const isInternal = vList.every((v) => v.is_internal === true);
 
+    // Distinct share ids this viewer touched. Order doesn't matter for
+    // rendering ("3 shares" vs slug), so a Set→Array is fine.
+    const shareIds = Array.from(new Set(vList.map((v) => v.share_id)));
+
+    // Latest heartbeat across all sessions in this group. Drives the
+    // "live" pulse on the row when < 60s ago.
+    const lastHeartbeatMs = sList.reduce((acc, s) => {
+      const t = s.last_heartbeat_at ? new Date(s.last_heartbeat_at).getTime() : 0;
+      return t > acc ? t : acc;
+    }, 0);
+
     groups.push({
       key,
       viewerIds: vList.map((v) => v.id),
@@ -219,9 +242,11 @@ function buildGroups(
       visits,
       firstSeen,
       lastSeen,
+      shareIds,
       country: recent?.country_code ?? null,
       device: recent?.device_type ?? null,
       referrer: prettifyReferrer(recent?.referrer ?? null),
+      lastHeartbeatMs,
       sections,
     });
   }
@@ -244,6 +269,7 @@ export function ViewerInsights({
   sessions,
   events,
   documentId,
+  shareSlugs,
   toggleInternal,
 }: ViewerInsightsProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -394,12 +420,12 @@ export function ViewerInsights({
         />
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper">
+      <div className="mt-8 overflow-hidden rounded-2xl border border-line bg-paper">
         {/* Table header strip: column titles on the left, "Show hidden"
             toggle on the right. The toggle only appears when there's
             something to show — zero state stays uncluttered. */}
-        <div className="flex items-center justify-between border-b border-line bg-paper-2/40 px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
+        <div className="flex items-center justify-between border-b border-line bg-paper-2/40 px-6 py-3.5">
+          <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">
             {visibleGroups.length} {visibleGroups.length === 1 ? 'viewer' : 'viewers'}
             {hiddenGroups.length > 0 && showHidden && (
               <span className="ml-1.5 text-ink-soft">· {hiddenGroups.length} hidden shown</span>
@@ -429,13 +455,15 @@ export function ViewerInsights({
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-line text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
-              <th className="px-4 py-3 font-normal">Viewer</th>
-              <th className="px-4 py-3 text-right font-normal">Reading time</th>
-              <th className="px-4 py-3 font-normal">Scroll depth</th>
-              <th className="hidden px-4 py-3 text-right font-normal md:table-cell">Visits</th>
-              <th className="hidden px-4 py-3 text-right font-normal md:table-cell">First seen</th>
-              <th className="px-4 py-3 text-right font-normal">Last seen</th>
-              <th className="w-12 px-2 py-3 font-normal" aria-label="Hide / unhide" />
+              <th className="px-6 py-3.5 font-normal">Recipient</th>
+              <th className="px-4 py-3.5 text-right font-normal">Reading time</th>
+              <th className="px-4 py-3.5 font-normal">Scroll depth</th>
+              <th className="hidden px-4 py-3.5 text-right font-normal md:table-cell">Visits</th>
+              <th className="hidden px-4 py-3.5 text-right font-normal md:table-cell">
+                First seen
+              </th>
+              <th className="px-4 py-3.5 text-right font-normal">Last seen</th>
+              <th className="w-14 px-2 py-3.5 font-normal" aria-label="Hide / expand" />
             </tr>
           </thead>
           {rowsToRender.map((g) => {
@@ -457,19 +485,20 @@ export function ViewerInsights({
                   }
                   aria-expanded={isOpen}
                 >
-                  <td className="px-4 py-3">
-                    <div className="flex items-start gap-2">
+                  <td className="px-6 py-4">
+                    <div className="flex items-start gap-2.5">
                       <ChevronRight
                         aria-hidden
                         className={
-                          'mt-0.5 size-3.5 shrink-0 text-graphite transition ' +
+                          'mt-1 size-3.5 shrink-0 text-graphite transition ' +
                           (isOpen ? 'rotate-90' : '')
                         }
                       />
                       <div className="min-w-0 flex-1">
                         <div
                           className={
-                            'truncate font-medium ' + (isHidden ? 'text-ink-soft' : 'text-ink')
+                            'truncate text-[14.5px] font-medium ' +
+                            (isHidden ? 'text-ink-soft' : 'text-ink')
                           }
                         >
                           {g.primary}
@@ -479,15 +508,29 @@ export function ViewerInsights({
                             </span>
                           )}
                         </div>
+                        {/* Slug URL — surfaces which share this viewer
+                            came through. Single-slug viewers (common
+                            case) get the URL; multi-share viewers
+                            (rare) get "N shares" instead. */}
+                        {g.shareIds.length === 1 && shareSlugs?.[g.shareIds[0]!] && (
+                          <div className="mt-0.5 truncate font-mono text-[11px] text-graphite">
+                            /r/{shareSlugs[g.shareIds[0]!]}
+                          </div>
+                        )}
+                        {g.shareIds.length > 1 && (
+                          <div className="mt-0.5 font-mono text-[11px] text-graphite">
+                            {g.shareIds.length} shares
+                          </div>
+                        )}
                         {(g.country || g.device || g.referrer) && (
-                          <div className="mt-0.5 truncate font-mono text-[10.5px] uppercase tracking-[0.12em] text-graphite">
+                          <div className="mt-1 truncate font-mono text-[10.5px] uppercase tracking-[0.12em] text-graphite">
                             {[g.country, g.device, g.referrer].filter(Boolean).join(' · ')}
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums">
+                  <td className="px-4 py-4 text-right font-mono tabular-nums">
                     <div>{formatDuration(g.totalSeconds)}</div>
                     {g.activeSeconds > g.totalSeconds + 30 && (
                       // Show "tab open" only when the gap is meaningful
@@ -502,19 +545,28 @@ export function ViewerInsights({
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <ScrollBar pct={g.maxScroll} muted={isHidden} />
                   </td>
-                  <td className="hidden px-4 py-3 text-right font-mono tabular-nums md:table-cell">
+                  <td className="hidden px-4 py-4 text-right font-mono tabular-nums md:table-cell">
                     {g.visits}
                   </td>
-                  <td className="hidden px-4 py-3 text-right font-mono text-[12px] text-graphite md:table-cell">
+                  <td className="hidden px-4 py-4 text-right font-mono text-[12px] text-graphite md:table-cell">
                     {formatRelative(g.firstSeen)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-[12px] text-graphite">
-                    {formatRelative(g.lastSeen)}
+                  <td className="px-4 py-4 text-right font-mono text-[12px] text-graphite">
+                    <div className="inline-flex items-center justify-end gap-1.5">
+                      {/* Pulsing dot when this viewer heart-beated in
+                          the last 60s — "actively reading right now"
+                          signal lives at the row level, not just the
+                          hero. */}
+                      {g.lastHeartbeatMs > 0 && Date.now() - g.lastHeartbeatMs < 60_000 && (
+                        <PulsingDot tone="good" />
+                      )}
+                      {formatRelative(g.lastSeen)}
+                    </div>
                   </td>
-                  <td className="w-12 px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="w-14 px-2 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <HideViewerButton
                       viewerIds={g.viewerIds}
                       documentId={documentId}
@@ -525,7 +577,7 @@ export function ViewerInsights({
                 </tr>
                 {isOpen && (
                   <tr className="bg-paper-2/30">
-                    <td colSpan={7} className="px-4 py-5">
+                    <td colSpan={7} className="px-6 py-6">
                       <ViewerSectionDrill
                         primary={g.primary}
                         sections={g.sections}

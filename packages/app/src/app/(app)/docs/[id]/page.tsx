@@ -258,7 +258,7 @@ export default async function DocumentPage({
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {liveReaders > 0 && (
               <Chip variant="live">
-                {liveReaders} reading {liveReaders === 1 ? 'now' : 'now'}
+                {liveReaders === 1 ? '1 reading now' : `${liveReaders} reading now`}
               </Chip>
             )}
             <Chip

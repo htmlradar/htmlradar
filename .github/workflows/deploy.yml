@@ -1,16 +1,21 @@
 name: Deploy
 
-# Auto-deploy the Next.js app to Cloudflare Pages on every push to main.
-# Gated on lint + typecheck + test passing in the CI workflow. Today's
-# bug (commits sitting unpublished for hours because deploys were
-# manual via `wrangler pages deploy`) doesn't happen here — every
-# successful push to main becomes a prod deploy.
+# Production deploy with a preview-gated pipeline. Today (2026-05-18) a
+# straight push-deploy broke prod for ~15 min because GH Actions didn't
+# have NEXT_PUBLIC_* vars set at build time and Next inlined them as
+# undefined. Now: every build first goes to a preview URL, smoke-tests
+# against that URL, and only if the smoke test passes does the SAME
+# artifact get re-deployed to main. A broken bundle stays in preview
+# and prod keeps serving the last known-good deploy.
 #
-# Secrets required on the repo:
-#   - CLOUDFLARE_API_TOKEN — created at dash.cloudflare.com → My Profile
-#                            → API Tokens → "Edit Cloudflare Workers"
-#                            template (includes Pages:Edit)
+# Required secrets:
+#   - CLOUDFLARE_API_TOKEN — a cfut_ token with Pages:Edit + Workers:Edit
 #   - CLOUDFLARE_ACCOUNT_ID — REDACTED_CLOUDFLARE_ACCOUNT_ID
+#
+# Required to be committed at repo root in `.env.production`:
+#   - NEXT_PUBLIC_SUPABASE_URL — public, anon-key-only, safe to commit
+#   - NEXT_PUBLIC_SUPABASE_ANON_KEY — public-by-design (RLS gates writes)
+# The build sanity check (preflight) blocks deploy if these aren't set.
 
 on:
   workflow_run:
@@ -21,14 +26,12 @@ on:
 
 concurrency:
   group: deploy-main
-  cancel-in-progress: false # don't kill a deploy in flight — let it finish
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy to Cloudflare Pages
+    name: Deploy via preview → prod
     runs-on: ubuntu-latest
-    # Only deploy if CI passed AND we're on a push to main (not a PR
-    # workflow_run, which has head_branch=feature-branch).
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
@@ -37,8 +40,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Check out the exact commit CI tested — not the latest main,
-          # which could have moved since CI started.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: pnpm/action-setup@v3
@@ -53,6 +54,22 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Preflight — refuse to build if .env.production is missing required keys
+        run: |
+          set -e
+          ENVFILE="packages/app/.env.production"
+          if [ ! -f "$ENVFILE" ]; then
+            echo "::error::$ENVFILE missing — required for build-time NEXT_PUBLIC_* inlining."
+            exit 1
+          fi
+          for key in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
+            if ! grep -qE "^${key}=." "$ENVFILE"; then
+              echo "::error::$ENVFILE missing or empty: $key"
+              exit 1
+            fi
+          done
+          echo "Preflight OK."
+
       - name: Build tracker
         run: pnpm --filter @htmlradar/tracker build
 
@@ -61,15 +78,85 @@ jobs:
 
       - name: Build app for Cloudflare Pages
         run: cd packages/app && pnpm exec next-on-pages
-        env:
-          # Build-time env vars. Next.js inlines NEXT_PUBLIC_* into the
-          # client bundle, so they have to be present here. Anon key is
-          # safe in client code; service role is server-only and the app
-          # reads it from a Pages environment variable at runtime.
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: Deploy to Cloudflare Pages
+      - name: Bundle check — verify NEXT_PUBLIC_* were actually inlined
+        run: |
+          set -e
+          BUNDLE_DIR="packages/app/.vercel/output/static/_worker.js"
+          if ! grep -rq 'supabase.co' "$BUNDLE_DIR" 2>/dev/null; then
+            echo "::error::Built bundle has no supabase.co URL — NEXT_PUBLIC_SUPABASE_URL was undefined at build time."
+            exit 1
+          fi
+          echo "Bundle check OK — NEXT_PUBLIC_* values inlined."
+
+      - name: Deploy to PREVIEW (not main)
+        id: preview
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy packages/app/.vercel/output/static
+            --project-name=htmlradar
+            --branch=ci-preview
+            --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
+            --commit-dirty=false
+
+      - name: Extract preview URL
+        id: preview-url
+        run: |
+          # wrangler-action exposes `deployment-url` for some calls but not
+          # all — the most reliable read is the URL it prints. The action
+          # uses CLOUDFLARE_DEPLOYMENT_URL as a step output when it exists.
+          URL="${{ steps.preview.outputs.deployment-url }}"
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract preview deployment URL."
+            exit 1
+          fi
+          echo "preview_url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Preview deployed to: $URL"
+
+      - name: Smoke test the preview deploy
+        env:
+          PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
+        run: |
+          set -e
+          fail=0
+          check() {
+            local path="$1"
+            local expect="$2"
+            local code
+            code=$(curl -sL -o /tmp/page -w "%{http_code}" "${PREVIEW_URL}${path}")
+            if [ "$code" != "200" ]; then
+              echo "::error::${path} returned HTTP ${code} (expected 200)"
+              fail=$((fail + 1))
+              return
+            fi
+            if [ -n "$expect" ] && ! grep -q "$expect" /tmp/page; then
+              echo "::error::${path} returned 200 but body missing expected '${expect}'"
+              fail=$((fail + 1))
+            else
+              echo "  ✓ ${path}"
+            fi
+          }
+
+          echo "Smoke testing preview: $PREVIEW_URL"
+          check "/" "HTMLRadar"
+          check "/pricing" "pricing"
+          check "/sign-in" "sign-in"
+          check "/docs" ""    # 200 with redirect or content is fine
+          check "/feedback" "Tell us what we missed"
+          check "/v1/tracker.js" "qualifiedMs"   # confirms Release B tracker shipped
+          check "/sitemap.xml" "htmlradar.com"   # confirms SEO fix shipped
+          check "/robots.txt" "Sitemap"
+
+          if [ $fail -gt 0 ]; then
+            echo "::error::$fail smoke check(s) failed — NOT promoting to prod."
+            exit 1
+          fi
+          echo "All smoke checks passed."
+
+      - name: Promote preview → prod (deploy to main branch)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

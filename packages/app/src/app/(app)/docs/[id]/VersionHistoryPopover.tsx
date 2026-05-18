@@ -158,12 +158,25 @@ export function VersionHistoryPopover({
                         <Globe aria-hidden className="mt-0.5 size-3.5 shrink-0 text-signal-dark" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p
-                          className="truncate font-mono text-[12.5px] text-ink"
-                          title={v.filename ?? v.source_url ?? '—'}
-                        >
-                          {v.filename ?? v.source_url ?? '—'}
-                        </p>
+                        {v.filename ? (
+                          <p
+                            className="truncate font-mono text-[12.5px] text-ink"
+                            title={v.filename}
+                          >
+                            {v.filename}
+                          </p>
+                        ) : v.source_url ? (
+                          <p
+                            className="truncate font-mono text-[12.5px] text-ink"
+                            title={v.source_url}
+                          >
+                            {v.source_url}
+                          </p>
+                        ) : (
+                          <p className="truncate font-mono text-[12.5px] italic text-graphite">
+                            Filename not captured
+                          </p>
+                        )}
                         <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
                           {v.source_type === 'upload'
                             ? `Upload · ${formatBytes(v.bytes)}`
@@ -176,11 +189,17 @@ export function VersionHistoryPopover({
               })
             )}
           </ol>
-          <div className="border-t border-line bg-paper-2/40 px-5 py-3">
+          <div className="space-y-1.5 border-t border-line bg-paper-2/40 px-5 py-3">
             <p className="text-[12px] leading-relaxed text-graphite">
-              All existing share links automatically serve the current version. Earlier versions are
-              kept for reference only.
+              Every share link automatically serves the current version. Earlier versions are kept
+              for reference only.
             </p>
+            {currentVersion > 1 && total === 1 && (
+              <p className="text-[12px] leading-relaxed text-graphite">
+                Older filenames aren&apos;t shown because version history was added after those
+                uploads. From the next replace onward, the original local filename is captured.
+              </p>
+            )}
           </div>
         </div>
       ) : null}

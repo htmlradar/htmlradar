@@ -283,7 +283,7 @@ export default async function DocumentPage({
         <div className="min-w-0 flex-1">
           <h1
             title={doc.title}
-            className="text-letterpress truncate font-serif text-[44px] font-normal leading-[1.02] tracking-tightest text-ink md:text-[64px] lg:text-[72px]"
+            className="text-letterpress font-serif text-[26px] font-normal leading-[1.15] tracking-tight text-ink md:text-[32px] lg:text-[36px]"
           >
             {doc.title}
           </h1>

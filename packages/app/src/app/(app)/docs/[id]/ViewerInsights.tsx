@@ -271,6 +271,7 @@ export function ViewerInsights({
 }: ViewerInsightsProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [showAllViewers, setShowAllViewers] = useState(false);
 
   // All hooks must run before any conditional return.
   const allGroups = useMemo(
@@ -357,7 +358,14 @@ export function ViewerInsights({
   if (viewers.length === 0) return null;
 
   const toggle = (key: string) => setExpandedKey((prev) => (prev === key ? null : key));
-  const rowsToRender = showHidden ? [...visibleGroups, ...hiddenGroups] : visibleGroups;
+  const allRows = showHidden ? [...visibleGroups, ...hiddenGroups] : visibleGroups;
+  // Cap the viewer table to 5 rows in the collapsed state with a
+  // "Show all N" expand toggle below — same pattern as the sessions
+  // list. Long lists were dominating the page and the most-recent
+  // few are what the sender wants to glance.
+  const VIEWER_TABLE_INITIAL_LIMIT = 5;
+  const rowsToRender = showAllViewers ? allRows : allRows.slice(0, VIEWER_TABLE_INITIAL_LIMIT);
+  const hiddenByCapCount = Math.max(0, allRows.length - VIEWER_TABLE_INITIAL_LIMIT);
 
   return (
     <section className="mb-8">
@@ -562,12 +570,14 @@ export function ViewerInsights({
                   >
                     {formatTimestamp(g.firstSeen, 'auto').display}
                   </td>
-                  {/* Last seen — always relative ("recent" mode). Recency
-                      is the question; "23d ago" reads as "this lead is
-                      cold" better than a stale calendar date would. */}
+                  {/* Last seen — same hybrid "auto" mode as First seen:
+                      recent stays relative ("12h ago"), older pins to
+                      absolute ("May 17"). Symmetric with First seen so
+                      the two columns read consistently on the same row.
+                      Hover reveals the full timestamp. */}
                   <td
                     className="px-4 py-4 text-right font-mono text-[12px] text-graphite"
-                    title={formatTimestamp(g.lastSeen, 'recent').full}
+                    title={formatTimestamp(g.lastSeen, 'auto').full}
                   >
                     <div className="inline-flex items-center justify-end gap-1.5">
                       {/* Pulsing dot when this viewer heart-beated in
@@ -577,7 +587,7 @@ export function ViewerInsights({
                       {g.lastHeartbeatMs > 0 && Date.now() - g.lastHeartbeatMs < 60_000 && (
                         <PulsingDot tone="good" />
                       )}
-                      {formatTimestamp(g.lastSeen, 'recent').display}
+                      {formatTimestamp(g.lastSeen, 'auto').display}
                     </div>
                   </td>
                   <td className="w-14 px-2 py-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -604,6 +614,20 @@ export function ViewerInsights({
             );
           })}
         </table>
+        {hiddenByCapCount > 0 && (
+          <div className="flex items-center justify-center border-t border-line bg-paper-2/30 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setShowAllViewers((v) => !v)}
+              aria-expanded={showAllViewers}
+              className="link-slide inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite transition hover:text-signal-dark"
+            >
+              {showAllViewers
+                ? `Show top ${VIEWER_TABLE_INITIAL_LIMIT}`
+                : `Show ${hiddenByCapCount} more viewer${hiddenByCapCount === 1 ? '' : 's'}`}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -418,11 +418,14 @@ function SharePane({
     <section className="space-y-6 rounded-2xl border border-line bg-paper p-6 md:p-7">
       <header className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-graphite">
               Share
             </p>
-            <h2 className="text-letterpress mt-2 break-words font-serif text-[28px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[34px]">
+            <h2
+              title={share.recipient_label ?? 'Unlabeled'}
+              className="text-letterpress mt-2 truncate font-serif text-[28px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[34px]"
+            >
               {share.recipient_label ?? 'Unlabeled'}
             </h2>
           </div>

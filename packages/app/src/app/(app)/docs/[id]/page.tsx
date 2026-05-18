@@ -445,15 +445,15 @@ export default async function DocumentPage({
         </div>
       )}
 
-      {/* Two-column master-detail body on lg+ (Mock B). Shares column on
-          the left so the primary action (edit / copy / revoke) is one
-          short scroll away — fixes a designer QA3's "two scrolls to edit"
-          complaint. Analytics on the right is monitored, not acted on.
-          Below lg the page stacks: Shares above Analytics (Mock A flow). */}
-      <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.25fr] lg:items-start lg:gap-12">
-        {/* LEFT — Shares column. Sticky-positioned on lg+ so it stays
-            visible while the analytics column scrolls independently. */}
-        <section className="lg:sticky lg:top-6">
+      {/* Single-column stack — Shares above, Analytics below. The
+          Batch-F "outer master-detail" overlapped at every laptop
+          width because grid items without min-w-0 collapsed the
+          SharePane; the simpler stack is what worked before and
+          what users actually scan top-to-bottom anyway. The inner
+          DocumentShareManager keeps its own rail+pane master-detail
+          at 2xl+ for very wide screens. */}
+      <div className="mt-10 space-y-12">
+        <section>
           <SectionHead
             title="Shares."
             hint={`${shares.length} ${shares.length === 1 ? 'link' : 'links'} · per-recipient settings`}
@@ -471,10 +471,6 @@ export default async function DocumentPage({
           />
         </section>
 
-        {/* RIGHT — Analytics column. ViewerInsights renders its own
-            "Who's reading." header + glance grid + viewer table + drill.
-            SharesTable goes below it (only renders when 2+ shares — same
-            anti-clutter rule as before). */}
         <section className="space-y-8">
           <ViewerInsights
             viewers={allViewers}

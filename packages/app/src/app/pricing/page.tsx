@@ -333,7 +333,15 @@ function Tier({
   external = false,
 }: TierProps) {
   return (
+    // Box shadows live in landing-v2.css rules (.pricing-tier and
+    // .pricing-tier[data-accent='true']) so the :hover variant can
+    // actually override them. Inline styles win over external CSS by
+    // specificity rules, so an inline boxShadow here would have left
+    // the hover state with a lift but no deepened shadow — caught by
+    // the static-audit pass on 2026-05-19.
     <article
+      className="pricing-tier"
+      data-accent={accent ? 'true' : 'false'}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -342,9 +350,6 @@ function Tier({
         border: `1px solid ${accent ? 'var(--ink)' : 'var(--line)'}`,
         borderRadius: 16,
         padding: '32px 32px 28px',
-        boxShadow: accent
-          ? '0 30px 60px -20px rgba(42,24,18,0.30)'
-          : '0 18px 40px -20px rgba(31,17,8,0.10)',
       }}
     >
       <div

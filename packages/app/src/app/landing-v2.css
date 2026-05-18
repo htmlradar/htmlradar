@@ -151,8 +151,16 @@
   font-weight: 500;
   text-decoration: none;
 }
+.v2-nav .nav-cta {
+  transition:
+    background 0.15s,
+    transform 0.08s;
+}
 .v2-nav .nav-cta:hover {
   background: #2a2722;
+}
+.v2-nav .nav-cta:active {
+  transform: translateY(0.5px);
 }
 
 /* ============ HERO ============ */
@@ -2459,6 +2467,45 @@
 .v2-os .repo svg {
   width: 14px;
   height: 14px;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* L7 — small playful rotate on the GitHub icon when hovering the repo
+   link. Tied to :hover only; mobile users without hover never trigger
+   it. prefers-reduced-motion neutralises via global rule. */
+@media (hover: hover) {
+  .v2-os .repo:hover svg {
+    transform: rotate(-8deg);
+  }
+}
+
+/* P5 — /pricing Tier card. Shadow + transition live here (not inline)
+   so the :hover variant can actually override the rest shadow —
+   inline styles would have won by specificity. The transition is
+   declared in the base rule, runs on every state change including
+   hover-exit. */
+.pricing-tier {
+  box-shadow: 0 18px 40px -20px rgba(31, 17, 8, 0.1);
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pricing-tier[data-accent='true'] {
+  box-shadow: 0 30px 60px -20px rgba(42, 24, 18, 0.3);
+}
+/* Hover lift gated to hover-capable devices — mobile taps don't stick
+   the card in a lifted state. */
+@media (hover: hover) {
+  .pricing-tier:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 30px 60px -20px rgba(31, 17, 8, 0.18),
+      0 12px 30px -16px rgba(31, 17, 8, 0.1);
+  }
+  .pricing-tier[data-accent='true']:hover {
+    box-shadow:
+      0 40px 80px -20px rgba(42, 24, 18, 0.36),
+      0 16px 36px -16px rgba(42, 24, 18, 0.18);
+  }
 }
 
 /* ============ THE SHIFT (PDF → HTML manifesto beat) ============ */
@@ -2701,6 +2748,14 @@
   background: var(--brand);
   box-shadow: 0 0 0 4px rgba(107, 30, 44, 0.16);
   animation: v2-packet-down 7s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+/* L4 — pause the workflow packet on hover so the reader can study the
+   steps without the dot pulling attention. Pure CSS; mobile users
+   without :hover never trigger it. */
+@media (hover: hover) {
+  .v2-flow-stage:hover::after {
+    animation-play-state: paused;
+  }
 }
 @keyframes v2-packet-down {
   0% {

@@ -41,6 +41,9 @@ playwright-report/
 test-results/
 .nyc_output/
 e2e/.auth/
+**/e2e/.auth/
+**/test-results/
+**/playwright-report/
 
 # Cloudflare
 .wrangler/

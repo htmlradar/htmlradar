@@ -150,8 +150,13 @@ export default async function DocumentsPage() {
 
       {/* Top-line stat strip — same visual language as the per-doc
           ViewerInsights strip. Renders even on empty libraries so the
-          numbers read as "zero so far" rather than absent. */}
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          numbers read as "zero so far" rather than absent.
+
+          motion-safe:animate-in adds a soft 300ms opacity fade on
+          first paint without count-up theatrics (the numbers should
+          land final, not animate). prefers-reduced-motion: ignored
+          via Tailwind's motion-safe variant. */}
+      <div className="fade-in-soft mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Documents" value={String(totalDocs)} />
         <Stat label="Active shares" value={String(activeShares)} />
         <Stat label="Reads · 7d" value={String(readsThisWeek)} />
@@ -170,7 +175,7 @@ export default async function DocumentsPage() {
               <li key={d.id}>
                 <Link
                   href={`/docs/${d.id}`}
-                  className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-paper-2/40"
+                  className="group flex items-center justify-between gap-4 px-5 py-4 transition duration-200 hover:bg-paper-2/40 motion-safe:hover:-translate-y-px"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-4">
                     <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-paper-3 text-signal-dark">
@@ -180,11 +185,24 @@ export default async function DocumentsPage() {
                         <Link2 aria-hidden className="size-4" />
                       )}
                       {isActive && (
-                        <span
-                          aria-label="New activity since your last visit"
-                          title="New activity since your last visit"
-                          className="absolute -right-0.5 -top-0.5 inline-flex size-2.5 rounded-full bg-signal ring-2 ring-paper"
-                        />
+                        <>
+                          {/* Outer halo — uses the existing .radar-ring
+                              utility (scales 0.4 → 1.0, fades 0 → 0.55 → 0
+                              every 4s). The dot itself stays static and
+                              load-bearing for the affordance; the halo is
+                              ambient. prefers-reduced-motion globally
+                              neutralizes the animation via the !important
+                              rule in globals.css. */}
+                          <span
+                            aria-hidden
+                            className="radar-ring pointer-events-none absolute -right-1.5 -top-1.5 size-5 rounded-full bg-signal/30"
+                          />
+                          <span
+                            aria-label="New activity since your last visit"
+                            title="New activity since your last visit"
+                            className="absolute -right-0.5 -top-0.5 inline-flex size-2.5 rounded-full bg-signal ring-2 ring-paper"
+                          />
+                        </>
                       )}
                     </span>
                     <div className="min-w-0 flex-1">

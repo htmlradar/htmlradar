@@ -121,9 +121,15 @@ export function SignInForm({
         <button
           onClick={signInWithGoogle}
           disabled={busy}
-          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-paper px-4 py-3 text-[14.5px] font-medium text-ink shadow-[0_1px_0_rgba(31,17,8,0.04)] transition hover:border-signal hover:text-signal-dark disabled:opacity-50"
+          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-paper px-4 py-3 text-[14.5px] font-medium text-ink shadow-[0_1px_0_rgba(31,17,8,0.04)] transition hover:border-signal hover:text-signal-dark disabled:cursor-wait disabled:opacity-60"
         >
-          Continue with Google
+          {busy ? (
+            <span className="font-mono text-[12px] uppercase tracking-[0.16em] text-graphite">
+              Opening Google…
+            </span>
+          ) : (
+            <>Continue with Google</>
+          )}
         </button>
 
         <p className="mt-3 text-[11.5px] leading-relaxed text-graphite">
@@ -152,7 +158,12 @@ export function SignInForm({
         </div>
 
         {sent ? (
-          <div className="rounded-md border border-line bg-paper-2/60 p-5 text-[14px] leading-relaxed text-ink-soft">
+          // Soft 350ms fade-in on the confirmation card so the
+          // form→confirmation swap doesn't snap. The opacity-only
+          // motion (no translate) avoids any layout shift, which
+          // matters because the surrounding paragraphs about the
+          // help/error states keep their positions stable.
+          <div className="fade-in-soft-slow rounded-md border border-line bg-paper-2/60 p-5 text-[14px] leading-relaxed text-ink-soft">
             HTMLRadar sent a sign-in link to <strong className="text-ink">{email}</strong>. Open the
             email and click through to finish.
           </div>

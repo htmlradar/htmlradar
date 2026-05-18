@@ -51,6 +51,56 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* ----------------------------------------------------------------
+     Tactile interactions — Phase 2 design polish (P1)
+     ----------------------------------------------------------------
+     Two site-wide additions:
+
+     1. Keyboard a11y: every interactive control gets a visible
+        :focus-visible ring. Without an explicit selector, Tailwind's
+        default focus ring is suppressed across all the buttons that
+        also disable :focus.
+     2. Tactile press: every <button> + role=button + anchor that's
+        styled as a button gets a 0.5-1px downward shift on :active.
+        Matches how the recipient corner pill already feels.
+
+     Both are pure additive — no existing behavior changes. The
+     prefers-reduced-motion rule above already neutralizes the active
+     transition for users who opt out. */
+
+  /* Focus ring on buttons + button-shaped anchors only. We deliberately
+     do NOT match plain text links — they communicate focus through
+     their existing underline + decoration; layering an outline on top
+     produces a jagged box across wrapped lines. Alpha 0.78 clears
+     WCAG AA non-text contrast (3:1) against the paper background. */
+  button:not(:disabled):focus-visible,
+  [role='button']:not(:disabled):focus-visible,
+  a.rounded-md:focus-visible,
+  a.rounded-lg:focus-visible,
+  a.rounded-xl:focus-visible,
+  a.rounded-2xl:focus-visible,
+  a.rounded-full:focus-visible {
+    outline: 2px solid rgba(90, 21, 33, 0.78);
+    outline-offset: 2px;
+  }
+
+  button:not(:disabled):active,
+  [role='button']:not(:disabled):active {
+    transform: translateY(0.5px);
+  }
+
+  /* Anchors styled as buttons (we have many — `bg-signal px-5 py-2.5`
+     pattern). They keep the same tactile feel. Scoped via the rounded-
+     md / rounded-lg / rounded-xl class hooks so plain text links don't
+     accidentally shift on click. */
+  a.rounded-md:active,
+  a.rounded-lg:active,
+  a.rounded-xl:active,
+  a.rounded-2xl:active,
+  a.rounded-full:active {
+    transform: translateY(0.5px);
+  }
 }
 
 @layer components {
@@ -67,6 +117,28 @@
   /* Editorial measure — keeps prose readable. ~66 characters wide. */
   .measure {
     max-width: 38rem;
+  }
+
+  /* Soft on-mount opacity fade. Used on the /docs stat strip and the
+     /sign-in sent-confirmation card. We avoided the `animate-in`
+     Tailwind utility because the `tailwindcss-animate` plugin isn't
+     installed — that class set would emit no CSS and silently no-op.
+     prefers-reduced-motion is neutralised globally via the rule in
+     @layer base. */
+  .fade-in-soft {
+    animation: fade-in-soft 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .fade-in-soft-slow {
+    animation: fade-in-soft 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  @keyframes fade-in-soft {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   /* For the radar-pulse rings — sets a CSS variable that the animation

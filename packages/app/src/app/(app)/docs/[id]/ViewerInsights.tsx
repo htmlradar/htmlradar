@@ -33,6 +33,7 @@ import { ChevronRight, EyeOff, Eye } from 'lucide-react';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { GlanceGrid, sparklineFromSessionStarts } from '@/components/doc-dashboard/Glance';
 import { PulsingDot } from '@/components/doc-dashboard/PulsingDot';
+import { SectionHead } from '@/components/doc-dashboard/SectionHead';
 
 interface ViewerInsightsProps {
   viewers: Viewer[];
@@ -364,12 +365,7 @@ export function ViewerInsights({
 
   return (
     <section className="mb-8">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-3">
-        <h2 className="font-serif text-[22px] leading-tight text-ink md:text-[26px]">Viewers</h2>
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-          Click a viewer to see their section-level dwell
-        </p>
-      </div>
+      <SectionHead title="Who's reading." hint="Click a viewer for section-level dwell" />
 
       {/* Glance grid — 1 feature card (dark, big number + sparkline) +
           3 paper cards. Replaces the prior 5-card paper-only strip per

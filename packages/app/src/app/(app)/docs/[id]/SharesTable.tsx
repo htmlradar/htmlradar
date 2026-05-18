@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
+import { SectionHead } from '@/components/doc-dashboard/SectionHead';
 import type { ShareRow, ShareAnalyticsData } from './DocumentShareManager';
 
 type Status = 'active' | 'revoked' | 'expired';
@@ -76,15 +77,11 @@ export function SharesTable({
 
   return (
     <section className="mb-8">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-3">
-        <h2 className="font-serif text-[22px] leading-tight text-ink md:text-[26px]">
-          At a glance
-        </h2>
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-          {shares.length} {shares.length === 1 ? 'share' : 'shares'} · click a row to drill in
-        </p>
-      </div>
-      <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper">
+      <SectionHead
+        title="Share-by-share."
+        hint={`${shares.length} ${shares.length === 1 ? 'share' : 'shares'} · click a row to drill in`}
+      />
+      <div className="overflow-hidden rounded-2xl border border-line bg-paper">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-line bg-paper-2/40 text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">

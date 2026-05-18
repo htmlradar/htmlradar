@@ -12,20 +12,27 @@
 // On mobile (<lg), the layout stacks: list on top, detail below. After
 // selecting a share, the page scrolls the detail pane into view.
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  Calendar,
   Check,
   Copy,
+  Download,
   ExternalLink,
   Eye,
   EyeOff,
+  Globe,
+  Lock,
+  Mail,
   Pencil,
   Plus,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
+import { GateTag } from '@/components/doc-dashboard/GateTag';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
 import type { Viewer, Session } from '@/lib/types';
 
@@ -147,7 +154,7 @@ export function DocumentShareManager({
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[320px_1fr] lg:gap-6">
+    <div className="grid gap-5 lg:grid-cols-[300px_1fr] lg:items-start lg:gap-8">
       <ShareRail
         shares={shares}
         analyticsByShareId={analyticsByShareId}
@@ -237,34 +244,40 @@ function ShareRail({
   const showEmptyPlaceholder = shares.length === 0 && selection.mode !== 'new';
 
   return (
-    <aside className="overflow-hidden rounded-2xl border border-line bg-paper">
+    <aside className="flex flex-col gap-2 lg:sticky lg:top-24">
+      {/* "+ New share" pill — dashed border, no fill. Matches a designer
+          ref's transparent-rail composition. When the new-share form is
+          open in the right pane, the pill goes signal-tinted so the
+          relationship between rail-state and pane-state is obvious. */}
       <button
         type="button"
         onClick={onSelectNew}
         className={cn(
-          'flex w-full items-center gap-2 border-b border-line px-5 py-4 text-left transition',
+          'flex w-full items-center gap-3 rounded-2xl border-2 border-dashed px-4 py-3.5 text-left text-[14px] font-medium transition',
           selection.mode === 'new'
-            ? 'bg-signal/8 text-signal-dark'
-            : 'text-ink-soft hover:bg-paper-2/40 hover:text-ink',
+            ? 'border-signal bg-paper text-ink'
+            : 'border-line bg-transparent text-ink-soft hover:border-signal/50 hover:bg-paper hover:text-ink',
         )}
       >
         <span
           className={cn(
-            'flex size-6 items-center justify-center rounded-full transition',
-            selection.mode === 'new' ? 'bg-signal text-paper' : 'bg-paper-3 text-signal-dark',
+            'flex size-7 items-center justify-center rounded-full border transition',
+            selection.mode === 'new'
+              ? 'border-signal bg-signal text-paper'
+              : 'border-line bg-paper text-signal-dark',
           )}
         >
           <Plus aria-hidden className="size-3.5" />
         </span>
-        <span className="text-[14px] font-medium">New share</span>
+        New share
       </button>
 
       {showEmptyPlaceholder ? (
-        <p className="px-5 py-5 text-[13px] text-graphite">
+        <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-[13px] leading-relaxed text-graphite">
           No shares yet. Click <span className="text-ink">New share</span> to create one.
         </p>
       ) : shares.length > 0 ? (
-        <ul>
+        <ul className="flex flex-col gap-1">
           {shares.map((s) => {
             const isExpired = !!s.expires_at && new Date(s.expires_at) < new Date();
             const isRevoked = !!s.revoked_at;
@@ -275,22 +288,32 @@ function ShareRail({
                 ? 'expired'
                 : 'active';
             return (
-              <li key={s.id} className="border-b border-line last:border-b-0">
+              <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => onSelectShare(s.id)}
                   className={cn(
-                    'flex w-full items-start gap-3 border-l-2 px-5 py-4 text-left transition',
+                    'group relative flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition',
                     active
-                      ? 'border-signal bg-signal/8 text-ink'
-                      : 'border-transparent hover:border-signal/30 hover:bg-paper-2/40',
+                      ? 'border-line bg-paper shadow-[0_1px_0_rgba(31,17,8,0.04)]'
+                      : 'border-transparent hover:border-line hover:bg-paper',
                   )}
                 >
+                  {/* 3px vertical brand bar on selected — a designer's
+                      "selection accent" pattern. Transparent on unselected
+                      so the row stays clean. */}
                   <span
                     aria-hidden
                     className={cn(
-                      'mt-1.5 size-2 shrink-0 rounded-full',
-                      status === 'active' && 'bg-signal',
+                      'absolute inset-y-3 left-2 w-[3px] rounded-full transition-colors',
+                      active ? 'bg-signal' : 'bg-transparent group-hover:bg-signal/30',
+                    )}
+                  />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'ml-3 mt-1.5 size-2 shrink-0 rounded-full',
+                      status === 'active' && 'bg-good',
                       status === 'expired' && 'bg-alert',
                       status === 'revoked' && 'bg-graphite/40',
                     )}
@@ -314,11 +337,11 @@ function ShareRail({
                             {identity.primary}
                           </div>
                           {identity.secondary && (
-                            <div className="mt-0.5 truncate text-[11px] text-graphite">
+                            <div className="mt-0.5 truncate text-[11.5px] text-graphite">
                               Labelled {identity.secondary}
                             </div>
                           )}
-                          <div className="mt-0.5 truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
+                          <div className="mt-1 truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
                             {status === 'revoked'
                               ? 'Revoked'
                               : status === 'expired'
@@ -368,13 +391,17 @@ function SharePane({
   const isLive = !isRevoked && !isExpired;
   const fullUrl = `https://htmlradar.com/r/${share.slug}`;
 
+  const gateTags = buildGateTags(share);
+
   return (
-    <section className="space-y-7">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-graphite">Share</p>
-            <h2 className="text-letterpress mt-2 font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+    <section className="space-y-6 rounded-2xl border border-line bg-paper p-6 md:p-7">
+      <header className="space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-graphite">
+              Share
+            </p>
+            <h2 className="text-letterpress mt-2 break-words font-serif text-[28px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[34px]">
               {share.recipient_label ?? 'Unlabeled'}
             </h2>
           </div>
@@ -403,8 +430,8 @@ function SharePane({
 
         <div
           className={cn(
-            'flex flex-wrap items-center gap-3 rounded-xl border border-line px-4 py-3',
-            isLive ? 'bg-paper' : 'bg-paper-2/40 opacity-70',
+            'flex flex-wrap items-center gap-3 rounded-xl border bg-paper-2/30 px-4 py-3',
+            isLive ? 'border-line' : 'border-line/60 opacity-70',
           )}
         >
           <span
@@ -418,7 +445,10 @@ function SharePane({
           {isLive && <CopyInline slug={share.slug} />}
         </div>
 
-        <p className="font-mono text-[11px] text-graphite">{gateSummary(share)}</p>
+        {/* Gate row — one chip per gate condition. Replaces the prior
+            single-sentence gateSummary() so each setting is independently
+            scannable. */}
+        {gateTags.length > 0 && <div className="flex flex-wrap items-center gap-2">{gateTags}</div>}
       </header>
 
       {!isLive && (
@@ -446,6 +476,10 @@ function SharePane({
           viewers={analytics.viewers}
           sessions={analytics.sessions}
           sections={analytics.sections}
+          // panel-mini styles the stats with the pop accent on the
+          // headline and rebuilds the sessions row as a 5-col grid;
+          // /dashboard/[slug] keeps the default variant.
+          variant="panel-mini"
           // When this is the only share on the doc, the per-doc
           // ViewerInsights strip already shows the same Viewers /
           // Sessions / Avg active / Max scroll numbers. Suppress the
@@ -460,19 +494,85 @@ function SharePane({
   );
 }
 
-// Human-readable summary of which gates a share has + expiry.
-// Distinguishes "email gate", "password gate", "both", "neither" so the
-// "Anonymous · Password" wrong-label issue from the audit doesn't happen.
-function gateSummary(share: ShareRow): string {
-  const gate = share.require_email
-    ? share.require_password
-      ? 'Email + password gate'
-      : 'Email gate'
-    : share.require_password
-      ? 'Password gate'
-      : 'No gate (anonymous)';
-  const expiry = share.expires_at ? `Expires ${formatExpiry(share.expires_at)}` : 'No expiry';
-  return `${gate} · ${expiry}`;
+// Renders the per-share access conditions as independent chips.
+// Replaces the prior single-sentence gateSummary() — easier to scan at
+// a glance ("password + 3-domain allowlist, expires in 7d") than
+// parsing a comma-list. Returns React nodes ready to drop into a row.
+function buildGateTags(share: ShareRow): ReactNode[] {
+  const tags: ReactNode[] = [];
+  // Gate: email + password presented as separate chips so the user
+  // sees "both" as two chips, "either" as one. Anonymous = "Open"
+  // dashed chip so the absence of a gate reads as deliberate.
+  if (share.require_email) {
+    tags.push(
+      <GateTag key="email" icon={<Mail className="size-3" />}>
+        Email gate
+      </GateTag>,
+    );
+  }
+  if (share.require_password) {
+    tags.push(
+      <GateTag key="password" icon={<Lock className="size-3" />}>
+        Password
+      </GateTag>,
+    );
+  }
+  if (!share.require_email && !share.require_password) {
+    tags.push(
+      <GateTag key="open" tone="off">
+        Open · no gate
+      </GateTag>,
+    );
+  }
+  // Allowlists — surfaced as count when present. "+1 email" / "3 domains"
+  // is the most useful affordance at glance; full list lives in the edit
+  // form.
+  const domainCount = share.allowed_email_domains?.length ?? 0;
+  if (domainCount > 0) {
+    tags.push(
+      <GateTag key="domains" icon={<Globe className="size-3" />}>
+        {domainCount} {domainCount === 1 ? 'domain' : 'domains'}
+      </GateTag>,
+    );
+  }
+  const emailCount = share.allowed_emails?.length ?? 0;
+  if (emailCount > 0) {
+    tags.push(
+      <GateTag key="emails" icon={<ShieldCheck className="size-3" />}>
+        {emailCount} allow-listed
+      </GateTag>,
+    );
+  }
+  // Expiry chip — alert tone if already past, default otherwise.
+  // "No expiry" goes muted so its absence reads deliberate.
+  if (share.expires_at) {
+    const exp = new Date(share.expires_at);
+    const past = exp < new Date();
+    tags.push(
+      <GateTag
+        key="expiry"
+        icon={<Calendar className="size-3" />}
+        tone={past ? 'alert' : 'default'}
+      >
+        {past ? 'Expired' : 'Expires'} {formatExpiry(share.expires_at)}
+      </GateTag>,
+    );
+  } else {
+    tags.push(
+      <GateTag key="no-expiry" tone="off">
+        No expiry
+      </GateTag>,
+    );
+  }
+  // Download / screenshot protection — default OFF means guard is
+  // active. Surfaced because it's the highest-friction default and
+  // worth advertising prominently to the sender.
+  tags.push(
+    <GateTag key="download" icon={<Download className="size-3" />}>
+      {share.allow_download ? 'Download allowed' : 'Download blocked'}
+    </GateTag>,
+  );
+  return tags;
 }
 
 function WaitingInline({ shareSlug }: { shareSlug: string; recipientLabel: string | null }) {

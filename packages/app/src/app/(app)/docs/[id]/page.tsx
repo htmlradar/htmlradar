@@ -16,6 +16,7 @@ import { requireUser, serverClient } from '@/lib/supabase-server';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import { Chip } from '@/components/doc-dashboard/Chip';
+import { SectionHead } from '@/components/doc-dashboard/SectionHead';
 import {
   createShareAction,
   toggleShareAction,
@@ -388,16 +389,22 @@ export default async function DocumentPage({
 
         <SharesTable shares={shares} analyticsByShareId={analyticsByShareId} />
 
-        <DocumentShareManager
-          documentId={doc.id}
-          shares={shares}
-          analyticsByShareId={analyticsByShareId}
-          createShare={createShareAction}
-          toggleShare={toggleShareAction}
-          editShare={editShareAction}
-          previewShare={previewShareAction}
-          attachmentCount={attachments.length}
-        />
+        <section className="mb-8">
+          <SectionHead
+            title="Shares."
+            hint={`${shares.length} ${shares.length === 1 ? 'link' : 'links'} · per-recipient settings`}
+          />
+          <DocumentShareManager
+            documentId={doc.id}
+            shares={shares}
+            analyticsByShareId={analyticsByShareId}
+            createShare={createShareAction}
+            toggleShare={toggleShareAction}
+            editShare={editShareAction}
+            previewShare={previewShareAction}
+            attachmentCount={attachments.length}
+          />
+        </section>
 
         <AttachmentsPanel
           documentId={doc.id}

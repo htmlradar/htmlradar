@@ -176,3 +176,18 @@ jobs:
             --branch=main
             --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
             --commit-dirty=false
+
+      # Cloudflare Pages deploys the Next.js app. The /r/* recipient
+      # path is served by a separate Worker (packages/proxy) — without
+      # this step, proxy changes (download guard, materials panel,
+      # tracker injection) sit unpublished even after CI is green.
+      # The 2026-05-18 incident where Feature 1's download guard was
+      # 'shipped' to git but not live until manually `wrangler deploy`d
+      # is the bug this step prevents.
+      - name: Deploy proxy worker (packages/proxy)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/proxy
+          command: deploy

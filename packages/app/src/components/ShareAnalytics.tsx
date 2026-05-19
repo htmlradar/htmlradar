@@ -51,6 +51,11 @@ export interface ShareAnalyticsProps {
 }
 
 function formatDuration(seconds: number): string {
+  // Sub-1s "glanced" sections render as em-dash (matches ViewerInsights).
+  // Sections-v2 may emit qualifiedMs=0 for sections the reader scrolled
+  // past too fast to qualify; surfacing them honestly beats a misleading
+  // "0s" or rounded-up "1s".
+  if (!seconds || seconds < 1) return '—';
   if (seconds < 60) return `${Math.round(seconds)}s`;
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);

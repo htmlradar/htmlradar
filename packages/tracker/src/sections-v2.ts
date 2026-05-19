@@ -123,11 +123,26 @@ export class SectionTracker {
     this.scheduleTick();
   }
 
-  // Returns sections that have accumulated ≥ minDwellMs of QUALIFIED time.
-  // `timeSeconds` is qualifiedMs / 1000 — what the dashboard surfaces.
+  // Returns EVERY section that has entered the viewport at least once,
+  // with its (possibly zero) qualified time. The dashboard renders the
+  // narrative in deck order; we want sections the reader scrolled
+  // through without sustaining attention to still appear (with time
+  // 0 or sub-second) — same model DocSend uses for per-page views.
+  //
+  // Was previously filtered to sections that hit `minDwellMs` of
+  // qualified time. That filter is now a UI concern (render `—` for
+  // sub-threshold time) so we can show the full read pattern instead
+  // of dropping "scrolled past" sections silently.
+  //
+  // Important — `qualifiedMs` math is UNCHANGED. We're only changing
+  // what gets flushed to the DB. The IAB 50%-coverage / 1s-continuous
+  // / 5s-activity rules still gate qualifiedMs accumulation. A
+  // section that doesn't qualify simply ships with timeSeconds=0.
+  // The `onSectionRead` callback (which still uses minDwellMs) is
+  // unaffected — "read" is still a meaningful, dwell-thresholded event.
   snapshot(): SectionInfo[] {
     return this.sections
-      .filter((s) => s.qualifiedMs >= this.opts.minDwellMs)
+      .filter((s) => this.enteredOnce.has(s.id))
       .map((s) => ({
         id: s.id,
         title: s.title,

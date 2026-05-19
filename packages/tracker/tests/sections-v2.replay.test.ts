@@ -225,3 +225,24 @@ describe.skipIf(!existsSync(F3))('F3 — Claude long itinerary', () => {
     expect(result.titles).toContain('Departure Day');
   });
 });
+
+describe.skipIf(!existsSync(F1))('Fast-scroll behaviour — every entered section is emitted', () => {
+  it('sub-qualification dwell still surfaces all entered sections (timeSeconds=0)', () => {
+    const html = readFileSync(F1, 'utf8');
+    // 600ms per section — UNDER the 1000ms QUALIFIED_DWELL_MS gate.
+    // No section accumulates qualifiedMs, so every section's
+    // timeSeconds must be 0 — but they MUST all appear in snapshot()
+    // so the dashboard can render them as "entered but didn't engage".
+    // This is the Viewer5 case from prod (11s session, 11 sections crossed,
+    // only 1 qualified — we want all 11 surfaced honestly).
+    const result = simulate(html, { dwellPerSectionMs: 600 });
+
+    // All deck sections must appear in snapshot regardless of qualification.
+    expect(result.titles.length).toBeGreaterThanOrEqual(13);
+
+    // None should have credited qualified time (dwell was sub-1s).
+    for (const [id, secs] of result.perSection) {
+      expect(secs, `${id} should have ~0s qualified time, got ${secs}`).toBeLessThan(0.05);
+    }
+  });
+});

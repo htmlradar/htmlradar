@@ -720,34 +720,65 @@ function ViewerSectionDrill({
     );
   }
 
-  const longestPossibleBar = sections[0]!.totalSeconds || 1;
+  // Largest dwell in the list anchors the bar widths. Step A sorts
+  // sections by deck order (not by time desc), so sections[0] is the
+  // first-in-deck section which can be a glanced/zero-time section.
+  // Must take the actual max across the list. Falls back to 1 when
+  // no section qualified (every row is glanced).
+  const longestPossibleBar = sections.reduce((m, s) => Math.max(m, s.totalSeconds), 0) || 1;
+  // Count how many sections actually got real dwell so we can show a
+  // helpful aggregate ("3 read · 8 glanced") rather than forcing the
+  // sender to count rows themselves.
+  const readCount = sections.filter((s) => s.totalSeconds >= 1).length;
+  const glancedCount = sections.length - readCount;
 
   return (
     <div className="mx-2">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-graphite">
-          Sections read by <span className="text-signal-dark">{primary}</span>
+          Sections by <span className="text-signal-dark">{primary}</span>
         </h3>
         <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">
-          {sections.length} section{sections.length === 1 ? '' : 's'} · {visits} visit
+          {readCount} read
+          {glancedCount > 0 ? ` · ${glancedCount} glanced` : ''} · {visits} visit
           {visits === 1 ? '' : 's'}
         </p>
       </div>
       <ul className="space-y-1.5">
         {sections.map((s) => {
-          const widthPct = Math.max(8, Math.round((s.totalSeconds / longestPossibleBar) * 100));
+          // Glanced = entered the viewport but didn't sustain ≥1s of
+          // qualified time. Render with a flat track + em-dash time
+          // instead of a stub bar — keeps the visual hierarchy honest
+          // (read sections stand out, glanced ones don't pretend).
+          const glanced = s.totalSeconds < 1;
+          const widthPct = glanced
+            ? 0
+            : Math.max(8, Math.round((s.totalSeconds / longestPossibleBar) * 100));
           return (
-            <li key={s.id} className="flex items-center gap-3 rounded-md bg-paper px-3 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink">{s.title}</span>
+            <li
+              key={s.id}
+              className="flex items-center gap-3 rounded-md bg-paper px-3 py-2.5"
+              title={glanced ? 'Entered the viewport but did not sustain attention.' : undefined}
+            >
+              <span
+                className={
+                  'min-w-0 flex-1 truncate text-[13.5px] ' +
+                  (glanced ? 'text-graphite' : 'text-ink')
+                }
+              >
+                {s.title}
+              </span>
               <div className="flex shrink-0 items-center gap-3">
                 <div
                   className="h-1.5 w-24 overflow-hidden rounded-full bg-paper-3 sm:w-40"
-                  aria-label={`${formatDuration(s.totalSeconds)} dwell`}
+                  aria-label={glanced ? 'glanced' : `${formatDuration(s.totalSeconds)} dwell`}
                 >
-                  <div
-                    className="h-full rounded-full bg-signal"
-                    style={{ width: `${widthPct}%` }}
-                  />
+                  {!glanced && (
+                    <div
+                      className="h-full rounded-full bg-signal"
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  )}
                 </div>
                 <span className="w-12 text-right font-mono text-[12px] tabular-nums text-ink-soft">
                   {formatDuration(s.totalSeconds)}
@@ -757,6 +788,12 @@ function ViewerSectionDrill({
           );
         })}
       </ul>
+      {glancedCount > 0 && (
+        <p className="mt-3 px-3 font-mono text-[10.5px] leading-relaxed text-graphite">
+          Glanced = entered the viewport, didn&apos;t sustain attention. The viewer scrolled past
+          without pausing long enough to register a read.
+        </p>
+      )}
     </div>
   );
 }

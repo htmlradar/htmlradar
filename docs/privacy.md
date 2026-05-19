@@ -8,8 +8,9 @@ When a recipient opens a tracked share, we record:
 
 - The **email address** they enter at the gate (if the share requires one).
 - A **random fingerprint** (a UUID we generate and store in their browser's `localStorage` — no cross-site value).
-- **Session metrics**: start time, total active time, max scroll depth, sections read with dwell.
+- **Session metrics**: start time, total active time (with a 5-second idle watchdog so a parked tab doesn't inflate the number), max scroll depth, sections read with per-section dwell.
 - **Coarse network metadata**: IP-derived country and city (we never store the IP itself), user-agent-derived device / OS / browser strings, referrer URL.
+- **Attachment downloads**, if you click any attached file: which file, its size, your viewer ID, and your session ID. Stored in `attachment_downloads`. The file bytes are served from R2 but the download event is what we log.
 
 We do **not** collect: keystrokes, mouse positions, third-party trackers, anything from outside the document, or anything that identifies the recipient beyond the email they provided.
 
@@ -37,7 +38,7 @@ Operators of the hosted service have technical access to the underlying database
 
 ## Data retention
 
-By default, sessions and section events are retained for 365 days. You can configure shorter retention per document. Deleting a document removes all of its sessions, section events, and uploaded HTML within 24 hours.
+By default, sessions and section events are retained indefinitely. Deleting a share removes all of its sessions, viewers, section events, and attachment-download records immediately (via Postgres `on delete cascade`). Deleting a document removes the document row, its `document_versions` history, and its uploaded HTML from R2 within 24 hours.
 
 ## Right to delete
 

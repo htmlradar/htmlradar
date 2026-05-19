@@ -20,14 +20,14 @@ We will respond within 72 hours with an acknowledgement, and aim to ship a fix w
 The following are in scope:
 
 - The hosted service at htmlradar.com
-- The published tracker script at cdn.htmlradar.com/v1/tracker.js
-- The code in this repository
+- The published tracker script at htmlradar.com/v1/tracker.js
+- The code in this repository (proxy worker, monitor worker, Next.js app, tracker, schema)
 
 Out of scope:
 
 - Self-hosted instances run by third parties
 - Forks or modified versions of HTMLRadar
-- Social engineering, physical attacks, third-party services we depend on (Supabase, Cloudflare, Stripe)
+- Social engineering, physical attacks, third-party services we depend on (Supabase, Cloudflare, Resend, Polar)
 
 ## Disclosure
 

@@ -1,14 +1,13 @@
 # Self-hosting
 
-HTMLRadar runs on three services. All offer free tiers that comfortably cover personal use.
+HTMLRadar runs on two vendors. Both offer free tiers that comfortably cover personal use.
 
-| Service    | What it does                               | Free tier               |
-| ---------- | ------------------------------------------ | ----------------------- |
-| Supabase   | Postgres database, auth, storage           | 500 MB DB, 50 K MAU     |
-| Cloudflare | Workers (proxy), R2 (storage), Pages (CDN) | 100 K req/day, 10 GB R2 |
-| Vercel     | Next.js web app                            | Hobby plan              |
+| Service    | What it does                                                      | Free tier               |
+| ---------- | ----------------------------------------------------------------- | ----------------------- |
+| Supabase   | Postgres database, auth, vault for secrets                        | 500 MB DB, 50 K MAU     |
+| Cloudflare | Workers (proxy + monitor cron), R2 (storage), Pages (Next.js app) | 100 K req/day, 10 GB R2 |
 
-You also need a domain (any) and a [Resend](https://resend.com) account (free 100 emails/day) for view notifications.
+You also need a domain (any) and a [Resend](https://resend.com) account (free 100 emails/day) for view notifications. Email notifications are optional — without Resend the `notify_on_first_open` trigger writes a `skipped` row to `notifications_log` and everything else works.
 
 ## 1. Supabase
 
@@ -18,20 +17,15 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
    - **anon public key** → `SUPABASE_ANON_KEY`
    - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret — never put in client code)
 3. From `Project Settings → Database`, note your DB password.
-4. In `SQL Editor`, run, in order:
+4. In `SQL Editor`, copy/paste each file under `schema/` in numeric order — 001 through 019 at v1.2. Each is idempotent; re-running is safe.
+5. Resend secrets via Supabase Vault (not `ALTER DATABASE SET` — that needs superuser, which Supabase free doesn't grant). In `SQL Editor`:
    ```sql
-   -- Copy/paste the contents of:
-   --   schema/001_init.sql
-   --   schema/002_rpcs.sql
-   --   schema/003_triggers.sql
+   select vault.create_secret('re_your_resend_api_key', 'resend_api_key');
+   select vault.create_secret('hello@yourdomain.com',  'resend_from');
    ```
-5. In `SQL Editor`, set the database settings:
-   ```sql
-   alter database postgres set app.session_secret = 'your-32-byte-hex';   -- openssl rand -hex 32
-   alter database postgres set app.resend_api_key = 're_your_key';
-   alter database postgres set app.resend_from    = 'hello@yourdomain.com';
-   ```
-6. In `Authentication → Providers`, enable **Google** (use your own OAuth credentials) or rely on the magic-link fallback.
+   Vault is a native Supabase feature (built on pgsodium) available on every tier. `notify_on_first_open` reads decrypted secrets at trigger time.
+6. Session auth uses per-session bearer tokens stored on the `sessions.token` column — no app-level secret needed for the session layer. The proxy gate (email + password cookies) does use an HMAC secret; set it as a worker secret in step 3 below.
+7. In `Authentication → Providers`, enable **Google** (use your own OAuth credentials) or rely on the magic-link fallback. The site URL must include your domain plus `http://localhost:3000` if you also want local dev to authenticate.
 
 ## 2. Cloudflare
 
@@ -44,34 +38,47 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
 
 ## 3. Deploy
 
+The reference deploy is fully automated by `.github/workflows/deploy.yml` (preview → smoke → prod, plus proxy + monitor workers, plus a cache purge). If you want to deploy from your laptop, the manual sequence is:
+
 ```bash
-# Worker (proxy)
-cd packages/proxy
+# Tracker bundle — proxy injects this on every recipient view.
+cd packages/tracker && pnpm build
+cp dist/tracker.js ../app/public/v1/tracker.js
+
+# Proxy worker
+cd ../proxy
 wrangler secret put SUPABASE_URL
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 wrangler secret put SUPABASE_ANON_KEY
-wrangler secret put SESSION_SECRET
+wrangler secret put SESSION_SECRET             # openssl rand -hex 32
+wrangler secret put CLOUDFLARE_R2_ACCESS_KEY_ID
+wrangler secret put CLOUDFLARE_R2_SECRET_ACCESS_KEY
 wrangler deploy
 
-# Tracker (CDN)
-cd ../tracker
-pnpm build
-# Deploy dist/tracker.js to a static host. Cloudflare Pages or any CDN works.
+# Monitor cron worker
+cd ../monitor
+wrangler secret put SUPABASE_URL
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put RESEND_API_KEY
+wrangler deploy
 
-# Web app
+# Web app (Cloudflare Pages — NOT Vercel)
 cd ../app
-# Push to Vercel and add all env vars from .env.example in the Vercel dashboard.
+pnpm exec next-on-pages
+wrangler pages deploy .vercel/output/static --project-name=htmlradar --branch=main
 ```
+
+Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and any other public env vars in `.env.production` (written at build time — the workflow does this from GitHub secrets). NEVER commit `.env.production` itself; only `.env.example`.
 
 ## DNS
 
-Point the relevant CNAMEs at the deployed targets:
+Point the relevant routes at Cloudflare:
 
-- `htmlradar.com` and `www.htmlradar.com` → Vercel (web app)
-- `htmlradar.com/r/*` route on the proxy worker
-- `cdn.htmlradar.com` → wherever you host `tracker.js`
+- `htmlradar.com` and `www.htmlradar.com` → Cloudflare Pages project (`htmlradar`)
+- `htmlradar.com/r/*` → proxy worker (set via worker route in `packages/proxy/wrangler.toml`)
+- `htmlradar.com/v1/tracker.js` → served by the Pages app from `public/v1/tracker.js` (copied at build time)
 
-(For your own domain, substitute `htmlradar.com` with yours and update `NEXT_PUBLIC_APP_URL`.)
+For your own domain, substitute `htmlradar.com` with yours throughout and set `NEXT_PUBLIC_APP_URL` accordingly.
 
 ## Verifying the install
 
@@ -81,6 +88,6 @@ A working install passes this checklist:
 - Uploading an HTML file shows up at `/docs`
 - Creating a share returns a `/r/{slug}` URL
 - Opening that URL prompts the email gate, shows the document, and starts a session
-- After ~15 seconds of reading, your dashboard shows the session with section dwell
+- Within 30 seconds of active reading (idle watchdog gates after 5s without scroll/keydown/touch), the dashboard shows the session with section dwell
 
-If any step fails, check the Worker logs in Cloudflare and the Supabase auth logs.
+If any step fails, check the Worker logs in Cloudflare and the Supabase auth + `error_log` table.

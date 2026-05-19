@@ -9,7 +9,7 @@ The hosted version at [htmlradar.com](https://htmlradar.com) is the fastest path
 3. Click **Create share**. Copy the link.
 4. Send.
 
-Free tier: 10 documents, unlimited shares per document.
+Free tier: 10 documents lifetime, unlimited shares per document, 20 attachments per doc (25 MB each, 100 MB total).
 
 ## Local development
 
@@ -59,4 +59,4 @@ For a full self-host setup including Supabase schema application and Cloudflare 
 6. Scroll. Wait 3+ seconds on a section.
 7. Return to your dashboard. The session and section dwell will appear.
 
-If sections don't track, check your document has `<h1>`, `<h2>`, or `<h3>` tags **with `id` attributes**. The tracker uses headings with ids by default.
+If sections don't track, the tracker tried six fallback layers before giving up: explicit `[id]` anchored headings → bare `<h1>/<h2>/<h3>` (slugified from text) → slide containers (`section`, `[class*="slide"]`, `[data-slide]`) → article containers → paragraph buckets on plain prose. If none of those match, your doc probably has only one viewport-sized block — there's nothing to split. Adding any `<h2>` headings is the simplest fix; explicit `id` attributes aren't required.

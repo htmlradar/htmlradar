@@ -2,8 +2,8 @@
 
 Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
-- **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 10 documents lifetime, $15/mo Pro for unlimited + 10× attachment headroom
-- **Source**: this repo, AGPL-3.0 · current release: **v1.1.2**
+- **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 10 documents lifetime, $15/mo Pro for unlimited
+- **Source**: this repo, AGPL-3.0 · current release: **v1.2**
 - **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
 - **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
 
@@ -20,12 +20,14 @@ The bigger pattern: teams that use LLMs heavily ship more and more of their work
 - **Section-level dwell — on any HTML.** Three-second floor separates a real read from a scroll-past. The tracker auto-detects sections from your HTML: explicit anchored headings → bare `h1/h2/h3` (slugged from text) → slide/page containers (`section`, `.slide`, `.page`) → paragraph buckets on plain prose. Dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12s on Problem, and skipped Market sizing.
 - **Per-viewer dashboard, aggregated across every share.** One row per person who actually opened the doc, with email + country + device + referrer + total time + scroll depth + visits + first/last seen. Updates live every 30 seconds while the tab is in focus.
 - **Per-recipient share links.** One document, many shares. Each share carries its own email gate, password, expiry, revocation, and email-domain or per-email allow-list.
-- **Files.** Attach PDFs, financial models, images, and ZIPs alongside the HTML deck. Per-share `Allow downloads` toggle; recipients see no signal that files exist when it's off. Every download is tracked.
-- **Edit + preview on the fly.** Change a share's password, expiry, or allow-list without revoking. Preview the doc as the recipient sees it before sending — short-lived HMAC token, no gate.
-- **Re-upload, keep the link.** Replace the HTML after partner feedback. Every share you've already sent now points at v2. No re-sending.
+- **Files alongside the deck.** Attach PDFs, financial models, images, and ZIPs to any share. Recipients see a small corner pill that opens a side drawer; files are always available when present (the per-share "Lock the deck" toggle controls deck save/print only, never attachments). Every download is logged per viewer + per session + per filename.
+- **Version history.** Replace the HTML after partner feedback. Every existing share keeps the same link and serves the new version on next open. The `v{n}` chip on the doc page is a popover with every upload's original local filename, byte size, and timestamp.
+- **Retroactive share access.** Change a share's password, expiry, or allow-list without revoking. The proxy re-checks the allow-list on every request — removing an email kicks them out immediately on their next click, not their next browser session.
+- **Edit + preview without leaving the dashboard.** Preview the doc as the recipient sees it before sending (short-lived HMAC token, no gate). Both "Preview document" and "Preview as you" open in a new tab so your dashboard stays where you left it.
 - **Branded first-open email.** When a recipient crosses the dwell threshold, you get a properly designed HTML notification — viewer email + doc title + a single "See the read →" CTA back to the dashboard. Tease, not report.
+- **Engaged-time, not tab-open time.** Both per-section dwell and per-session active time apply a 5-second idle watchdog (keydown / scroll / touchstart, mousemove deliberately excluded). Same methodology as Chartbeat / Parse.ly engagement-time. A tab parked while the reader walked away stops counting after 5 seconds.
 - **Bot / accidental-tap filter.** Sessions only create after a 5-second warm-up; if the recipient backgrounded the tab or bounced before then, no session, no notification, no inflated viewer count.
-- **Privacy-respecting.** No mouse tracking, no keystrokes, no DOM snapshots, no session replay. Section dwell + scroll depth + active time. Recipients can opt out via `window.HTMLRadar.optOut()`.
+- **Privacy-respecting.** No mouse tracking, no keystrokes, no DOM snapshots, no session replay. Section dwell + scroll depth + active time only. Recipients can opt out via `window.HTMLRadar.optOut()`.
 
 ## What it deliberately is not
 
@@ -35,20 +37,23 @@ A sender-side analytics tool for one document at a time. **Not** a CMS, deck bui
 
 ## Architecture
 
-Three packages, three places. Each is small and does one thing.
+Four packages, two storage backends.
 
 ```
 htmlradar/
 ├── packages/
 │   ├── tracker/      # 14 KB browser IIFE — embedded in the recipient's view
 │   ├── proxy/        # Cloudflare Worker at /r/{slug} — gates + HTML fetch + tracker inject + attachment serving
-│   └── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
-├── schema/           # 9 SQL files — tables, RLS, SECURITY DEFINER RPCs, triggers, attachments
+│   ├── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
+│   └── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
+├── schema/           # 19 idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
 ├── examples/         # Demo HTML for trying it locally
-└── docs/             # Self-hosting, architecture, privacy, quickstart
+└── docs/             # Architecture, privacy, quickstart, self-hosting
 ```
 
-The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled PostgREST instead of `@supabase/supabase-js`, why stored-token session auth instead of HMAC — are in [`docs/architecture.md`](./docs/architecture.md).
+Document HTML + attachment bytes live in Cloudflare R2. Everything else (sessions, sections, viewers, shares, attachments metadata, version history) lives in Supabase Postgres.
+
+The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled PostgREST instead of `@supabase/supabase-js`, why per-session bearer tokens instead of HMAC, the engagement-time methodology, the retroactive allow-list — are in [`docs/architecture.md`](./docs/architecture.md).
 
 ## Stack
 
@@ -72,7 +77,7 @@ Two vendors total: Cloudflare + Supabase. Free tiers cover personal use end-to-e
 4. Send the tracked link.
 5. Watch the dashboard. First-read email lands when the recipient crosses the three-second threshold.
 
-Free tier: 10 documents lifetime, 20 attachments per doc up to 25 MB each and 100 MB total. Pro tier ($15/month): unlimited documents, 50 attachments per doc up to 100 MB each and 1 GB total, no "Shared with HTMLRadar" chrome on the recipient view, priority support. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
+Free tier: 10 documents lifetime, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month): unlimited documents, no "Shared with HTMLRadar" chrome on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
 
 ## Quick start — self-host
 
@@ -95,7 +100,7 @@ pnpm typecheck && pnpm test          # sanity check
 pnpm build                           # build all 3 packages
 ```
 
-Schema setup: apply `schema/001_init.sql` through `schema/010_email_template.sql` in order via the Supabase SQL editor. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, etc.) so re-running is safe.
+Schema setup: apply every file under `schema/` in numeric order via the Supabase SQL editor (001 through 019 at v1.2; check the directory for the current top number). Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe.
 
 Resend secrets go in Supabase Vault (works on free tier — no `ALTER DATABASE SET` required):
 

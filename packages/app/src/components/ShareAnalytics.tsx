@@ -22,6 +22,9 @@ interface SectionRow {
   title: string;
   totalSeconds: number;
   viewers: number;
+  // DOM ordinal at first observation. Null for legacy rows captured
+  // before the ordinal column existed. Used purely for deck-order sort.
+  ordinal?: number | null;
 }
 
 export interface ShareAnalyticsProps {

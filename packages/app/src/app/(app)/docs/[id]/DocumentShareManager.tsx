@@ -72,6 +72,7 @@ export interface ShareAnalyticsData {
     title: string;
     totalSeconds: number;
     viewers: number;
+    ordinal?: number | null;
   }>;
 }
 

@@ -56,6 +56,10 @@ interface SectionRow {
   id: string;
   title: string;
   totalSeconds: number;
+  // Smallest DOM ordinal observed for this section across the viewer's
+  // sessions. Used to render the drill in deck order. Null when older
+  // section_events rows didn't capture an ordinal.
+  ordinal: number | null;
 }
 
 interface ViewerGroup {
@@ -170,8 +174,14 @@ function buildGroups(
       id: e.section_id,
       title: e.section_title ?? e.section_id,
       totalSeconds: 0,
+      ordinal: null as number | null,
     };
     cur.totalSeconds += e.time_seconds;
+    // Smallest observed ordinal wins so the deck-order sort is stable
+    // even if a section's DOM position drifts mid-fundraise.
+    if (typeof e.ordinal === 'number') {
+      cur.ordinal = cur.ordinal == null ? e.ordinal : Math.min(cur.ordinal, e.ordinal);
+    }
     map.set(e.section_id, cur);
     groupSections.set(gKey, map);
   }
@@ -207,7 +217,16 @@ function buildGroups(
 
     const sectionsMap = groupSections.get(key);
     const sections = sectionsMap
-      ? [...sectionsMap.values()].sort((a, b) => b.totalSeconds - a.totalSeconds)
+      ? [...sectionsMap.values()].sort((a, b) => {
+          // Deck order — narrative reads top-to-bottom the way the
+          // sender wrote the deck, not by time-spent desc. Sections
+          // missing an ordinal (older sessions before the column was
+          // captured) fall to the end.
+          if (a.ordinal == null && b.ordinal == null) return 0;
+          if (a.ordinal == null) return 1;
+          if (b.ordinal == null) return -1;
+          return a.ordinal - b.ordinal;
+        })
       : [];
 
     // A group is "internal" only if every viewer row backing it is

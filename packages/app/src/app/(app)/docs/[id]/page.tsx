@@ -153,7 +153,7 @@ export default async function DocumentPage({
   const eventsRes = sessionIds.length
     ? await supabase
         .from('section_events')
-        .select('section_id, section_title, time_seconds, session_id')
+        .select('section_id, section_title, time_seconds, session_id, ordinal')
         .in('session_id', sessionIds)
     : { data: [] as SectionEvent[] };
   // Belt-and-suspenders alongside migration 011: if a viewer is still on
@@ -214,7 +214,12 @@ export default async function DocumentPage({
     );
     const sectionMap = new Map<
       string,
-      { title: string; totalSeconds: number; viewerIds: Set<string> }
+      {
+        title: string;
+        totalSeconds: number;
+        viewerIds: Set<string>;
+        minOrdinal: number;
+      }
     >();
     for (const e of allEvents) {
       if (sessionToShare.get(e.session_id) !== s.id) continue;
@@ -222,10 +227,19 @@ export default async function DocumentPage({
         title: e.section_title ?? e.section_id,
         totalSeconds: 0,
         viewerIds: new Set<string>(),
+        // Track the smallest ordinal seen for this section so we can
+        // render the list in deck order. The tracker writes the DOM
+        // position the section had when it first entered the
+        // viewport; earliest observation wins on the rare chance
+        // anchors shifted mid-fundraise.
+        minOrdinal: Number.POSITIVE_INFINITY,
       };
       cur.totalSeconds += e.time_seconds;
       const vId = sessionToViewer.get(e.session_id);
       if (vId) cur.viewerIds.add(vId);
+      if (typeof e.ordinal === 'number' && e.ordinal < cur.minOrdinal) {
+        cur.minOrdinal = e.ordinal;
+      }
       sectionMap.set(e.section_id, cur);
     }
     const sections = [...sectionMap.entries()]
@@ -234,8 +248,17 @@ export default async function DocumentPage({
         title: v.title,
         totalSeconds: v.totalSeconds,
         viewers: v.viewerIds.size,
+        ordinal: Number.isFinite(v.minOrdinal) ? v.minOrdinal : null,
       }))
-      .sort((a, b) => b.totalSeconds - a.totalSeconds);
+      // Deck order — the narrative reads top-to-bottom the way the
+      // sender wrote it, not by who-spent-most-time-where. Sections
+      // without any captured ordinal fall to the end.
+      .sort((a, b) => {
+        if (a.ordinal == null && b.ordinal == null) return 0;
+        if (a.ordinal == null) return 1;
+        if (b.ordinal == null) return -1;
+        return a.ordinal - b.ordinal;
+      });
 
     analyticsByShareId[s.id] = {
       viewers: viewersByShare[s.id] ?? [],

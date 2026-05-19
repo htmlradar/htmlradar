@@ -54,22 +54,31 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
 
   const sectionMap = new Map<
     string,
-    { title: string; totalSeconds: number; viewerIds: Set<string> }
+    {
+      title: string;
+      totalSeconds: number;
+      viewerIds: Set<string>;
+      minOrdinal: number;
+    }
   >();
   if (sessionIds.length > 0) {
     const { data: events } = await supabase
       .from('section_events')
-      .select('section_id, section_title, time_seconds, session_id')
+      .select('section_id, section_title, time_seconds, session_id, ordinal')
       .in('session_id', sessionIds);
     for (const e of events ?? []) {
       const cur = sectionMap.get(e.section_id) ?? {
         title: e.section_title ?? e.section_id,
         totalSeconds: 0,
         viewerIds: new Set<string>(),
+        minOrdinal: Number.POSITIVE_INFINITY,
       };
       cur.totalSeconds += e.time_seconds;
       const vId = sessionToViewer.get(e.session_id);
       if (vId) cur.viewerIds.add(vId);
+      if (typeof e.ordinal === 'number' && e.ordinal < cur.minOrdinal) {
+        cur.minOrdinal = e.ordinal;
+      }
       sectionMap.set(e.section_id, cur);
     }
   }
@@ -79,8 +88,16 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
       title: v.title,
       totalSeconds: v.totalSeconds,
       viewers: v.viewerIds.size,
+      ordinal: Number.isFinite(v.minOrdinal) ? v.minOrdinal : null,
     }))
-    .sort((a, b) => b.totalSeconds - a.totalSeconds);
+    // Deck order — narrative reads the way the sender wrote it,
+    // not by time-spent desc. Sections without ordinal fall to the end.
+    .sort((a, b) => {
+      if (a.ordinal == null && b.ordinal == null) return 0;
+      if (a.ordinal == null) return 1;
+      if (b.ordinal == null) return -1;
+      return a.ordinal - b.ordinal;
+    });
 
   const recipient = share.recipient_label ?? 'Unlabeled share';
   const fullUrl = `htmlradar.com/r/${share.slug}`;

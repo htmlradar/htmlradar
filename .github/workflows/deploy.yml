@@ -98,28 +98,52 @@ jobs:
           fi
           echo "Bundle check OK — NEXT_PUBLIC_* values inlined."
 
-      - name: Deploy to PREVIEW (not main)
-        id: preview
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >-
-            pages deploy packages/app/.vercel/output/static
-            --project-name=htmlradar
-            --branch=ci-preview
-            --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
-            --commit-dirty=false
-
-      - name: Extract preview URL
+      # Preview deploy with internal retry. CF Pages occasionally returns
+      # "Unknown internal error" on a fresh upload — pure transient noise,
+      # the next attempt 30s later succeeds. Before this retry block the
+      # whole workflow failed → user got a deploy-failure email for what
+      # was effectively a CF blip. We retry up to 3 times before giving
+      # up, so genuine bundle/auth issues still surface but transient CF
+      # 5xx-class errors stay silent.
+      #
+      # Switched off wrangler-action@v3 because that action has no
+      # built-in retry knob — instead we shell out to the wrangler CLI
+      # and wrap it in a retry loop. Same end result (the same wrangler
+      # binary runs the same command), just with our own resilience.
+      - name: Deploy to PREVIEW (not main) with retry
         id: preview-url
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          # wrangler-action exposes `deployment-url` for some calls but not
-          # all — the most reliable read is the URL it prints. The action
-          # uses CLOUDFLARE_DEPLOYMENT_URL as a step output when it exists.
-          URL="${{ steps.preview.outputs.deployment-url }}"
+          set -e
+          set -o pipefail
+          LOG=/tmp/preview-deploy.log
+          : > "$LOG"
+          attempt=0
+          while :; do
+            attempt=$((attempt + 1))
+            echo "Preview deploy attempt $attempt..."
+            if npx --yes wrangler@3 pages deploy packages/app/.vercel/output/static \
+                --project-name=htmlradar \
+                --branch=ci-preview \
+                --commit-hash="$HEAD_SHA" \
+                --commit-dirty=false 2>&1 | tee -a "$LOG"; then
+              break
+            fi
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error::Preview deploy failed after 3 attempts."
+              exit 1
+            fi
+            echo "::warning::Preview deploy attempt $attempt failed — retrying in 30s..."
+            sleep 30
+          done
+          # Wrangler prints the deployment URL on a line containing
+          # ".htmlradar.pages.dev". Grab the last such URL from the log.
+          URL=$(grep -oE 'https://[a-z0-9-]+\.htmlradar\.pages\.dev' "$LOG" | tail -1)
           if [ -z "$URL" ]; then
-            echo "::error::Could not extract preview deployment URL."
+            echo "::error::Could not extract preview deployment URL from wrangler output."
             exit 1
           fi
           echo "preview_url=$URL" >> "$GITHUB_OUTPUT"
@@ -182,17 +206,36 @@ jobs:
           fi
           echo "All smoke checks passed."
 
-      - name: Promote preview → prod (deploy to main branch)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >-
-            pages deploy packages/app/.vercel/output/static
-            --project-name=htmlradar
-            --branch=main
-            --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
-            --commit-dirty=false
+      # Same retry pattern as the preview step. This is the worse of the
+      # two failure modes — preview already passed smoke, so a transient
+      # CF 5xx on the prod promotion was emailing a false failure for a
+      # deploy that was effectively done. 3 attempts with 30s back-off.
+      - name: Promote preview → prod (deploy to main branch) with retry
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -e
+          set -o pipefail
+          attempt=0
+          while :; do
+            attempt=$((attempt + 1))
+            echo "Prod promotion attempt $attempt..."
+            if npx --yes wrangler@3 pages deploy packages/app/.vercel/output/static \
+                --project-name=htmlradar \
+                --branch=main \
+                --commit-hash="$HEAD_SHA" \
+                --commit-dirty=false; then
+              break
+            fi
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error::Prod promotion failed after 3 attempts."
+              exit 1
+            fi
+            echo "::warning::Prod promotion attempt $attempt failed — retrying in 30s..."
+            sleep 30
+          done
 
       # Cloudflare Pages deploys the Next.js app. The /r/* recipient
       # path is served by a separate Worker (packages/proxy) — without

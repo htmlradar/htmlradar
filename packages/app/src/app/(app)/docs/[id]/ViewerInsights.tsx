@@ -124,9 +124,25 @@ function formatDurationParts(seconds: number): { value: string; unit: string } {
 
 function buildGroups(
   viewers: Viewer[],
-  sessions: Session[],
+  sessionsRaw: Session[],
   events: SectionEvent[],
 ): ViewerGroup[] {
+  // Phantom-session filter. Drop sessions where bounced=true AND
+  // active_time_seconds=0 AND max_scroll_depth=0 — these are "tracker
+  // created a row but recipient never engaged" ghosts that previously
+  // inflated visit counts (Viewer1's "2 visits" with one real read and
+  // one phantom bounce). The rail viewCount on /docs/[id] and the
+  // /dashboard/[slug] sessionList already apply the same filter — this
+  // is the third hop, the ViewerInsights table, which was missed.
+  const sessions = sessionsRaw.filter(
+    (s) =>
+      !(
+        s.bounced === true &&
+        (s.active_time_seconds ?? 0) === 0 &&
+        (s.max_scroll_depth ?? 0) === 0
+      ),
+  );
+
   // Stable group order from first_seen.
   const sortedViewers = [...viewers].sort((a, b) =>
     (a.first_seen ?? '').localeCompare(b.first_seen ?? ''),
@@ -313,7 +329,19 @@ export function ViewerInsights({
   const aggregates = useMemo(() => {
     const visibleViewerIds = new Set<string>();
     for (const g of visibleGroups) for (const id of g.viewerIds) visibleViewerIds.add(id);
-    const visibleSessions = sessions.filter((s) => visibleViewerIds.has(s.viewer_id));
+    // Mirror the phantom filter from buildGroups so the headline stat
+    // cards (Sessions, Max scroll) match the per-viewer rows. Without
+    // this the "Sessions" stat would still include the bounced/0-active
+    // ghost rows we just stripped from the table.
+    const visibleSessions = sessions.filter(
+      (s) =>
+        visibleViewerIds.has(s.viewer_id) &&
+        !(
+          s.bounced === true &&
+          (s.active_time_seconds ?? 0) === 0 &&
+          (s.max_scroll_depth ?? 0) === 0
+        ),
+    );
 
     const totalViewers = visibleGroups.length;
     const totalSessions = visibleSessions.length;

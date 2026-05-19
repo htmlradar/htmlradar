@@ -173,7 +173,25 @@ export default async function DocumentPage({
   // and handles the "Show hidden (N)" toggle locally.
   const internalViewerIds = new Set(allViewers.filter((v) => v.is_internal).map((v) => v.id));
   const visibleViewers = allViewers.filter((v) => !internalViewerIds.has(v.id));
-  const visibleSessions = allSessions.filter((s) => !internalViewerIds.has(s.viewer_id));
+  // A "phantom" session is one that started (a session row was
+  // created) but recorded zero engagement: bounced=true AND
+  // active_time_seconds=0 AND max_scroll_depth=0. Real cases we've
+  // seen on prod: a tab loaded then immediately backgrounded before
+  // any heartbeat, or a tracker that started but the recipient
+  // never interacted. Counting these as "visits" inflated the rail's
+  // view count (Viewer1's "2 views" — one real read + one phantom).
+  // Filter them out here so the rail viewCount AND the ViewerInsights
+  // visits column both ignore them. Sessions with ANY signal (active
+  // time, scroll, or not-bounced) stay in.
+  const visibleSessions = allSessions.filter(
+    (s) =>
+      !internalViewerIds.has(s.viewer_id) &&
+      !(
+        s.bounced === true &&
+        (s.active_time_seconds ?? 0) === 0 &&
+        (s.max_scroll_depth ?? 0) === 0
+      ),
+  );
   const sessionToShare = new Map<string, string>(visibleSessions.map((s) => [s.id, s.share_id]));
   const viewersByShare: Record<string, Viewer[]> = {};
   for (const v of visibleViewers) {

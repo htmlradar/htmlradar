@@ -48,7 +48,18 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
     .eq('share_id', share.id)
     .order('started_at', { ascending: false });
 
-  const sessionList = sessions ?? [];
+  // Phantom-session filter (mirrors /docs/[id]/page.tsx). Drop sessions
+  // where bounced=true AND active_time_seconds=0 AND max_scroll_depth=0
+  // — these are "tracker created a row but recipient never engaged"
+  // ghosts that inflated visit counts on prod.
+  const sessionList = (sessions ?? []).filter(
+    (s) =>
+      !(
+        s.bounced === true &&
+        (s.active_time_seconds ?? 0) === 0 &&
+        (s.max_scroll_depth ?? 0) === 0
+      ),
+  );
   const sessionIds = sessionList.map((s) => s.id);
   const sessionToViewer = new Map<string, string>(sessionList.map((s) => [s.id, s.viewer_id]));
 

@@ -1,12 +1,12 @@
 # Architecture
 
-This document explains _why_ HTMLRadar is built the way it is. If you're contributing or auditing, read this first — it's the reasoning behind every non-obvious choice in the code. Inline comments mark fixes from `AUDIT-1` when relevant.
+This document explains _why_ HTMLRadar is built the way it is. If you're contributing or auditing, read this first — it's the reasoning behind every non-obvious choice in the code.
 
 ---
 
 ## The big picture
 
-Three processes, one database.
+Four processes, two storage backends.
 
 ```
    recipient browser                                  document owner browser
@@ -15,23 +15,24 @@ Three processes, one database.
           ▼                                                    ▼
    ┌────────────────────────┐                       ┌──────────────────────┐
    │  Cloudflare Worker     │                       │  Next.js app         │
-   │  (packages/proxy)      │  ─── tracker.js ───▶  │  (packages/app)      │
-   │  serves /r/{slug}      │                       │  sign-in / upload /  │
-   │  password+email gates  │                       │  share mgmt /        │
-   │  HTMLRewriter inject   │                       │  dashboard           │
-   └─────────┬──────────────┘                       └─────────┬────────────┘
-             │                                                │
-             ▼                                                ▼
-                       ┌────────────────────────┐
-                       │  Supabase Postgres     │
-                       │  (schema/)             │
-                       │  RLS + SECURITY        │
-                       │  DEFINER RPCs          │
-                       └────────────────────────┘
+   │  packages/proxy        │  ─── tracker.js ───▶  │  packages/app        │
+   │  /r/{slug} + /r/{slug} │                       │  sign-in / upload /  │
+   │  /attachments/{id}     │                       │  share mgmt /        │
+   │  HMAC gates · inject   │                       │  dashboard           │
+   └────┬──────────┬────────┘                       └─────────┬────────────┘
+        │          │                                          │
+        ▼          ▼                                          ▼
+  ┌─────────┐  ┌──────────────┐                  ┌────────────────────────┐
+  │  R2     │  │  Supabase    │  ◀─── cron ────  │  packages/monitor      │
+  │ doc +   │  │  Postgres    │   every 5 min    │  CF cron Worker —      │
+  │ attach. │  │  RLS + RPCs  │                  │  alerts on regression  │
+  └─────────┘  └──────────────┘                  └────────────────────────┘
 ```
 
-**Why three processes instead of one Next.js app?**
-The proxy runs on every recipient view (could be 1000s/sec near a viral share). Next.js cold-start latency on Vercel is ~200–800 ms; Cloudflare Workers cold-start is ~5 ms with global pop coverage. The proxy is on the hottest path; it gets its own process. The Next.js app is on a cooler path (owners managing shares), and benefits from Server Components + React. The tracker is its own bundle because it ships to every recipient browser — must be small (≤14 KB gzipped target).
+**Why four processes instead of one Next.js app?**
+The proxy runs on every recipient view (could be 1000s/sec near a viral share). Next.js cold-start latency on Vercel is ~200–800 ms; Cloudflare Workers cold-start is ~5 ms with global pop coverage. The proxy is on the hottest path; it gets its own process. The Next.js app is on a cooler path (owners managing shares), and benefits from Server Components + React. The tracker is its own bundle because it ships to every recipient browser — must be small (≤14 KB gzipped target). The monitor cron Worker runs every 5 minutes against Supabase, checking `error_log` and `notifications_log` for regressions and emailing the founder via Resend — no HTTP entry, cron only.
+
+R2 holds two things: the uploaded HTML body (keyed `docs/{owner}/{doc}/v{n}.html`) and the per-share attachment bytes (PDFs, Excels, ZIPs). Supabase holds everything else.
 
 ---
 
@@ -53,7 +54,7 @@ The proxy worker uses `HTMLRewriter.on('head')` and `HTMLRewriter.on('body')` to
 
 ### 3. Anon writes only through SECURITY DEFINER RPCs
 
-The Supabase `anon` role has **no** direct INSERT/UPDATE/DELETE access to viewer-side tables. All recipient-driven writes go through four RPCs in `schema/002_rpcs.sql`: `start_session`, `update_session`, `create_share` (authenticated), `verify_share_password`. Each RPC is rate-limited, input-validated, and runs as the owner of the function (which has elevated privileges).
+The Supabase `anon` role has **no** direct INSERT/UPDATE/DELETE access to viewer-side tables. Recipient-driven writes go through three RPCs: `start_session`, `update_session`, `verify_share_password` (`schema/002_rpcs.sql`, hardened in `004_password_security.sql` + `012_viewer_is_internal.sql`). Owner-side mutations go through their own SECURITY DEFINER RPCs invoked from server actions — `create_share`, `update_share` (`007_share_edit.sql`), `set_share_lock_deck` (`015_lock_deck_rename.sql`), `toggle_viewer_internal` (`012`). Each RPC is rate-limited, input-validated, and runs as the function owner.
 
 **Why?** Direct table access via PostgREST gives the client the ability to compose arbitrary filters, which is hard to lock down with RLS alone. The wedge-of-an-attack would be: get the anon key, write a script that inserts millions of fake viewer rows, exhausting Resend quota and corrupting analytics. SECURITY DEFINER RPCs give us a _narrow_ attack surface — four functions instead of seven tables. Each function explicitly validates its inputs. The audit called this "the strongest layer."
 
@@ -67,54 +68,55 @@ When a recipient enters a password or email at a proxy-side gate, we issue a coo
 
 **Trade-off:** Revoking a gate session before its TTL expires requires rotating `SESSION_SECRET` (nukes all gate sessions globally). Acceptable for our threat model — if a recipient passed the gate once, we're fine with them having 24h of access.
 
-### 5. The proxy enforces allow-list, not the tracker
+### 5. The proxy enforces allow-list, retroactively
 
-When a share has `allowed_email_domains` set, the proxy renders a server-side email gate _before_ serving any document HTML. Only after the email validates does the proxy issue an email cookie, redirect, and then stream the document.
+When a share has `allowed_email_domains` or `allowed_emails` set, the proxy renders a server-side email gate _before_ serving any document HTML. Only after the email validates does the proxy issue an email cookie, redirect, and then stream the document.
 
-**Why?** Without this, the HTML reaches the recipient first (via the streamed response), then the tracker's Shadow-DOM gate displays _on top of_ it. A determined recipient could view-source and bypass the gate. For plain email-gated shares (no allow-list), this UX-only gate is acceptable — the trust signal is "you said you were Marc, the sender now expects to see Marc's name in analytics." But for "this document is only for @example-ventures.test," the proxy must enforce server-side. AUDIT-1 P1-2 caught the original mistake; commit `5799d0a` moved enforcement to the proxy.
+**Critically, the cookie is not trusted on later requests.** Every doc-serve and every attachment-fetch re-runs `isEmailAllowed(share, cookie.email)` against the share's _current_ allowlist (`packages/proxy/src/index.ts`). If the sender tightened the list after a cookie was issued, the stale cookie is rejected and the gate re-prompts. This was the QA3 #5 fix — without it, a recipient who passed the gate once kept access even after being removed.
+
+**Why server-side at all?** Without this, the HTML would reach the recipient via the streamed response and the tracker's Shadow-DOM gate would display _on top of_ it. A determined recipient could view-source and bypass it. For plain email-gated shares (no allow-list), the in-document gate is acceptable; for allow-listed shares it must be the proxy. AUDIT-1 P1-2 caught the original mistake; commit `5799d0a` moved enforcement to the proxy.
 
 ---
 
 ## The schema in 60 seconds
 
-`schema/001_init.sql` defines eight tables. The non-obvious ones:
+15 tables across `schema/001_init.sql` and migrations 003–018. The ones worth knowing:
 
 - **`profiles`** mirrors `auth.users` with `tier` (`free` | `pro`). Set via a trigger on auth.users insert.
-- **`documents`** has `current_version` and `r2_key`. Re-uploading bumps the version; the share link doesn't change. This is how "replace the deck after partner feedback" works without invalidating existing links.
-- **`document_shares`** carries per-share config: password hash (bcrypt), expiry timestamp, revocation timestamp, allowed email domains array, recipient label. One document, many shares.
-- **`viewers`** is scoped per share — the same email viewing two of your shares is two viewer rows. This is intentional: it lets each share have its own analytics narrative, and revoking a share doesn't affect viewer rows on other shares.
-- **`sessions`** holds aggregate per-view metrics (active time, max scroll) and the `document_version` they saw — useful when the owner updated the doc mid-fundraise.
+- **`documents`** has `current_version`, `r2_key`, and `last_viewed_by_owner_at`. Re-uploading bumps `current_version`; the share link doesn't change. `last_viewed_by_owner_at` drives the activity dot on `/docs`.
+- **`document_versions`** (migration 018) — one row per upload or replace, capturing the original local filename, byte size, R2 key, and the user who uploaded. Powers the version-history popover on the doc detail page; `documents.current_version` always equals `max(document_versions.version)` for that doc.
+- **`document_shares`** carries per-share config: password hash (bcrypt), expiry, revocation, `allowed_email_domains`, `allowed_emails`, `lock_deck` (renamed from `allow_download` in migration 015, semantic flipped — `lock_deck` controls deck save/print only; attachments are always available regardless), recipient label. One document, many shares.
+- **`document_attachments`** (009) + **`attachment_downloads`** (016) — files riding alongside a share, plus a per-viewer download log keyed on `viewer_id` + `session_id` + `filename` + `size_bytes`.
+- **`viewers`** is scoped per share — the same email viewing two of your shares is two viewer rows. Lets each share own its analytics narrative; revoking a share doesn't affect viewer rows on other shares.
+- **`sessions`** holds aggregate per-view metrics (`active_time_seconds`, `max_scroll_depth`, `last_heartbeat_at`) and the `document_version` they actually saw — useful when the owner updated the deck mid-fundraise.
 - **`section_events`** has `unique (session_id, section_id)` so the tracker's UPSERT-on-flush can never duplicate.
-- **`waitlist`** is the v1.1 capture surface (intentionally simple).
+- **`notifications_log`** (003) — audit row per first-open email send; status enum (`queued / delivered / failed / skipped`) drives the monitor cron.
+- **`app_events`**, **`error_log`**, **`feedback`** (006) — observability layer; `app_events` is PostHog-shaped so we can replay later without vendor lock-in.
 - **`rate_limits`** is the only table `revoke all` is applied for both anon and authenticated.
+- **`waitlist`** is the legacy pre-launch capture surface, retained but not actively used post-launch.
 
-`bounced` is a generated column on `sessions` (`max_scroll_depth < 0.05`) — prevents drift between code and DB definitions of "bounce." Same logic for `notifications_log` status: a CHECK constraint enforces valid values.
+`bounced` is a generated column on `sessions` (`max_scroll_depth < 0.05`) — prevents drift between code and DB definitions of "bounce." Same approach for `notifications_log.status` and `document_versions.source_type`: CHECK constraints enforce valid values.
 
 ---
 
 ## Tracker design
 
-Single ESM bundle. ~12 KB gzipped target. Nine TypeScript modules in `packages/tracker/src/`. Each module has one responsibility:
+Single ESM bundle. ~12 KB gzipped target. Ten TypeScript modules in `packages/tracker/src/`, each with one responsibility:
 
 - `config.ts` — read `data-*` attrs + `window.HTMLRadarConfig`, validate, fill defaults
-- `transport.ts` — fetch wrapper for the two RPCs, with `keepalive: true` on unload
+- `transport.ts` — fetch wrapper for the RPCs, with `keepalive: true` on unload
 - `identity.ts` — fingerprint, email, opt-out (localStorage)
 - `gate.ts` — Shadow-DOM email gate (only used for email-gated shares without allow-list)
-- `session.ts` — visibility + heartbeat + scroll + flush mutex
-- `sections.ts` — heading observer + dwell with `minDwellMs: 3000` default
+- `session.ts` — visibility + heartbeat + scroll + idle watchdog + flush mutex
+- `sections-v2.ts` — IAB-style viewport-coverage section tracker (active)
+- `sections-legacy.ts` — pre-v2 heading-observer fallback (retained as one-line rollback target; remove after 7-day v2 stability)
 - `api.ts` — `window.HTMLRadar` public surface
 - `types.ts` — shared types
 - `index.ts` — boot
 
 ### Why not @supabase/supabase-js?
 
-The tracker uses ~5% of the supabase-js surface (two RPCs). The SDK is ~25 KB gzipped — twice our entire budget. We hand-rolled the fetch wrapper in `transport.ts` (about 80 lines). Bonus: `fetch + keepalive: true` works directly for the unload path; via supabase-js it requires wrapping the internal client, which is awkward.
-
-### Why 3000 ms minDwell?
-
-This is the audit fix for F-7. The original tracker fired `onSectionRead` every time a heading transitioned into the viewport — including when the user fast-scrolled past 10 sections in one swipe, each crediting ~16 ms. The dashboard showed "every section read" even for a tab that was open for 5 seconds.
-
-3 seconds is the minimum dwell empirically chosen to separate "scanned" from "read." Configurable per deployment via `window.HTMLRadarConfig.sections.minDwellMs`, but the default is the right answer for ~95% of cases.
+The tracker uses ~5% of the supabase-js surface (two recipient RPCs). The SDK is ~25 KB gzipped — twice our entire budget. We hand-rolled the fetch wrapper in `transport.ts` (about 80 lines). Bonus: `fetch + keepalive: true` works directly for the unload path; via supabase-js it requires wrapping the internal client, which is awkward.
 
 ### Why a closed Shadow DOM gate?
 
@@ -126,16 +128,53 @@ When the heartbeat fires while the user is navigating away, `visibilitychange:hi
 
 ---
 
-## Rate-limit and identity model
+## Engagement-time methodology
 
-`schema/002_rpcs.sql:check_rate_limit` keys on a caller-supplied string. The two RPCs feed it different keys:
+"Reading time" and "section dwell" each need to mean _engaged_ time, not _tab-open_ time. The tracker enforces this at both granularities with the same idle definition.
+
+**The shared definition.** A reader is considered active when ALL of these hold:
+
+1. The tab is visible (`document.visibilityState === 'visible'`).
+2. They've fired one of `keydown`, `scroll`, or `touchstart` in the last **5 seconds** (`ACTIVITY_IDLE_MS = 5000` in `sections-v2.ts`; `Session.IDLE_THRESHOLD_MS = 5000` in `session.ts`). Mousemove is deliberately excluded — too noisy, doesn't reliably imply attention. This matches the IAB / Chartbeat / Parse.ly engagement-time methodology.
+
+**At the section level** (`sections-v2.ts`). The tracker samples every 250 ms via `requestAnimationFrame`. For each visible section, it credits time weighted by what fraction of the viewport that section occupies. A section needs ≥50% of its own height in the viewport (`MIN_COVERAGE = 0.5`, IAB Viewable Impression Standard) and ≥1 second of continuous visibility (`QUALIFIED_DWELL_MS = 1000`) before its credited time counts toward `qualifiedMs`. Time accumulated before qualification is discarded. The dashboard surfaces qualified time only.
+
+**At the session level** (`session.ts`). `tickActive` caps the credited window at `lastActivityMs + 5000`. If the reader walked away with the tab open, active_time stops accumulating after the 5s grace; when they interact again, accumulation resumes from that moment. A 30-second heartbeat or `visibilitychange:hidden` triggers the tick, so writes to `sessions.active_time_seconds` always reflect the engaged total, never tab-open time.
+
+**Why 5 seconds and not 30?** Engagement reads as continuous activity, not as one action followed by minutes of dwell. Five seconds is the value Chartbeat settled on after a decade of A/B testing; we adopted it directly. Configurable per deployment but the default is the right answer for ~95% of cases.
+
+**Why two counters at all?** Section dwell is per-section detail (which slide held attention). Session active_time is the aggregate signal (was this a real read or a scroll-by). They use the same idle gate so they agree on what "engaged" means — the per-section bars sum to ~the session's active_time, modulo sampling and rounding.
+
+**One pre-existing limitation.** Sessions written before commit `e3d4bc2` have inflated `active_time_seconds` because the session-level watchdog didn't exist yet. We don't back-fill; the legacy numbers stay as they are.
+
+---
+
+## Rate-limit and recipient identity
+
+`schema/002_rpcs.sql:check_rate_limit` keys on a caller-supplied string. The two recipient-side RPCs feed it different keys:
 
 - `start_session`: key = `start:{slug}:{lower(email) or fingerprint or 'anon'}`. Cap = 5 calls per 60 s.
 - `update_session`: key = `update:{session_id}`. Cap = 30 calls per 60 s (tracker heartbeats ~4/min, generous headroom).
 
 **Why not key on client IP?** Because the tracker calls Supabase directly from the recipient's browser — the IP isn't surfaced as `request.cf.connecting_ip` to PostgREST. The original RPC accepted `p_client_ip` but it was always null. The audit caught this in P1-1 (commit 5799d0a).
 
+**Identity on the dashboard side.** Three views (`/docs/[id]` rail, `/docs/[id]` viewer table, `/dashboard/[slug]`) all surface the same share or viewer; without a single resolver they drift. `packages/app/src/lib/recipient-identity.ts` is the single source of truth. The rule: the sender-supplied `recipient_label` is always primary when present (a group label like "Investor list" or a person label like "Marc at Example Ventures" beats first-viewer-email for at-a-glance identification); viewer emails demote to secondary. Without a label, viewer email (or `Viewer N` fallback) takes primary. Tested in `recipient-identity.test.ts`.
+
 If we later move RPC calls server-side (via the proxy), we can re-add IP-based limits as defense-in-depth.
+
+---
+
+## App-layer surfaces worth knowing
+
+A few owner-side features have non-obvious shapes worth pinning down here so contributors don't reinvent them.
+
+**Attachments** (`schema/009_attachments.sql` + `016_attachment_downloads.sql`, surfaced via `inject.ts` corner pill on the recipient side, `AttachmentsPanel.tsx` on the owner side). Files (PDF / Office / image / ZIP) ride alongside the deck on every share. They're stored in R2 keyed by attachment id. The proxy lists them on every recipient view and the corner pill opens a side drawer. **They are always available when present** — never gated by `lock_deck` (that flag only controls deck save/print). Each download writes one row to `attachment_downloads` keyed on `viewer_id` + `session_id` + `filename` + `size_bytes`, so the dashboard shows per-recipient download counts without joining against the file bytes themselves.
+
+**Version history** (`schema/018_document_versions.sql` + `019_document_versions_rls_insert.sql`). Every initial upload and every replace appends a row to `document_versions` capturing the original local filename (from `formData.get('file').name`), byte size, R2 key, source type, and who replaced it. `documents.current_version` always equals `max(document_versions.version)` for that doc. Share links don't change on replace; recipients get the new version on next open, and `sessions.document_version` records which version each session actually saw — useful when you audit reads across deck revisions. Versions written before this schema shipped have no captured filename; the popover renders an italic "Filename not captured" affordance for those rows.
+
+**Lifetime quota** (`schema/003_triggers.sql:enforce_doc_cap` + `packages/app/src/lib/quota.ts`). Free tier caps at 10 lifetime documents — deleted docs count, so a user can't rotate slots by deleting and re-uploading. The Postgres trigger raises before insert #11; the UI counter on `/new`, `/settings`, and `/upgrade` reads `readQuota()`. Both code paths count `documents WHERE owner_id = ...` with no `deleted_at` filter so they agree. The cap is the trigger that routes Free users to `/upgrade?reason=quota` with a contextual headline.
+
+**Recipient error pages** (`packages/proxy/src/responses.ts`). Four states — link doesn't exist, sender revoked, link expired, source unreachable — all rendered as branded shells. Cache headers set `private, no-store, max-age=0` so extending an expiry doesn't get masked by a cached error page (QA2 #4 incident). No HTTP code is mentioned in the visible body; the recipient sees warm copy plus a "Reply to the person who sent this" footer. 26 regression tests in `packages/proxy/tests/responses.test.ts` lock the contract.
 
 ---
 
@@ -189,7 +228,7 @@ That answer keeps the brand sharp, sends wrong-fit users away cleanly, and gives
 
 ## The v1.1 lead magnet: `htmlradar.com/convert`
 
-A free, no-sign-in tool that takes Markdown / DOCX / TXT input and outputs a branded HTML file the user can download. Ships **week 2 post-launch**, not earlier. Held until then so the launch narrative stays sharp: HTMLRadar tracks HTML; the converter is the on-ramp for users who don't already have HTML.
+A free, no-sign-in tool that takes Markdown / DOCX / TXT input and outputs a branded HTML file the user can download. Ships **~10 days post-launch**, not earlier. Held until then so the launch narrative stays sharp: HTMLRadar tracks HTML; the converter is the on-ramp for users who don't already have HTML.
 
 ### Why it exists
 
@@ -277,16 +316,16 @@ Each of these is a v1.2+ candidate if `/convert` shows real traction. Until then
 
 ## Things we deliberately did not build
 
-| Not built                               | Why not                                                                                                                                                                                                                        |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Self-signup with custom auth            | Supabase Auth (Google OAuth + magic link) covers it. Building our own = three weeks of work to get to feature parity, plus a real liability if we get the password hashing wrong.                                              |
-| Real-time websockets for analytics      | A 15 s heartbeat is fine. Websockets would be ~3× the worker cost for marginal UX gain. v1.1 maybe.                                                                                                                            |
-| Custom state management (Redux/Zustand) | Server Components handle most state. The few interactive surfaces (sign-in, upload) use plain React hooks. Anything more is premature.                                                                                         |
-| Full Stripe billing integration in v1.0 | A Payment Link + manual tier flip is the Wizard-of-Oz pattern. We invest in real billing infra when ≥5 customers prove demand.                                                                                                 |
-| Watermark on the document body          | Researched competitor strategies — none of Tally, Cal.com, Loom, Papermark, Formbricks watermark the user-generated artifact. They all brand chrome. Doing otherwise would kill adoption in the high-stakes B2B sender market. |
-| In-product email composer               | Senders use their own mail client. We give them a URL.                                                                                                                                                                         |
-| AI doc chat / "ask the deck a question" | Differentiator candidate for v1.2 if signal warrants. Not v1.0.                                                                                                                                                                |
-| Folder organization / data rooms        | DocSend Advanced ($250/mo) gates these. We start without; add when paid users ask.                                                                                                                                             |
+| Not built                                      | Why not                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Self-signup with custom auth                   | Supabase Auth (Google OAuth + magic link) covers it. Building our own = three weeks of work to get to feature parity, plus a real liability if we get the password hashing wrong.                                                                                                                                                    |
+| Real-time websockets for analytics             | A 15 s heartbeat is fine. Websockets would be ~3× the worker cost for marginal UX gain. v1.1 maybe.                                                                                                                                                                                                                                  |
+| Custom state management (Redux/Zustand)        | Server Components handle most state. The few interactive surfaces (sign-in, upload) use plain React hooks. Anything more is premature.                                                                                                                                                                                               |
+| Full billing webhook + customer portal in v1.0 | A Polar Payment Link + manual `profiles.tier` flip is the Wizard-of-Oz pattern. The checkout URL already appends `customer_external_id` + `customer_email` so the eventual webhook handler can auto-flip; KYC + payouts are plumbed, we just don't run the webhook yet. Invest in real billing infra when ≥5 customers prove demand. |
+| Watermark on the document body                 | Researched competitor strategies — none of Tally, Cal.com, Loom, Papermark, Formbricks watermark the user-generated artifact. They all brand chrome. Doing otherwise would kill adoption in the high-stakes B2B sender market.                                                                                                       |
+| In-product email composer                      | Senders use their own mail client. We give them a URL.                                                                                                                                                                                                                                                                               |
+| AI doc chat / "ask the deck a question"        | Differentiator candidate for v1.2 if signal warrants. Not v1.0.                                                                                                                                                                                                                                                                      |
+| Folder organization / multi-doc data rooms     | Per-share attachments already ship the "send the whole packet under one tracked link" UX without folders (PDFs, cap tables, ZIPs alongside the deck). Real DocSend-style folders + per-folder permissions are a v1.2+ candidate if paid users ask.                                                                                   |
 
 ---
 
@@ -304,10 +343,11 @@ The 5% of users who self-host are not our paying customers regardless. The 95% w
 
 ## Where to start as a contributor
 
-- **Schema change?** Edit `schema/001_init.sql` or add a new migration file. Test the RLS policies by hand in the SQL editor. Update this doc if the table model changes.
+- **Schema change?** Add a new migration file under `schema/` — don't edit existing ones. Test RLS policies by hand in the Supabase SQL editor. Update this doc if the table model changes.
 - **Tracker change?** `packages/tracker/src/`. Add a Vitest test for any new branch. Re-verify `dist/tracker.js` size stays under budget.
-- **Proxy change?** `packages/proxy/src/`. Worker handler in `index.ts`; security logic (cookies, allow-list) in `auth.ts` + `index.ts`.
-- **App change?** `packages/app/src/app/`. App Router + Server Actions for mutations.
+- **Proxy change?** `packages/proxy/src/`. Worker handler in `index.ts`; security logic (cookies, allow-list) in `auth.ts` + `index.ts`; recipient shells in `responses.ts`.
+- **App change?** `packages/app/src/app/`. App Router + Server Actions for mutations. New surfaces should flow through `lib/recipient-identity.ts` for any share/viewer naming.
+- **Deploy infra?** `.github/workflows/deploy.yml`. The pipeline builds tracker, builds Pages app, deploys preview, smoke-tests, promotes to prod, deploys proxy + monitor workers, then runs a Cloudflare zone cache purge.
 
 Every PR runs CI (lint, typecheck, vitest, gitleaks, DCO). Every commit must be signed off (`git commit -s`).
 

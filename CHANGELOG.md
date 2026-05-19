@@ -4,6 +4,57 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 
 ---
 
+## v1.2 — 2026-05-19
+
+Round-three QA pass (a designer R3 plus an ownership sweep) and a Phase 2 micro-interaction polish. The doc-detail page got a hard rewrite (identity hierarchy, deduplicated analytics, capped lists with elegant expand), the attachments model was fixed, a version-history feature shipped, and the landing copy stopped trash-talking PDF.
+
+### Added
+
+- **Document version history** (`document_versions` table; hero `v{n}` chip becomes a popover). Every upload and replace logs the original local filename, file size, timestamp, and who replaced it. Existing share links automatically serve the current version; earlier versions are kept for reference only. Italic "Filename not captured" affordance on rows that pre-date the feature.
+- **Lifetime quota counter** on `/new`, `/settings`, and `/upgrade`. Live "X of 10 uploads used" with progress bar, tone-shifts to alert at cap. Contextual headline on `/upgrade?reason=quota` ("Ten uploads in. Pro removes the ceiling.").
+- **Permanent Delete share** in a Danger zone in Edit settings, separate from the reversible Revoke pause. Opens a typed-DELETE confirmation modal. Hard-deletes the share row + cascades to sessions/viewers/section_events. URL returns Not Found after.
+- **Recipient corner-pill attachments UI** — small oxblood pill in the top-right of the recipient view opens a side drawer listing the attached files. Always available when present; never hidden behind a deck-lock toggle. Per-viewer download tracking writes viewer_id + session_id + filename + size_bytes per download.
+- **Preview opens in a new tab** — both "Preview document" (hero) and "Preview as you" (per-share). Dashboard tab stays put.
+- **Cloudflare cache purge on every deploy** (`.github/workflows/deploy.yml`). After Pages + worker uploads, hits the zone purge_cache endpoint. `continue-on-error: true` so a narrower token doesn't fail the deploy; requires `CLOUDFLARE_ZONE_ID` secret.
+- **Phase 2 design polish**: site-wide button `:focus-visible` ring (WCAG AA contrast) + `:active` press; `/docs` row hover lift; `/docs` activity-dot ambient halo; stat-strip soft fade-in; landing workflow packet pause-on-hover; landing GitHub-icon rotate-on-hover; `/pricing` Tier card hover lift; `/sign-in` "Opening Google…" busy state; `/sign-in` sent-confirmation card fade-in.
+- **Playwright auth helper** (`packages/app/e2e/auth-setup.spec.ts`) — mints a qa-bot session via Supabase password REST, writes a storageState file. Unblocks future authed-surface e2e tests.
+
+### Changed
+
+- **Recipient identity hierarchy rewritten.** The sender's `recipient_label` is now always primary; viewer email is secondary. Share rail, viewer table, share table, and SharePane heading all read consistently — "Investor list" stays "Investor list" on every surface instead of demoting to "viewer2@... +5". 10 new test cases cover the rule.
+- **Doc-detail layout** simplified to a single-column stack (Shares above, Analytics below). The earlier outer 2-col layout collapsed the SharePane at every laptop width — grid items without `min-w-0` let the analytics column overflow into the shares column.
+- **Sessions list capped at 5** with "Show N more" expand on `/dashboard/[slug]`. The SharePane on `/docs/[id]` suppresses both the stat row and the sessions list entirely — `ViewerInsights` below is the one canonical analytics view.
+- **Viewer table capped at top 5** with "Show N more viewers / Show top 5" expand below.
+- **Hero title shrunk** from 44/64/72px to 26/32/36px with `truncate` and tooltip — no more long titles ellipsised to "the company Pitch De...".
+- **`First seen` + `Last seen` columns** symmetric: both use hybrid relative/absolute formatting (recent = "12h ago", older = "May 17"), full timestamp on hover.
+- **Recipient error pages rewritten** (`notFound` / `revoked` / `expired` / `sourceUnreachable`). No HTTP codes mentioned in any visible body. Each ends with "Reply to the person who sent this to you" + "What is HTMLRadar?" link. 26 regression tests lock in the copy + cache headers.
+- **Lock-the-deck semantic flipped** — `document_shares.allow_download` renamed to `lock_deck`. One toggle "Lock the deck" governs the deck's save/print/screenshot posture; attachments are no longer gated by this flag.
+- **Share access changes apply retroactively.** Email allowlist is re-checked against the current share state on every proxy request (both doc-serve and attachment routes). Previously an email cookie issued before the allowlist tightened stayed valid.
+- **`/docs` activity dot is static**, derived from `documents.last_viewed_by_owner_at`. Visible until the owner opens the doc.
+- **Landing copy rewritten** — "The shift" leads with what HTML enables instead of trash-talking PDF. Trust row adds "Diligence packets" alongside investor decks / sales reports / design specs / proposals. Workflow "Share" step positions attachments as "The whole packet under one tracked link".
+- **`/compare/papermark` and `/why`** now export proper `metadata` (title + description). Both were falling back to the default app title — SEO regression caught by the pre-deploy QA pass.
+- **Middleware preserves querystring on unauth redirect** so `/upgrade?reason=quota` survives the sign-in bounce.
+- **Hero "Delete" → "Delete document"**, "Live · 30s" → "Live" / "Paused", `Recipient` column on viewer table → `Viewer`, "1 link" → "1 share", several stale "returns 403" hints rewritten in human terms.
+
+### Fixed
+
+- **Missing `INSERT`/`UPDATE` RLS policies on `document_versions`** (schema 019). Migration 018 enabled RLS with a `SELECT`-only policy; every history insert from server actions was silently rejected as the authenticated role. Caught by the static-audit agent before deploy.
+- **Three fire-and-forget Supabase writes** on Edge runtime were being dropped by the worker terminating after redirect. Awaited explicitly (version-history v1 seed for both URL + upload, version-history append on replace, `last_viewed_by_owner_at` update on doc visit).
+- **Delete-share modal case mismatch.** Client `canDestroy` was case-insensitive ("delete" enabled the button); server required exact uppercase "DELETE". Normalized server-side.
+- **Inline `boxShadow` on pricing Tier** was winning over the CSS `:hover` shadow by specificity, so the card lifted on hover without a deepening shadow. Moved rest shadow into CSS rule with `[data-accent='true']` variant.
+- **Hero stat strip duplicated `ViewerInsights` glance grid** with conflicting framings (avg-scroll top, max-scroll bottom). Removed.
+- **`SharesTable` viewer count** now dedupes by email + drops internal viewers so it reconciles with `ViewerInsights`' "Viewers" glance card.
+
+### Migrations
+
+- `schema/015_lock_deck_rename.sql` — renames `document_shares.allow_download` to `lock_deck`, flips the semantic
+- `schema/016_attachment_downloads.sql` — adds viewer_id, session_id, filename, size_bytes columns
+- `schema/017_doc_last_viewed.sql` — adds `documents.last_viewed_by_owner_at`
+- `schema/018_document_versions.sql` — new `document_versions` table + backfill v1 for existing docs
+- `schema/019_document_versions_rls_insert.sql` — INSERT/UPDATE RLS policies + grants on `document_versions`
+
+---
+
 ## v1.1.2 — 2026-05-16
 
 Post-QA polish round. The product now reads as a working dashboard, not a list. Highlights: per-viewer rollup across every share of a doc, a live-refreshing dashboard, auto-detected sections on any HTML (including plain prose), a properly branded first-open email, and a thorough mobile pass.

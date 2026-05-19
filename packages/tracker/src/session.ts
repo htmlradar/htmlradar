@@ -32,6 +32,14 @@ export class Session {
 
   private activeMs = 0;
   private activeRunningSince: number | null = null;
+  // Idle watchdog at the session level. Same threshold + same events
+  // as sections-v2 (keydown / scroll / touchstart — mousemove
+  // deliberately excluded as "too noisy"). If the reader doesn't
+  // interact with the page for this long, session active_time stops
+  // accumulating even if the tab is foregrounded. Without this,
+  // "reading time" inflated when the reader left the tab open and
+  // walked away.
+  private lastActivityMs: number = performance.now();
   private maxScroll = 0;
 
   private heartbeatTimer: number | null = null;
@@ -200,6 +208,11 @@ export class Session {
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('scroll', this.onScroll, { passive: true });
+    // Activity watchdog inputs. Same events sections-v2 listens to.
+    // No mousemove (too noisy; doesn't reliably imply attention).
+    window.addEventListener('keydown', this.onActivity, { passive: true });
+    window.addEventListener('touchstart', this.onActivity, { passive: true });
+    // scroll already bumps activity via onScroll → onActivity below.
   }
 
   private unbindListeners(): void {
@@ -208,6 +221,8 @@ export class Session {
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('scroll', this.onScroll);
+    window.removeEventListener('keydown', this.onActivity);
+    window.removeEventListener('touchstart', this.onActivity);
   }
 
   private onVisibility = (): void => {
@@ -217,7 +232,13 @@ export class Session {
       this.sections.pause();
       void this.flush();
     } else {
-      this.activeRunningSince = performance.now();
+      const now = performance.now();
+      // Tab returning to focus IS an attention signal — bump the
+      // activity timestamp so the idle watchdog starts fresh from
+      // this moment. Without this, a reader who came back from a
+      // long absence would have their first few seconds skipped.
+      this.lastActivityMs = now;
+      this.activeRunningSince = now;
       this.sections.resume();
     }
   };
@@ -230,12 +251,26 @@ export class Session {
   };
 
   private onScroll = (): void => {
+    this.onActivity();
     if (this.rafScrollScheduled) return;
     this.rafScrollScheduled = true;
     requestAnimationFrame(() => {
       this.rafScrollScheduled = false;
       this.updateMaxScroll();
     });
+  };
+
+  // Bumps the activity timestamp. Called from scroll / keydown /
+  // touchstart so the idle watchdog knows the reader is engaged.
+  // Also resumes accumulation if we were idle-paused and the tab is
+  // currently visible — first interaction after going idle starts
+  // counting again immediately.
+  private onActivity = (): void => {
+    const now = performance.now();
+    this.lastActivityMs = now;
+    if (this.activeRunningSince === null && typeof document !== 'undefined' && !document.hidden) {
+      this.activeRunningSince = now;
+    }
   };
 
   private updateMaxScroll(): void {
@@ -265,13 +300,40 @@ export class Session {
     }
   }
 
+  // Session-level active-time accumulator with idle watchdog.
+  //
+  // The reader's active_time only advances while ALL of:
+  //   - the tab is visible (handled in onVisibility — when hidden,
+  //     activeRunningSince is set to null and this method no-ops)
+  //   - they did one of keydown / scroll / touchstart in the last
+  //     IDLE_THRESHOLD_MS (handled here by capping the elapsed
+  //     window at lastActivityMs + IDLE_THRESHOLD_MS)
+  //
+  // Matches the sections-v2 watchdog semantically — both counters
+  // now agree on what "engaged time" means. Without this, sitting
+  // on a foregrounded tab while AFK inflated active_time without
+  // bound, while section dwell correctly stopped accumulating.
+  // Industry standard (IAB / Chartbeat / Parse.ly engagement-time).
+  private static readonly IDLE_THRESHOLD_MS = 5_000;
+
   private tickActive(nowMs: number): void {
     if (this.activeRunningSince === null) return;
-    const elapsed = nowMs - this.activeRunningSince;
+    const idleAt = this.lastActivityMs + Session.IDLE_THRESHOLD_MS;
+    // Cap the credited window at the moment the user went idle.
+    // If they were active throughout, effectiveNow === nowMs.
+    const effectiveNow = Math.min(nowMs, idleAt);
+    const elapsed = effectiveNow - this.activeRunningSince;
     if (elapsed > 0) {
       this.activeMs += elapsed;
       this.dirty = true;
     }
-    this.activeRunningSince = nowMs;
+    if (nowMs <= idleAt) {
+      // Still active — keep accumulating from here.
+      this.activeRunningSince = nowMs;
+    } else {
+      // Idle — pause accumulation. onActivity will restart it when
+      // the reader interacts again.
+      this.activeRunningSince = null;
+    }
   }
 }

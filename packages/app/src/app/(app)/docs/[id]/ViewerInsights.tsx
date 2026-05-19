@@ -328,12 +328,17 @@ export function ViewerInsights({
       }
     }
 
-    // Live readers: anyone heartbeating within the last 60s.
+    // Live readers: count UNIQUE viewer groups whose latest session
+    // heart-beated in the last 60s. Counting raw sessions over-counts
+    // the same person with two tabs open. Grouping by viewer key
+    // matches the green dot semantic in the table below — chip and
+    // dot now agree on what "one reader" means.
     const liveCutoff = Date.now() - 60_000;
-    const liveReaders = visibleSessions.filter((s) => {
-      const hb = s.last_heartbeat_at ? new Date(s.last_heartbeat_at).getTime() : 0;
-      return hb > liveCutoff;
-    }).length;
+    const liveGroupKeys = new Set<string>();
+    for (const g of visibleGroups) {
+      if (g.lastHeartbeatMs > liveCutoff) liveGroupKeys.add(g.key);
+    }
+    const liveReaders = liveGroupKeys.size;
 
     // 12 buckets x 2h each → 24h sparkline.
     const sparkline = sparklineFromSessionStarts(

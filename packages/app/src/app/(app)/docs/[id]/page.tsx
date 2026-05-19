@@ -244,16 +244,30 @@ export default async function DocumentPage({
     };
   }
 
-  // "Reading now" — anyone heartbeated within the last 60s? Uses the
-  // FULL session list (not visibleSessions) on purpose: a sender's own
-  // test-read should also surface the live chip so they can verify the
-  // share is working. internal-viewer filtering only matters for the
-  // aggregate stat strip + viewer table.
+  // "Reading now" — count UNIQUE viewers (by email when available,
+  // otherwise viewer_id) whose latest session heart-beated in the
+  // last 60s. Counting raw sessions over-counts when the same human
+  // has two tabs open: "2 reading now" + 1 pulsing email row in the
+  // viewer table read as contradictory. The dot in the viewer table
+  // groups by email, so the chip should match that semantic.
+  //
+  // Uses the FULL session list (not visibleSessions) on purpose: a
+  // sender's own test-read should also surface the live chip so they
+  // can verify the share is working. internal-viewer filtering only
+  // matters for the aggregate stat strip + viewer table.
   const now = Date.now();
-  const liveReaders = allSessions.filter((s) => {
+  const liveSessions = allSessions.filter((s) => {
     const hb = s.last_heartbeat_at ? new Date(s.last_heartbeat_at).getTime() : 0;
     return hb > 0 && now - hb < 60_000;
-  }).length;
+  });
+  const viewersById = new Map(allViewers.map((v) => [v.id, v]));
+  const liveViewerKeys = new Set<string>();
+  for (const s of liveSessions) {
+    const v = viewersById.get(s.viewer_id);
+    const key = v?.email?.trim().toLowerCase() || s.viewer_id;
+    liveViewerKeys.add(key);
+  }
+  const liveReaders = liveViewerKeys.size;
 
   return (
     <div className="py-8">

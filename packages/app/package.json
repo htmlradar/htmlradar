@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
-    "qa:smoke": "playwright test e2e/smoke.spec.ts"
+    "qa:smoke": "playwright test e2e/smoke.spec.ts",
+    "gen:og": "node scripts/generate-og-card.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",

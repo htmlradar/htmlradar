@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HTMLRadar OG Card</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+    Fraunces — display serif used in the marketing site headlines (the
+    a designer reference). 400 + italic variants in display optical size.
+    JetBrains Mono — the brand mark, the footer credit, the pill.
+    Both load with display=block so Playwright's font-ready wait below
+    actually pauses until they're available — display=swap would let it
+    paint with a fallback first, and the screenshot would be wrong.
+  -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=JetBrains+Mono:wght@500;600&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #fbf1e8;
+        --paper-2: #f4e1cb;
+        --ink: #1f1108;
+        --ink-soft: #3a2818;
+        --graphite: #876959;
+        --signal: #7a1f2e;
+        --signal-dark: #5a1521;
+        --line: #e8d5bd;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+      }
+      body {
+        background: var(--paper);
+        background-image: radial-gradient(rgba(31, 17, 8, 0.045) 1px, transparent 1px);
+        background-size: 22px 22px;
+        color: var(--ink);
+        font:
+          400 16px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          'Inter',
+          system-ui,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        position: relative;
+        overflow: hidden;
+      }
+      /* Radar mark on the right — concentric rings + sweep wedge. Sits
+       behind the headline. Subtle: faded oxblood so it tints the corner
+       without competing with the type. */
+      .radar {
+        position: absolute;
+        top: -80px;
+        right: -120px;
+        width: 720px;
+        height: 720px;
+        opacity: 0.55;
+      }
+      /* Brand pill — same shape as the recipient gate shells. Top-left,
+       not top-right, so it doesn't collide with the radar mark. */
+      .pill {
+        position: absolute;
+        top: 56px;
+        left: 64px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--signal);
+        color: var(--paper);
+        padding: 11px 18px 11px 16px;
+        border-radius: 999px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 600;
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        box-shadow: 0 1px 0 rgba(31, 17, 8, 0.08);
+      }
+      .pill svg {
+        display: block;
+      }
+      /* Content stack — anchored to a 64px content gutter, vertically
+       balanced to feel weighted toward the lower-middle (the eye lands
+       there after scanning the pill at top). */
+      .stack {
+        position: absolute;
+        left: 64px;
+        right: 64px;
+        top: 220px;
+        max-width: 920px;
+      }
+      .h1 {
+        font-family: 'Fraunces', 'Newsreader', Georgia, serif;
+        font-weight: 400;
+        font-size: 116px;
+        line-height: 0.96;
+        letter-spacing: -0.025em;
+        color: var(--ink);
+        font-variation-settings: 'opsz' 144;
+      }
+      .h1 .accent {
+        display: block;
+        margin-top: 6px;
+        color: var(--signal);
+        font-style: italic;
+        font-weight: 400;
+      }
+      .sub {
+        margin-top: 32px;
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 400;
+        font-size: 30px;
+        line-height: 1.35;
+        color: var(--ink-soft);
+        letter-spacing: -0.005em;
+        font-variation-settings: 'opsz' 24;
+      }
+      /* Footer credit line — bottom-left, mono, tracked-out. AGPL-3.0
+       dropped vs the prior card; "OPEN SOURCE" alone signals trust
+       without leaking a licence string most recipients won't recognise. */
+      .footer {
+        position: absolute;
+        bottom: 56px;
+        left: 64px;
+        right: 64px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 500;
+        font-size: 14px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--graphite);
+      }
+      .footer .dot {
+        display: inline-block;
+        margin: 0 10px;
+        color: var(--line);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Radar wedge + rings. SVG so it stays crisp at any export DPR. -->
+    <svg class="radar" viewBox="0 0 720 720" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="sweep" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#7A1F2E" stop-opacity="0.42" />
+          <stop offset="60%" stop-color="#7A1F2E" stop-opacity="0.10" />
+          <stop offset="100%" stop-color="#7A1F2E" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <g fill="none" stroke="#7A1F2E" stroke-width="1.4">
+        <circle cx="360" cy="360" r="80" opacity="0.20" />
+        <circle cx="360" cy="360" r="160" opacity="0.18" />
+        <circle cx="360" cy="360" r="240" opacity="0.16" />
+        <circle cx="360" cy="360" r="320" opacity="0.13" />
+        <circle cx="360" cy="360" r="400" opacity="0.10" />
+        <circle cx="360" cy="360" r="480" opacity="0.07" />
+      </g>
+      <!-- Sweep wedge — 60° slice angled toward top-right; gradient
+         fades the leading edge so it reads as motion-without-motion. -->
+      <path d="M 360 360 L 360 -120 A 480 480 0 0 1 776 96 Z" fill="url(#sweep)" />
+      <!-- Center dot -->
+      <circle cx="360" cy="360" r="6" fill="#7A1F2E" opacity="0.45" />
+    </svg>
+
+    <div class="pill">
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          fill="none"
+          stroke="#FBF1E8"
+          stroke-width="1.6"
+          opacity="0.55"
+        />
+        <circle
+          cx="12"
+          cy="12"
+          r="5"
+          fill="none"
+          stroke="#FBF1E8"
+          stroke-width="1.6"
+          opacity="0.85"
+        />
+        <line
+          x1="12"
+          y1="12"
+          x2="12"
+          y2="3"
+          stroke="#FBF1E8"
+          stroke-width="1.8"
+          stroke-linecap="round"
+        />
+        <circle cx="12" cy="12" r="1.8" fill="#FBF1E8" />
+      </svg>
+      HTMLRADAR
+    </div>
+
+    <div class="stack">
+      <h1 class="h1">A document<span class="accent">shared with you.</span></h1>
+      <p class="sub">Open to view.</p>
+    </div>
+
+    <div class="footer">HTMLRADAR.COM <span class="dot">·</span> OPEN SOURCE</div>
+  </body>
+</html>

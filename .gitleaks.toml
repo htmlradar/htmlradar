@@ -31,4 +31,7 @@ regexes = [
   '''SUPABASE_ANON_KEY=$''',
   '''eyJ\.\.\.''',
   '''re_xxxxxxxx''',
+  # Fake webhook-signature fixture in payments.test.ts — NOT a real secret,
+  # used only to exercise the standardwebhooks HMAC round-trip in tests.
+  '''whsec_abc123xyz789defghijklmnop''',
 ]

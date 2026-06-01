@@ -183,15 +183,29 @@ export class SectionTracker {
   private tick = (ts: number): void => {
     if (!this.active) return;
 
-    const elapsed = ts - this.lastSampleTs;
     const isActive =
       typeof document !== 'undefined' &&
       document.visibilityState === 'visible' &&
       ts - this.lastActivityTs < ACTIVITY_IDLE_MS;
 
-    if (isActive && elapsed >= SAMPLE_INTERVAL_MS) {
+    // Idle (tab visible but no recent activity): advance the sample clock
+    // WITHOUT crediting. Otherwise the idle gap stays folded into `elapsed`,
+    // and the next active tick dumps the entire gap onto whatever section is
+    // on screen — inflating section dwell well past the session's active
+    // time. active_time is idle-gated (5s watchdog); section dwell must be
+    // too, or the two diverge (the "timing is off" over-credit).
+    if (!isActive) {
       this.lastSampleTs = ts;
-      this.sample(elapsed);
+      this.scheduleTick();
+      return;
+    }
+
+    const elapsed = ts - this.lastSampleTs;
+    if (elapsed >= SAMPLE_INTERVAL_MS) {
+      this.lastSampleTs = ts;
+      // Clamp to two sample intervals so a residual gap (a throttled rAF,
+      // a slow frame, a wake-from-background race) can never over-credit.
+      this.sample(Math.min(elapsed, SAMPLE_INTERVAL_MS * 2));
     }
 
     this.scheduleTick();

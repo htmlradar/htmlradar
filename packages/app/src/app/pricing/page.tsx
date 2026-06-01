@@ -15,7 +15,7 @@ import { ArrowRight, ArrowUpRight, Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import '../landing-v2.css';
 
-export const runtime = 'edge';
+export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
   title: 'Pricing',

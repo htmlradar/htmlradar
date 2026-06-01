@@ -9,7 +9,7 @@ import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
 import type { Metadata } from 'next';
 
-export const runtime = 'edge';
+export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
   title: 'Privacy',

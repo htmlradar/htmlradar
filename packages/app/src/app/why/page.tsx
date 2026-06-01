@@ -11,7 +11,7 @@ import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
-export const runtime = 'edge';
+export const dynamic = 'force-static';
 
 export const metadata = {
   title: 'Why HTMLRadar',

@@ -17,28 +17,312 @@
 //   9. Footer.
 
 import Link from 'next/link';
-import { serverClient } from '@/lib/supabase-server';
+import type { ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
 import { LandingEffects } from './LandingEffects';
+import { AuthLink, AuthText } from './AuthCta';
 import './landing-v2.css';
 
-export const runtime = 'edge';
+// Statically prerendered (no edge SSR — that was the source of the
+// cold-start 1102 errors). force-static is explicit because the app's
+// middleware matcher otherwise makes Next treat this route as dynamic;
+// this page has zero per-request data (auth moved client-side to
+// <AuthLink>/<AuthText>), so prerendering is correct.
+export const dynamic = 'force-static';
 
-export default async function LandingV2() {
-  // Auth-aware nav + CTAs: signed-in users see "Open dashboard"
-  // instead of "Get started" / "Start free". The landing stays
-  // accessible (no auto-redirect) so signed-in users can re-read
-  // the pitch or share the link with someone. Just the calls-to-
-  // action change so a returning user isn't told to "get started"
-  // with a product they're already inside.
-  const supabase = serverClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const ctaHref = user ? '/docs' : '/sign-in';
-  const navCtaLabel = user ? 'Open dashboard' : 'Get started';
-  const heroCtaLabel = user ? 'Open dashboard' : 'Start free';
+// ─── Use-cases mocks ──────────────────────────────────────────────
+// High-fidelity per-case document previews. Mirror the detail level
+// of a designer's reference (Sales Proposal / Pitch Deck / Board
+// Pre-Read), scaled to fit a ~280px-wide card.
 
+function CaseChrome({ filename, children }: { filename: string; children: ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-line bg-[#FBF6E9]">
+      <div className="flex items-center gap-1.5 border-b border-line/70 bg-paper-2/40 px-3 py-1.5">
+        <span className="size-1.5 rounded-full bg-[#E5A1A1]" />
+        <span className="size-1.5 rounded-full bg-[#E5C68A]" />
+        <span className="size-1.5 rounded-full bg-[#A3CFA1]" />
+        <span className="ml-1 truncate font-mono text-[9.5px] tracking-tight text-graphite">
+          {filename}
+        </span>
+      </div>
+      <div className="p-3.5">{children}</div>
+    </div>
+  );
+}
+
+function PitchDeckMock() {
+  return (
+    <CaseChrome filename="aurora-seed.html · data-room">
+      {/* Dark deck canvas */}
+      <div className="relative overflow-hidden rounded-[8px] bg-gradient-to-br from-ink to-[#1a0e09] p-3 text-paper">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(217,181,176,0.18)_0%,transparent_45%),radial-gradient(circle_at_5%_95%,rgba(122,31,46,0.4)_0%,transparent_50%)]"
+        />
+        <div className="relative">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 font-mono text-[7.5px] font-bold uppercase tracking-[0.22em] text-paper/55">
+              <span className="size-1 rounded-full bg-signal-soft" />
+              Aurora
+            </span>
+            <span className="font-mono text-[7.5px] tracking-[0.16em] text-paper/45">
+              <span className="font-bold text-signal-soft">07</span> / 18
+            </span>
+          </div>
+          <div className="mt-2 font-mono text-[7.5px] uppercase tracking-[0.22em] text-signal-soft">
+            The Ask
+          </div>
+          <div className="mt-0.5 font-serif text-[18px] font-bold leading-[1.05] tracking-tight">
+            Raising <em className="not-italic font-semibold text-signal-soft">$2.4M</em>
+            <br />
+            to close 2026.
+          </div>
+          <div className="mt-2 flex gap-3">
+            {[
+              ['ARR', '$840K'],
+              ['YoY', '3.1×'],
+              ['NRR', '142%'],
+              ['Runway', '14mo'],
+            ].map(([k, v]) => (
+              <div key={k as string}>
+                <div className="font-mono text-[6.5px] uppercase tracking-[0.18em] text-paper/45">
+                  {k}
+                </div>
+                <div className="font-serif text-[11px] font-semibold leading-none">{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Thumb strip */}
+      <div className="mt-2 grid grid-cols-6 gap-1">
+        {['01', '02', '03', '04', '05', '07'].map((n, i) => {
+          const isCurrent = i === 5;
+          return (
+            <div
+              key={n}
+              className={`aspect-[16/9] rounded-[3px] border ${isCurrent ? 'border-ink bg-ink' : 'border-line bg-paper-2/60'}`}
+            >
+              <div className={`m-1 h-[1px] ${isCurrent ? 'bg-signal-soft' : 'bg-graphite/40'}`} />
+              <div
+                className={`m-1 -mt-0.5 h-[1px] w-[60%] ${isCurrent ? 'bg-signal-soft/70' : 'bg-graphite/25'}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {/* File rows */}
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {[
+          ['Financial model.xlsx', '3m 04s'],
+          ['Cap table.pdf', '2.1s'],
+        ].map(([name, ts]) => (
+          <div
+            key={name as string}
+            className="flex items-center gap-1.5 rounded-md border border-line bg-paper-2/40 px-2 py-1"
+          >
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="size-2.5 shrink-0 text-graphite"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span className="flex-1 truncate text-[9px] font-medium text-ink">{name}</span>
+            <span className="font-mono text-[8px] font-bold text-signal">{ts}</span>
+          </div>
+        ))}
+      </div>
+    </CaseChrome>
+  );
+}
+
+function ProposalMock() {
+  return (
+    <CaseChrome filename="aurora-proposal.html · v2">
+      <div className="flex items-start justify-between gap-2 border-b border-line/60 pb-2">
+        <div>
+          <div className="font-mono text-[7.5px] font-bold uppercase tracking-[0.22em] text-signal">
+            Sales Proposal
+          </div>
+          <div className="mt-0.5 font-mono text-[8.5px] tracking-[0.06em] text-graphite">
+            № AUR-2026-014
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-[7px] uppercase tracking-[0.16em] text-graphite">
+            Valid until
+          </div>
+          <div className="font-serif text-[10px] font-semibold leading-none text-ink">
+            Jan 24, 2026
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {[
+          ['From', 'Aurora Studio', 'Maya Chen · Partner'],
+          ['Prepared for', 'Northwind & Co.', 'Daniel Park · Growth'],
+        ].map(([label, name, sub]) => (
+          <div key={label as string} className="rounded-md border border-line bg-paper-2/40 p-1.5">
+            <div className="font-mono text-[7px] uppercase tracking-[0.16em] text-graphite">
+              {label}
+            </div>
+            <div className="mt-0.5 text-[10px] font-semibold leading-tight text-ink">{name}</div>
+            <div className="text-[8.5px] text-ink-soft">{sub}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 space-y-1">
+        {[
+          ['Discovery, audit & retention map', 'Wk 1–2'],
+          ['Cohort dashboards & activation', 'Wk 3–6'],
+          ['Rollout, training & handoff', 'Wk 7–12'],
+        ].map(([item, wk]) => (
+          <div
+            key={item as string}
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-1.5 rounded-md border border-line bg-paper-2/40 px-2 py-1"
+          >
+            <span className="grid size-3 place-items-center rounded-full bg-signal text-signal-soft">
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                className="size-1.5"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
+            <span className="text-[9px] font-medium text-ink">{item}</span>
+            <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-graphite">
+              {wk}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2 rounded-lg bg-ink px-2.5 py-2 text-paper">
+        <div>
+          <div className="font-mono text-[7px] uppercase tracking-[0.18em] text-signal-soft">
+            Total fee · fixed
+          </div>
+        </div>
+        <div className="font-serif text-[18px] font-bold leading-none tracking-tight">
+          $42,000
+          <span className="ml-1 font-sans text-[8px] font-normal text-paper/55">USD</span>
+        </div>
+      </div>
+    </CaseChrome>
+  );
+}
+
+function BoardPrepMock() {
+  return (
+    <CaseChrome filename="board-prep-mar-14.html · confidential">
+      <div className="flex items-center justify-between font-mono text-[7.5px] font-bold uppercase tracking-[0.16em] text-graphite">
+        <span className="inline-flex items-center gap-1 text-signal">
+          <span className="size-1 rounded-full bg-signal" />
+          Friday · Mar 14
+        </span>
+        <span>Pre-read · 9 pages</span>
+      </div>
+      <div className="mt-1.5 font-serif text-[16px] font-bold leading-[1.05] tracking-tight text-ink">
+        The five things we&apos;ll
+        <br />
+        cover <em className="not-italic text-signal">Friday</em>.
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        {[
+          ['On agenda', '5', '90-min call'],
+          ['Decisions', '2', 'Vote required'],
+          ['Open risks', '1', 'Flagged red'],
+        ].map(([k, v, sub]) => (
+          <div key={k as string} className="rounded-md border border-line bg-paper-2/40 p-1.5">
+            <div className="font-mono text-[6.5px] font-bold uppercase tracking-[0.14em] text-graphite">
+              {k}
+            </div>
+            <div className="font-serif text-[14px] font-semibold leading-none text-ink">{v}</div>
+            <div className="mt-0.5 font-mono text-[6.5px] font-semibold text-signal">{sub}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 space-y-1">
+        {[
+          ['#1F7A3A', 'CEO opening · Q1 narrative', '15 min'],
+          ['#D9A04A', '2026 hiring plan', '25 min'],
+          ['#7A1F2E', 'Enterprise GTM · debate', '20 min'],
+        ].map(([color, label, tag]) => (
+          <div
+            key={label as string}
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-1.5 rounded-md border border-line bg-paper-2/40 px-2 py-1"
+          >
+            <span
+              aria-hidden
+              className="size-1.5 rounded-full"
+              style={{ backgroundColor: color as string }}
+            />
+            <span className="text-[9px] font-medium text-ink">{label}</span>
+            <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-graphite">
+              {tag}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between border-t border-line/60 pt-1.5 font-mono text-[7px] uppercase tracking-[0.14em] text-graphite">
+        <span className="inline-flex items-center gap-1.5 text-ink">
+          <span className="grid size-3.5 place-items-center rounded-full bg-signal text-signal-soft font-serif text-[8px] font-semibold tracking-tight normal-case">
+            J
+          </span>
+          Jules Kim · CEO
+        </span>
+        <span>Sent Tue 6:02 PM</span>
+      </div>
+    </CaseChrome>
+  );
+}
+
+const USE_CASES: Array<{
+  n: string;
+  title: string;
+  body: string;
+  mock: ReactNode;
+  caseKey: string;
+}> = [
+  {
+    n: '01',
+    title: 'Pitch Decks & Investor Data Rooms',
+    body: 'Per-investor links. See which slide they replayed, which model they downloaded, where the deck lost them.',
+    mock: <PitchDeckMock />,
+    caseKey: 'pitch-deck',
+  },
+  {
+    n: '02',
+    title: 'B2B Proposals & Outreach Kits',
+    body: 'Open one follow-up with the exact section the buyer re-read — not "just checking in".',
+    mock: <ProposalMock />,
+    caseKey: 'b2b-proposal',
+  },
+  {
+    n: '03',
+    title: 'Meeting Prep & Weekly Updates',
+    body: 'Know who walked in cold. Pre-reads as HTML — see who actually read it, who skimmed, who needs the recap.',
+    mock: <BoardPrepMock />,
+    caseKey: 'meeting-prep',
+  },
+];
+
+export default function LandingV2() {
+  // Auth-aware nav + CTAs: signed-in users see "Open dashboard" instead
+  // of "Get started" / "Start free". This page is statically prerendered
+  // (no edge SSR — that was the source of the cold-start 1102 "Worker
+  // exceeded resource limits" errors), so the signed-in/out CTA swap
+  // resolves client-side in <AuthLink>/<AuthText> after hydration. The
+  // landing stays accessible to signed-in users — no auto-redirect.
   return (
     <div className="v2-root">
       <LandingEffects />
@@ -66,9 +350,9 @@ export default async function LandingV2() {
             same "Get started" CTA we've always had, routing to
             /sign-in (which handles both new accounts and returning
             users via Google OAuth + magic link). */}
-        <Link href={ctaHref} className="nav-cta">
-          {navCtaLabel}
-        </Link>
+        <AuthLink guestHref="/sign-in" className="nav-cta">
+          <AuthText guest="Get started" authed="Open dashboard" />
+        </AuthLink>
       </nav>
 
       {/* ─────────────────────── HERO ─────────────────────── */}
@@ -111,13 +395,13 @@ export default async function LandingV2() {
             </p>
 
             <div className="cta-row">
-              <Link href={ctaHref} className="v2-btn v2-btn-primary">
-                {heroCtaLabel}
+              <AuthLink guestHref="/sign-in" className="v2-btn v2-btn-primary">
+                <AuthText guest="Start free" authed="Open dashboard" />
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="12 5 19 12 12 19" />
                 </svg>
-              </Link>
+              </AuthLink>
             </div>
 
             <div className="v2-trust">
@@ -492,6 +776,68 @@ export default async function LandingV2() {
         </div>
       </section>
 
+      {/* ─────────────────────── USE CASES ─────────────────────── */}
+      {/* Three concrete deliverables HTMLRadar covers today, each with
+         a high-fidelity mock that mirrors a designer's per-case detail
+         (Sales Proposal / Pitch Deck / Board Pre-Read). Trimmed from
+         her 4-case mockup (dropped Press/Media Kits as furthest from
+         AI-native ICP) and replaced her 420vh pinned-scroll with a
+         calm grid so mobile works. */}
+      <section className="v2-cases py-24 md:py-32" id="use-cases">
+        {/* Shared wrapper so the eyebrow + headline + cards all align
+            to the same left edge (a designer: "top indentation is too
+            towards the left"). */}
+        <div className="mx-auto max-w-[1200px] px-6">
+          <div className="head">
+            <div className="v2-kicker v2-reveal">Use cases</div>
+            <h2 className="v2-reveal d1">
+              One link, <em>every kind of deliverable</em>.
+            </h2>
+            <p className="v2-reveal d2">
+              HTMLRadar follows the document, not the file type. Sharper for the things you send
+              most.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            {USE_CASES.map((c) => (
+              <AuthLink
+                key={c.caseKey}
+                guestHref={`/sign-in?case=${c.caseKey}`}
+                className="v2-reveal group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-paper p-6 shadow-[0_18px_40px_-24px_rgba(31,17,8,0.18)] transition-shadow hover:shadow-[0_24px_50px_-22px_rgba(31,17,8,0.28)]"
+              >
+                <div className="flex items-baseline gap-3">
+                  <span className="font-mono text-[11px] font-bold tracking-[0.18em] text-graphite">
+                    No.{c.n}
+                  </span>
+                  <span className="h-px flex-1 bg-line" />
+                </div>
+                <h3 className="mt-4 font-serif text-[20px] font-semibold leading-tight tracking-tight text-ink">
+                  {c.title}
+                </h3>
+                <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">{c.body}</p>
+
+                {/* High-fidelity per-case mock. */}
+                <div className="mt-6">{c.mock}</div>
+
+                <div className="mt-5 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-signal-dark transition-transform group-hover:translate-x-0.5">
+                  <AuthText guest="Try with your own" authed="Open dashboard" />
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="size-3"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </AuthLink>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ─────────────────────── WORKFLOW (vertical timeline) ─────────────────────── */}
       <section className="v2-flow" id="how">
         <div className="head">
@@ -826,13 +1172,13 @@ export default async function LandingV2() {
           An email lands the moment a real read happens. Free for 10 documents — no card needed.
         </p>
         <div className="row">
-          <Link href={ctaHref} className="v2-btn v2-btn-primary">
-            {heroCtaLabel}
+          <AuthLink guestHref="/sign-in" className="v2-btn v2-btn-primary">
+            <AuthText guest="Start free" authed="Open dashboard" />
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
             </svg>
-          </Link>
+          </AuthLink>
           <a
             href="https://github.com/htmlradar/htmlradar"
             target="_blank"

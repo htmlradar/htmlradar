@@ -387,7 +387,7 @@ function pickCandidates(configured: string): { elements: HTMLElement[]; strategy
 // Filter out candidates that are DOM descendants of other candidates
 // in the same set. After this pass only "outermost" matches remain —
 // which is what we want for slide containers, where the real slide is
-// always the outermost element. The the company deck would otherwise
+// always the outermost element. The sample deck would otherwise
 // return 14 real `<div class="slide">` blocks PLUS 14 `.slide-num`
 // PLUS 14 `.slide-label` children = 42 phantom sections.
 function dedupeNested(elements: HTMLElement[]): HTMLElement[] {
@@ -476,7 +476,7 @@ function slugify(s: string): string {
 // 6-layer priority chain. Order matters; first
 // layer that yields non-meta text wins. The earlier 4-layer cascade
 // (semantic-heading → largest-font → first-meaningful → positional)
-// failed on the company-shape decks where the title lives in a class-
+// failed on slide-label-shape decks where the title lives in a class-
 // hinted span (`.slide-label`) rather than an `<h1>` — the largest-
 // font fallback would grab body-text pull-quotes like "We own the"
 // instead of the real slide name.
@@ -509,7 +509,7 @@ function extractSlideTitle(el: HTMLElement, ord: number): string {
     }
   }
 
-  // Layer 2: convention-based class hints. The the company deck uses
+  // Layer 2: convention-based class hints. The sample deck uses
   // `<span class="slide-label">Cover</span>`; hand-coded itineraries
   // use `<div class="day-title">…</div>`; LLM-generated decks
   // sometimes use `.page-title` / `.card-title`. `[class~="x"]` is a

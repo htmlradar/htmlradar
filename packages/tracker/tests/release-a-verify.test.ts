@@ -40,7 +40,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe.skipIf(!existsSync(F1))('F1 — the company pitch deck (.slide-label convention)', () => {
+describe.skipIf(!existsSync(F1))('F1 — sample deck (.slide-label convention)', () => {
   it('extracts the 13 slide-label titles', () => {
     const html = readFileSync(F1, 'utf8');
     const titles = discoveredTitles(html);

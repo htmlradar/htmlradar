@@ -164,7 +164,7 @@ describe('section detection — IntersectionObserver (swipe-deck path)', () => {
   });
 
   it('handles the swipe-deck pattern: 14 slides, each briefly fully visible', () => {
-    // Mirrors the the company mobile deck — 14 slides, viewer swipes through
+    // Mirrors a sample mobile deck — 14 slides, viewer swipes through
     // each. Each slide is in-viewport for ~3s, then transformed out.
     // Old scroll-listener tracker: 0 transitions, all time on slide 1.
     // New IO tracker: 14 transitions, time distributed evenly.

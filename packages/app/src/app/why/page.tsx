@@ -1,4 +1,4 @@
-// /why — the longer essay. v2: rewritten per the the company writing prompt.
+// /why — the longer essay. v2: rewritten per the editorial brief.
 // Title is now a single declarative sentence ("HTML quietly won."), not an
 // "X / Y" punchline. The throat-clearing line is gone. The standalone
 // pull-quote with the "X. Y. Stayed there." reversal is folded into prose.

@@ -25,7 +25,7 @@ A QA and ownership pass and a Phase 2 micro-interaction polish. The doc-detail p
 - **Doc-detail layout** simplified to a single-column stack (Shares above, Analytics below). The earlier outer 2-col layout collapsed the SharePane at every laptop width — grid items without `min-w-0` let the analytics column overflow into the shares column.
 - **Sessions list capped at 5** with "Show N more" expand on `/dashboard/[slug]`. The SharePane on `/docs/[id]` suppresses both the stat row and the sessions list entirely — `ViewerInsights` below is the one canonical analytics view.
 - **Viewer table capped at top 5** with "Show N more viewers / Show top 5" expand below.
-- **Hero title shrunk** from 44/64/72px to 26/32/36px with `truncate` and tooltip — no more long titles ellipsised to "the company Pitch De...".
+- **Hero title shrunk** from 44/64/72px to 26/32/36px with `truncate` and tooltip — no more long titles ellipsised to "Long Pitch De...".
 - **`First seen` + `Last seen` columns** symmetric: both use hybrid relative/absolute formatting (recent = "12h ago", older = "May 17"), full timestamp on hover.
 - **Recipient error pages rewritten** (`notFound` / `revoked` / `expired` / `sourceUnreachable`). No HTTP codes mentioned in any visible body. Each ends with "Reply to the person who sent this to you" + "What is HTMLRadar?" link. 26 regression tests lock in the copy + cache headers.
 - **Lock-the-deck semantic flipped** — `document_shares.allow_download` renamed to `lock_deck`. One toggle "Lock the deck" governs the deck's save/print/screenshot posture; attachments are no longer gated by this flag.

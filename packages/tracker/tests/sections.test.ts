@@ -156,7 +156,7 @@ describe('SectionTracker', () => {
     return t.snapshot();
   }
 
-  it('auto-discovers headings without ids and slugifies their text (the company deck case)', () => {
+  it('auto-discovers headings without ids and slugifies their text (sample deck case)', () => {
     setupDom(`
       <h1>Now it executes</h1>
       <p>...</p>
@@ -211,7 +211,7 @@ describe('SectionTracker', () => {
     expect(ids).toEqual(['slide-1', 'slide-2', 'slide-3']);
   });
 
-  it('rejects page-number patterns and prefers actual title text (the company deck case)', () => {
+  it('rejects page-number patterns and prefers actual title text (sample deck case)', () => {
     // Mimics a real-world deck where each slide has a big title in a
     // styled div (NOT a semantic h1) plus a small "01 / 14" footer.
     // Old naive extractSlideTitle returned the footer; new logic must
@@ -268,7 +268,7 @@ describe('SectionTracker', () => {
     }
   });
 
-  it('de-nests slide-container matches (the company deck: 14 slides + 14 .slide-num + 14 .slide-label)', () => {
+  it('de-nests slide-container matches (sample deck: 14 slides + 14 .slide-num + 14 .slide-label)', () => {
     // Reproduces the actual pattern the user hit: every slide is
     // <div class="slide"> with children <div class="slide-num"> and
     // <div class="slide-label">. The substring selector [class*="slide"]
@@ -309,7 +309,7 @@ describe('SectionTracker', () => {
   });
 
   it('skips headings containing only page-number text and falls through to slide containers', () => {
-    // Realistic the company-deck pathology: each slide has an h2 with the
+    // Realistic sample-deck pathology: each slide has an h2 with the
     // page indicator AND a big styled div for the actual title. The
     // heading strategy must reject the page-number h2s entirely so
     // slide-container strategy kicks in and font-size detection wins.

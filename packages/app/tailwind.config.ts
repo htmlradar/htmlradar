@@ -1,9 +1,9 @@
 import type { Config } from 'tailwindcss';
 
 // v2 palette — Oxblood accent on warm cream. The warm light theme stays
-// (paper, ink, graphite, line from the the company palette image); only the
+// (paper, ink, graphite, line from a palette reference); only the
 // accent shifts from Emborange to Oxblood `#7A1F2E`. The intention is to
-// keep visual semblance with the company out of the page entirely — same
+// keep visual semblance with the source brand out of the page entirely — same
 // warm family, completely different focal color. Oxblood reads as
 // editorial / literary press, not tech-bro orange.
 

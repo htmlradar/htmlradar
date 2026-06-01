@@ -4,7 +4,7 @@ import { SectionTracker } from '../src/sections-legacy.js';
 // Fixture-based regression suite.
 //
 // The earlier unit tests covered hand-imagined DOM patterns and missed a
-// real-world bug (the company deck: `.slide` containing `.slide-num` +
+// real-world bug (sample deck: `.slide` containing `.slide-num` +
 // `.slide-label` produced 42 phantom sections for 14 real slides). This
 // file fixes that gap. Each test below is a SIMULATION of a real-world
 // document pattern we know HTMLRadar users will throw at us — pitch
@@ -231,8 +231,8 @@ describe('section detection — real-world DOM fixtures', () => {
     assertNoMetaTitles(snap.map((s) => s.title));
   });
 
-  // ── Fixture 6: the company-deck pattern (the real user-reported bug)
-  it('the company deck: <div class="slide"> + .slide-num + .slide-label siblings', () => {
+  // ── Fixture 6: sample-deck pattern (the real user-reported bug)
+  it('sample deck: <div class="slide"> + .slide-num + .slide-label siblings', () => {
     const slides = Array.from(
       { length: 14 },
       (_, i) => `

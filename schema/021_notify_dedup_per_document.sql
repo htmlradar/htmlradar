@@ -6,7 +6,7 @@
 -- itself per (share, email) — so the SAME person opening TWO
 -- different shares of the SAME document produced two "FIRST OPEN"
 -- emails. The 2026-05-19 screenshot showed viewer10@example.test triggering
--- two "First open" alerts for the same the company pitch deck, 57 min
+-- two "First open" alerts for the same pitch deck, 57 min
 -- apart. The label was technically correct (first open of THAT share
 -- by THAT viewer-row), but it's the wrong scope to dedup on.
 --

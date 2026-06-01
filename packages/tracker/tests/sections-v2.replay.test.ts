@@ -154,7 +154,7 @@ function simulate(
   };
 }
 
-describe.skipIf(!existsSync(F1))('F1 — the company pitch deck', () => {
+describe.skipIf(!existsSync(F1))('F1 — sample deck', () => {
   it('distributes time across all 13 slides, no winner-takes-all', () => {
     const html = readFileSync(F1, 'utf8');
     const dwellMs = 4000;

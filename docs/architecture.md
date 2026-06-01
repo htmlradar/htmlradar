@@ -295,7 +295,7 @@ export interface BrandConfig {
 
 ### Legal: font licensing
 
-The original the company prototype shipped `Reckless-Light.woff2`. **Reckless is a commercial font from MCKL**, not redistributable. Any version of the converter going into the AGPL repo or hosted at htmlradar.com must use only Google Fonts (free / open license) or self-licensed open fonts (Fraunces, Instrument Serif, etc.). This is a hard rule, not a recommendation.
+The original prototype shipped `Reckless-Light.woff2`. **Reckless is a commercial font from MCKL**, not redistributable. Any version of the converter going into the AGPL repo or hosted at htmlradar.com must use only Google Fonts (free / open license) or self-licensed open fonts (Fraunces, Instrument Serif, etc.). This is a hard rule, not a recommendation.
 
 ### What we don't build in v1.1
 

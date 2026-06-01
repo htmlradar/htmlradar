@@ -46,7 +46,7 @@ async function fetchAll<T>(path: string): Promise<T[]> {
       apikey: SERVICE_ROLE,
       Authorization: `Bearer ${SERVICE_ROLE}`,
     },
-    cache: 'no-store',
+    next: { revalidate: 0 },
   });
   if (!res.ok) return [];
   return (await res.json()) as T[];

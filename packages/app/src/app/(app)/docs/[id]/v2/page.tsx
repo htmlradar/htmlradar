@@ -254,6 +254,28 @@ async function renderV2({
   //    of one. Sections without a title fall back to id (can't merge
   //    unknowns safely).
   const visibleSessionIds = new Set(visibleSessions.map((s) => s.id));
+
+  // Per-session cap. A session's section dwell can never exceed the time the
+  // session was actually active. Sessions recorded by an older tracker (before
+  // the normalized viewport-coverage fix) over-credited — their section
+  // time_seconds can sum to 2–3x the session's active_time. Rescale each
+  // session's events proportionally so its sections sum to at most its
+  // active_time, then aggregate. Current-tracker sessions already satisfy this
+  // (scale = 1), so this only corrects stale pre-fix data on the chart.
+  const sessionActiveSeconds = new Map(
+    visibleSessions.map((s) => [s.id, s.active_time_seconds ?? 0]),
+  );
+  const sessionEventSum = new Map<string, number>();
+  for (const e of allEvents) {
+    if (!visibleSessionIds.has(e.session_id)) continue;
+    sessionEventSum.set(e.session_id, (sessionEventSum.get(e.session_id) ?? 0) + e.time_seconds);
+  }
+  const sessionScale = (sessionId: string): number => {
+    const active = sessionActiveSeconds.get(sessionId) ?? 0;
+    const sum = sessionEventSum.get(sessionId) ?? 0;
+    return sum > active && sum > 0 ? active / sum : 1;
+  };
+
   const sectionAgg = new Map<
     string,
     { id: string; title: string; totalSeconds: number; minOrdinal: number }
@@ -268,7 +290,7 @@ async function renderV2({
       totalSeconds: 0,
       minOrdinal: Number.POSITIVE_INFINITY,
     };
-    cur.totalSeconds += e.time_seconds;
+    cur.totalSeconds += e.time_seconds * sessionScale(e.session_id);
     if (typeof e.ordinal === 'number' && e.ordinal < cur.minOrdinal) {
       cur.minOrdinal = e.ordinal;
     }
@@ -310,7 +332,7 @@ async function renderV2({
         viewerIds: new Set<string>(),
         minOrdinal: Number.POSITIVE_INFINITY,
       };
-      cur.totalSeconds += e.time_seconds;
+      cur.totalSeconds += e.time_seconds * sessionScale(e.session_id);
       const vId = sessionToViewer.get(e.session_id);
       if (vId) cur.viewerIds.add(vId);
       if (typeof e.ordinal === 'number' && e.ordinal < cur.minOrdinal) {

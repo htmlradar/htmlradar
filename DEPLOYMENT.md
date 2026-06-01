@@ -18,10 +18,6 @@ A manual `wrangler pages deploy` ships your _uncommitted working tree_ — a
 code and **silently overwrites** your manual deploy, reverting anything you
 never committed.
 
-> This is exactly the regression on 2026-06-01: the tabbed `/docs/[id]`
-> redesign was live via dirty manual deploys but never committed, so a clean
-> CI deploy reverted it. Fix was to commit everything and deploy through CI.
-
 **Tell:** in the Cloudflare Pages deployment list, production should always be
 `dirty=false`. If you see `dirty=true`, someone hand-deployed uncommitted work.
 

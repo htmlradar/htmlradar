@@ -1,8 +1,7 @@
 // Replay simulator for sections-v2. Loads each real-world fixture into
 // jsdom, mocks getBoundingClientRect for every discovered section to
 // simulate an even scroll trace, drives the rAF tick loop manually, and
-// asserts distribution sanity. See docs/active/section-tracking-postmortem.md
-// for the design intent.
+// asserts distribution sanity.
 //
 // What we assert per fixture:
 //   1. Every expected section appears in snapshot()
@@ -15,10 +14,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SectionTracker } from '../src/sections-v2.js';
 
-const F1 =
-  'fixture.html';
-const F2 = 'fixture.html';
-const F3 = 'fixture.html';
+// Local-only replay fixtures: set HR_FIXTURE_DIR to a folder holding the
+// sample HTML files. Absent (CI, contributors), these blocks skip.
+const FIXTURE_DIR = process.env['HR_FIXTURE_DIR'];
+const F1 = FIXTURE_DIR ? `${FIXTURE_DIR}/deck.html` : '';
+const F2 = FIXTURE_DIR ? `${FIXTURE_DIR}/onepager.html` : '';
+const F3 = FIXTURE_DIR ? `${FIXTURE_DIR}/itinerary.html` : '';
 
 const VIEWPORT_HEIGHT = 800;
 const SLIDE_HEIGHT = 800; // each section is exactly one viewport tall

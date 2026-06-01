@@ -1,5 +1,5 @@
 // Release A title-chain verification against the 3 real-world fixtures
-// from docs/active/section-tracking-fixtures.md.
+// from local HTML fixtures (set HR_FIXTURE_DIR — see below).
 //
 // Ground truth for each fixture is hand-curated from the source HTML.
 // This test asserts that Release A's 6-layer chain (data-attr → class-
@@ -11,10 +11,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SectionTracker } from '../src/sections-legacy.js';
 
-const F1 =
-  'fixture.html';
-const F2 = 'fixture.html';
-const F3 = 'fixture.html';
+// Local-only replay fixtures: set HR_FIXTURE_DIR to a folder holding the
+// sample HTML files. Absent (CI, contributors), these blocks skip.
+const FIXTURE_DIR = process.env['HR_FIXTURE_DIR'];
+const F1 = FIXTURE_DIR ? `${FIXTURE_DIR}/deck.html` : '';
+const F2 = FIXTURE_DIR ? `${FIXTURE_DIR}/onepager.html` : '';
+const F3 = FIXTURE_DIR ? `${FIXTURE_DIR}/itinerary.html` : '';
 
 function discoveredTitles(html: string): string[] {
   document.documentElement.innerHTML = html.replace(/<!DOCTYPE[^>]*>/i, '');

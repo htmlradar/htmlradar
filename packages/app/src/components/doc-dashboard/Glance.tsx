@@ -1,6 +1,6 @@
 // "At a glance" stat grid for /docs/[id]. One dark feature card + three
 // paper cards. Replaces the prior 5-card paper-only stat strip on
-// ViewerInsights. Per a designer's reference design.
+// ViewerInsights. Per the reference design.
 //
 // Pure presentation — every metric value is computed by the caller and
 // passed in. Sparkline points are precomputed too (12 buckets, 24h).
@@ -8,8 +8,7 @@
 // Critical: the feature value is "total active read time" — the SUM of
 // per-viewer section dwell across visible viewers. This is the honest
 // "engaged with content" total. NEVER source from session.active_time,
-// which inflates on idle-but-foregrounded mobile tabs (audit F-7,
-// idle-foreground-tab incident, post-mortem 2026-05-17).
+// which inflates on idle-but-foregrounded mobile tabs.
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';

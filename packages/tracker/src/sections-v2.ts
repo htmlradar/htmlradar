@@ -10,7 +10,7 @@
 // `SectionTracker` and calls start/stop/pause/resume/snapshot only) so
 // the swap in session.ts is a one-line import change.
 //
-// Background and rationale: docs/active/section-tracking-postmortem.md.
+// Background: why viewport-coverage replaced the legacy winner-takes-all chain.
 
 import type { SectionInfo } from './types.js';
 

@@ -123,24 +123,31 @@
         font-variation-settings: 'opsz' 24;
       }
       /* Footer credit line — bottom-left, mono, tracked-out. AGPL-3.0
-       dropped vs the prior card; "OPEN SOURCE" alone signals trust
-       without leaking a licence string most recipients won't recognise. */
+       dropped vs the prior card; "OPEN SOURCE" stays as free-marketing.
+       Sized + contrasted so it survives WhatsApp / iMessage downscale
+       to thumbnail (~600×315) — at 14px graphite-on-cream it washed
+       out and read as "missing". 20px + ink-soft is the floor for
+       "still legible after platform compression". */
       .footer {
         position: absolute;
         bottom: 56px;
         left: 64px;
         right: 64px;
         font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-        font-weight: 500;
-        font-size: 14px;
+        font-weight: 600;
+        font-size: 20px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: var(--graphite);
+        color: var(--ink-soft);
       }
       .footer .dot {
         display: inline-block;
-        margin: 0 10px;
-        color: var(--line);
+        margin: 0 14px;
+        color: var(--graphite);
+        font-weight: 400;
+      }
+      .footer .src {
+        color: var(--signal);
       }
     </style>
   </head>
@@ -208,6 +215,8 @@
       <p class="sub">Open to view.</p>
     </div>
 
-    <div class="footer">HTMLRADAR.COM <span class="dot">·</span> OPEN SOURCE</div>
+    <div class="footer">
+      HTMLRADAR.COM <span class="dot">·</span> <span class="src">OPEN SOURCE</span>
+    </div>
   </body>
 </html>

@@ -1,7 +1,7 @@
-var j = Object.defineProperty;
-var z = (t, e, n) =>
-  e in t ? j(t, e, { enumerable: !0, configurable: !0, writable: !0, value: n }) : (t[e] = n);
-var l = (t, e, n) => (z(t, typeof e != 'symbol' ? e + '' : e, n), n);
+var z = Object.defineProperty;
+var G = (t, e, n) =>
+  e in t ? z(t, e, { enumerable: !0, configurable: !0, writable: !0, value: n }) : (t[e] = n);
+var c = (t, e, n) => (G(t, typeof e != 'symbol' ? e + '' : e, n), n);
 var y = {
   sections: { selector: 'h1, h2, h3', boundaryOffsetPx: 120, minDwellMs: 3e3 },
   session: { heartbeatMs: 15e3, maxSessionMinutes: 120 },
@@ -20,8 +20,8 @@ var y = {
   hooks: {},
   debug: !1,
 };
-function _(t) {
-  let e = t ? G(t) : {},
+function I(t) {
+  let e = t ? W(t) : {},
     n = window.HTMLRadarConfig ?? {},
     i = n.supabaseUrl ?? e.supabaseUrl,
     s = n.supabaseAnonKey ?? e.supabaseAnonKey,
@@ -45,7 +45,7 @@ function _(t) {
   };
   return (n.email && (r.email = n.email), n.geo && (r.geo = n.geo), r);
 }
-function G(t) {
+function W(t) {
   let e = {};
   return (
     t.dataset.supabaseUrl && (e.supabaseUrl = t.dataset.supabaseUrl),
@@ -54,45 +54,45 @@ function G(t) {
     e
   );
 }
-var A = 'htmlradar:',
-  M = `${A}fp`,
-  L = `${A}email`,
-  C = `${A}optout`;
-function H() {
+var L = 'htmlradar:',
+  M = `${L}fp`,
+  k = `${L}email`,
+  H = `${L}optout`;
+function R() {
   try {
-    return localStorage.getItem(C) === '1';
+    return localStorage.getItem(H) === '1';
   } catch {
     return !1;
   }
 }
-function R() {
-  try {
-    (localStorage.setItem(C, '1'), localStorage.removeItem(M), localStorage.removeItem(L));
-  } catch {}
-}
 function P() {
   try {
-    let t = localStorage.getItem(M);
-    if (t) return t;
-    let e = I();
-    return (localStorage.setItem(M, e), e);
-  } catch {
-    return I();
-  }
+    (localStorage.setItem(H, '1'), localStorage.removeItem(M), localStorage.removeItem(k));
+  } catch {}
 }
 function O() {
   try {
-    return localStorage.getItem(L);
+    let t = localStorage.getItem(M);
+    if (t) return t;
+    let e = C();
+    return (localStorage.setItem(M, e), e);
+  } catch {
+    return C();
+  }
+}
+function N() {
+  try {
+    return localStorage.getItem(k);
   } catch {
     return null;
   }
 }
-function k(t) {
+function _(t) {
   try {
-    localStorage.setItem(L, t);
+    localStorage.setItem(k, t);
   } catch {}
 }
-function I() {
+function C() {
   return typeof crypto < 'u' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (t) => {
@@ -101,25 +101,25 @@ function I() {
       });
 }
 var F = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function $(t, e) {
+function D(t, e) {
   return new Promise((n) => {
     let i = document.createElement('div');
     ((i.id = 'htmlradar-gate'),
       (i.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'),
       document.body.appendChild(i));
     let s = i.attachShadow({ mode: 'closed' });
-    s.innerHTML = W(t);
+    s.innerHTML = Y(t);
     let o = s.querySelector('form'),
       r = s.querySelector('input[type=email]'),
-      c = s.querySelector('.error'),
+      l = s.querySelector('.error'),
       a = s.querySelector('button'),
       d = a.textContent ?? 'Continue';
     requestAnimationFrame(() => r.focus());
     let u = (h) => {
-        ((c.textContent = h), r.setAttribute('aria-invalid', 'true'));
+        ((l.textContent = h), r.setAttribute('aria-invalid', 'true'));
       },
       f = () => {
-        ((c.textContent = ''), r.removeAttribute('aria-invalid'));
+        ((l.textContent = ''), r.removeAttribute('aria-invalid'));
       };
     (r.addEventListener('input', f),
       o.addEventListener('submit', async (h) => {
@@ -144,10 +144,10 @@ function $(t, e) {
       }));
   });
 }
-function W(t) {
+function Y(t) {
   let e = t.gate.copy,
-    n = N(t.gate.brand.accentColor, '#1a8870'),
-    i = N(t.gate.brand.backgroundColor, '#faf7f1'),
+    n = $(t.gate.brand.accentColor, '#1a8870'),
+    i = $(t.gate.brand.backgroundColor, '#faf7f1'),
     s = { accentColor: n, backgroundColor: i };
   return `
 <style>
@@ -226,23 +226,23 @@ function S(t) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-function N(t, e) {
+function $(t, e) {
   return /^#[0-9a-fA-F]{3,8}$/.test(t) ||
     /^rgba?\(\s*\d+(?:\s*,\s*\d+){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(t) ||
     /^hsla?\(\s*\d+(?:\s*,\s*[\d.]+%?){2}(?:\s*,\s*[\d.]+)?\s*\)$/.test(t)
     ? t
     : e;
 }
-var T = class {
+var w = class {
   constructor(e) {
-    l(this, 'opts');
-    l(this, 'sections', []);
-    l(this, 'active', !1);
-    l(this, 'rafHandle', 0);
-    l(this, 'lastSampleTs', 0);
-    l(this, 'lastActivityTs', 0);
-    l(this, 'enteredOnce', new Set());
-    l(this, 'tick', (e) => {
+    c(this, 'opts');
+    c(this, 'sections', []);
+    c(this, 'active', !1);
+    c(this, 'rafHandle', 0);
+    c(this, 'lastSampleTs', 0);
+    c(this, 'lastActivityTs', 0);
+    c(this, 'enteredOnce', new Set());
+    c(this, 'tick', (e) => {
       if (!this.active) return;
       let n = e - this.lastSampleTs;
       (typeof document < 'u' &&
@@ -252,7 +252,7 @@ var T = class {
         ((this.lastSampleTs = e), this.sample(n)),
         this.scheduleTick());
     });
-    l(this, 'onActivity', () => {
+    c(this, 'onActivity', () => {
       this.lastActivityTs = x();
     });
     this.opts = e;
@@ -278,7 +278,7 @@ var T = class {
   }
   snapshot() {
     return this.sections
-      .filter((e) => e.qualifiedMs >= this.opts.minDwellMs)
+      .filter((e) => this.enteredOnce.has(e.id))
       .map((e) => ({
         id: e.id,
         title: e.title,
@@ -321,22 +321,22 @@ var T = class {
       for (let a of this.sections) a.continuousVisibleMs = 0;
       return;
     }
-    let c = new Set();
+    let l = new Set();
     for (let { section: a, viewportShare: d } of o) {
-      c.add(a.id);
+      l.add(a.id);
       let u = d / r,
         f = e * u;
       ((a.totalMs += f),
         (a.continuousVisibleMs += e),
         this.enteredOnce.has(a.id) ||
-          (this.enteredOnce.add(a.id), this.opts.onSectionEnter?.(V(a))),
+          (this.enteredOnce.add(a.id), this.opts.onSectionEnter?.(K(a))),
         a.continuousVisibleMs >= 1e3 &&
           ((a.qualifiedMs += f),
           !a.hasReadFired &&
             a.qualifiedMs >= this.opts.minDwellMs &&
-            ((a.hasReadFired = !0), this.opts.onSectionRead?.(V(a)))));
+            ((a.hasReadFired = !0), this.opts.onSectionRead?.(K(a)))));
     }
-    for (let a of this.sections) c.has(a.id) || (a.continuousVisibleMs = 0);
+    for (let a of this.sections) l.has(a.id) || (a.continuousVisibleMs = 0);
   }
   bindActivityListeners() {
     typeof window > 'u' ||
@@ -355,28 +355,28 @@ var T = class {
       window.removeEventListener('wheel', this.onActivity));
   }
   discoverSections() {
-    let e = B(this.opts.selector),
+    let e = X(this.opts.selector),
       n = new Map();
     e.elements.forEach((i, s) => {
       let o = i.id;
       if (!o)
         if (e.strategy === 'slides') o = `slide-${s + 1}`;
         else if (e.strategy === 'prose') {
-          let a = D((i.textContent ?? '').trim());
+          let a = V((i.textContent ?? '').trim());
           o = q(a) || `part-${s + 1}`;
         } else o = q((i.textContent ?? '').trim()) || `section-${s + 1}`;
       let r = (n.get(o) ?? 0) + 1;
       (n.set(o, r), r > 1 && (o = `${o}-${r}`));
-      let c;
+      let l;
       (e.strategy === 'slides'
-        ? (c = Z(i, s + 1))
+        ? (l = ee(i, s + 1))
         : e.strategy === 'prose'
-          ? (c = D((i.textContent ?? '').trim()) || `Part ${s + 1}`)
-          : (c = p(i.textContent ?? '').slice(0, 200) || `Section ${s + 1}`),
+          ? (l = V((i.textContent ?? '').trim()) || `Part ${s + 1}`)
+          : (l = p(i.textContent ?? '').slice(0, 200) || `Section ${s + 1}`),
         this.sections.push({
           id: o,
-          title: c,
-          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : Y(i.tagName),
+          title: l,
+          depth: e.strategy === 'slides' || e.strategy === 'prose' ? 1 : B(i.tagName),
           ordinal: s,
           element: i,
           totalMs: 0,
@@ -392,7 +392,7 @@ function x() {
     ? performance.now()
     : Date.now();
 }
-function Y(t) {
+function B(t) {
   switch (t) {
     case 'H1':
       return 1;
@@ -404,7 +404,7 @@ function Y(t) {
       return 4;
   }
 }
-function B(t) {
+function X(t) {
   let e = (s) => {
       try {
         let o = getComputedStyle(s).position;
@@ -423,7 +423,7 @@ function B(t) {
   )
     return { elements: n, strategy: 'headings' };
   if (
-    ((n = X(
+    ((n = J(
       Array.from(
         document.querySelectorAll(
           [
@@ -445,12 +445,12 @@ function B(t) {
     n.length >= 2)
   )
     return { elements: n, strategy: 'slides' };
-  let i = Q(e);
+  let i = Z(e);
   return i.length >= 2
     ? { elements: i, strategy: 'prose' }
     : { elements: [], strategy: 'configured' };
 }
-function X(t) {
+function J(t) {
   if (t.length < 2) return t;
   let e = [...t].sort((i, s) => {
       if (i === s) return 0;
@@ -466,12 +466,12 @@ function X(t) {
   return n;
 }
 var U = 8,
-  J = 40;
-function Q(t) {
+  Q = 40;
+function Z(t) {
   let e = Array.from(document.querySelectorAll('p, li, blockquote')).filter(
     (s) =>
       !(
-        (s.textContent ?? '').trim().length < J ||
+        (s.textContent ?? '').trim().length < Q ||
         t(s) ||
         s.closest(
           'nav, footer, aside, header, [role="banner"], [role="navigation"], [role="contentinfo"], [aria-hidden="true"]',
@@ -488,7 +488,7 @@ function Q(t) {
   }
   return i;
 }
-function D(t) {
+function V(t) {
   let e = t.replace(/\s+/g, ' ').trim();
   if (!e) return '';
   let n = e.slice(0, 200).match(/^[\s\S]{1,120}?[.!?](?=\s|$)/);
@@ -503,7 +503,7 @@ function q(t) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 }
-function Z(t, e) {
+function ee(t, e) {
   let n = t.matches('[data-section-title], [data-slide-title]')
     ? t
     : t.querySelector('[data-section-title], [data-slide-title]');
@@ -530,9 +530,9 @@ function Z(t, e) {
   let o = t.querySelector('h1, h2, h3, h4, [role="heading"]'),
     r = p(o?.textContent ?? '');
   if (r && !g(r) && r.length >= 3) return r.slice(0, 200);
-  let c = ee(t);
-  if (c) return c.slice(0, 200);
-  let a = te(t);
+  let l = te(t);
+  if (l) return l.slice(0, 200);
+  let a = ne(t);
   return a ? a.slice(0, 200) : `Slide ${e}`;
 }
 function g(t) {
@@ -551,7 +551,7 @@ function g(t) {
 function p(t) {
   return t.replace(/\s+/g, ' ').trim();
 }
-function ee(t) {
+function te(t) {
   let e = 0,
     n = null,
     i = document.createTreeWalker(t, NodeFilter.SHOW_ELEMENT, null),
@@ -564,21 +564,21 @@ function ee(t) {
     }
     let r = '';
     for (let a of o.childNodes) a.nodeType === 3 && (r += a.textContent ?? '');
-    let c = p(r);
-    if (c && c.length >= 3 && !g(c)) {
+    let l = p(r);
+    if (l && l.length >= 3 && !g(l)) {
       let a = 0;
       try {
         a = parseFloat(getComputedStyle(o).fontSize || '0');
       } catch {
         a = 0;
       }
-      (Number.isFinite(a) || (a = 0), a > e && ((e = a), (n = c)));
+      (Number.isFinite(a) || (a = 0), a > e && ((e = a), (n = l)));
     }
     s = i.nextNode();
   }
   return n;
 }
-function te(t) {
+function ne(t) {
   let e = t.querySelectorAll('p, span, div, li');
   for (let n of e) {
     if (n.getAttribute('aria-hidden') === 'true') continue;
@@ -587,7 +587,7 @@ function te(t) {
   }
   return null;
 }
-function V(t) {
+function K(t) {
   return {
     id: t.id,
     title: t.title,
@@ -604,7 +604,7 @@ var v = class extends Error {
     this.name = 'RpcError';
   }
 };
-function w(t) {
+function T(t) {
   let e = (r) => `${t.supabaseUrl}/rest/v1/rpc/${r}`,
     n = (r = {}) => ({
       apikey: t.anonKey,
@@ -612,22 +612,22 @@ function w(t) {
       'Content-Type': 'application/json',
       ...r,
     });
-  async function i(r, c, a = !1) {
+  async function i(r, l, a = !1) {
     let d = await fetch(e(r), {
       method: 'POST',
       headers: n(),
-      body: JSON.stringify(c),
+      body: JSON.stringify(l),
       keepalive: a,
     });
     if (!d.ok) {
       let u = await d.text().catch(() => ''),
-        f = ne(u) ?? `http_${d.status}`;
+        f = ie(u) ?? `http_${d.status}`;
       throw new v(f, u || d.statusText, d.status);
     }
     return d.status === 204 ? null : await d.json();
   }
   async function s(r) {
-    let c = await i('start_session', {
+    let l = await i('start_session', {
       p_share_slug: r.shareSlug,
       p_email: r.email,
       p_fingerprint: r.fingerprint,
@@ -640,13 +640,13 @@ function w(t) {
       p_browser: r.geo?.browser ?? null,
     });
     return {
-      sessionId: c.session_id,
-      token: c.token,
-      documentId: c.document_id,
-      documentVersion: c.document_version,
+      sessionId: l.session_id,
+      token: l.token,
+      documentId: l.document_id,
+      documentVersion: l.document_version,
     };
   }
-  async function o(r, c = !1) {
+  async function o(r, l = !1) {
     await i(
       'update_session',
       {
@@ -656,12 +656,12 @@ function w(t) {
         p_max_scroll: r.maxScrollDepth,
         p_sections: r.sections,
       },
-      c,
+      l,
     );
   }
   return { startSession: s, updateSession: o };
 }
-function ne(t) {
+function ie(t) {
   try {
     let e = JSON.parse(t);
     if (e.code) return e.code;
@@ -672,49 +672,62 @@ function ne(t) {
   } catch {}
   return null;
 }
-var E = class {
+var A = class A {
   constructor(e) {
-    l(this, 'opts');
-    l(this, 'transport');
-    l(this, 'sections');
-    l(this, 'info', null);
-    l(this, 'token', null);
-    l(this, 'activeMs', 0);
-    l(this, 'activeRunningSince', null);
-    l(this, 'maxScroll', 0);
-    l(this, 'heartbeatTimer', null);
-    l(this, 'maxSessionTimer', null);
-    l(this, 'flushing', !1);
-    l(this, 'dirty', !1);
-    l(this, 'rafScrollScheduled', !1);
-    l(this, 'boundCount', 0);
-    l(this, 'onVisibility', () => {
-      document.hidden
-        ? (this.tickActive(performance.now()),
+    c(this, 'opts');
+    c(this, 'transport');
+    c(this, 'sections');
+    c(this, 'info', null);
+    c(this, 'token', null);
+    c(this, 'activeMs', 0);
+    c(this, 'activeRunningSince', null);
+    c(this, 'lastActivityMs', performance.now());
+    c(this, 'maxScroll', 0);
+    c(this, 'heartbeatTimer', null);
+    c(this, 'maxSessionTimer', null);
+    c(this, 'flushing', !1);
+    c(this, 'dirty', !1);
+    c(this, 'rafScrollScheduled', !1);
+    c(this, 'boundCount', 0);
+    c(this, 'onVisibility', () => {
+      if (document.hidden)
+        (this.tickActive(performance.now()),
           (this.activeRunningSince = null),
           this.sections.pause(),
-          this.flush())
-        : ((this.activeRunningSince = performance.now()), this.sections.resume());
+          this.flush());
+      else {
+        let e = performance.now();
+        ((this.lastActivityMs = e), (this.activeRunningSince = e), this.sections.resume());
+      }
     });
-    l(this, 'onPageHide', () => {
+    c(this, 'onPageHide', () => {
       (this.tickActive(performance.now()),
         (this.activeRunningSince = null),
         this.sections.pause(),
         this.flush(!0));
     });
-    l(this, 'onScroll', () => {
-      this.rafScrollScheduled ||
-        ((this.rafScrollScheduled = !0),
-        requestAnimationFrame(() => {
-          ((this.rafScrollScheduled = !1), this.updateMaxScroll());
-        }));
+    c(this, 'onScroll', () => {
+      (this.onActivity(),
+        !this.rafScrollScheduled &&
+          ((this.rafScrollScheduled = !0),
+          requestAnimationFrame(() => {
+            ((this.rafScrollScheduled = !1), this.updateMaxScroll());
+          })));
+    });
+    c(this, 'onActivity', () => {
+      let e = performance.now();
+      ((this.lastActivityMs = e),
+        this.activeRunningSince === null &&
+          typeof document < 'u' &&
+          !document.hidden &&
+          (this.activeRunningSince = e));
     });
     ((this.opts = e),
-      (this.transport = w({
+      (this.transport = T({
         supabaseUrl: e.config.supabaseUrl,
         anonKey: e.config.supabaseAnonKey,
       })),
-      (this.sections = new T({
+      (this.sections = new w({
         selector: e.config.sections.selector,
         boundaryOffsetPx: e.config.sections.boundaryOffsetPx,
         minDwellMs: e.config.sections.minDwellMs,
@@ -810,14 +823,18 @@ var E = class {
       ((this.boundCount = 1),
       document.addEventListener('visibilitychange', this.onVisibility),
       window.addEventListener('pagehide', this.onPageHide),
-      window.addEventListener('scroll', this.onScroll, { passive: !0 }));
+      window.addEventListener('scroll', this.onScroll, { passive: !0 }),
+      window.addEventListener('keydown', this.onActivity, { passive: !0 }),
+      window.addEventListener('touchstart', this.onActivity, { passive: !0 }));
   }
   unbindListeners() {
     this.boundCount !== 0 &&
       ((this.boundCount = 0),
       document.removeEventListener('visibilitychange', this.onVisibility),
       window.removeEventListener('pagehide', this.onPageHide),
-      window.removeEventListener('scroll', this.onScroll));
+      window.removeEventListener('scroll', this.onScroll),
+      window.removeEventListener('keydown', this.onActivity),
+      window.removeEventListener('touchstart', this.onActivity));
   }
   updateMaxScroll() {
     let e = document.documentElement.scrollHeight - document.documentElement.clientHeight;
@@ -835,22 +852,26 @@ var E = class {
   }
   tickActive(e) {
     if (this.activeRunningSince === null) return;
-    let n = e - this.activeRunningSince;
-    (n > 0 && ((this.activeMs += n), (this.dirty = !0)), (this.activeRunningSince = e));
+    let n = this.lastActivityMs + A.IDLE_THRESHOLD_MS,
+      s = Math.min(e, n) - this.activeRunningSince;
+    (s > 0 && ((this.activeMs += s), (this.dirty = !0)),
+      e <= n ? (this.activeRunningSince = e) : (this.activeRunningSince = null));
   }
 };
-function K(t) {
+c(A, 'IDLE_THRESHOLD_MS', 5e3);
+var E = A;
+function j(t) {
   let e = {
     version: t.version,
     ready: t.ready,
     flush: () => t.session.flush(),
     optOut: () => {
-      (R(), t.session.stop());
+      (P(), t.session.stop());
     },
   };
   return ((window.HTMLRadar = e), e);
 }
-function ie(t) {
+function se(t) {
   if (t instanceof v)
     switch (t.code) {
       case 'P0001':
@@ -874,12 +895,12 @@ function ie(t) {
     }
   return "We couldn't reach the server. Check your connection and try again.";
 }
-var se = '0.1.0';
-re();
-async function re() {
-  if (H()) return;
+var re = '0.1.0';
+oe();
+async function oe() {
+  if (R()) return;
   let t = document.currentScript,
-    e = _(t);
+    e = I(t);
   if (!e) {
     typeof console < 'u' &&
       console.warn(
@@ -887,16 +908,16 @@ async function re() {
       );
     return;
   }
-  let n = P(),
-    i = O(),
+  let n = O(),
+    i = N(),
     s = null,
     o;
-  if (e.email) ((s = e.email), s !== i && k(s));
+  if (e.email) ((s = e.email), s !== i && _(s));
   else if (e.privacy.mode === 'email-gated' && e.gate.enabled)
     if (i) s = i;
     else {
-      let a = w({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
-      ((s = await $(e, async (d) => {
+      let a = T({ supabaseUrl: e.supabaseUrl, anonKey: e.supabaseAnonKey });
+      ((s = await D(e, async (d) => {
         try {
           return (
             (o = await a.startSession({
@@ -910,15 +931,15 @@ async function re() {
             null
           );
         } catch (u) {
-          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', u), ie(u));
+          return (e.debug && console.warn('[HTMLRadar] gate attempt rejected', u), se(u));
         }
       })),
-        k(s));
+        _(s));
     }
   let r = new E({ config: e, email: s, fingerprint: n, ...(o ? { preStarted: o } : {}) }),
-    c = r.start().catch((a) => {
+    l = r.start().catch((a) => {
       throw (e.debug && console.warn('[HTMLRadar] session start failed', a), a);
     });
-  K({ session: r, ready: c, version: se });
+  j({ session: r, ready: l, version: re });
 }
 //# sourceMappingURL=tracker.js.map

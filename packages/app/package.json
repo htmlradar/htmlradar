@@ -7,7 +7,9 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3000",
+    "dev:edge": "next-on-pages --watch & wrangler pages dev .vercel/output/static --compatibility-flag=nodejs_compat --port 3001",
     "build": "next build",
+    "build:edge": "next-on-pages",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
@@ -27,6 +29,7 @@
     "next": "^14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "standardwebhooks": "^1.0.0",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

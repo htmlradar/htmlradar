@@ -1,17 +1,3 @@
-// Cap-hit upsell + Pro tier entry point. v2 pricing (post v4.1 redesign):
-// Pro unlocks *presentation* (custom domain on share URLs, chrome
-// footer removed, allow-list, longer retention) rather than volume.
-// Volume cap on Free is 10 docs lifetime.
-//
-// v1.0 uses a Stripe Payment Link (no billing integration). When someone
-// completes checkout, Stripe emails the founder; the founder manually
-// flips `profiles.tier` to `pro` in Supabase. This is the Wizard-of-Oz
-// pattern from the Lean Startup playbook — validates demand before
-// investing in a real billing webhook + customer portal.
-//
-// We move to a real Stripe Checkout + webhook flow when ≥5 paying
-// customers prove the pricing.
-
 import Link from 'next/link';
 import { ArrowRight, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
@@ -34,9 +20,22 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
     userId: user.id,
     properties: { reason: reason ?? 'direct', at_cap: quota.atCap },
   });
-  const rawCheckoutUrl = process.env['STRIPE_PAYMENT_LINK_URL'];
-  const checkoutAvailable =
-    !!rawCheckoutUrl && rawCheckoutUrl !== '#' && rawCheckoutUrl.startsWith('http');
+  // POLAR_CHECKOUT_URL is the canonical name; STRIPE_PAYMENT_LINK_URL is
+  // the legacy name still set in some envs — read either, prefer the new
+  // one, and refuse anything that isn't a Polar host so a bad rotation
+  // can't route customers to the wrong processor.
+  const rawCheckoutUrl =
+    process.env['POLAR_CHECKOUT_URL'] ?? process.env['STRIPE_PAYMENT_LINK_URL'];
+  let checkoutHostOk = false;
+  if (rawCheckoutUrl && rawCheckoutUrl.startsWith('http')) {
+    try {
+      const host = new URL(rawCheckoutUrl).hostname;
+      checkoutHostOk = host === 'buy.polar.sh' || host.endsWith('.polar.sh');
+    } catch {
+      checkoutHostOk = false;
+    }
+  }
+  const checkoutAvailable = !!rawCheckoutUrl && rawCheckoutUrl !== '#' && checkoutHostOk;
   // Append customer_external_id + customer_email so Polar's webhook
   // payload identifies which HTMLRadar user paid. Lets the v1.1 webhook
   // handler auto-flip them to Pro without manual SQL.
@@ -83,9 +82,6 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
           <h2 className="font-mono text-[12px] uppercase tracking-[0.18em] text-signal-dark">
             Hosted, Pro
           </h2>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
-            Wizard-of-Oz checkout
-          </span>
         </div>
         <div className="mt-5 flex items-baseline gap-1">
           <span className="font-serif text-[44px] leading-none tracking-tightest text-ink">
@@ -123,14 +119,8 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
 
         {checkoutAvailable ? (
           <p className="mt-4 text-[12px] leading-relaxed text-graphite">
-            Payment opens in a new tab. After paying, email{' '}
-            <a
-              href="mailto:hello@htmlradar.com"
-              className="text-signal-dark underline decoration-line decoration-2 underline-offset-2 hover:decoration-signal"
-            >
-              hello@htmlradar.com
-            </a>{' '}
-            and we'll flip your account to Pro within a few hours.
+            Payment opens in a new tab. You'll be returned here once it's complete and your account
+            will upgrade automatically.
           </p>
         ) : (
           <p className="mt-4 inline-flex items-start gap-2 text-[12px] leading-relaxed text-alert">
@@ -142,7 +132,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
             >
               hello@htmlradar.com
             </a>{' '}
-            and we'll flip your account to Pro manually within a few hours.
+            in the meantime and we'll get you on Pro.
           </p>
         )}
       </article>

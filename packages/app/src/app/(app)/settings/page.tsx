@@ -1,19 +1,193 @@
-// /settings — Profile + plan + sign out. v4 register.
-//
-// Sign-out also revalidates the layout cache so back-button doesn't
-// briefly show the previous user's documents (Next App Router router
-// cache pre-deletion bug). See UX audit Critical #7.
-
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { createClient } from '@supabase/supabase-js';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
+import { logServerError } from '@/lib/error-log';
 import { readQuota } from '@/lib/quota';
 import { SectionMark } from '@/components/SectionMark';
-import { ArrowRight, LogOut } from 'lucide-react';
+import { UpgradePending } from '@/components/UpgradePending';
+import { SubscriptionControls } from '@/components/SubscriptionControls';
+import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
 export const runtime = 'edge';
+
+async function polarGet<T>(path: string): Promise<T> {
+  // Reads env inside the function — next-on-pages can resolve env at
+  // request time but not always at module-load time on edge.
+  const apiKey = process.env['POLAR_API_KEY'] ?? '';
+  if (!apiKey) throw new Error('POLAR_API_KEY env var is empty at request time');
+  // Cloudflare Workers fetch rejects `cache: 'no-store'` ("The 'cache'
+  // field on 'RequestInitializerDict' is not implemented."). Use
+  // Next.js's `next.revalidate: 0` instead — handled by the Next caching
+  // layer and not passed through to the underlying CF fetch.
+  const r = await fetch(`https://api.polar.sh${path}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    next: { revalidate: 0 },
+  });
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    throw new Error(`Polar GET ${path} → HTTP ${r.status}: ${body.slice(0, 120)}`);
+  }
+  return (await r.json()) as T;
+}
+
+type PolarSubLite = { id: string; status: string; cancel_at_period_end: boolean };
+
+async function getActiveSubscription(
+  externalId: string,
+): Promise<{ id: string; canceling: boolean } | null> {
+  type CustomersResp = { items: Array<{ id: string }> };
+  type SubsResp = { items: PolarSubLite[] };
+  const customers = await polarGet<CustomersResp>(
+    `/v1/customers/?external_id=${encodeURIComponent(externalId)}&limit=1`,
+  );
+  const customerId = customers.items?.[0]?.id;
+  if (!customerId) return null;
+  const subs = await polarGet<SubsResp>(
+    `/v1/subscriptions/?customer_id=${customerId}&active=true&limit=1`,
+  );
+  const sub = subs.items?.[0];
+  if (!sub) return null;
+  return { id: sub.id, canceling: sub.cancel_at_period_end === true };
+}
+
+async function patchSubscription(
+  subscriptionId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const apiKey = process.env['POLAR_API_KEY'] ?? '';
+  if (!apiKey) throw new Error('POLAR_API_KEY env var is empty at request time');
+  const r = await fetch(`https://api.polar.sh/v1/subscriptions/${subscriptionId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const errBody = await r.text().catch(() => '');
+    throw new Error(
+      `Polar PATCH /v1/subscriptions/${subscriptionId} → HTTP ${r.status}: ${errBody.slice(0, 120)}`,
+    );
+  }
+}
+
+async function cancelSubscriptionAction(
+  reason: string,
+  comment: string,
+): Promise<{ ok: boolean; error?: string }> {
+  'use server';
+  const user = await requireUser();
+  try {
+    const sub = await getActiveSubscription(user.id);
+    if (!sub) {
+      await logServerError({
+        source: 'settings.cancel',
+        message: 'No active subscription found for user during cancel',
+        userId: user.id,
+        route: '/settings',
+        context: { reason },
+      });
+      return {
+        ok: false,
+        error:
+          'No active subscription found on Polar for this account. Email hello@htmlradar.com and we can cancel manually.',
+      };
+    }
+    if (!sub.canceling) {
+      await patchSubscription(sub.id, { cancel_at_period_end: true });
+    }
+    try {
+      const sb = createClient(
+        process.env['SUPABASE_URL'] ?? '',
+        process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '',
+        { auth: { persistSession: false, autoRefreshToken: false } },
+      );
+      await sb.from('cancellation_feedback').insert({
+        profile_id: user.id,
+        subscription_id: sub.id,
+        reason,
+        comment: comment.trim() || null,
+      });
+    } catch {
+      // Feedback insert failure shouldn't block the cancellation.
+    }
+    // Skip revalidatePath — it has known issues on edge runtime via
+    // next-on-pages and can crash the post-action re-render. The client
+    // calls router.refresh() instead.
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    await logServerError({
+      source: 'settings.cancel',
+      message: msg,
+      userId: user.id,
+      route: '/settings',
+      context: { reason, threw: true },
+    });
+    return { ok: false, error: msg };
+  }
+}
+
+async function resumeSubscriptionAction(): Promise<{ ok: boolean; error?: string }> {
+  'use server';
+  const user = await requireUser();
+  try {
+    const sub = await getActiveSubscription(user.id);
+    if (!sub) {
+      await logServerError({
+        source: 'settings.resume',
+        message: 'No subscription found for user during resume',
+        userId: user.id,
+        route: '/settings',
+      });
+      return { ok: false, error: 'No subscription found to resume.' };
+    }
+    if (sub.canceling) {
+      await patchSubscription(sub.id, { cancel_at_period_end: false });
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    await logServerError({
+      source: 'settings.resume',
+      message: msg,
+      userId: user.id,
+      route: '/settings',
+      context: { threw: true },
+    });
+    return { ok: false, error: msg };
+  }
+}
+
+type SearchParams = Promise<{ upgraded?: string; checkout_id?: string }>;
+
+function ProSuccessBanner({ proUntil }: { proUntil: string | null }) {
+  const untilStr = proUntil
+    ? new Date(proUntil).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
+  return (
+    <div className="mb-8 flex items-start gap-3 rounded-2xl border border-signal/40 bg-signal/5 p-5">
+      <CheckCircle2 aria-hidden className="mt-0.5 size-5 shrink-0 text-signal-dark" />
+      <div>
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+          Pro active
+        </p>
+        <p className="mt-1 text-[14.5px] text-ink">
+          You&apos;re on HTMLRadar Pro{untilStr ? ` through ${untilStr}` : ''}. Thanks for the
+          support.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 async function signOut() {
   'use server';
@@ -37,13 +211,30 @@ async function signOut() {
   redirect('/');
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const isPostUpgrade = params.upgraded === '1';
   const user = await requireUser();
   const supabase = serverClient();
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   const quota = await readQuota(supabase, user.id);
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
+  let subState: { id: string; canceling: boolean } | null = null;
+  if (tier === 'pro') {
+    try {
+      subState = await getActiveSubscription(user.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'unknown';
+      await logServerError({
+        source: 'settings.render',
+        message: `getActiveSubscription failed: ${msg}`,
+        userId: user.id,
+        route: '/settings',
+      });
+      // Render Cancel link anyway; the real error surfaces on click.
+    }
+  }
   const accountCreated = new Date(profile?.created_at ?? user.created_at).toLocaleDateString(
     undefined,
     {
@@ -59,6 +250,17 @@ export default async function SettingsPage() {
       <h1 className="text-letterpress mt-4 font-serif text-[36px] font-normal leading-[1.06] tracking-tightest text-ink md:text-[44px]">
         Your account.
       </h1>
+
+      {isPostUpgrade && tier === 'pro' && (
+        <div className="mt-8">
+          <ProSuccessBanner proUntil={profile?.pro_until ?? null} />
+        </div>
+      )}
+      {isPostUpgrade && tier === 'free' && (
+        <div className="mt-8">
+          <UpgradePending userId={user.id} proUntil={profile?.pro_until ?? null} />
+        </div>
+      )}
 
       <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
         <dl className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
@@ -86,6 +288,19 @@ export default async function SettingsPage() {
               )
             }
           />
+          {tier === 'pro' ? (
+            <Row
+              label="Subscription"
+              value={
+                <SubscriptionControls
+                  canceling={subState?.canceling ?? false}
+                  proUntil={profile?.pro_until ?? null}
+                  cancelAction={cancelSubscriptionAction}
+                  resumeAction={resumeSubscriptionAction}
+                />
+              }
+            />
+          ) : null}
           <Row label="Account created" value={accountCreated} />
         </dl>
 

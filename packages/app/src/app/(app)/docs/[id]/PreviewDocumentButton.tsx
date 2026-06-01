@@ -24,10 +24,24 @@ export function PreviewDocumentButton({
     // window.open must fire synchronously from the click handler —
     // popup blockers reject calls made from inside an async callback.
     // We open about:blank as a placeholder, then set its location once
-    // the server action returns the signed proxy URL. If the action
-    // errors, the placeholder tab is closed and the error surfaces on
-    // the current page.
-    const previewTab = window.open('about:blank', '_blank', 'noopener');
+    // the server action returns the signed proxy URL.
+    //
+    // Do NOT pass 'noopener' here: Chrome/Firefox return `null` from
+    // window.open when noopener is set, leaving us no handle to
+    // navigate the placeholder tab. The result was a stuck about:blank
+    // tab while the dashboard tab silently navigated to the preview
+    // (the blank-preview bug reported 2026-05-29). The preview tab is
+    // same-origin and serves the owner's own HTML; we sever
+    // window.opener manually before navigation as a defense-in-depth
+    // measure against a malicious tab-jack from a pasted-in script.
+    const previewTab = window.open('about:blank', '_blank');
+    if (previewTab) {
+      try {
+        previewTab.opener = null;
+      } catch {
+        // Some browsers throw on cross-origin opener writes — ignore.
+      }
+    }
     startTransition(async () => {
       const fd = new FormData();
       fd.set('document_id', documentId);

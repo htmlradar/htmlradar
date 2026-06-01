@@ -22,7 +22,16 @@ export function ReplaceDocumentButton({
   const formRef = useRef<HTMLFormElement | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const onClick = () => fileInputRef.current?.click();
+  const onClick = () => {
+    // Reset the input value before opening the picker so re-selecting
+    // the SAME file (same path/name) still fires `change`. Without this,
+    // a user editing pitch-deck-v14.html and trying to re-upload it
+    // gets nothing — the browser sees `value` unchanged and skips the
+    // event. Reported 2026-05-29: "V14 with changes doesn't get
+    // replaced if the same file name".
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    fileInputRef.current?.click();
+  };
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

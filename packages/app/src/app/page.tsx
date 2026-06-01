@@ -1,4 +1,4 @@
-// HTMLRadar landing v2 — adapted from a designer's reference + the v1
+// HTMLRadar landing v2 — adapted from the reference + the v1
 // landing's stronger positioning beats pulled forward.
 //
 // Sections in order:
@@ -32,7 +32,7 @@ export const dynamic = 'force-static';
 
 // ─── Use-cases mocks ──────────────────────────────────────────────
 // High-fidelity per-case document previews. Mirror the detail level
-// of a designer's reference (Sales Proposal / Pitch Deck / Board
+// of the reference (Sales Proposal / Pitch Deck / Board
 // Pre-Read), scaled to fit a ~280px-wide card.
 
 function CaseChrome({ filename, children }: { filename: string; children: ReactNode }) {
@@ -778,14 +778,14 @@ export default function LandingV2() {
 
       {/* ─────────────────────── USE CASES ─────────────────────── */}
       {/* Three concrete deliverables HTMLRadar covers today, each with
-         a high-fidelity mock that mirrors a designer's per-case detail
+         a high-fidelity mock that mirrors the per-case detail
          (Sales Proposal / Pitch Deck / Board Pre-Read). Trimmed from
          her 4-case mockup (dropped Press/Media Kits as furthest from
          AI-native ICP) and replaced her 420vh pinned-scroll with a
          calm grid so mobile works. */}
       <section className="v2-cases py-24 md:py-32" id="use-cases">
         {/* Shared wrapper so the eyebrow + headline + cards all align
-            to the same left edge (a designer: "top indentation is too
+            to the same left edge (design note: "top indentation is too
             towards the left"). */}
         <div className="mx-auto max-w-[1200px] px-6">
           <div className="head">

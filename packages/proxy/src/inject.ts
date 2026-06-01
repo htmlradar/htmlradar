@@ -29,7 +29,7 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
   const headSnippet = headInjection(opts);
   const footerSnippet = opts.tier === 'free' ? chromeFooter() : '';
   // Attachments are ALWAYS surfaced to the recipient when present, per
-  // the 2026-05-19 design call: "if you don't want a file shared,
+  // the design decision: "if you don't want a file shared,
   // don't attach it." The recipient view shows a corner pill + side
   // drawer regardless of lock_deck — the lock_deck toggle controls the
   // DECK's save/print posture, not the attachments.
@@ -104,7 +104,7 @@ function headInjection(opts: InjectOptions): string {
 // Attachments panel — recipient-side UI for files attached to a share.
 //
 // Replaces the prior bottom-right floating "materials panel" with a
-// less intrusive pattern (QA3 feedback 2026-05-19):
+// less intrusive pattern:
 //   • A small `📎 N` pill in the TOP-right corner of the viewport,
 //     pulses gently twice on first load to surface its existence,
 //     then settles.

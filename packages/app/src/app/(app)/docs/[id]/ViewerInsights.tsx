@@ -356,7 +356,7 @@ export function ViewerInsights({
     // Avg seconds per SESSION (not per viewer) — surfaces as the
     // delta annotation under the Sessions card.
     const avgPerSession = totalSessions > 0 ? totalActiveSeconds / totalSessions : 0;
-    // Single best scroll across all visible sessions — a designer's
+    // Single best scroll across all visible sessions — the
     // reference shows the headline "max scroll" not "avg scroll"
     // because the average gets pulled down by the inevitable 5%
     // bounce-rate sessions. Max is the more interesting signal:
@@ -425,7 +425,7 @@ export function ViewerInsights({
 
       {/* Glance grid — 1 feature card (dark, big number + sparkline) +
           3 paper cards. Replaces the prior 5-card paper-only strip per
-          a designer's 2026-05-18 redesign. Every metric still reflects
+          the 2026-05-18 redesign. Every metric still reflects
           VISIBLE viewers only (hidden viewers stay out of the headline
           numbers regardless of the table's show-hidden toggle).
           Critical: feature value derives from section dwell SUM, NOT

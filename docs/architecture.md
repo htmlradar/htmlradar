@@ -72,7 +72,7 @@ When a recipient enters a password or email at a proxy-side gate, we issue a coo
 
 When a share has `allowed_email_domains` or `allowed_emails` set, the proxy renders a server-side email gate _before_ serving any document HTML. Only after the email validates does the proxy issue an email cookie, redirect, and then stream the document.
 
-**Critically, the cookie is not trusted on later requests.** Every doc-serve and every attachment-fetch re-runs `isEmailAllowed(share, cookie.email)` against the share's _current_ allowlist (`packages/proxy/src/index.ts`). If the sender tightened the list after a cookie was issued, the stale cookie is rejected and the gate re-prompts. This was the QA3 #5 fix — without it, a recipient who passed the gate once kept access even after being removed.
+**Critically, the cookie is not trusted on later requests.** Every doc-serve and every attachment-fetch re-runs `isEmailAllowed(share, cookie.email)` against the share's _current_ allowlist (`packages/proxy/src/index.ts`). If the sender tightened the list after a cookie was issued, the stale cookie is rejected and the gate re-prompts. Without it, a recipient who passed the gate once kept access even after being removed.
 
 **Why server-side at all?** Without this, the HTML would reach the recipient via the streamed response and the tracker's Shadow-DOM gate would display _on top of_ it. A determined recipient could view-source and bypass it. For plain email-gated shares (no allow-list), the in-document gate is acceptable; for allow-listed shares it must be the proxy. AUDIT-1 P1-2 caught the original mistake; commit `5799d0a` moved enforcement to the proxy.
 
@@ -174,7 +174,7 @@ A few owner-side features have non-obvious shapes worth pinning down here so con
 
 **Lifetime quota** (`schema/003_triggers.sql:enforce_doc_cap` + `packages/app/src/lib/quota.ts`). Free tier caps at 10 lifetime documents — deleted docs count, so a user can't rotate slots by deleting and re-uploading. The Postgres trigger raises before insert #11; the UI counter on `/new`, `/settings`, and `/upgrade` reads `readQuota()`. Both code paths count `documents WHERE owner_id = ...` with no `deleted_at` filter so they agree. The cap is the trigger that routes Free users to `/upgrade?reason=quota` with a contextual headline.
 
-**Recipient error pages** (`packages/proxy/src/responses.ts`). Four states — link doesn't exist, sender revoked, link expired, source unreachable — all rendered as branded shells. Cache headers set `private, no-store, max-age=0` so extending an expiry doesn't get masked by a cached error page (QA2 #4 incident). No HTTP code is mentioned in the visible body; the recipient sees warm copy plus a "Reply to the person who sent this" footer. 26 regression tests in `packages/proxy/tests/responses.test.ts` lock the contract.
+**Recipient error pages** (`packages/proxy/src/responses.ts`). Four states — link doesn't exist, sender revoked, link expired, source unreachable — all rendered as branded shells. Cache headers set `private, no-store, max-age=0` so extending an expiry doesn't get masked by a cached error page. No HTTP code is mentioned in the visible body; the recipient sees warm copy plus a "Reply to the person who sent this" footer. 26 regression tests in `packages/proxy/tests/responses.test.ts` lock the contract.
 
 ---
 

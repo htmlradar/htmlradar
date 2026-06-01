@@ -95,7 +95,7 @@ describe.skipIf(!existsSync(F3))(
       // selector that catches `.day-section`, and the prose fallback
       // requires <p>/<li>/<blockquote>. So discovery returns 0 sections.
       //
-      // Release A does NOT widen discovery (post-mortem §3 — discovery
+      // Release A does NOT widen discovery (discovery
       // widening is part of Release B alongside the v2 algorithm). The
       // assertion below pins down the current behaviour so it doesn't
       // change silently. Flip this to expect.toBeGreaterThan(0) when

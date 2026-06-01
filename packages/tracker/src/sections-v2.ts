@@ -481,7 +481,7 @@ function slugify(s: string): string {
 }
 
 // 6-layer title chain. Identical to the Release A logic in
-// sections-legacy.ts. See post-mortem §1.
+// sections-legacy.ts.
 function extractSlideTitle(el: HTMLElement, ord: number): string {
   // Layer 1: data-attr hint
   const dataAttrEl = el.matches('[data-section-title], [data-slide-title]')

@@ -473,7 +473,7 @@ function slugify(s: string): string {
 
 // Extract a slide's title from its DOM subtree.
 //
-// 6-layer priority chain (post-mortem 2026-05-17). Order matters; first
+// 6-layer priority chain. Order matters; first
 // layer that yields non-meta text wins. The earlier 4-layer cascade
 // (semantic-heading → largest-font → first-meaningful → positional)
 // failed on the company-shape decks where the title lives in a class-

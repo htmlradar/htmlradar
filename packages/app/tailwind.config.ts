@@ -20,7 +20,7 @@ const config: Config = {
         // Pistachio pop — accent reserved for live indicators and a
         // single "headline stat" highlight per dashboard. Used very
         // sparingly; cream + oxblood remain the default palette.
-        // Introduced 2026-05-18 with a designer's /docs/[id] redesign.
+        // Introduced 2026-05-18 with the /docs/[id] redesign.
         pop: { DEFAULT: '#C9E4A5', ink: '#2F4118' },
         good: '#1F7A3A',
         line: '#E8D5BD',

@@ -1,7 +1,7 @@
 // Aggregated "Where readers spend time" bar chart for the Analytics tab.
 //
 // Pure presentational — takes pre-aggregated section rows and renders
-// the maroon-bar visualisation from a designer's mockup
+// the maroon-bar visualisation from the mockup
 // (document-page-redesign.html .sectime block). Sorted by the section's
 // minimum ordinal so the narrative reads top→bottom the way the deck
 // was written, not by who-spent-most-time-where (matches the existing

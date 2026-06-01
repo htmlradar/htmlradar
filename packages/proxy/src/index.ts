@@ -88,7 +88,7 @@ export default {
     //   4. attachment exists AND attachment.document_id matches the
     //      share's document_id (defends against cross-doc enumeration)
     // Note: attachments are no longer gated by lock_deck (2026-05-19
-    // design call — if the sender uploaded files, recipients can
+    // Design decision — if the sender uploaded files, recipients can
     // download them; lock_deck only controls deck save/print).
     // On success: stream the R2 object with Content-Disposition: attachment
     // and a sanitised filename, log the download event, return.
@@ -174,7 +174,7 @@ export default {
         env.SESSION_SECRET,
       );
       if (!cookie) return emailGateForm(slug);
-      // QA3 #5 fix (2026-05-19): re-check the cookie's email against
+      // Re-check the cookie's email against
       // the share's CURRENT allowlist on every request — not just at
       // gate-submission time. If the sender tightened the allowlist
       // after the cookie was issued, the recipient's stale cookie
@@ -199,7 +199,7 @@ export default {
     const geo = geoFromRequest(request);
 
     // Attachments are ALWAYS surfaced to the recipient when they exist
-    // (2026-05-19 design call). The pill + drawer UI lives in the
+    // (design decision). The pill + drawer UI lives in the
     // corner; clicking expands the file list. Owner-preview still
     // skips the DB call — the sender is checking deck-render, not
     // attachments which they themselves uploaded.
@@ -318,7 +318,7 @@ async function handleAttachmentDownload(
   if (share.require_email) {
     const cookie = await verifyEmailCookie(request.headers.get('cookie'), slug, env.SESSION_SECRET);
     if (!cookie) return notFound();
-    // QA3 #5: same fresh-allowlist check as the doc-serve path. A
+    // Same fresh-allowlist check as the doc-serve path. A
     // stale email cookie must NOT bypass a tightened allowlist on the
     // attachment route either. 404 here (not "your email's not on the
     // list") because attachments are quieter than the gate page — we

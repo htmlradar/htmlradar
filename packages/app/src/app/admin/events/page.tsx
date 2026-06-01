@@ -9,7 +9,13 @@ import { SectionMark } from '@/components/SectionMark';
 
 export const runtime = 'edge';
 
-const ADMIN_EMAILS = ['hello@htmlradar.com'];
+// Admin allowlist comes from the ADMIN_EMAILS env var (comma-separated),
+// not hardcoded — keeps the founder's email out of the public source.
+// Set it in the Cloudflare Pages env vars (same place as SUPABASE_*).
+const ADMIN_EMAILS = (process.env['ADMIN_EMAILS'] ?? '')
+  .split(',')
+  .map((e) => e.trim())
+  .filter(Boolean);
 
 const SUPABASE_URL = process.env['SUPABASE_URL']!;
 const SERVICE_ROLE = process.env['SUPABASE_SERVICE_ROLE_KEY']!;

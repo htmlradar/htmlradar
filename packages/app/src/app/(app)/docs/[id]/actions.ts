@@ -178,7 +178,7 @@ export async function toggleShareAction(formData: FormData) {
   }
 }
 
-// Permanently delete a share — a designer QA3 #6. Pair to revoke (which
+// Permanently delete a share. Pair to revoke (which
 // is a reversible pause). Delete here is unrecoverable: the share row
 // goes away, the slug is freed, and anyone with the old URL gets a
 // 404 (NOT 403/expired). Used only when the sender explicitly wants

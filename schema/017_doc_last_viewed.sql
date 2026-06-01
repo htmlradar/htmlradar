@@ -1,7 +1,7 @@
 -- 017_doc_last_viewed.sql
 -- ------------------------------------------------------------
 -- Adds documents.last_viewed_by_owner_at so the /docs list can show
--- a "new activity since last visit" dot — a designer QA3 #9.
+-- a "new activity since last visit" dot.
 --
 -- Semantics:
 --   - Default: now() at row creation (avoids dot on freshly-created docs)

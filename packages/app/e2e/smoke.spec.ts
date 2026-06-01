@@ -6,7 +6,7 @@
 //      sets `private, no-store, max-age=0` on expired/revoked/404.
 //      Without this, browsers + Cloudflare cache HTTP 410, and
 //      extending an expiry on a share doesn't reach the recipient
-//      (QA2 #4 — a designer).
+//      (error-page cache-header regression).
 //
 //   2. Recipient flow on mobile. Visits /r/qa-smoke-deck in an
 //      iPhone 14 Pro viewport. The deck loads, tracker boots,
@@ -64,7 +64,7 @@ async function supabaseQuery(path: string): Promise<unknown[]> {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// 1. Proxy error responses — Cache-Control no-store (QA2 #4 regression)
+// 1. Proxy error responses — Cache-Control no-store (cache-header regression)
 // ──────────────────────────────────────────────────────────────────
 test.describe('proxy error responses', () => {
   test('404 / not-found returns Cache-Control no-store', async ({ request }) => {
@@ -206,7 +206,7 @@ test.describe('analytics invariants', () => {
     expect(events.length, 'no section_events captured').toBeGreaterThanOrEqual(2);
 
     // (d) No section title is a meta pattern — guards against the
-    // the company-deck "01 / 14" regression.
+    // sample deck "01 / 14" regression.
     const META =
       /^\s*\d{1,3}\s*\/\s*\d{1,3}\s*$|^\s*\d{1,3}\s*$|^page\s+\d+|^slide\s+\d+\s+of\s+\d+/i;
     for (const ev of events) {

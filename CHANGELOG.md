@@ -6,7 +6,7 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 
 ## v1.2 — 2026-05-19
 
-Round-three QA pass (a designer R3 plus an ownership sweep) and a Phase 2 micro-interaction polish. The doc-detail page got a hard rewrite (identity hierarchy, deduplicated analytics, capped lists with elegant expand), the attachments model was fixed, a version-history feature shipped, and the landing copy stopped trash-talking PDF.
+A QA and ownership pass and a Phase 2 micro-interaction polish. The doc-detail page got a hard rewrite (identity hierarchy, deduplicated analytics, capped lists with elegant expand), the attachments model was fixed, a version-history feature shipped, and the landing copy stopped trash-talking PDF.
 
 ### Added
 

@@ -285,7 +285,7 @@ ${FONTS_LINK}
         // AND Cloudflare's edge cache them by default. When the sender
         // extends an expiry or unrevokes a share, the recipient hits
         // their own cached error page and concludes "still expired".
-        // This was QA2 #4. Same reasoning applies to the gate forms —
+        // Same reasoning applies to the gate forms —
         // a stale cached form would carry an old CSRF posture and
         // confuse error-state rendering. no-store covers both.
         'Cache-Control': 'private, no-store, max-age=0',

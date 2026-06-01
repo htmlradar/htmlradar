@@ -262,7 +262,7 @@ function ShareRail({
   // make sense again.
   return (
     <aside className="flex flex-col gap-2 2xl:sticky 2xl:top-24">
-      {/* "+ New share" pill — dashed border, no fill. Matches a designer
+      {/* "+ New share" pill — dashed border, no fill. Matches the
           ref's transparent-rail composition. When the new-share form is
           open in the right pane, the pill goes signal-tinted so the
           relationship between rail-state and pane-state is obvious. */}
@@ -316,7 +316,7 @@ function ShareRail({
                       : 'border-transparent hover:border-line hover:bg-paper',
                   )}
                 >
-                  {/* 3px vertical brand bar on selected — a designer's
+                  {/* 3px vertical brand bar on selected — the
                       "selection accent" pattern. Transparent on unselected
                       so the row stays clean. */}
                   <span
@@ -826,7 +826,7 @@ function ShareSettingsForm({
   // lock_deck starts from the existing share value on edit, or true
   // on create. Default-true is the safe posture — deck locked +
   // watermarked unless the sender explicitly unlocks. Attachments are
-  // no longer gated by this flag (2026-05-19 design call).
+  // no longer gated by this flag (design decision).
   const [lockDeck, setLockDeck] = useState(initial?.lock_deck ?? true);
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);

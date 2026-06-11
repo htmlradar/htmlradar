@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { ArticleLd, BreadcrumbLd } from '@/components/JsonLd';
 
 export const runtime = 'edge';
 
@@ -20,6 +21,21 @@ export default function Post() {
       <NavBar />
       <main className="relative">
         <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+          <ArticleLd
+            headline="How I built HTMLRadar in three packages"
+            datePublished="2026-05-14"
+            url="/blog/how-we-built-htmlradar"
+          />
+          <BreadcrumbLd
+            items={[
+              { name: 'Home', url: '/' },
+              { name: 'Blog', url: '/blog' },
+              {
+                name: 'How I built HTMLRadar in three packages',
+                url: '/blog/how-we-built-htmlradar',
+              },
+            ]}
+          />
           <SectionMark>HTMLRadar · Engineering</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.06] tracking-tightest text-ink md:text-[52px]">
             How I built HTMLRadar in three packages.
@@ -286,9 +302,16 @@ const cookie = \`\${payload}.\${mac}\`;`}
           </div>
 
           <div className="mt-20 border-t border-line pt-10">
+            <p className="text-[14px] leading-relaxed text-ink-soft">
+              Built an HTML deck of your own? See{' '}
+              <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">
+                how to track the HTML deck you already built
+              </Link>
+              .
+            </p>
             <Link
               href="/"
-              className="link-slide font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
+              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
             >
               ← Back to home
             </Link>

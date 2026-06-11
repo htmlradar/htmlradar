@@ -27,11 +27,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: `${baseUrl}/compare/papermark`,
       lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.5,
+    },
+    { url: `${baseUrl}/compare/docsend`, lastModified, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${baseUrl}/compare/pitch`, lastModified, changeFrequency: 'weekly', priority: 0.5 },
+    {
+      url: `${baseUrl}/use-case/pitch-deck-tracking`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/use-case/track-html-deck`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    { url: `${baseUrl}/self-hosted`, lastModified, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${baseUrl}/blog`, lastModified, changeFrequency: 'weekly', priority: 0.6 },
+    {
+      url: `${baseUrl}/blog/how-we-built-htmlradar`,
+      lastModified,
       changeFrequency: 'monthly',
       priority: 0.5,
     },
-    { url: `${baseUrl}/compare/docsend`, lastModified, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${baseUrl}/compare/pitch`, lastModified, changeFrequency: 'monthly', priority: 0.5 },
   ];
 
   return routes;

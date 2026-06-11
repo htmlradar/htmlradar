@@ -13,15 +13,37 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, Check } from 'lucide-react';
 import type { Metadata } from 'next';
+import { FaqLd } from '@/components/JsonLd';
+import { pageMeta } from '@/lib/seo';
 import '../landing-v2.css';
 
 export const dynamic = 'force-static';
 
-export const metadata: Metadata = {
-  title: 'Pricing',
+export const metadata: Metadata = pageMeta({
+  title: 'HTMLRadar Pricing — Free to Start, Open Source',
   description:
-    'Open source under AGPL-3.0. Run it yourself, free forever. Or use the hosted version — free for 10 documents, $15/mo for unlimited.',
-};
+    'Simple pricing for tracked HTML documents. Free for 10 docs, $15/mo Pro for unlimited documents and no viewer footer. Or self-host free under AGPL-3.0.',
+  path: '/pricing',
+});
+
+const FAQ = [
+  {
+    q: 'Is there a free plan?',
+    a: 'Yes. The hosted free tier covers 10 documents lifetime with unlimited shares per document and full section-level tracking — no credit card needed.',
+  },
+  {
+    q: 'What does Pro add?',
+    a: 'Unlimited documents, bigger attachments (50 files, 100 MB each, 1 GB per doc), no "Shared with HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat.',
+  },
+  {
+    q: 'Can I run HTMLRadar for free forever?',
+    a: 'Yes — self-host it. The full source is AGPL-3.0 on GitHub and runs on your own Cloudflare and Supabase accounts; their free tiers cover personal use.',
+  },
+  {
+    q: 'Do recipients need an account?',
+    a: 'No. Recipients just open the link. If you enable the email gate or a password on a share, they verify before the document renders — still no account.',
+  },
+];
 
 export default function PricingPage() {
   const stripeUrl = process.env['STRIPE_PAYMENT_LINK_URL'] ?? '#';
@@ -268,6 +290,68 @@ export default function PricingPage() {
           Track + vote on GitHub
           <ArrowUpRight style={{ width: 14, height: 14 }} />
         </Link>
+      </section>
+
+      {/* ─────────────────────── FAQ ─────────────────────── */}
+      <section style={{ padding: '0 56px 110px', maxWidth: 1180, margin: '0 auto' }}>
+        <FaqLd items={FAQ} />
+        <div className="v2-kicker">FAQ</div>
+        <h2
+          style={{
+            fontFamily: 'var(--serif)',
+            fontWeight: 600,
+            letterSpacing: '-0.02em',
+            fontSize: 'clamp(24px, 3vw, 40px)',
+            lineHeight: 1.15,
+            margin: '12px 0 0',
+            maxWidth: '30ch',
+          }}
+        >
+          Common questions.
+        </h2>
+        <dl
+          style={{
+            margin: '32px 0 0',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 24,
+          }}
+          className="v2-pricing-grid"
+        >
+          {FAQ.map(({ q, a }) => (
+            <div
+              key={q}
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: '20px 22px',
+              }}
+            >
+              <dt
+                style={{
+                  fontFamily: 'var(--serif)',
+                  fontSize: 17,
+                  fontWeight: 600,
+                  letterSpacing: '-0.01em',
+                  color: 'var(--ink)',
+                }}
+              >
+                {q}
+              </dt>
+              <dd
+                style={{
+                  margin: '8px 0 0',
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  color: 'var(--ink-2)',
+                }}
+              >
+                {a}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       {/* ─────────────────────── FOOTER ─────────────────────── */}

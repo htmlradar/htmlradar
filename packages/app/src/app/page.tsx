@@ -19,9 +19,18 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
+import { SoftwareApplicationLd } from '@/components/JsonLd';
+import { pageMeta } from '@/lib/seo';
 import { LandingEffects } from './LandingEffects';
 import { AuthLink, AuthText } from './AuthCta';
 import './landing-v2.css';
+
+export const metadata = pageMeta({
+  title: 'Track an HTML Document — See Who Read It | HTMLRadar',
+  description:
+    'Send any HTML deck, brief, or proposal as a tracked link. See who opened it, which sections they read, and how long they stayed. Open-source. Free to start.',
+  path: '/',
+});
 
 // Statically prerendered (no edge SSR — that was the source of the
 // cold-start 1102 errors). force-static is explicit because the app's
@@ -325,6 +334,7 @@ export default function LandingV2() {
   // landing stays accessible to signed-in users — no auto-redirect.
   return (
     <div className="v2-root">
+      <SoftwareApplicationLd />
       <LandingEffects />
 
       {/* ─────────────────────── NAV ─────────────────────── */}
@@ -1196,9 +1206,15 @@ export default function LandingV2() {
           <Logo size="sm" />
           <span>· Document tracking for HTML. Open source · AGPL-3.0.</span>
         </div>
-        <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <Link href="/why">Why</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/use-case/pitch-deck-tracking">Pitch deck tracking</Link>
+          <Link href="/use-case/track-html-deck">Track HTML decks</Link>
+          <Link href="/self-hosted">Self-hosted</Link>
+          <Link href="/compare/docsend">vs DocSend</Link>
+          <Link href="/compare/papermark">vs Papermark</Link>
+          <Link href="/compare/pitch">For Pitch.com</Link>
           <Link href="/privacy">Privacy</Link>
           <a
             href="https://github.com/htmlradar/htmlradar"

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Newsreader, JetBrains_Mono } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
 import { EventTracker } from '@/components/EventTracker';
+import { OrganizationLd } from '@/components/JsonLd';
 import './globals.css';
 
 // Newsreader — variable serif for editorial headlines. Less ubiquitous
@@ -55,12 +56,22 @@ export const metadata: Metadata = {
       'The deck moved to HTML. Tracking should follow. Open-source read tracking for HTML decks, mocks, briefs, and updates. AGPL-3.0.',
     siteName: 'HTMLRadar',
     url: 'https://htmlradar.com',
+    // public/og-card.png is 2400×1260 — exactly 2× the 1200×630 OG spec.
+    images: [
+      {
+        url: '/og-card.png',
+        width: 2400,
+        height: 1260,
+        alt: 'HTMLRadar — track who reads your HTML decks',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'HTMLRadar — Document tracking for HTML',
     description:
       'Open-source read tracking for HTML decks, mocks, briefs, and updates. Section-level dwell, per-recipient shares, real-time read notifications.',
+    images: ['/og-card.png'],
   },
   robots: {
     index: true,
@@ -78,6 +89,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${newsreader.variable} ${GeistSans.variable} ${mono.variable}`}>
       <body className="min-h-screen font-sans">
+        <OrganizationLd />
         <EventTracker />
         {children}
       </body>

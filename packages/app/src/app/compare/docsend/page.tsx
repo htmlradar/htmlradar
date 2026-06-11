@@ -4,15 +4,19 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { BreadcrumbLd } from '@/components/JsonLd';
+import { Faq } from '@/components/Faq';
+import { pageMeta } from '@/lib/seo';
 import { Check, X } from 'lucide-react';
 
 export const runtime = 'edge';
 
-export const metadata = {
-  title: 'HTMLRadar vs DocSend',
+export const metadata = pageMeta({
+  title: 'Open-Source DocSend Alternative for HTML | HTMLRadar',
   description:
-    'A fair comparison of HTMLRadar and DocSend. HTML-first vs PDF-first, AGPL-licensed vs closed-source, $15 flat vs $15 per seat.',
-};
+    'Looking for a DocSend alternative? HTMLRadar tracks HTML decks and proposals with section-level read analytics. Open-source, self-hostable, free to start.',
+  path: '/compare/docsend',
+});
 
 interface Row {
   feature: string;
@@ -79,9 +83,15 @@ export default function ComparePage() {
       <NavBar />
       <main className="relative">
         <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
+          <BreadcrumbLd
+            items={[
+              { name: 'Home', url: '/' },
+              { name: 'HTMLRadar vs DocSend', url: '/compare/docsend' },
+            ]}
+          />
           <SectionMark>HTMLRadar · Compare</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            HTMLRadar vs DocSend.
+            The open-source DocSend alternative built for HTML.
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             DocSend is the category leader for document tracking. We built HTMLRadar because DocSend
@@ -220,6 +230,23 @@ export default function ComparePage() {
             </p>
           </section>
 
+          <Faq
+            items={[
+              {
+                q: 'Is HTMLRadar a free DocSend alternative?',
+                a: 'The hosted free tier covers your first 10 documents with unlimited shares and full section-level analytics. Past that it is $15/mo flat — or self-host the AGPL-3.0 source for free on your own infrastructure.',
+              },
+              {
+                q: 'Does HTMLRadar track PDFs like DocSend does?',
+                a: 'HTMLRadar is HTML-first. PDFs, spreadsheets, and ZIPs ride along as attachments under the same tracked link, with every download logged per recipient — but section-level dwell tracking is for HTML documents.',
+              },
+              {
+                q: 'Can I self-host HTMLRadar?',
+                a: 'Yes. The full source is AGPL-3.0 on GitHub and runs on your own Cloudflare and Supabase accounts. The repo includes a 15-minute self-hosting guide.',
+              },
+            ]}
+          />
+
           <section className="mt-14">
             <Link
               href="/sign-in"
@@ -240,9 +267,30 @@ export default function ComparePage() {
           </section>
 
           <div className="mt-20 border-t border-line pt-10">
+            <p className="text-[14px] leading-relaxed text-ink-soft">
+              Related:{' '}
+              <Link href="/self-hosted" className="text-signal-dark hover:underline">
+                self-hosted document tracking
+              </Link>
+              ,{' '}
+              <Link
+                href="/use-case/pitch-deck-tracking"
+                className="text-signal-dark hover:underline"
+              >
+                pitch deck tracking for founders
+              </Link>
+              , and{' '}
+              <Link
+                href="/blog/how-we-built-htmlradar"
+                className="text-signal-dark hover:underline"
+              >
+                how we built HTMLRadar
+              </Link>
+              .
+            </p>
             <Link
               href="/"
-              className="link-slide font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
+              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
             >
               ← Back to home
             </Link>

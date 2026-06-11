@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { BreadcrumbLd } from '@/components/JsonLd';
 
 export const runtime = 'edge';
 
@@ -19,6 +20,12 @@ export default function PitchPage() {
       <NavBar />
       <main className="relative">
         <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+          <BreadcrumbLd
+            items={[
+              { name: 'Home', url: '/' },
+              { name: 'HTMLRadar for Pitch.com decks', url: '/compare/pitch' },
+            ]}
+          />
           <SectionMark>HTMLRadar · For Pitch.com</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Track a Pitch deck without PDFifying it.

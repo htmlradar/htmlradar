@@ -1,19 +1,44 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { BreadcrumbLd, FaqLd } from '@/components/JsonLd';
+import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
 
-export const metadata = {
-  title: 'HTMLRadar vs Papermark',
+export const metadata = pageMeta({
+  title: 'Papermark Alternative for HTML Decks | HTMLRadar',
   description:
-    'A fair comparison of HTMLRadar and Papermark. HTML-first vs PDF-first, but the same open-source AGPL playbook and the same flat-pricing posture.',
-};
+    'HTMLRadar vs Papermark: same open-source AGPL license, but built HTML-native for decks, briefs, and proposals instead of heavyweight data rooms.',
+  path: '/compare/papermark',
+});
+
+const FAQ = [
+  {
+    q: 'How is HTMLRadar different from Papermark?',
+    a: 'Both are open-source AGPL-3.0 document trackers. Papermark is PDF-first with data rooms; HTMLRadar is HTML-native with section-level dwell tracking for decks, briefs, and proposals.',
+  },
+  {
+    q: 'Is HTMLRadar open source like Papermark?',
+    a: 'Yes — same AGPL-3.0 license. The tracker, proxy worker, schema, and web app are all on GitHub and can be self-hosted.',
+  },
+  {
+    q: 'Which is cheaper?',
+    a: "HTMLRadar's paid tier is $15/mo flat. Papermark's entry paid tier is $29/mo. Both have free tiers, and both can be self-hosted for free.",
+  },
+];
 
 export default function ComparePapermarkPage() {
   return (
     <>
       <NavBar />
       <main className="mx-auto max-w-3xl px-6 py-16">
+        <BreadcrumbLd
+          items={[
+            { name: 'Home', url: '/' },
+            { name: 'HTMLRadar vs Papermark', url: '/compare/papermark' },
+          ]}
+        />
+        <FaqLd items={FAQ} />
         <p className="mb-2 font-mono text-xs uppercase tracking-widest text-graphite">
           HTMLRadar vs Papermark
         </p>
@@ -80,6 +105,30 @@ export default function ComparePapermarkPage() {
 
         <p className="mt-12 text-sm text-graphite">
           Both products are AGPL-3.0. Both are bootstrapped. We hope they both do well.
+        </p>
+
+        <div className="mt-12 rounded-lg border border-line bg-paper-2 p-6">
+          <h2 className="text-base font-medium">Common questions</h2>
+          <dl className="mt-3 space-y-4">
+            {FAQ.map(({ q, a }) => (
+              <div key={q}>
+                <dt className="text-sm font-medium">{q}</dt>
+                <dd className="mt-1 text-sm text-ink-soft">{a}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <p className="mt-8 text-sm text-ink-soft">
+          Related:{' '}
+          <Link href="/self-hosted" className="text-signal-dark hover:underline">
+            self-hosted document tracking
+          </Link>{' '}
+          and{' '}
+          <Link href="/blog/how-we-built-htmlradar" className="text-signal-dark hover:underline">
+            how we built HTMLRadar
+          </Link>
+          .
         </p>
 
         <Link href="/" className="mt-8 inline-block text-sm text-signal-dark hover:underline">

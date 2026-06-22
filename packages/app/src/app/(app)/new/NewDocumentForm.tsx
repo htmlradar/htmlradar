@@ -62,6 +62,19 @@ export function NewDocumentForm({ action }: NewDocumentFormProps) {
     return null;
   };
 
+  // Switching source mode unmounts the inactive panel. The file input lives
+  // inside UploadPanel, so leaving upload mode makes the browser discard the
+  // selected File — but `fileName` state would persist and wrongly keep submit
+  // enabled with no file attached (the server then throws "No file uploaded").
+  // Reset the file state on every switch so submit eligibility always reflects
+  // a currently-mounted selection. URL is controlled state and persists fine.
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    setMode(next);
+    setFileName(null);
+    setFileError(null);
+  };
+
   return (
     <form
       action={(fd) => startTransition(() => action(fd))}
@@ -94,13 +107,13 @@ export function NewDocumentForm({ action }: NewDocumentFormProps) {
             label="Upload HTML"
             icon={<Upload className="size-3.5" />}
             active={mode === 'upload'}
-            onClick={() => setMode('upload')}
+            onClick={() => switchMode('upload')}
           />
           <SegmentButton
             label="Use a URL"
             icon={<Link2 className="size-3.5" />}
             active={mode === 'url'}
-            onClick={() => setMode('url')}
+            onClick={() => switchMode('url')}
           />
         </div>
 

@@ -10,6 +10,7 @@
 
 import { redirect } from 'next/navigation';
 import { serverClient } from '@/lib/supabase-server';
+import { safeNext } from '@/lib/safe-next';
 import { SignInForm } from './SignInForm';
 
 export const runtime = 'edge';
@@ -25,11 +26,10 @@ export default async function SignInPage({
   } = await supabase.auth.getUser();
 
   if (user) {
-    // Honour ?next= when it's a safe in-app path (matches /auth/callback's
-    // safeNext). Otherwise go to the dashboard.
-    const next = searchParams?.next;
-    const safe = next && next.startsWith('/') && !next.startsWith('//') ? next : '/docs';
-    redirect(safe);
+    // Honour ?next= when it's a safe in-app path. Shared safeNext() rejects
+    // open-redirect shapes (//evil.com, /\evil.com, absolute URLs) — the same
+    // rule /auth/callback uses, so the two entry points can't drift again.
+    redirect(safeNext(searchParams?.next));
   }
 
   return <SignInForm errorCode={searchParams?.error ?? null} next={searchParams?.next ?? null} />;

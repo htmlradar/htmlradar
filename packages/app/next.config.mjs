@@ -32,15 +32,18 @@ const nextConfig = {
     serverActions: { bodySizeLimit: '30mb' },
   },
   // /v2: redesigned landing was staged here while iterating; now at /.
-  // /dashboard: cross-doc Analytics tab removed 2026-05-17 — strictly
-  //             redundant with /docs/[id]. Route file kept in repo
-  //             (resurrection ready) but the redirect points stale
-  //             bookmarks at the canonical Documents list.
+  // /dashboard: the cross-doc Analytics *overview* tab was removed
+  //             2026-05-17 (redundant with /docs/[id]), so the bare
+  //             /dashboard route redirects stale bookmarks to the
+  //             Documents list. NOTE: /dashboard/:slug is NOT part of
+  //             that — it's the live per-share analytics page that the
+  //             first-open email CTA, the share-by-share table, and the
+  //             post-create redirect all link into. It must resolve to
+  //             the real page, so it is deliberately NOT redirected.
   async redirects() {
     return [
       { source: '/v2', destination: '/', permanent: true },
       { source: '/dashboard', destination: '/docs', permanent: false },
-      { source: '/dashboard/:slug', destination: '/docs', permanent: false },
     ];
   },
 };

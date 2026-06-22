@@ -769,21 +769,41 @@ export async function replaceDocumentAction(formData: FormData) {
 export async function toggleViewerInternalAction(formData: FormData) {
   const user = await requireUser();
   const supabase = serverClient();
-  const viewerId = String(formData.get('viewer_id'));
+  // A merged viewer row can back several DB viewers (same email across
+  // shares). Update every backing row to a definite target state so hiding
+  // a merged group fully takes (was: only the first row flipped).
+  const viewerIds = formData.getAll('viewer_id').map(String).filter(Boolean);
   const documentId = String(formData.get('document_id'));
+  const targetRaw = formData.get('internal_target');
+  const target = targetRaw === null ? null : String(targetRaw) === 'true';
 
   let errorMessage: string | null = null;
   try {
-    const { error: rpcErr } = await supabase.rpc('toggle_viewer_internal', {
-      p_viewer_id: viewerId,
-    });
-    if (rpcErr) throw new Error(rpcErr.message);
+    for (const viewerId of viewerIds) {
+      // Prefer set semantics (migration 026). If that RPC isn't deployed yet,
+      // PostgREST returns a "function not found" error — degrade to toggle so
+      // the deploy is safe regardless of migration order.
+      if (target !== null) {
+        const { error: setErr } = await supabase.rpc('set_viewer_internal', {
+          p_viewer_id: viewerId,
+          p_internal: target,
+        });
+        if (!setErr) continue;
+        if (!/PGRST202|could not find|does not exist|not found/i.test(setErr.message)) {
+          throw new Error(setErr.message);
+        }
+      }
+      const { error: toggleErr } = await supabase.rpc('toggle_viewer_internal', {
+        p_viewer_id: viewerId,
+      });
+      if (toggleErr) throw new Error(toggleErr.message);
+    }
 
     await captureServerEvent({
       event: 'viewer.hidden_toggled',
       distinctId: user.id,
       userId: user.id,
-      properties: { viewer_id: viewerId, document_id: documentId },
+      properties: { viewer_ids: viewerIds, document_id: documentId, target },
     });
 
     revalidatePath(`/docs/${documentId}`);

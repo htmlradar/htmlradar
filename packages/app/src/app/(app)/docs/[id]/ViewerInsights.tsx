@@ -699,17 +699,15 @@ function HideViewerButton({
   isHidden: boolean;
   action: (formData: FormData) => void | Promise<void>;
 }) {
-  // One viewer-row will be the common case; multi-row groups still get
-  // a single click — we render N invisible siblings and submit-then-
-  // submit them via a wrapper form, but for the common case we just
-  // submit one. Keep it simple: submit the primary row; if the group
-  // had two, the second flip can happen on next click. Trade-off
-  // acceptable — multi-share viewer hide is rare.
-  const primaryId = viewerIds[0]!;
+  // Submit every backing viewer row + a definite target so hiding a merged
+  // multi-share viewer fully takes in one click (the action sets all rows).
   return (
     <form action={action} className="inline-flex">
-      <input type="hidden" name="viewer_id" value={primaryId} />
+      {viewerIds.map((id) => (
+        <input key={id} type="hidden" name="viewer_id" value={id} />
+      ))}
       <input type="hidden" name="document_id" value={documentId} />
+      <input type="hidden" name="internal_target" value={String(!isHidden)} />
       <button
         type="submit"
         title={isHidden ? 'Unhide this viewer' : 'Hide from analytics'}

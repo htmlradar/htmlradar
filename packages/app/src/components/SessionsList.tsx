@@ -10,7 +10,7 @@
 // rest, and "Show recent" to collapse back. Stateless beyond that.
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatTimestamp } from '@/lib/format-timestamp';
 import type { Session, Viewer } from '@/lib/types';
@@ -58,7 +58,7 @@ export function SessionsList({ sessions, viewers, variant, initialLimit = 5 }: P
           return (
             <li
               key={s.id}
-              className="grid items-center gap-3 px-4 py-3.5 text-[13.5px] sm:grid-cols-[2fr_1fr_auto_1.2fr_auto]"
+              className="grid items-center gap-3 px-4 py-3.5 text-[13.5px] sm:grid-cols-[2fr_1fr_auto_1.2fr]"
             >
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-medium text-ink">
@@ -90,7 +90,6 @@ export function SessionsList({ sessions, viewers, variant, initialLimit = 5 }: P
                   {Math.round(s.max_scroll_depth * 100)}%
                 </span>
               </div>
-              <ChevronRight aria-hidden className="size-4 text-graphite/60" />
             </li>
           );
         })}

@@ -5,6 +5,7 @@
 // client component.
 
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { SectionMark } from '@/components/SectionMark';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { readQuota } from '@/lib/quota';
@@ -31,7 +32,30 @@ export default async function NewDocumentPage() {
       {quota.tier === 'free' && <QuotaStrip quota={quota} />}
 
       <div className="mt-10">
-        <NewDocumentForm action={createDocument} />
+        {quota.tier === 'free' && quota.atCap ? (
+          // At the lifetime cap — don't show an interactive form that can only
+          // dead-end in a /upgrade redirect on submit. The server action still
+          // enforces the cap (authoritative guard); this just makes the UI
+          // honest about it.
+          <div className="rounded-2xl border border-line bg-paper p-8">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+              Uploads paused
+            </p>
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft">
+              You&apos;ve used all {quota.cap} free uploads. Upgrade to Pro to keep adding documents
+              — your existing documents and analytics stay exactly as they are.
+            </p>
+            <Link
+              href="/upgrade?reason=quota"
+              className="group mt-6 inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
+            >
+              Upgrade to Pro
+              <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        ) : (
+          <NewDocumentForm action={createDocument} />
+        )}
       </div>
     </div>
   );

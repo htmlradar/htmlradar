@@ -50,7 +50,7 @@ export function ReplaceDocumentButton({
         ref={fileInputRef}
         type="file"
         name="file"
-        accept=".html,text/html"
+        accept=".html,.htm,text/html"
         className="hidden"
         onChange={onChange}
         disabled={isPending}

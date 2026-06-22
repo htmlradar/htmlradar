@@ -15,9 +15,41 @@ import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { r2Key, uploadHtml } from '@/lib/r2';
 import { captureServerEvent } from '@/lib/events';
+import { isHtmlFile, validateSourceUrl } from '@/lib/html-source';
 
 const FREE_TIER_CAP = 10;
 const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+
+// Seed document_versions v1 for a freshly-created document. Retries once
+// (failures here are almost always transient edge/network blips) and, if it
+// still fails, captures an event so the gap is visible on /admin/events
+// instead of silently leaving a document with no recorded v1.
+async function seedFirstVersion(
+  supabase: ReturnType<typeof serverClient>,
+  userId: string,
+  row: {
+    document_id: string;
+    filename: string | null;
+    bytes: number | null;
+    source_type: 'url' | 'upload';
+    source_url: string | null;
+    r2_key: string | null;
+  },
+) {
+  const attempt = () =>
+    supabase.from('document_versions').insert({ version: 1, replaced_by: userId, ...row });
+  let { error } = await attempt();
+  if (error) ({ error } = await attempt());
+  if (error) {
+    console.warn('[version-history] v1 insert failed:', error.message);
+    await captureServerEvent({
+      event: 'version.v1_seed_failed',
+      distinctId: userId,
+      userId,
+      properties: { document_id: row.document_id, error: error.message },
+    });
+  }
+}
 
 export async function createDocument(formData: FormData) {
   const user = await requireUser();
@@ -54,7 +86,8 @@ export async function createDocument(formData: FormData) {
 
   if (sourceType === 'url') {
     const sourceUrl = String(formData.get('source_url') ?? '').trim();
-    if (!/^https?:\/\//i.test(sourceUrl)) throw new Error('Invalid URL');
+    const urlError = validateSourceUrl(sourceUrl);
+    if (urlError) throw new Error(urlError);
     const { error } = await supabase.from('documents').insert({
       id: docId,
       title,
@@ -64,26 +97,24 @@ export async function createDocument(formData: FormData) {
     });
     if (error) throw new Error(error.message);
 
-    // Seed version history (schema 018) with v1 for URL-source docs.
-    // Awaited because the Edge runtime is free to terminate the worker
-    // after redirect; fire-and-forget would drop the write. Swallow any
-    // error — history-write failure should not surface as an upload
-    // failure to the user, but logging it would help debug RLS issues.
-    const { error: versionErr } = await supabase.from('document_versions').insert({
+    // Seed version history (schema 018) with v1. Awaited because the Edge
+    // runtime may terminate the worker after redirect; retried + logged on
+    // failure rather than silently dropped (see seedFirstVersion).
+    await seedFirstVersion(supabase, user.id, {
       document_id: docId,
-      version: 1,
       filename: null,
       bytes: null,
       source_type: 'url',
       source_url: sourceUrl,
       r2_key: null,
-      replaced_by: user.id,
     });
-    if (versionErr) console.warn('[version-history] v1 insert failed:', versionErr.message);
   } else {
     const file = formData.get('file') as File | null;
     if (!file || file.size === 0) throw new Error('No file uploaded');
     if (file.size > MAX_UPLOAD_BYTES) throw new Error('File exceeds 30 MB');
+    if (!isHtmlFile(file.name, file.type)) {
+      throw new Error('Only HTML files are supported. Rename your export to .html and retry.');
+    }
 
     const key = r2Key(user.id, docId, 1);
     const { error: insertError } = await supabase.from('documents').insert({
@@ -103,20 +134,16 @@ export async function createDocument(formData: FormData) {
       throw err;
     }
 
-    // Seed version history (schema 018) with v1 for upload docs. Captures
-    // the original local filename + size for the version-history popover.
-    // Awaited for the same Edge-runtime reason as the URL branch above.
-    const { error: versionErr } = await supabase.from('document_versions').insert({
+    // Seed version history (schema 018) with v1, capturing the original
+    // filename + size. Retried + logged on failure (see seedFirstVersion).
+    await seedFirstVersion(supabase, user.id, {
       document_id: docId,
-      version: 1,
       filename: file.name || null,
       bytes: file.size,
       source_type: 'upload',
       source_url: null,
       r2_key: key,
-      replaced_by: user.id,
     });
-    if (versionErr) console.warn('[version-history] v1 insert failed:', versionErr.message);
   }
 
   await captureServerEvent({

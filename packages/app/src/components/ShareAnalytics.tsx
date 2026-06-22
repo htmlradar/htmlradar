@@ -14,6 +14,7 @@
 
 import { cn } from '@/lib/cn';
 import { CopySlugButton } from '@/components/CopySlugButton';
+import { countDistinctViewers } from '@/lib/viewer-metrics';
 import { SessionsList } from '@/components/SessionsList';
 import type { Viewer, Session } from '@/lib/types';
 
@@ -92,12 +93,12 @@ export function ShareAnalytics({
           )}
         >
           <Stat
-            label="Avg active"
+            label="Avg tab-open"
             value={formatDuration(avgActiveSeconds)}
             pop={isPanel}
             variant={variant}
           />
-          <Stat label="Viewers" value={String(viewers.length)} variant={variant} />
+          <Stat label="Viewers" value={String(countDistinctViewers(viewers))} variant={variant} />
           <Stat label="Sessions" value={String(sessions.length)} variant={variant} />
           <Stat label="Max scroll" value={`${Math.round(maxScroll * 100)}%`} variant={variant} />
         </div>

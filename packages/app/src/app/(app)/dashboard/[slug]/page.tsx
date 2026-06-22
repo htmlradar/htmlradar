@@ -20,6 +20,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { CopySlugButton } from '@/components/CopySlugButton';
+import { isMetaSectionTitle } from '@/lib/section-filter';
 
 export const runtime = 'edge';
 
@@ -48,12 +49,22 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
     .eq('share_id', share.id)
     .order('started_at', { ascending: false });
 
+  // Hide internal viewers (owner self-views + @htmlradar staff, flagged via
+  // viewers.is_internal) so this per-share drill-in matches /docs/[id], which
+  // excludes them from its headline stats. Without this, clicking a share row
+  // from the document page reintroduces reads that page intentionally hid.
+  const internalViewerIds = new Set(
+    (viewers ?? []).filter((v) => v.is_internal === true).map((v) => v.id),
+  );
+  const visibleViewers = (viewers ?? []).filter((v) => !internalViewerIds.has(v.id));
+
   // Phantom-session filter (mirrors /docs/[id]/page.tsx). Drop sessions
   // where bounced=true AND active_time_seconds=0 AND max_scroll_depth=0
-  // — these are "tracker created a row but recipient never engaged"
-  // ghosts that inflated visit counts on prod.
+  // — tracker ghosts that inflated visit counts. Also drop internal viewers'
+  // sessions so the stats below match the visible viewer set.
   const sessionList = (sessions ?? []).filter(
     (s) =>
+      !internalViewerIds.has(s.viewer_id) &&
       !(
         s.bounced === true &&
         (s.active_time_seconds ?? 0) === 0 &&
@@ -62,6 +73,7 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
   );
   const sessionIds = sessionList.map((s) => s.id);
   const sessionToViewer = new Map<string, string>(sessionList.map((s) => [s.id, s.viewer_id]));
+  const sessionActiveSeconds = new Map(sessionList.map((s) => [s.id, s.active_time_seconds ?? 0]));
 
   const sectionMap = new Map<
     string,
@@ -73,18 +85,36 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
     }
   >();
   if (sessionIds.length > 0) {
-    const { data: events } = await supabase
+    const { data: rawEvents } = await supabase
       .from('section_events')
       .select('section_id, section_title, time_seconds, session_id, ordinal')
       .in('session_id', sessionIds);
-    for (const e of events ?? []) {
+    // Mirror /docs/[id]/v2's per-share aggregation so the drill-in matches:
+    // (1) drop meta/structural "sections" (page numbers, "01 / 14"); and
+    // (2) per-session cap — a session's section dwell can't exceed its active
+    //     time. Stale pre-fix tracker data over-credited; rescale each
+    //     session's events to sum to at most its active_time (current-tracker
+    //     sessions already satisfy this, so scale = 1 for them).
+    const events = (rawEvents ?? []).filter(
+      (e) => !isMetaSectionTitle(e.section_title, e.section_id),
+    );
+    const sessionEventSum = new Map<string, number>();
+    for (const e of events) {
+      sessionEventSum.set(e.session_id, (sessionEventSum.get(e.session_id) ?? 0) + e.time_seconds);
+    }
+    const sessionScale = (sessionId: string): number => {
+      const active = sessionActiveSeconds.get(sessionId) ?? 0;
+      const sum = sessionEventSum.get(sessionId) ?? 0;
+      return sum > active && sum > 0 ? active / sum : 1;
+    };
+    for (const e of events) {
       const cur = sectionMap.get(e.section_id) ?? {
         title: e.section_title ?? e.section_id,
         totalSeconds: 0,
         viewerIds: new Set<string>(),
         minOrdinal: Number.POSITIVE_INFINITY,
       };
-      cur.totalSeconds += e.time_seconds;
+      cur.totalSeconds += e.time_seconds * sessionScale(e.session_id);
       const vId = sessionToViewer.get(e.session_id);
       if (vId) cur.viewerIds.add(vId);
       if (typeof e.ordinal === 'number' && e.ordinal < cur.minOrdinal) {
@@ -148,7 +178,7 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
         <ShareAnalytics
           shareSlug={share.slug}
           recipientLabel={share.recipient_label}
-          viewers={viewers ?? []}
+          viewers={visibleViewers}
           sessions={sessionList}
           sections={sections}
         />

@@ -46,6 +46,7 @@ import { normalizeTab, type TabKey } from './tab-key';
 import { type ShareRow, type ShareAnalyticsData } from '../DocumentShareManager';
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { isMetaSectionTitle } from '@/lib/section-filter';
+import { countDistinctViewers } from '@/lib/viewer-metrics';
 
 export const runtime = 'edge';
 
@@ -194,7 +195,7 @@ async function renderV2({
         ),
     );
 
-    viewerCount = visibleViewers.length;
+    viewerCount = countDistinctViewers(visibleViewers);
     hasOpens = visibleSessions.length > 0;
 
     const now = Date.now();

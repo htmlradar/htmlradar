@@ -433,7 +433,7 @@ export function ViewerInsights({
       <div className="mt-5">
         <GlanceGrid
           feature={{
-            label: 'Total active read time',
+            label: 'Total reading time',
             ...formatDurationParts(aggregates.totalActiveSeconds),
             liveReaders: aggregates.liveReaders,
             sparkline: aggregates.sparkline,

@@ -89,7 +89,7 @@ export function SharesTable({
               <th className="hidden px-4 py-3 font-normal sm:table-cell">Status</th>
               <th className="px-4 py-3 text-right font-normal">Viewers</th>
               <th className="hidden px-4 py-3 text-right font-normal md:table-cell">Sessions</th>
-              <th className="px-4 py-3 text-right font-normal">Avg active</th>
+              <th className="px-4 py-3 text-right font-normal">Avg tab-open</th>
               <th className="hidden px-4 py-3 text-right font-normal md:table-cell">Max scroll</th>
               <th className="hidden px-4 py-3 text-right font-normal lg:table-cell">Last open</th>
               <th className="px-4 py-3 font-normal" aria-label="Open dashboard" />

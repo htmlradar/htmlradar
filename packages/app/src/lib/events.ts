@@ -16,6 +16,7 @@ export type AppEvent =
   | 'document.created'
   | 'document.deleted'
   | 'document.replaced'
+  | 'version.v1_seed_failed'
   | 'share.created'
   | 'share.edited'
   | 'share.revoked'

@@ -67,6 +67,11 @@ export async function createShareAction(formData: FormData) {
 
     const expiresAtRaw = String(formData.get('expires_at') ?? '').trim();
     const expiresAt = expiresAtRaw ? new Date(expiresAtRaw).toISOString() : null;
+    if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+      throw new Error(
+        'Expiry must be in the future. Pick a later time, or leave it blank for no expiry.',
+      );
+    }
 
     const { data: created, error } = await supabase.rpc('create_share', {
       p_document_id: documentId,

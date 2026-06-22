@@ -490,12 +490,18 @@ function SharePane({
           )}
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-graphite">
-            {isRevoked ? 'Currently revoked' : 'Expired'}
+            {isRevoked && isExpired
+              ? 'Revoked & expired'
+              : isRevoked
+                ? 'Currently revoked'
+                : 'Expired'}
           </p>
           <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-soft">
-            {isRevoked
-              ? "Recipients see a polite 'sender turned this link off' notice. Flip the switch above to bring it back — past read history stays intact."
-              : 'The expiry date passed; recipients now see an Expired notice. Extend the date below or create a new share from the left rail to re-share.'}
+            {isRevoked && isExpired
+              ? 'This link is both revoked and past its expiry, so the toggle above is hidden. Extend the expiry in Edit settings first — once it’s no longer expired the reactivate switch returns, then flip it to bring the link back.'
+              : isRevoked
+                ? "Recipients see a polite 'sender turned this link off' notice. Flip the switch above to bring it back — past read history stays intact."
+                : 'The expiry date passed; recipients now see an Expired notice. Extend the date below or create a new share from the left rail to re-share.'}
           </p>
         </div>
       )}
@@ -1313,7 +1319,16 @@ function CopyInline({ slug }: { slug: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      // navigator.clipboard fails in non-secure contexts; ignore silently.
+      // navigator.clipboard fails in non-secure contexts; fall back to a
+      // hidden-textarea copy so the action never silently no-ops.
+      const el = document.createElement('textarea');
+      el.value = `https://htmlradar.com/r/${slug}`;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
     }
   };
   return (

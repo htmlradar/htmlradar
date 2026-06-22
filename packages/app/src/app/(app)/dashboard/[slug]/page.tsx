@@ -141,6 +141,11 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
     });
 
   const recipient = share.recipient_label ?? 'Unlabeled share';
+  const shareStatus = share.revoked_at
+    ? ('revoked' as const)
+    : share.expires_at && new Date(share.expires_at) < new Date()
+      ? ('expired' as const)
+      : ('live' as const);
   const fullUrl = `htmlradar.com/r/${share.slug}`;
 
   return (
@@ -181,6 +186,7 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
           viewers={visibleViewers}
           sessions={sessionList}
           sections={sections}
+          shareStatus={shareStatus}
         />
       </div>
     </div>

@@ -49,6 +49,10 @@ export interface ShareAnalyticsProps {
   // /dashboard/[slug]; 'panel-mini' uses the pop-accented mini-grid
   // tuned for the SharePane on /docs/[id]. Pure styling difference.
   variant?: 'default' | 'panel-mini';
+  // Share lifecycle state. Lets the no-sessions "waiting" panel tell the
+  // owner when the link is revoked/expired instead of telling them to send a
+  // dead link.
+  shareStatus?: 'live' | 'revoked' | 'expired';
 }
 
 function formatDuration(seconds: number): string {
@@ -72,9 +76,16 @@ export function ShareAnalytics({
   hideStatRow = false,
   hideSessions = false,
   variant = 'default',
+  shareStatus = 'live',
 }: ShareAnalyticsProps) {
   if (sessions.length === 0) {
-    return <WaitingState shareSlug={shareSlug} recipientLabel={recipientLabel} />;
+    return (
+      <WaitingState
+        shareSlug={shareSlug}
+        recipientLabel={recipientLabel}
+        shareStatus={shareStatus}
+      />
+    );
   }
 
   const avgActiveSeconds =
@@ -195,12 +206,35 @@ function Stat({
 function WaitingState({
   shareSlug,
   recipientLabel,
+  shareStatus = 'live',
 }: {
   shareSlug: string;
   recipientLabel: string | null;
+  shareStatus?: 'live' | 'revoked' | 'expired';
 }) {
   const fullUrl = `https://htmlradar.com/r/${shareSlug}`;
   const who = recipientLabel ?? 'the recipient';
+
+  // Revoked/expired with no reads: don't tell the owner to send a link that
+  // recipients can't open — point them at re-enabling/extending instead.
+  if (shareStatus !== 'live') {
+    const isRevoked = shareStatus === 'revoked';
+    return (
+      <div className="space-y-3 rounded-xl border border-dashed border-alert/30 bg-alert/5 px-5 py-6">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-alert">
+          {isRevoked ? 'Link revoked' : 'Link expired'}
+        </p>
+        <h3 className="font-serif text-[20px] leading-snug text-ink md:text-[22px]">
+          No reads yet, and this link is {isRevoked ? 'turned off' : 'past its expiry'}.
+        </h3>
+        <p className="max-w-md text-[13.5px] leading-relaxed text-ink-soft">
+          {isRevoked
+            ? 'Recipients currently see a “sender turned this link off” notice. Re-enable it from the document page to start collecting reads.'
+            : 'Recipients currently see an Expired notice. Extend the expiry from the document page, or create a fresh share, to start collecting reads.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 rounded-xl border border-dashed border-signal/30 bg-paper-2/30 px-5 py-6">

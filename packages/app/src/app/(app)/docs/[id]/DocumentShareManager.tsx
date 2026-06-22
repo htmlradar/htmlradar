@@ -35,6 +35,7 @@ import { cn } from '@/lib/cn';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { GateTag } from '@/components/doc-dashboard/GateTag';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
+import { localInputToIso } from '@/lib/datetime-local';
 import type { Viewer, Session } from '@/lib/types';
 
 export interface ShareRow {
@@ -890,7 +891,19 @@ function ShareSettingsForm({
       </header>
 
       <form
-        action={(fd) => startTransition(() => action(fd))}
+        action={(fd) => {
+          // Convert the tz-less datetime-local expiry to a true UTC instant in
+          // the browser (timezone known here) so the server stores the moment
+          // the owner actually picked — not a UTC misparse of the wall-clock.
+          const localExpiry = String(fd.get('expires_at') ?? '');
+          if (localExpiry) {
+            fd.set(
+              'expires_at',
+              localInputToIso(localExpiry, new Date(localExpiry).getTimezoneOffset()),
+            );
+          }
+          startTransition(() => action(fd));
+        }}
         className="space-y-7 rounded-2xl border border-line bg-paper p-6 md:p-8"
       >
         <input type="hidden" name="document_id" value={documentId} />

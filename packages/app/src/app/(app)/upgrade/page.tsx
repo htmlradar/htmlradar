@@ -20,6 +20,44 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
     userId: user.id,
     properties: { reason: reason ?? 'direct', at_cap: quota.atCap },
   });
+
+  // Already on Pro — don't pitch a second checkout. Rendering the
+  // "Upgrade to Pro" card to a paying customer read as a contradictory plan
+  // state and let them re-enter checkout.
+  if (quota.tier !== 'free') {
+    return (
+      <div className="mx-auto max-w-2xl space-y-8 py-8">
+        <header>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+            You&rsquo;re on Pro
+          </p>
+          <h1 className="text-letterpress mt-4 font-serif text-[36px] font-normal leading-[1.08] tracking-tightest text-ink md:text-[44px]">
+            Pro is <span className="italic text-signal">active.</span>
+          </h1>
+          <p className="mt-5 max-w-lg text-[16px] leading-relaxed text-ink-soft">
+            Your account has unlimited documents and the Pro presentation features — nothing more to
+            do here. Manage or cancel your plan from settings.
+          </p>
+        </header>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/docs"
+            className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
+          >
+            Back to documents
+            <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          </Link>
+          <Link
+            href="/settings"
+            className="link-slide inline-flex items-center gap-1.5 text-[14px] text-ink-soft hover:text-signal-dark"
+          >
+            Billing &amp; settings
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   // POLAR_CHECKOUT_URL is the canonical name; STRIPE_PAYMENT_LINK_URL is
   // the legacy name still set in some envs — read either, prefer the new
   // one, and refuse anything that isn't a Polar host so a bad rotation

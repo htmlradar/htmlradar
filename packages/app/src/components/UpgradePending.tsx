@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { browserClient } from '@/lib/supabase-browser';
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 
-type State = 'pending' | 'success' | 'timeout';
+type State = 'pending' | 'success' | 'timeout' | 'signed_out';
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 60_000;
@@ -28,7 +28,7 @@ export function UpgradePending({ userId, proUntil }: { userId: string; proUntil:
       const { data: authData } = await sb.auth.getUser();
       if (cancelled) return;
       if (!authData.user) {
-        setState('timeout');
+        setState('signed_out');
         return;
       }
       const { data, error } = await sb
@@ -82,6 +82,21 @@ export function UpgradePending({ userId, proUntil }: { userId: string; proUntil:
     );
   }
 
+  if (state === 'signed_out') {
+    return (
+      <div className="mb-8 flex items-start gap-3 rounded-2xl border border-alert/40 bg-alert/5 p-5">
+        <AlertCircle aria-hidden className="mt-0.5 size-5 shrink-0 text-alert" />
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-alert">Signed out</p>
+          <p className="mt-1 text-[14.5px] text-ink">
+            You&apos;re signed out, so we can&apos;t check your Pro status here. Sign back in
+            &mdash; if your payment went through, Pro will be active when you return.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (state === 'timeout') {
     return (
       <div className="mb-8 flex items-start gap-3 rounded-2xl border border-alert/40 bg-alert/5 p-5">
@@ -91,7 +106,8 @@ export function UpgradePending({ userId, proUntil }: { userId: string; proUntil:
             Activation taking longer than usual
           </p>
           <p className="mt-1 text-[14.5px] text-ink">
-            Your payment is logged on our side. Refresh this page in a minute, or email{' '}
+            If you completed payment, activation is taking longer than usual. Refresh this page in a
+            minute, or email{' '}
             <a
               href="mailto:hello@htmlradar.com"
               className="text-signal-dark underline decoration-line decoration-2 underline-offset-2 hover:decoration-signal"

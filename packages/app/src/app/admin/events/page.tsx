@@ -9,14 +9,6 @@ import { SectionMark } from '@/components/SectionMark';
 
 export const runtime = 'edge';
 
-// Admin allowlist comes from the ADMIN_EMAILS env var (comma-separated),
-// not hardcoded — keeps the founder's email out of the public source.
-// Set it in the Cloudflare Pages env vars (same place as SUPABASE_*).
-const ADMIN_EMAILS = (process.env['ADMIN_EMAILS'] ?? '')
-  .split(',')
-  .map((e) => e.trim())
-  .filter(Boolean);
-
 const SUPABASE_URL = process.env['SUPABASE_URL']!;
 const SERVICE_ROLE = process.env['SUPABASE_SERVICE_ROLE_KEY']!;
 
@@ -46,25 +38,42 @@ interface FeedbackRow {
   resolved: boolean;
 }
 
-async function fetchAll<T>(path: string): Promise<T[]> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: SERVICE_ROLE,
-      Authorization: `Bearer ${SERVICE_ROLE}`,
-    },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) return [];
-  return (await res.json()) as T[];
+type FetchResult<T> = { ok: boolean; data: T[]; status: number; table: string };
+
+async function fetchAll<T>(path: string): Promise<FetchResult<T>> {
+  const table = path.split('?')[0] ?? path;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SERVICE_ROLE,
+        Authorization: `Bearer ${SERVICE_ROLE}`,
+      },
+      next: { revalidate: 0 },
+    });
+    // Surface load failures instead of rendering them as a clean empty system
+    // ("No errors. Good." when the fetch actually 401'd is a dangerous lie on
+    // an observability page).
+    if (!res.ok) return { ok: false, data: [], status: res.status, table };
+    return { ok: true, data: (await res.json()) as T[], status: res.status, table };
+  } catch {
+    return { ok: false, data: [], status: 0, table };
+  }
 }
 
 export default async function AdminEventsPage() {
   const user = await requireUser();
-  if (!ADMIN_EMAILS.includes(user.email ?? '')) {
+  // Parse the allowlist at request time (not module load): on the edge runtime
+  // a module-scope env read can resolve before bindings are ready, which would
+  // lock the founder out of their own admin view. Case-normalized both sides.
+  const adminEmails = (process.env['ADMIN_EMAILS'] ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (!adminEmails.includes((user.email ?? '').toLowerCase())) {
     redirect('/docs');
   }
 
-  const [events, errors, feedback] = await Promise.all([
+  const [eventsR, errorsR, feedbackR] = await Promise.all([
     fetchAll<AppEvent>(
       'recent_events?order=timestamp.desc&limit=50&select=id,timestamp,event,distinct_id,properties,user_id,user_email',
     ),
@@ -75,6 +84,10 @@ export default async function AdminEventsPage() {
       'feedback?order=timestamp.desc&limit=20&select=id,timestamp,email,body,resolved',
     ),
   ]);
+  const events = eventsR.data;
+  const errors = errorsR.data;
+  const feedback = feedbackR.data;
+  const fetchFailures = [eventsR, errorsR, feedbackR].filter((r) => !r.ok);
 
   // Per-event counts (rolled up across the 50-row sample)
   const eventCounts = events.reduce<Record<string, number>>((acc, e) => {
@@ -88,6 +101,14 @@ export default async function AdminEventsPage() {
       <h1 className="text-letterpress mt-4 font-serif text-[34px] font-normal leading-[1.06] tracking-tightest text-ink md:text-[42px]">
         What's happening.
       </h1>
+
+      {fetchFailures.length > 0 && (
+        <div className="mt-6 rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-[13px] leading-relaxed text-alert">
+          Couldn&apos;t load: {fetchFailures.map((f) => `${f.table} (HTTP ${f.status})`).join(', ')}
+          . The empty sections below may be a load failure, not an empty system — check the service
+          role key and table access.
+        </div>
+      )}
 
       <section className="mt-10">
         <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">

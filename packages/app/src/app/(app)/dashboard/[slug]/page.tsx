@@ -24,7 +24,13 @@ import { isMetaSectionTitle } from '@/lib/section-filter';
 
 export const runtime = 'edge';
 
-export default async function ShareAnalyticsPage({ params }: { params: { slug: string } }) {
+export default async function ShareAnalyticsPage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams?: { just_created?: string };
+}) {
   await requireUser();
   const supabase = serverClient();
 
@@ -162,6 +168,13 @@ export default async function ShareAnalyticsPage({ params }: { params: { slug: s
       <h1 className="text-letterpress mt-8 break-words font-serif text-[40px] font-normal leading-[1.04] tracking-tightest text-ink md:text-[52px]">
         {recipient}
       </h1>
+
+      {searchParams?.just_created === '1' && (
+        <div className="mt-5 rounded-xl border border-signal/40 bg-signal/5 px-4 py-3 text-[13.5px] leading-relaxed text-ink">
+          Share created. Copy the link below and send it to{' '}
+          <span className="font-medium">{recipient}</span> — reads appear here as they come in.
+        </div>
+      )}
 
       <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-soft">
         A tracked share of{' '}

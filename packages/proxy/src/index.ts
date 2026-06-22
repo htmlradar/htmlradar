@@ -20,6 +20,7 @@ import {
   logAttachmentDownload,
   getViewerIdByShareEmail,
   verifySharePassword,
+  UpstreamError,
   type Attachment,
   type Share,
 } from './supabase.js';
@@ -46,180 +47,192 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-
-    // Sender's "Preview document" — minted by /docs/[id] in the app when
-    // the doc owner clicks the Preview button. Bound to a doc_id (not a
-    // slug); no share lookup, no gates, no tracker injection. Lets the
-    // sender verify what they uploaded before creating any share.
-    //
-    // Path: /r/_doc/{doc_id}?owner_doc_preview={token}
-    //
-    // The leading underscore on `_doc` is the discriminator from a share
-    // slug (which is `{adjective}-{noun}-{hex}` and can never start with
-    // an underscore). Keeps the route table flat without a separate /p/
-    // prefix that would confuse the recipient namespace.
-    const docPreviewMatch = /^\/r\/_doc\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
-    if (docPreviewMatch) {
-      const docId = docPreviewMatch[1]!;
-      const previewToken = url.searchParams.get('owner_doc_preview');
-      const tokenValid = previewToken
-        ? await verifyOwnerDocPreviewToken(previewToken, docId, env.SESSION_SECRET)
-        : false;
-      if (!tokenValid) return notFound();
-
-      const doc = await getDocument(env, docId);
-      if (!doc || doc.deleted_at) return notFound();
-      const htmlResp = await fetchDocumentHtml(doc, env);
-      if (!htmlResp) return sourceUnreachable();
-      const body = await htmlResp.text();
-      return new Response(body, {
-        status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
+    try {
+      return await handleRequest(request, env);
+    } catch (err) {
+      // A transient Supabase failure must not masquerade as a deleted/missing
+      // share ("this link doesn't open anything") — show the recipient the
+      // try-again page. Genuine bugs still surface as a 500.
+      if (err instanceof UpstreamError) return sourceUnreachable();
+      throw err;
     }
-
-    // Recipient download of a supporting-material attachment.
-    //   GET /r/{slug}/m/{attachment_id}
-    // Gate sequence (must pass IN ORDER, just like the doc route):
-    //   1. share exists, not revoked, not expired
-    //   2. password cookie (if require_password)
-    //   3. email cookie (if require_email)
-    //   4. attachment exists AND attachment.document_id matches the
-    //      share's document_id (defends against cross-doc enumeration)
-    // Note: attachments are no longer gated by lock_deck (2026-05-19
-    // Design decision — if the sender uploaded files, recipients can
-    // download them; lock_deck only controls deck save/print).
-    // On success: stream the R2 object with Content-Disposition: attachment
-    // and a sanitised filename, log the download event, return.
-    const downloadMatch = /^\/r\/([a-z0-9-]+)\/m\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
-    if (downloadMatch) {
-      const slug = downloadMatch[1]!;
-      const attachmentId = downloadMatch[2]!;
-      if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
-      return handleAttachmentDownload(request, slug, attachmentId, env);
-    }
-
-    const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email))?\/?$/i.exec(url.pathname);
-    if (!match) return new Response('Not Found', { status: 404 });
-    const slug = match[1]!;
-    const subroute = match[2];
-
-    const share = await getShareBySlug(env, slug);
-    if (!share) return notFound();
-
-    // Owner-preview short-circuit. When the doc owner clicks "Preview
-    // as you" in /docs/[id], the app mints a 10-minute HMAC token bound
-    // to this slug and sends them here with ?owner_preview=<token>.
-    // Valid token bypasses revoked/expired/password/email — the owner
-    // is checking what the doc itself looks like, not the recipient's
-    // gate experience. They've already proved ownership via Supabase
-    // auth in the app server action that minted the token.
-    const previewToken = url.searchParams.get('owner_preview');
-    const isOwnerPreview = previewToken
-      ? await verifyOwnerPreviewToken(previewToken, slug, env.SESSION_SECRET)
-      : false;
-
-    if (!isOwnerPreview) {
-      if (share.revoked_at) return revoked();
-      if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
-        return expired();
-      }
-    }
-
-    if (subroute === 'auth') {
-      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
-      return handlePasswordSubmit(request, slug, env);
-    }
-    if (subroute === 'email') {
-      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
-      return handleEmailSubmit(request, share, env);
-    }
-
-    // Gate sequence: password (if required) → email (if allow-listed) → content.
-    if (share.require_password && !isOwnerPreview) {
-      const cookie = await verifyAuthCookie(
-        request.headers.get('cookie'),
-        slug,
-        env.SESSION_SECRET,
-      );
-      if (!cookie) return passwordForm(slug);
-    }
-
-    // Hard-gate the document on a verified email whenever require_email
-    // is true — regardless of whether an allow-list is set.
-    //
-    // Why this is at the proxy and not (only) the tracker:
-    //   The tracker's Shadow DOM gate identifies viewers per-browser via
-    //   a localStorage viewer_id that PERSISTS across all shares from the
-    //   same browser. That means if a recipient enters their email on
-    //   one share they're treated as "already authenticated" on every
-    //   subsequent share from the same machine — even when each share is
-    //   meant for a different recipient. Founders sending decks to
-    //   different investors NEED the gate to fire per-share.
-    //
-    //   The proxy-issued email cookie is HMAC-scoped to a single slug
-    //   (see verifyEmailCookie + tests/auth.test.ts "rejects an email
-    //   cookie for a different slug"), so a fresh share asks for the
-    //   email again, every time.
-    //
-    //   When the proxy gate fires, the tracker's in-doc gate stays off
-    //   because injectTracker sees `email` already set in the config
-    //   (gate.enabled = require_email && !email = false).
-    let verifiedEmail: string | undefined;
-    if (share.require_email && !isOwnerPreview) {
-      const cookie = await verifyEmailCookie(
-        request.headers.get('cookie'),
-        slug,
-        env.SESSION_SECRET,
-      );
-      if (!cookie) return emailGateForm(slug);
-      // Re-check the cookie's email against
-      // the share's CURRENT allowlist on every request — not just at
-      // gate-submission time. If the sender tightened the allowlist
-      // after the cookie was issued, the recipient's stale cookie
-      // must NOT bypass the new rule.
-      //
-      // isEmailAllowed returns true for shares with no allowlist
-      // (so vanilla require_email shares keep working), and for the
-      // owner-preview path which already short-circuits above.
-      if (!isEmailAllowed(share, cookie.email)) {
-        return emailGateForm(slug, 'This document is no longer shared with your address.');
-      }
-      verifiedEmail = cookie.email;
-    }
-
-    const doc = await getDocument(env, share.document_id);
-    if (!doc || doc.deleted_at) return notFound();
-
-    const html = await fetchDocumentHtml(doc, env);
-    if (!html) return sourceUnreachable();
-
-    const tier = await getProfileTier(env, doc.owner_id);
-    const geo = geoFromRequest(request);
-
-    // Attachments are ALWAYS surfaced to the recipient when they exist
-    // (design decision). The pill + drawer UI lives in the
-    // corner; clicking expands the file list. Owner-preview still
-    // skips the DB call — the sender is checking deck-render, not
-    // attachments which they themselves uploaded.
-    let attachments: Attachment[] = [];
-    if (!isOwnerPreview) {
-      attachments = await listAttachmentsForDocument(env, doc.id);
-    }
-
-    return injectTracker(html, {
-      share,
-      tier,
-      trackerUrl: env.TRACKER_URL,
-      supabaseUrl: env.SUPABASE_URL,
-      supabaseAnonKey: env.SUPABASE_ANON_KEY,
-      ...(verifiedEmail ? { email: verifiedEmail } : {}),
-      ...(geo && Object.keys(geo).length > 0 ? { geo } : {}),
-      ...(attachments.length > 0 ? { attachments } : {}),
-    });
   },
 } satisfies ExportedHandler<Env>;
+
+async function handleRequest(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+
+  // Sender's "Preview document" — minted by /docs/[id] in the app when
+  // the doc owner clicks the Preview button. Bound to a doc_id (not a
+  // slug); no share lookup, no gates, no tracker injection. Lets the
+  // sender verify what they uploaded before creating any share.
+  //
+  // Path: /r/_doc/{doc_id}?owner_doc_preview={token}
+  //
+  // The leading underscore on `_doc` is the discriminator from a share
+  // slug (which is `{adjective}-{noun}-{hex}` and can never start with
+  // an underscore). Keeps the route table flat without a separate /p/
+  // prefix that would confuse the recipient namespace.
+  const docPreviewMatch = /^\/r\/_doc\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
+  if (docPreviewMatch) {
+    const docId = docPreviewMatch[1]!;
+    const previewToken = url.searchParams.get('owner_doc_preview');
+    const tokenValid = previewToken
+      ? await verifyOwnerDocPreviewToken(previewToken, docId, env.SESSION_SECRET)
+      : false;
+    if (!tokenValid) return notFound();
+
+    const doc = await getDocument(env, docId);
+    if (!doc || doc.deleted_at) return notFound();
+    const htmlResp = await fetchDocumentHtml(doc, env);
+    if (!htmlResp) return sourceUnreachable();
+    const body = await htmlResp.text();
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        // The recipient path sets these via injectTracker; mirror the
+        // framing/sniffing protections on the owner-preview response so
+        // arbitrary sender HTML can't be framed or content-sniffed.
+        'X-Frame-Options': 'DENY',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
+      },
+    });
+  }
+
+  // Recipient download of a supporting-material attachment.
+  //   GET /r/{slug}/m/{attachment_id}
+  // Gate sequence (must pass IN ORDER, just like the doc route):
+  //   1. share exists, not revoked, not expired
+  //   2. password cookie (if require_password)
+  //   3. email cookie (if require_email)
+  //   4. attachment exists AND attachment.document_id matches the
+  //      share's document_id (defends against cross-doc enumeration)
+  // Note: attachments are no longer gated by lock_deck (2026-05-19
+  // Design decision — if the sender uploaded files, recipients can
+  // download them; lock_deck only controls deck save/print).
+  // On success: stream the R2 object with Content-Disposition: attachment
+  // and a sanitised filename, log the download event, return.
+  const downloadMatch = /^\/r\/([a-z0-9-]+)\/m\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
+  if (downloadMatch) {
+    const slug = downloadMatch[1]!;
+    const attachmentId = downloadMatch[2]!;
+    if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
+    return handleAttachmentDownload(request, slug, attachmentId, env);
+  }
+
+  const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email))?\/?$/i.exec(url.pathname);
+  if (!match) return new Response('Not Found', { status: 404 });
+  const slug = match[1]!;
+  const subroute = match[2];
+
+  const share = await getShareBySlug(env, slug);
+  if (!share) return notFound();
+
+  // Owner-preview short-circuit. When the doc owner clicks "Preview
+  // as you" in /docs/[id], the app mints a 10-minute HMAC token bound
+  // to this slug and sends them here with ?owner_preview=<token>.
+  // Valid token bypasses revoked/expired/password/email — the owner
+  // is checking what the doc itself looks like, not the recipient's
+  // gate experience. They've already proved ownership via Supabase
+  // auth in the app server action that minted the token.
+  const previewToken = url.searchParams.get('owner_preview');
+  const isOwnerPreview = previewToken
+    ? await verifyOwnerPreviewToken(previewToken, slug, env.SESSION_SECRET)
+    : false;
+
+  if (!isOwnerPreview) {
+    if (share.revoked_at) return revoked();
+    if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
+      return expired();
+    }
+  }
+
+  if (subroute === 'auth') {
+    if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+    return handlePasswordSubmit(request, slug, env);
+  }
+  if (subroute === 'email') {
+    if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+    return handleEmailSubmit(request, share, env);
+  }
+
+  // Gate sequence: password (if required) → email (if allow-listed) → content.
+  if (share.require_password && !isOwnerPreview) {
+    const cookie = await verifyAuthCookie(request.headers.get('cookie'), slug, env.SESSION_SECRET);
+    if (!cookie) return passwordForm(slug);
+  }
+
+  // Hard-gate the document on a verified email whenever require_email
+  // is true — regardless of whether an allow-list is set.
+  //
+  // Why this is at the proxy and not (only) the tracker:
+  //   The tracker's Shadow DOM gate identifies viewers per-browser via
+  //   a localStorage viewer_id that PERSISTS across all shares from the
+  //   same browser. That means if a recipient enters their email on
+  //   one share they're treated as "already authenticated" on every
+  //   subsequent share from the same machine — even when each share is
+  //   meant for a different recipient. Founders sending decks to
+  //   different investors NEED the gate to fire per-share.
+  //
+  //   The proxy-issued email cookie is HMAC-scoped to a single slug
+  //   (see verifyEmailCookie + tests/auth.test.ts "rejects an email
+  //   cookie for a different slug"), so a fresh share asks for the
+  //   email again, every time.
+  //
+  //   When the proxy gate fires, the tracker's in-doc gate stays off
+  //   because injectTracker sees `email` already set in the config
+  //   (gate.enabled = require_email && !email = false).
+  let verifiedEmail: string | undefined;
+  if (share.require_email && !isOwnerPreview) {
+    const cookie = await verifyEmailCookie(request.headers.get('cookie'), slug, env.SESSION_SECRET);
+    if (!cookie) return emailGateForm(slug);
+    // Re-check the cookie's email against
+    // the share's CURRENT allowlist on every request — not just at
+    // gate-submission time. If the sender tightened the allowlist
+    // after the cookie was issued, the recipient's stale cookie
+    // must NOT bypass the new rule.
+    //
+    // isEmailAllowed returns true for shares with no allowlist
+    // (so vanilla require_email shares keep working), and for the
+    // owner-preview path which already short-circuits above.
+    if (!isEmailAllowed(share, cookie.email)) {
+      return emailGateForm(slug, 'This document is no longer shared with your address.');
+    }
+    verifiedEmail = cookie.email;
+  }
+
+  const doc = await getDocument(env, share.document_id);
+  if (!doc || doc.deleted_at) return notFound();
+
+  const html = await fetchDocumentHtml(doc, env);
+  if (!html) return sourceUnreachable();
+
+  const tier = await getProfileTier(env, doc.owner_id);
+  const geo = geoFromRequest(request);
+
+  // Attachments are ALWAYS surfaced to the recipient when they exist
+  // (design decision). The pill + drawer UI lives in the
+  // corner; clicking expands the file list. Owner-preview still
+  // skips the DB call — the sender is checking deck-render, not
+  // attachments which they themselves uploaded.
+  let attachments: Attachment[] = [];
+  if (!isOwnerPreview) {
+    attachments = await listAttachmentsForDocument(env, doc.id);
+  }
+
+  return injectTracker(html, {
+    share,
+    tier,
+    trackerUrl: env.TRACKER_URL,
+    supabaseUrl: env.SUPABASE_URL,
+    supabaseAnonKey: env.SUPABASE_ANON_KEY,
+    ...(verifiedEmail ? { email: verifiedEmail } : {}),
+    ...(geo && Object.keys(geo).length > 0 ? { geo } : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
+  });
+}
 
 async function handlePasswordSubmit(request: Request, slug: string, env: Env): Promise<Response> {
   const form = await request.formData();
@@ -227,7 +240,11 @@ async function handlePasswordSubmit(request: Request, slug: string, env: Env): P
   if (typeof password !== 'string' || password.length === 0) {
     return passwordForm(slug, 'Password is required.');
   }
-  if (!(await verifySharePassword(env, slug, password))) {
+  const verdict = await verifySharePassword(env, slug, password);
+  if (verdict === 'rate_limited') {
+    return passwordForm(slug, 'Too many attempts. Wait a minute, then try again.');
+  }
+  if (verdict !== 'ok') {
     return passwordForm(slug, 'Incorrect password.');
   }
   return new Response(null, {

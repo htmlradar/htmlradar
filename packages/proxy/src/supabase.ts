@@ -3,6 +3,12 @@
 
 import type { Env } from './env.js';
 
+// Thrown when an upstream (Supabase) request fails at the transport/HTTP level
+// — distinct from "the query succeeded but returned no rows". Lets the worker
+// show recipients a "try again" page instead of a "deleted" 404 on a transient
+// Supabase blip.
+export class UpstreamError extends Error {}
+
 export interface Share {
   id: string;
   document_id: string;
@@ -61,7 +67,7 @@ export async function getShareBySlug(env: Env, slug: string): Promise<Share | nu
   url.searchParams.set('limit', '1');
 
   const res = await call(env, url);
-  if (!res.ok) return null;
+  if (!res.ok) throw new UpstreamError(`document_shares lookup failed: ${res.status}`);
   const rows = (await res.json()) as Share[];
   return rows[0] ?? null;
 }
@@ -153,7 +159,7 @@ export async function getDocument(env: Env, id: string): Promise<Document | null
   url.searchParams.set('limit', '1');
 
   const res = await call(env, url);
-  if (!res.ok) return null;
+  if (!res.ok) throw new UpstreamError(`documents lookup failed: ${res.status}`);
   const rows = (await res.json()) as Document[];
   return rows[0] ?? null;
 }
@@ -170,17 +176,25 @@ export async function getProfileTier(env: Env, ownerId: string): Promise<'free' 
   return rows[0]?.tier ?? 'free';
 }
 
+// 'ok' = correct password; 'bad' = wrong; 'rate_limited' = the RPC's per-slug
+// rate limiter tripped (5/min) — kept distinct so the recipient sees a "wait a
+// minute" message instead of being told their (possibly correct) password is
+// wrong.
 export async function verifySharePassword(
   env: Env,
   slug: string,
   password: string,
-): Promise<boolean> {
+): Promise<'ok' | 'bad' | 'rate_limited'> {
   const res = await call(env, new URL(`${env.SUPABASE_URL}/rest/v1/rpc/verify_share_password`), {
     method: 'POST',
     body: JSON.stringify({ p_slug: slug, p_password_plain: password }),
   });
-  if (!res.ok) return false;
-  return (await res.json()) === true;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    if (res.status === 429 || /rate.?limit|P0001|too many/i.test(body)) return 'rate_limited';
+    return 'bad';
+  }
+  return (await res.json()) === true ? 'ok' : 'bad';
 }
 
 function call(env: Env, url: URL, init: RequestInit = {}): Promise<Response> {

@@ -4,6 +4,23 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 
 ---
 
+## Unreleased
+
+### Changed
+
+- **Free tier is now 2 tracked links (lifetime), not 10 documents.** Documents are uncapped; the tracked link (share) is the metered unit. Revoked and expired links still count, so slots can't be rotated by deleting and re-creating. Enforced server-side by `enforce_share_cap` (`schema/027_free_tier_share_cap.sql`, replacing the old `enforce_doc_cap`); Free users at the cap are routed to `/upgrade?reason=share_quota`. Pro ($15/mo) is unlimited tracked links.
+
+### Added
+
+- **Commercial license** (`COMMERCIAL-LICENSE.md`) alongside AGPL-3.0 — a dual-license path for closed-source or hosted-SaaS use that AGPL's copyleft doesn't permit. AGPL-3.0 remains the public license; self-hosting as-is needs no commercial license.
+
+### Fixed
+
+- **Share expiry timezone** — the live share form now converts the `datetime-local` value to ISO in the browser before submit, so an expiry set as local time is stored at the intended instant.
+- **Copy-link button** — falls back to a hidden-textarea copy when the async clipboard API is unavailable, instead of silently doing nothing.
+
+---
+
 ## v1.2 — 2026-05-19
 
 A QA and ownership pass and a Phase 2 micro-interaction polish. The doc-detail page got a hard rewrite (identity hierarchy, deduplicated analytics, capped lists with elegant expand), the attachments model was fixed, a version-history feature shipped, and the landing copy stopped trash-talking PDF.

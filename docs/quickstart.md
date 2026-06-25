@@ -9,7 +9,7 @@ The hosted version at [htmlradar.com](https://htmlradar.com) is the fastest path
 3. Click **Create share**. Copy the link.
 4. Send.
 
-Free tier: 10 documents lifetime, unlimited shares per document, 20 attachments per doc (25 MB each, 100 MB total).
+Free tier: 2 tracked links lifetime, unlimited documents, 20 attachments per doc (25 MB each, 100 MB total).
 
 ## Local development
 

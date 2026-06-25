@@ -2,7 +2,7 @@
 
 Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
-- **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 10 documents lifetime, $15/mo Pro for unlimited
+- **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 2 tracked links lifetime, $15/mo Pro for unlimited links
 - **Source**: this repo, AGPL-3.0 · current release: **v1.2**
 - **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
 - **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
@@ -77,7 +77,7 @@ Two vendors total: Cloudflare + Supabase. Free tiers cover personal use end-to-e
 4. Send the tracked link.
 5. Watch the dashboard. First-read email lands when the recipient crosses the three-second threshold.
 
-Free tier: 10 documents lifetime, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month): unlimited documents, no "Shared with HTMLRadar" chrome on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
+Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month): unlimited tracked links, no "Shared with HTMLRadar" chrome on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
 
 ## Quick start — self-host
 

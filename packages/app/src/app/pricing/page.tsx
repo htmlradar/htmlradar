@@ -1,6 +1,6 @@
 // /pricing — public pricing page, restyled to match the v2 landing.
 //
-// Tier model unchanged from v1: free hosted with caps (10 documents
+// Tier model (pricing v4): free hosted with caps (2 tracked links
 // lifetime + 100 MB total attachments), Pro $15/mo lifts the caps and
 // drops the footer chrome. Self-host under AGPL stays free, no caps.
 // Roadmap section is honest about what's NOT in Pro yet.
@@ -22,18 +22,18 @@ export const dynamic = 'force-static';
 export const metadata: Metadata = pageMeta({
   title: 'HTMLRadar Pricing — Free to Start, Open Source',
   description:
-    'Simple pricing for tracked HTML documents. Free for 10 docs, $15/mo Pro for unlimited documents and no viewer footer. Or self-host free under AGPL-3.0.',
+    'Simple pricing for tracked HTML documents. Free for 2 tracked links, $15/mo Pro for unlimited links and no viewer footer. Or self-host free under AGPL-3.0.',
   path: '/pricing',
 });
 
 const FAQ = [
   {
     q: 'Is there a free plan?',
-    a: 'Yes. The hosted free tier covers 10 documents lifetime with unlimited shares per document and full section-level tracking — no credit card needed.',
+    a: 'Yes. The hosted free tier covers 2 tracked links across any number of documents, with full section-level tracking — no credit card needed.',
   },
   {
     q: 'What does Pro add?',
-    a: 'Unlimited documents, bigger attachments (50 files, 100 MB each, 1 GB per doc), no "Shared with HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat.',
+    a: 'Unlimited tracked links, bigger attachments (50 files, 100 MB each, 1 GB per doc), no "Shared with HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat.',
   },
   {
     q: 'Can I run HTMLRadar for free forever?',
@@ -88,7 +88,7 @@ export default function PricingPage() {
             maxWidth: '20ch',
           }}
         >
-          Free for ten. <em className="v2-em-italic">Pro</em> past that. Or run it{' '}
+          Two links free. <em className="v2-em-italic">Pro</em> past that. Or run it{' '}
           <em className="v2-em-italic">yourself</em>.
         </h1>
         <p
@@ -101,8 +101,8 @@ export default function PricingPage() {
           }}
         >
           Source is AGPL-3.0 on GitHub — run HTMLRadar on your own Cloudflare and Supabase, free
-          forever. Or use the hosted version. Free for the first ten documents, Pro when you want to
-          send from your own domain with no &ldquo;Shared with HTMLRadar&rdquo; footer.
+          forever. Or use the hosted version. Free for your first 2 tracked links, Pro when you want
+          to send from your own domain with no &ldquo;Shared with HTMLRadar&rdquo; footer.
         </p>
       </section>
 
@@ -120,10 +120,10 @@ export default function PricingPage() {
             name="Hosted · Free"
             price="$0"
             cadence="forever"
-            description="Enough for an early fundraise or a few client decks."
+            description="Enough to try it on a deck or two."
             features={[
-              '10 documents lifetime',
-              'Unlimited shares per document',
+              '2 tracked links (lifetime)',
+              'Unlimited documents',
               'Section-level dwell tracking, per recipient',
               'Email gate, password, expiry, revoke per share',
               'Email-domain and per-email allow-lists',
@@ -144,7 +144,7 @@ export default function PricingPage() {
             description="For founders and consultants who send real diligence packages."
             features={[
               'Everything in Free, plus:',
-              'Unlimited documents',
+              'Unlimited tracked links',
               'Files attached: 50 files · 100 MB each · 1 GB per doc',
               'No “Shared with HTMLRadar” footer on recipient views',
               'Priority email support, response inside one business day',
@@ -169,6 +169,17 @@ export default function PricingPage() {
               The full HTMLRadar source is AGPL-3.0. The tracker, the proxy worker, the schema, the
               web app — all of it lives on GitHub. The free tiers on Cloudflare and Supabase cover
               personal use. The repo includes a 15-minute self-hosting guide.
+            </p>
+            <p style={{ marginTop: '14px' }}>
+              Need to use HTMLRadar inside a closed-source product, or run a hosted service without
+              AGPL&apos;s copyleft? A commercial license is available —{' '}
+              <a
+                href="mailto:hello@htmlradar.com"
+                style={{ color: 'inherit', textDecoration: 'underline' }}
+              >
+                email us
+              </a>
+              .
             </p>
             <a
               className="repo"

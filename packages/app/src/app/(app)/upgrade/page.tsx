@@ -12,7 +12,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
   const user = await requireUser();
   const reason = (await searchParams).reason;
   const quota = await readQuota(serverClient(), user.id);
-  const isQuotaTrigger = reason === 'quota' || quota.atCap;
+  const isQuotaTrigger = reason === 'quota' || reason === 'share_quota' || quota.atCap;
 
   void captureServerEvent({
     event: 'upgrade.viewed',
@@ -35,8 +35,8 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
             Pro is <span className="italic text-signal">active.</span>
           </h1>
           <p className="mt-5 max-w-lg text-[16px] leading-relaxed text-ink-soft">
-            Your account has unlimited documents and the Pro presentation features — nothing more to
-            do here. Manage or cancel your plan from settings.
+            Your account has unlimited tracked links and the Pro presentation features — nothing
+            more to do here. Manage or cancel your plan from settings.
           </p>
         </header>
         <div className="flex flex-wrap items-center gap-3">
@@ -94,7 +94,8 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
         <h1 className="text-letterpress mt-4 font-serif text-[36px] font-normal leading-[1.08] tracking-tightest text-ink md:text-[44px]">
           {isQuotaTrigger ? (
             <>
-              Ten uploads in. <span className="italic text-signal">Pro removes the ceiling.</span>
+              Both free links used.{' '}
+              <span className="italic text-signal">Pro removes the ceiling.</span>
             </>
           ) : (
             <>
@@ -104,13 +105,13 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
         </h1>
         <p className="mt-5 max-w-lg text-[16px] leading-relaxed text-ink-soft">
           {isQuotaTrigger
-            ? 'You hit the lifetime free cap. Your existing documents and analytics stay exactly where they are — upgrading just lifts the limit on new uploads.'
-            : 'Free covers ten documents lifetime, total. Move to Pro for unlimited documents and the presentation features that make HTMLRadar look like yours.'}
+            ? 'Both free tracked links used. Your existing links and analytics stay exactly where they are — upgrading just lifts the limit.'
+            : 'Free covers 2 tracked links, total. Move to Pro for unlimited links, no watermark, and the presentation features that make HTMLRadar look like yours.'}
         </p>
         {quota.tier === 'free' ? (
           <div className="mt-6 inline-flex items-center gap-3 rounded-full border border-line bg-paper px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite">
             <span className="text-ink tabular-nums">{quota.used}</span>
-            <span>of {quota.cap} lifetime uploads used</span>
+            <span>of {quota.cap} free links used</span>
           </div>
         ) : null}
       </header>
@@ -130,7 +131,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
 
         <ul className="mt-7 space-y-3 text-[14.5px] text-ink-soft">
           {[
-            'Unlimited documents',
+            'Unlimited tracked links',
             'No “Shared with HTMLRadar” footer on recipient views',
             'Priority support',
             'Coming soon: custom domain (share.yourdomain.com)',

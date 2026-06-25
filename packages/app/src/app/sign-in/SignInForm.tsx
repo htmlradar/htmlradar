@@ -191,7 +191,7 @@ export function SignInForm({
         )}
 
         <p className="mt-10 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-          No card needed. 10 documents free.
+          No card needed. 2 tracked links free.
         </p>
       </div>
     </main>

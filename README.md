@@ -152,7 +152,7 @@ Found a vulnerability? Email `security@htmlradar.com`. Please don't open a publi
 
 AGPL-3.0-or-later. See [`LICENSE`](./LICENSE).
 
-Want to run a hosted service from a closed-source modified version, or embed the tracker in a closed-source product? Email `hello@htmlradar.com` to discuss a commercial license.
+Want to run a hosted service from a closed-source modified version, or embed the tracker in a closed-source product? A **commercial license** is available — see [`COMMERCIAL-LICENSE.md`](./COMMERCIAL-LICENSE.md), or email `hello@htmlradar.com`.
 
 ---
 

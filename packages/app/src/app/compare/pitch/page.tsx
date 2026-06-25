@@ -99,9 +99,9 @@ export default function PitchPage() {
           <section className="mt-14">
             <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">Pricing</h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              Free for the first 10 documents on the hosted plan. $15/mo flat for unlimited
-              documents, custom share domains, and a removed HTMLRadar footer. Or self-host the
-              whole thing under AGPLv3, no cost.
+              Free for your first 2 tracked links on the hosted plan. $15/mo flat for unlimited
+              links, custom share domains, and a removed HTMLRadar footer. Or self-host the whole
+              thing under AGPLv3, no cost.
             </p>
           </section>
 
@@ -113,7 +113,7 @@ export default function PitchPage() {
               Try it on your next Pitch deck
             </Link>
             <p className="mt-3 text-[13px] text-graphite">
-              First 10 documents free. No credit card. Source at{' '}
+              First 2 tracked links free. No credit card. Source at{' '}
               <a
                 href="https://github.com/htmlradar/htmlradar"
                 className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"

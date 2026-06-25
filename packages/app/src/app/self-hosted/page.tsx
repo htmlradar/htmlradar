@@ -100,6 +100,10 @@ export default function SelfHostedPage() {
                 a: 'You can run, modify, and use HTMLRadar commercially. If you offer a modified version to others over a network, you must share those changes under the same license.',
               },
               {
+                q: 'What if I can’t use AGPL (closed-source product, or company policy)?',
+                a: 'A commercial license is available — it removes the AGPL copyleft obligations so you can embed HTMLRadar in a closed-source product or run a hosted service without publishing your changes. Email hello@htmlradar.com, and see COMMERCIAL-LICENSE.md in the repo.',
+              },
+              {
                 q: 'How long does setup take?',
                 a: 'About 15 minutes with the guide in the repo: clone the source, connect Cloudflare and Supabase, deploy.',
               },
@@ -121,7 +125,7 @@ export default function SelfHostedPage() {
               >
                 the hosted version
               </Link>{' '}
-              is free for your first 10 documents.
+              is free for your first 2 tracked links.
             </p>
           </section>
 

@@ -71,7 +71,7 @@ export default function ComparePapermarkPage() {
               ['Per-recipient links', 'Yes', 'Yes'],
               ['Password + expiry per share', 'Yes', 'Yes (free)'],
               ['Version control (replace, keep links)', 'Yes', 'Yes'],
-              ['Free-tier doc limit', '10 lifetime', '50 documents'],
+              ['Free-tier limit', '2 tracked links', '50 documents'],
               ['Watermark on user content', 'No — chrome only', 'No'],
               ['Custom domain', 'v1.1 paid', 'Business tier'],
               ['Open source', 'AGPL-3.0', 'AGPL-3.0'],

@@ -108,7 +108,7 @@ export default function PitchDeckTrackingPage() {
               },
               {
                 q: 'What does it cost for a fundraise?',
-                a: 'The free tier covers your first 10 documents — enough for an early fundraise. Pro is $15/mo flat for unlimited documents.',
+                a: 'The free tier covers 2 tracked links so you can try it. Pro is $15/mo flat for unlimited links — enough for a full fundraise.',
               },
               {
                 q: 'Can I revoke access after the round closes?',
@@ -125,7 +125,7 @@ export default function PitchDeckTrackingPage() {
               Track your deck free
             </Link>
             <p className="mt-3 text-[13px] text-graphite">
-              First 10 documents free. No credit card. AGPLv3 source on{' '}
+              First 2 tracked links free. No credit card. AGPLv3 source on{' '}
               <a
                 href="https://github.com/htmlradar/htmlradar"
                 className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"

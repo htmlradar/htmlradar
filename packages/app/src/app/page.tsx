@@ -1179,7 +1179,7 @@ export default function LandingV2() {
           <em>Send the link.</em>
         </h2>
         <p>
-          An email lands the moment a real read happens. Free for 10 documents — no card needed.
+          An email lands the moment a real read happens. Free for 2 tracked links — no card needed.
         </p>
         <div className="row">
           <AuthLink guestHref="/sign-in" className="v2-btn v2-btn-primary">

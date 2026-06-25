@@ -47,7 +47,7 @@ const ROWS: Row[] = [
   },
   {
     feature: 'Free tier',
-    htmlradar: '10 documents lifetime, unlimited reads',
+    htmlradar: '2 tracked links, unlimited reads',
     docsend: '14-day trial',
   },
   {
@@ -234,7 +234,7 @@ export default function ComparePage() {
             items={[
               {
                 q: 'Is HTMLRadar a free DocSend alternative?',
-                a: 'The hosted free tier covers your first 10 documents with unlimited shares and full section-level analytics. Past that it is $15/mo flat — or self-host the AGPL-3.0 source for free on your own infrastructure.',
+                a: 'The hosted free tier covers 2 tracked links with full section-level analytics. Past that it is $15/mo flat — or self-host the AGPL-3.0 source for free on your own infrastructure.',
               },
               {
                 q: 'Does HTMLRadar track PDFs like DocSend does?',
@@ -255,7 +255,7 @@ export default function ComparePage() {
               Try HTMLRadar free
             </Link>
             <p className="mt-3 text-[13px] text-graphite">
-              First 10 documents free. No credit card. AGPLv3 source on{' '}
+              First 2 tracked links free. No credit card. AGPLv3 source on{' '}
               <a
                 href="https://github.com/htmlradar/htmlradar"
                 className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"

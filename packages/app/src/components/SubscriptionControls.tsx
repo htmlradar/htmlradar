@@ -102,7 +102,7 @@ export function SubscriptionControls({
             </div>
             <p className="mt-3 text-[14px] leading-relaxed text-ink-soft">
               {untilStr
-                ? `You'll keep Pro through ${untilStr}. After that you drop back to the free tier (10-document lifetime cap).`
+                ? `You'll keep Pro through ${untilStr}. After that you drop back to the free tier (2 tracked links).`
                 : "You'll keep Pro through the rest of this billing period, then drop back to the free tier."}
             </p>
             <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">

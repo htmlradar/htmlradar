@@ -108,7 +108,7 @@ export default function TrackHtmlDeckPage() {
               Track your deck free
             </Link>
             <p className="mt-3 text-[13px] text-graphite">
-              First 10 documents free. No credit card. AGPLv3 source on{' '}
+              First 2 tracked links free. No credit card. AGPLv3 source on{' '}
               <a
                 href="https://github.com/htmlradar/htmlradar"
                 className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"

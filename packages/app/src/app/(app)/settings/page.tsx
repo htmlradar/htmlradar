@@ -273,7 +273,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   <span className="rounded-full bg-signal/15 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-signal-dark">
                     Pro
                   </span>
-                  <span className="text-[13px] text-ink-soft">Unlimited documents</span>
+                  <span className="text-[13px] text-ink-soft">Unlimited tracked links</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2">
@@ -281,8 +281,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                     Free
                   </span>
                   <span className="text-[13px] text-ink-soft">
-                    <span className="tabular-nums">{quota.used}</span> of {quota.cap} lifetime
-                    uploads used
+                    <span className="tabular-nums">{quota.used}</span> of {quota.cap} free links
+                    used
                   </span>
                 </span>
               )

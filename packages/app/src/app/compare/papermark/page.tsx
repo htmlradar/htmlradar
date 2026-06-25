@@ -71,7 +71,7 @@ export default function ComparePapermarkPage() {
               ['Per-recipient links', 'Yes', 'Yes'],
               ['Password + expiry per share', 'Yes', 'Yes (free)'],
               ['Version control (replace, keep links)', 'Yes', 'Yes'],
-              ['Free-tier limit', '2 tracked links', '50 documents'],
+              ['Free hosted tier', '2 tracked links', '50 documents'],
               ['Watermark on user content', 'No — chrome only', 'No'],
               ['Custom domain', 'v1.1 paid', 'Business tier'],
               ['Open source', 'AGPL-3.0', 'AGPL-3.0'],
@@ -85,6 +85,13 @@ export default function ComparePapermarkPage() {
             ))}
           </tbody>
         </table>
+
+        <p className="mt-6 text-sm leading-relaxed text-ink-soft">
+          Those are the hosted free tiers, for trying each tool. HTMLRadar is AGPL-3.0 end to end —
+          self-host it on your own Cloudflare and Supabase for{' '}
+          <strong className="text-ink">unlimited tracked links at no cost</strong>. The whole
+          product is open source, not open-core.
+        </p>
 
         <div className="mt-12 rounded-lg border border-line bg-paper-2 p-6">
           <h2 className="text-base font-medium">When to use HTMLRadar</h2>

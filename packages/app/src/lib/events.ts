@@ -34,6 +34,7 @@ export type AppEvent =
   | 'feedback.submitted'
   | 'pricing.viewed'
   | 'free_tier.cap_hit'
+  | 'free_tier.share_cap_hit'
   | 'share.first_view'
   | 'viewer.hidden_toggled'
   | '$identify';

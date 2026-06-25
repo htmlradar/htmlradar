@@ -17,7 +17,6 @@ import { r2Key, uploadHtml } from '@/lib/r2';
 import { captureServerEvent } from '@/lib/events';
 import { isHtmlFile, validateSourceUrl } from '@/lib/html-source';
 
-const FREE_TIER_CAP = 10;
 const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
 
 // Seed document_versions v1 for a freshly-created document. Retries once
@@ -55,30 +54,9 @@ export async function createDocument(formData: FormData) {
   const user = await requireUser();
   const supabase = serverClient();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('tier')
-    .eq('id', user.id)
-    .single();
-  if (profile?.tier !== 'pro') {
-    // Lifetime cap — count deleted rows too. Must match the trigger in
-    // schema/003_triggers.sql (which counts ALL documents, including
-    // soft-deleted). Earlier the UI filtered by deleted_at IS NULL,
-    // which let the action pass the check then the trigger reject the
-    // INSERT — a confusing 500 instead of a clean /upgrade redirect.
-    const { count } = await supabase
-      .from('documents')
-      .select('id', { count: 'exact', head: true })
-      .eq('owner_id', user.id);
-    if ((count ?? 0) >= FREE_TIER_CAP) {
-      await captureServerEvent({
-        event: 'free_tier.cap_hit',
-        distinctId: user.id,
-        userId: user.id,
-      });
-      redirect('/upgrade?reason=quota');
-    }
-  }
+  // Documents are no longer capped (pricing v4) — the free-tier lever is the
+  // tracked-link cap, enforced at share creation (createShareAction +
+  // enforce_share_cap, schema/027). Uploading a document is unrestricted.
 
   const sourceType = formData.get('source_type') as 'upload' | 'url';
   const title = String(formData.get('title') ?? '').trim() || 'Untitled document';

@@ -41,6 +41,7 @@ interface DocTabsClientProps {
   createShareAction: (formData: FormData) => Promise<void>;
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
+  freeShareCap?: { used: number; cap: number } | null;
   viewers: Viewer[];
   sessions: Session[];
   events: SectionEvent[];
@@ -206,6 +207,7 @@ export function DocTabsClient(props: DocTabsClientProps) {
             createShareAction={props.createShareAction}
             toggleShareAction={props.toggleShareAction}
             deleteShareAction={props.deleteShareAction}
+            freeShareCap={props.freeShareCap ?? null}
           />
         </TabPanel>
         <TabPanel tabKey="analytics" active={activeTab === 'analytics'}>
@@ -280,6 +282,7 @@ function SharingPanel({
   createShareAction,
   toggleShareAction,
   deleteShareAction,
+  freeShareCap,
 }: {
   documentId: string;
   shares: ShareRow[];
@@ -293,6 +296,7 @@ function SharingPanel({
   createShareAction: (formData: FormData) => Promise<void>;
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
+  freeShareCap?: { used: number; cap: number } | null;
 }) {
   return (
     <section>
@@ -314,6 +318,7 @@ function SharingPanel({
         createShareAction={createShareAction}
         toggleShareAction={toggleShareAction}
         deleteShareAction={deleteShareAction}
+        freeShareCap={freeShareCap ?? null}
       />
     </section>
   );

@@ -47,6 +47,7 @@ import { type ShareRow, type ShareAnalyticsData } from '../DocumentShareManager'
 import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import { countDistinctViewers } from '@/lib/viewer-metrics';
+import { readQuota } from '@/lib/quota';
 
 export const runtime = 'edge';
 
@@ -101,8 +102,13 @@ async function renderV2({
     share_deleted?: string;
   };
 }) {
-  await requireUser();
+  const user = await requireUser();
   const supabase = serverClient();
+
+  // Free-tier link-cap state for the share-creation gate (pricing v4). null for
+  // pro (unlimited); { used, cap } for free, counted lifetime by owner.
+  const quota = await readQuota(supabase, user.id);
+  const freeShareCap = quota.tier === 'free' ? { used: quota.used, cap: quota.cap } : null;
 
   const banners = collectBanners(searchParams ?? {});
   const initialTab: TabKey = normalizeTab(searchParams?.tab);
@@ -460,6 +466,7 @@ async function renderV2({
         previewShareAction={previewShareAction}
         editShareAction={editShareAction}
         createShareAction={createShareAction}
+        freeShareCap={freeShareCap}
         toggleShareAction={toggleShareAction}
         deleteShareAction={deleteShareAction}
         viewers={allViewers}

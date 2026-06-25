@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
+import { readQuota } from '@/lib/quota';
 import { issueOwnerDocPreviewToken, issueOwnerPreviewToken } from '@/lib/preview-token';
 import { deleteR2Object, r2Key, uploadAttachment, uploadHtml } from '@/lib/r2';
 import {
@@ -48,6 +49,21 @@ export async function createShareAction(formData: FormData) {
   const user = await requireUser();
   const supabase = serverClient();
   const documentId = String(formData.get('document_id'));
+
+  // Free-tier link cap (mirrors the enforce_share_cap trigger, schema/027).
+  // Pre-check for a clean upgrade redirect; the DB trigger is the
+  // authoritative, race-safe backstop. Pro is exempt (atCap is false for pro).
+  // redirect() throws internally, so it must sit OUTSIDE the try below.
+  const quota = await readQuota(supabase, user.id);
+  if (quota.atCap) {
+    await captureServerEvent({
+      event: 'free_tier.share_cap_hit',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { document_id: documentId },
+    });
+    redirect('/upgrade?reason=share_quota');
+  }
 
   // Server Actions can throw, but a thrown error inside an `action={...}`
   // form submission reaches the user as a generic Next.js error boundary
@@ -132,6 +148,11 @@ export async function createShareAction(formData: FormData) {
   // throwing a special error internally, so they must NOT be inside the
   // try block above.
   if (errorMessage) {
+    // Share-cap backstop: if the enforce_share_cap trigger fired (a race the
+    // pre-check missed), route to upgrade instead of a generic error toast.
+    if (/free_tier_share_cap_reached|tracked links, lifetime/i.test(errorMessage)) {
+      redirect('/upgrade?reason=share_quota');
+    }
     redirect(`/docs/${documentId}?share_error=${encodeURIComponent(errorMessage)}`);
   }
   if (slug) {

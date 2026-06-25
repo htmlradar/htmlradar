@@ -2,7 +2,7 @@
 // rejects at the recipient gate (schema/005_security_followup.sql) — kept
 // in sync by hand. Used at signup time so users can't trivially mint
 // new accounts from 10minutemail / mailinator / etc. to skirt the
-// 10-document lifetime cap.
+// free-tier link cap.
 //
 // Why a TS const instead of an RPC: signup is the wrong place for an
 // extra database round-trip on every submission, and the check needs to

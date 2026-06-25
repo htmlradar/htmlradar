@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { ShareRow, ShareAnalyticsData } from '../DocumentShareManager';
 import { cn } from '@/lib/cn';
+import { localInputToIso } from '@/lib/datetime-local';
 
 interface ShareCardListProps {
   documentId: string;
@@ -40,6 +41,8 @@ interface ShareCardListProps {
   createShareAction: (formData: FormData) => Promise<void>;
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
+  // Free-tier link cap (pricing v4). null = pro (unlimited, no counter/gate).
+  freeShareCap?: { used: number; cap: number } | null;
 }
 
 export function ShareCardList(props: ShareCardListProps) {
@@ -51,9 +54,11 @@ export function ShareCardList(props: ShareCardListProps) {
     createShareAction,
     toggleShareAction,
     deleteShareAction,
+    freeShareCap,
   } = props;
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [showDraft, setShowDraft] = useState(false);
+  const atShareCap = !!freeShareCap && freeShareCap.used >= freeShareCap.cap;
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -66,22 +71,46 @@ export function ShareCardList(props: ShareCardListProps) {
 
   return (
     <div className="space-y-3">
-      {!showDraft && (
-        <button
-          type="button"
-          onClick={() => setShowDraft(true)}
-          className={cn(
-            'group flex w-full items-center gap-3 rounded-2xl border border-dashed border-signal/70 bg-paper p-5 text-left transition-colors hover:bg-paper/60',
-          )}
-        >
-          <span className="grid size-9 place-items-center rounded-full border border-signal/70 text-signal transition-transform group-hover:rotate-90">
-            <Plus className="size-4" />
-          </span>
-          <span className="font-sans text-[14.5px] font-medium text-signal">
-            Create a new share link
-          </span>
-        </button>
-      )}
+      {!showDraft &&
+        (atShareCap ? (
+          // Free tier, both links used — gate the create action with an upgrade
+          // prompt. (The server action also enforces this; this is the UX.)
+          <div className="rounded-2xl border border-dashed border-signal/40 bg-signal/5 p-5">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+              Free plan · {freeShareCap!.used} of {freeShareCap!.cap} links used
+            </p>
+            <p className="mt-2 max-w-md text-[14px] leading-relaxed text-ink-soft">
+              You&apos;ve used both free tracked links. Upgrade to Pro for unlimited links and no
+              watermark.
+            </p>
+            <a
+              href="/upgrade?reason=share_quota"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 font-sans text-[14px] font-medium text-paper hover:bg-signal-dark"
+            >
+              Upgrade to Pro
+            </a>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowDraft(true)}
+            className={cn(
+              'group flex w-full items-center gap-3 rounded-2xl border border-dashed border-signal/70 bg-paper p-5 text-left transition-colors hover:bg-paper/60',
+            )}
+          >
+            <span className="grid size-9 place-items-center rounded-full border border-signal/70 text-signal transition-transform group-hover:rotate-90">
+              <Plus className="size-4" />
+            </span>
+            <span className="font-sans text-[14.5px] font-medium text-signal">
+              Create a new share link
+              {freeShareCap && (
+                <span className="ml-2 font-mono text-[11px] uppercase tracking-[0.1em] text-graphite">
+                  · {freeShareCap.used} of {freeShareCap.cap} free
+                </span>
+              )}
+            </span>
+          </button>
+        ))}
 
       {showDraft && (
         <DraftShareCard
@@ -292,7 +321,16 @@ function LinkSection({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Ignore — copy failure is non-critical, the URL is visible inline.
+      // navigator.clipboard rejects in non-secure contexts; fall back to a
+      // hidden-textarea copy so the action never silently no-ops.
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }
   };
 
@@ -365,7 +403,23 @@ function ShareForm({
   const [expiryOn, setExpiryOn] = useState(!!share?.expires_at);
 
   return (
-    <form action={action} className="space-y-7">
+    <form
+      action={(fd) => {
+        // Convert the tz-less datetime-local expiry to a true UTC instant in the
+        // browser (timezone known here) so the server stores the moment the owner
+        // picked, not a UTC misparse. Empty = no expiry, left as-is. (Fixes the
+        // [2] timezone bug on the live form — DocumentShareManager was dead.)
+        const localExpiry = String(fd.get('expires_at') ?? '');
+        if (localExpiry) {
+          fd.set(
+            'expires_at',
+            localInputToIso(localExpiry, new Date(localExpiry).getTimezoneOffset()),
+          );
+        }
+        return action(fd);
+      }}
+      className="space-y-7"
+    >
       <input type="hidden" name="document_id" value={documentId} />
       {mode === 'edit' && share && <input type="hidden" name="share_id" value={share.id} />}
 

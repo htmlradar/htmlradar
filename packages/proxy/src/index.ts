@@ -20,6 +20,7 @@ import {
   logAttachmentDownload,
   getViewerIdByShareEmail,
   verifySharePassword,
+  notifyDisabledAttempt,
   UpstreamError,
   type Attachment,
   type Share,
@@ -46,9 +47,9 @@ import {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      return await handleRequest(request, env);
+      return await handleRequest(request, env, ctx);
     } catch (err) {
       // A transient Supabase failure must not masquerade as a deleted/missing
       // share ("this link doesn't open anything") — show the recipient the
@@ -59,7 +60,7 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-async function handleRequest(request: Request, env: Env): Promise<Response> {
+async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
 
   // Sender's "Preview document" — minted by /docs/[id] in the app when
@@ -143,8 +144,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     : false;
 
   if (!isOwnerPreview) {
-    if (share.revoked_at) return revoked();
+    // A disabled open serves an error shell and loads no tracker, so this
+    // is the only place we learn the recipient tried. Fire-and-forget an
+    // owner alert (throttled per-share in the DB) without blocking the
+    // response — ctx.waitUntil keeps the worker alive until it completes.
+    if (share.revoked_at) {
+      ctx.waitUntil(notifyDisabledAttempt(env, share.id, 'revoked'));
+      return revoked();
+    }
     if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
+      ctx.waitUntil(notifyDisabledAttempt(env, share.id, 'expired'));
       return expired();
     }
   }

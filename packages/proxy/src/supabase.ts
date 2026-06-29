@@ -197,6 +197,24 @@ export async function verifySharePassword(
   return (await res.json()) === true ? 'ok' : 'bad';
 }
 
+// Best-effort: tell the DB a recipient hit a DISABLED link (revoked or
+// expired) so it can email the owner. There is no session or tracker on a
+// disabled open — the recipient gets an error shell — so the proxy is the
+// only thing that knows the attempt happened. The DB function throttles
+// per-share (one email per cooldown) and re-validates the state, so calling
+// this on every hit is safe. Never throws: a failed alert must never change
+// what the recipient sees (the error page) or stall the response.
+export async function notifyDisabledAttempt(
+  env: Env,
+  shareId: string,
+  kind: 'revoked' | 'expired',
+): Promise<void> {
+  await call(env, new URL(`${env.SUPABASE_URL}/rest/v1/rpc/notify_disabled_attempt`), {
+    method: 'POST',
+    body: JSON.stringify({ p_share_id: shareId, p_kind: kind }),
+  }).catch(() => undefined);
+}
+
 function call(env: Env, url: URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('apikey', env.SUPABASE_SERVICE_ROLE_KEY);

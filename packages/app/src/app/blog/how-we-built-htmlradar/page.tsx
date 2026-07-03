@@ -12,7 +12,7 @@ export const runtime = 'edge';
 export const metadata = {
   title: 'How I built HTMLRadar in three packages',
   description:
-    'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, a 14 KB browser tracker, six SQL files. What each part owns, why I kept them separate, and the calls I made.',
+    'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, an 8 KB (gzipped) browser tracker, six SQL files. What each part owns, why I kept them separate, and the calls I made.',
   alternates: { canonical: 'https://htmlradar.com/blog/how-we-built-htmlradar' },
 };
 
@@ -104,7 +104,7 @@ export default function Post() {
                 </p>
                 <p>
                   <code className="font-mono text-[14px] text-signal-dark">packages/tracker</code>{' '}
-                  is a 14 KB browser IIFE. The proxy injects a single{' '}
+                  is a 22 KB minified (8 KB gzipped) browser IIFE. The proxy injects a single{' '}
                   <code className="font-mono text-[14px] text-signal-dark">&lt;script&gt;</code> tag
                   into every served document. The tracker identifies the viewer, prompts for email
                   if the share requires one, and streams session metrics to Supabase.
@@ -119,11 +119,12 @@ export default function Post() {
 
             <section>
               <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
-                The tracker is 14 KB
+                The tracker is 22 KB minified
               </h2>
               <div className="mt-4 space-y-4">
                 <p>
-                  14 KB is a tight budget. The tracker uses PostgREST directly rather than{' '}
+                  22 KB minified — 8 KB over the wire gzipped — is a tight budget. The tracker uses
+                  PostgREST directly rather than{' '}
                   <code className="font-mono text-[14px] text-signal-dark">
                     @supabase/supabase-js
                   </code>
@@ -361,7 +362,7 @@ function ArchitectureDiagram() {
           <Arrow from={{ x: 140, y: 200 }} to={{ x: 240, y: 200 }} label="/r/{slug}" />
           <Pill x={240} y={170} w={150} label="packages/proxy" sub="CF Worker" accent />
           <Arrow from={{ x: 315, y: 215 }} to={{ x: 315, y: 268 }} />
-          <Pill x={240} y={270} w={150} label="packages/tracker" sub="14 KB IIFE" />
+          <Pill x={240} y={270} w={150} label="packages/tracker" sub="22 KB IIFE" />
         </g>
 
         {/* Supabase + R2 */}

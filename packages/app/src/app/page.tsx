@@ -1002,7 +1002,7 @@ export default function LandingV2() {
               </div>
               <div>
                 <h4>Download lock</h4>
-                <p>Block saving the page. Cmd+S, right-click save — nothing reaches their disk.</p>
+                <p>Block saving the page. Cmd+S and right-click save are disabled on the viewer.</p>
               </div>
             </div>
             <div className="v2-ctrl-item">
@@ -1218,6 +1218,7 @@ export default function LandingV2() {
           <Link href="/compare/docsend">vs DocSend</Link>
           <Link href="/compare/papermark">vs Papermark</Link>
           <Link href="/blog">Blog</Link>
+          <Link href="/feedback">Feedback</Link>
           <Link href="/privacy">Privacy</Link>
           <a
             href="https://github.com/htmlradar/htmlradar"

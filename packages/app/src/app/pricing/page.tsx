@@ -33,7 +33,7 @@ const FAQ = [
   },
   {
     q: 'What does Pro add?',
-    a: 'Unlimited tracked links, bigger attachments (50 files, 100 MB each, 1 GB per doc), no "Shared with HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat.',
+    a: 'Unlimited tracked links, no "Powered by HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat.',
   },
   {
     q: 'Can I run HTMLRadar for free forever?',
@@ -46,7 +46,10 @@ const FAQ = [
 ];
 
 export default function PricingPage() {
-  const stripeUrl = process.env['STRIPE_PAYMENT_LINK_URL'] ?? '#';
+  // Fall back to /sign-in rather than a dead '#': post-sign-in the app's
+  // own /upgrade page builds the checkout link, so conversion still works
+  // even if the env var is missing at build time.
+  const stripeUrl = process.env['STRIPE_PAYMENT_LINK_URL'] ?? '/sign-in';
 
   return (
     <div className="v2-root">
@@ -102,7 +105,7 @@ export default function PricingPage() {
         >
           Source is AGPL-3.0 on GitHub — run HTMLRadar on your own Cloudflare and Supabase, free
           forever. Or use the hosted version. Free for your first 2 tracked links, Pro when you want
-          to send from your own domain with no &ldquo;Shared with HTMLRadar&rdquo; footer.
+          unlimited links with no &ldquo;Powered by HTMLRadar&rdquo; footer.
         </p>
       </section>
 
@@ -130,7 +133,7 @@ export default function PricingPage() {
               'Files attached to a deck: 20 files · 25 MB each · 100 MB per doc',
               'Per-share download permission, every download logged',
               'Real-time email when a real read happens',
-              '“Shared with HTMLRadar” footer on the viewer',
+              '“Powered by HTMLRadar” footer on the viewer',
             ]}
             ctaLabel="Start free"
             ctaHref="/sign-in"
@@ -145,8 +148,7 @@ export default function PricingPage() {
             features={[
               'Everything in Free, plus:',
               'Unlimited tracked links',
-              'Files attached: 50 files · 100 MB each · 1 GB per doc',
-              'No “Shared with HTMLRadar” footer on recipient views',
+              'No “Powered by HTMLRadar” footer on recipient views',
               'Priority email support, response inside one business day',
             ]}
             ctaLabel="Upgrade to Pro"

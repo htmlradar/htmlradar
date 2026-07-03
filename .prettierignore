@@ -1,0 +1,5 @@
+# Build artifact — the minified tracker bundle is copied from
+# packages/tracker/dist at deploy time (see .github/workflows/deploy.yml).
+# Prettier reformatting a minified file only bloats it (it did once:
+# 22 KB -> 29 KB) without changing behavior.
+packages/app/public/v1/tracker.js

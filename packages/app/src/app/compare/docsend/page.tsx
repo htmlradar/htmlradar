@@ -26,7 +26,7 @@ interface Row {
 }
 
 const ROWS: Row[] = [
-  { feature: 'Source format', htmlradar: 'HTML (upload or URL)', docsend: 'PDF only' },
+  { feature: 'Source format', htmlradar: 'HTML (upload or URL)', docsend: 'PDF-first (files)' },
   { feature: 'Open source', htmlradar: 'AGPL-3.0', docsend: false },
   { feature: 'Self-hosting', htmlradar: 'Full self-host supported', docsend: false },
   { feature: 'Per-recipient share links', htmlradar: true, docsend: true },
@@ -39,20 +39,20 @@ const ROWS: Row[] = [
   { feature: 'Password gating', htmlradar: true, docsend: true },
   { feature: 'Email gating', htmlradar: true, docsend: true },
   { feature: 'Domain allow-list', htmlradar: true, docsend: 'Enterprise only' },
-  { feature: 'Custom share domain', htmlradar: 'Pro tier ($15/mo)', docsend: 'Enterprise tier' },
+  { feature: 'Custom share domain', htmlradar: 'Coming soon', docsend: 'Enterprise tier' },
   {
     feature: 'Pricing model',
     htmlradar: '$15/mo flat OR free self-host',
-    docsend: '$15-$45 per seat per month',
+    docsend: 'Per seat, per month',
   },
   {
     feature: 'Free tier',
     htmlradar: '2 tracked links, unlimited reads',
-    docsend: '14-day trial',
+    docsend: 'Free trial',
   },
   {
     feature: 'API for programmatic shares',
-    htmlradar: 'Polar webhook flow',
+    htmlradar: 'Not yet — planned',
     docsend: 'Enterprise API',
   },
   { feature: 'Privacy: no third-party tracking on viewer side', htmlradar: true, docsend: false },
@@ -112,8 +112,8 @@ export default function ComparePage() {
                   HTML-first, open source, $15/mo flat.
                 </p>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
-                  Track HTML decks from Pitch.com, Tome, Gamma, or hand-rolled HTML. Self-host the
-                  whole thing or use the hosted plan. AGPLv3.
+                  Track HTML decks from Claude, ChatGPT, v0, reveal.js, or hand-rolled HTML.
+                  Self-host the whole thing or use the hosted plan. AGPLv3.
                 </p>
               </div>
               <div className="rounded-2xl border border-line bg-paper-2/40 p-6">
@@ -121,7 +121,7 @@ export default function ComparePage() {
                   DocSend
                 </h3>
                 <p className="mt-3 font-serif text-[20px] leading-snug text-ink">
-                  PDF-first, closed source, $15-45 per seat.
+                  PDF-first, closed source, priced per seat.
                 </p>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
                   Decade-old category leader, polished UX, deep enterprise feature set. Owned by
@@ -187,8 +187,8 @@ export default function ComparePage() {
             </h2>
             <ul className="mt-4 list-disc space-y-2 pl-5 text-[16px] leading-[1.7] text-ink-soft">
               <li>
-                You send HTML decks (Pitch.com exports, Tome, Gamma, hand-rolled) and don't want to
-                PDFify them just to track.
+                You send HTML decks (Claude artifacts, reveal.js builds, hand-rolled pages) and
+                don't want to PDFify them just to track.
               </li>
               <li>You bill per-seat allergies. $15/mo flat scales with usage, not headcount.</li>
               <li>
@@ -196,8 +196,8 @@ export default function ComparePage() {
                 the no-vendor-dependence rights matter to your business.
               </li>
               <li>
-                You're an indie founder or small team where DocSend's lowest plan ($15/seat for
-                three seats = $45/mo) is more than the flat rate.
+                You're an indie founder or small team where per-seat pricing is more than the flat
+                rate.
               </li>
               <li>
                 You want section-level dwell time, not just scroll depth. Knowing the recipient
@@ -214,9 +214,9 @@ export default function ComparePage() {
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
               DocSend exports your existing tracked PDFs via their UI. We don't import them directly
               because the formats differ. For new HTML decks you create after switching, the flow
-              is: export your deck as HTML (Pitch.com → File → Export HTML; or hand-write), upload
-              to HTMLRadar, create per-recipient share links. The same tracking happens, on a
-              different file type.
+              is: bring your HTML deck (a Claude artifact, a reveal.js build, or a hand-written
+              page), upload to HTMLRadar, create per-recipient share links. The same tracking
+              happens, on a different file type.
             </p>
             <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">
               If you need help with the cutover, email{' '}
@@ -269,22 +269,26 @@ export default function ComparePage() {
           <div className="mt-20 border-t border-line pt-10">
             <p className="text-[14px] leading-relaxed text-ink-soft">
               Related:{' '}
+              <Link href="/compare/papermark" className="text-signal-dark hover:underline">
+                HTMLRadar vs Papermark
+              </Link>
+              ,{' '}
+              <Link
+                href="/compare/docsend-vs-papermark"
+                className="text-signal-dark hover:underline"
+              >
+                DocSend vs Papermark compared
+              </Link>
+              ,{' '}
               <Link href="/self-hosted" className="text-signal-dark hover:underline">
                 self-hosted document tracking
               </Link>
-              ,{' '}
+              , and{' '}
               <Link
                 href="/use-case/pitch-deck-tracking"
                 className="text-signal-dark hover:underline"
               >
                 pitch deck tracking for founders
-              </Link>
-              , and{' '}
-              <Link
-                href="/blog/how-we-built-htmlradar"
-                className="text-signal-dark hover:underline"
-              >
-                how we built HTMLRadar
               </Link>
               .
             </p>

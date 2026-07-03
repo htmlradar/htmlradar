@@ -2,7 +2,7 @@
   "name": "@htmlradar/tracker",
   "version": "0.1.0",
   "private": true,
-  "description": "The embedded tracker script. Served from cdn.htmlradar.com/v1/tracker.js.",
+  "description": "The embedded tracker script. Served from htmlradar.com/v1/tracker.js.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "main": "dist/tracker.js",

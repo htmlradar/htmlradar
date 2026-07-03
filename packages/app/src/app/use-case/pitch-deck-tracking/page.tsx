@@ -100,11 +100,11 @@ export default function PitchDeckTrackingPage() {
             items={[
               {
                 q: 'Do investors know the deck is tracked?',
-                a: 'On the free tier the viewer shows a "Shared with HTMLRadar" footer (Pro removes it). The tracker itself is open source, so anyone can audit exactly what is collected.',
+                a: 'On the free tier the viewer shows a small "Powered by HTMLRadar" badge (Pro removes it). The tracker itself is open source, so anyone can audit exactly what is collected.',
               },
               {
-                q: 'Does it work with decks made in Gamma, Claude, or Pitch.com?',
-                a: 'Yes. Upload any HTML file or point HTMLRadar at a live URL. If your deck is HTML — and most AI-built decks are — there is nothing to convert.',
+                q: 'Does it work with AI-built decks?',
+                a: 'Yes. Upload any HTML file — a Claude artifact, a ChatGPT one-pager, a reveal.js build — or point HTMLRadar at a URL you already host. If your deck is HTML, there is nothing to convert.',
               },
               {
                 q: 'What does it cost for a fundraise?',

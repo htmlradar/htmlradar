@@ -78,7 +78,7 @@ Point the relevant routes at Cloudflare:
 - `htmlradar.com/r/*` → proxy worker (set via worker route in `packages/proxy/wrangler.toml`)
 - `htmlradar.com/v1/tracker.js` → served by the Pages app from `public/v1/tracker.js` (copied at build time)
 
-For your own domain, substitute `htmlradar.com` with yours throughout and set `NEXT_PUBLIC_APP_URL` accordingly.
+For your own domain, substitute `htmlradar.com` with yours throughout — including the hardcoded site URL in `packages/app/src/app/sitemap.ts`, `robots.ts`, and `lib/seo.ts` (the app deliberately does not read `NEXT_PUBLIC_APP_URL` for these; see the comment in `sitemap.ts`).
 
 ## Verifying the install
 

@@ -57,8 +57,8 @@ export default function ClaudeArtifactsPage() {
                 in about a minute.
               </li>
               <li>
-                Send the link. The recipient sees the artifact pixel-for-pixel — no signup, no
-                viewer chrome over your content.
+                Send the link. The recipient sees the artifact rendered exactly as Claude made it —
+                no signup required, no viewer wrapper around your content.
               </li>
             </ol>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
@@ -103,7 +103,7 @@ export default function ClaudeArtifactsPage() {
               },
               {
                 q: 'Can the recipient tell it is tracked?',
-                a: 'Free-tier links carry a small "Powered by HTMLRadar" badge in the corner; the document itself is byte-identical to your upload. No mouse tracking, no keystrokes, no session replay — section dwell, scroll depth, and active time only, and recipients can opt out.',
+                a: 'Free-tier links carry a small "Powered by HTMLRadar" badge in the corner, and the tracker is added when the page is served — your uploaded file itself is never modified. No mouse tracking, no keystrokes, no session replay — section dwell, scroll depth, and active time only, and recipients can opt out.',
               },
             ]}
           />

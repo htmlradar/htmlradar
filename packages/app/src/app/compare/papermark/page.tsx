@@ -23,7 +23,7 @@ const FAQ = [
   },
   {
     q: 'Which is cheaper?',
-    a: "HTMLRadar's paid tier is $15/mo flat. Papermark's entry paid tier is $29/mo. Both have free tiers, and both can be self-hosted for free.",
+    a: "HTMLRadar's paid tier is $15/mo flat. Papermark's entry paid tier is €24/mo. Both have free tiers, and both can be self-hosted for free.",
   },
 ];
 
@@ -46,9 +46,9 @@ export default function ComparePapermarkPage() {
           We borrowed Papermark's playbook. Then aimed it at HTML.
         </h1>
         <p className="mt-4 text-ink-soft">
-          Papermark is the open-source DocSend alternative for PDFs. They got to $900K ARR doing
-          exactly what we're doing — open-source code, hosted SaaS, AGPL license. Honest answer: if
-          you live in PDFs, use them.
+          Papermark is the open-source DocSend alternative for PDFs. They grew past $900K ARR (by
+          their own public numbers) doing exactly what we're doing — open-source code, hosted SaaS,
+          AGPL license. Honest answer: if you live in PDFs, use them.
         </p>
         <p className="mt-3 text-ink-soft">
           But if you live in HTML — investor decks rendered to a browser, AI-generated briefs,
@@ -73,9 +73,9 @@ export default function ComparePapermarkPage() {
               ['Version control (replace, keep links)', 'Yes', 'Yes'],
               ['Free hosted tier', '2 tracked links', '50 documents'],
               ['Watermark on user content', 'No — chrome only', 'No'],
-              ['Custom domain', 'v1.1 paid', 'Business tier'],
+              ['Custom domain', 'Coming soon', 'Business tier'],
               ['Open source', 'AGPL-3.0', 'AGPL-3.0'],
-              ['Pricing (entry paid tier)', '$15/mo', '$29/mo'],
+              ['Pricing (entry paid tier)', '$15/mo', '€24/mo'],
             ].map(([feat, hr, pm]) => (
               <tr key={feat} className="text-sm">
                 <td className="py-3 pr-4 text-ink-soft">{feat}</td>
@@ -96,9 +96,7 @@ export default function ComparePapermarkPage() {
         <div className="mt-12 rounded-lg border border-line bg-paper-2 p-6">
           <h2 className="text-base font-medium">When to use HTMLRadar</h2>
           <ul className="mt-3 space-y-1.5 text-sm text-ink-soft">
-            <li>
-              · You write decks as HTML (AI-assisted, hand-coded, exported from Pitch/Tome/etc.)
-            </li>
+            <li>· You write decks as HTML (Claude artifacts, ChatGPT, reveal.js, hand-coded)</li>
             <li>· You want section-level reading data, not just page-views</li>
             <li>· You care that the document stays clean (no watermark on your content)</li>
           </ul>
@@ -128,6 +126,14 @@ export default function ComparePapermarkPage() {
 
         <p className="mt-8 text-sm text-ink-soft">
           Related:{' '}
+          <Link href="/compare/docsend" className="text-signal-dark hover:underline">
+            HTMLRadar vs DocSend
+          </Link>
+          ,{' '}
+          <Link href="/compare/docsend-vs-papermark" className="text-signal-dark hover:underline">
+            DocSend vs Papermark compared
+          </Link>
+          ,{' '}
           <Link href="/self-hosted" className="text-signal-dark hover:underline">
             self-hosted document tracking
           </Link>{' '}

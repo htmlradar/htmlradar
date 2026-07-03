@@ -50,12 +50,12 @@ export default function WhyPage() {
 
             <Reveal delay={0.18}>
               <p>
-                Founders started writing investor decks as one-page HTML files exported from Pitch,
-                or as styled documents typed into Claude and dropped into a WhatsApp thread.
-                Designers replaced static mocks with interactive prototypes. Researchers published
-                reports that rendered on phones, scaled to a screenshot, and adapted to whichever
-                browser opened them. Engineers wrote planning documents with embedded diffs and
-                call-graphs no markdown table could carry.
+                Founders started writing investor decks as one-page HTML files — styled documents
+                typed into Claude or ChatGPT and dropped into a WhatsApp thread. Designers replaced
+                static mocks with interactive prototypes. Researchers published reports that
+                rendered on phones, scaled to a screenshot, and adapted to whichever browser opened
+                them. Engineers wrote planning documents with embedded diffs and call-graphs no
+                markdown table could carry.
               </p>
             </Reveal>
 
@@ -126,6 +126,15 @@ export default function WhyPage() {
               </Link>
               <Link href="/blog" className="link-slide hover:text-signal-dark">
                 Blog
+              </Link>
+              <Link href="/compare/docsend" className="link-slide hover:text-signal-dark">
+                vs DocSend
+              </Link>
+              <Link
+                href="/use-case/pitch-deck-tracking"
+                className="link-slide hover:text-signal-dark"
+              >
+                Pitch deck tracking
               </Link>
               <a
                 href="https://github.com/htmlradar/htmlradar"

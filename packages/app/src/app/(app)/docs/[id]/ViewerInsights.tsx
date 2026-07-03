@@ -130,8 +130,8 @@ function buildGroups(
   // Phantom-session filter. Drop sessions where bounced=true AND
   // active_time_seconds=0 AND max_scroll_depth=0 — these are "tracker
   // created a row but recipient never engaged" ghosts that previously
-  // inflated visit counts (Viewer1's "2 visits" with one real read and
-  // one phantom bounce). The rail viewCount on /docs/[id] and the
+  // inflated visit counts (a recipient showing "2 visits" with one real
+  // read and one phantom bounce). The rail viewCount on /docs/[id] and the
   // /dashboard/[slug] sessionList already apply the same filter — this
   // is the third hop, the ViewerInsights table, which was missed.
   const sessions = sessionsRaw.filter(

@@ -4,8 +4,8 @@
 --
 -- Migration 012 added `viewers.is_internal` (auto-flagged for owner-self
 -- views and `@htmlradar.com` staff). But the notification trigger still
--- fired for those sessions, so abhinandan@... and verify+post-declutter@
--- previews kept pinging owners' inboxes — the exact noise we built
+-- fired for those sessions, so owner-preview and staff-QA opens kept
+-- pinging owners' inboxes — the exact noise we built
 -- is_internal to suppress. This patch returns early when the viewer is
 -- internal so the email never sends.
 --

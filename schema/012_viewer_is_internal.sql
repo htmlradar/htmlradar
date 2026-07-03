@@ -13,8 +13,8 @@
 --
 -- Backfill runs once: existing viewers matching the same auto-flag
 -- rules are marked internal so the dashboard cleans up retroactively
--- (Abhinandan's previewing-his-own-deck rows, verify+post-declutter
--- testing rows, etc.).
+-- (the owner's own preview-of-their-deck rows, staff QA testing rows,
+-- etc.).
 --
 -- Apply: paste into Supabase SQL editor, run once. Idempotent.
 -- ------------------------------------------------------------

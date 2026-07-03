@@ -134,7 +134,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
         <ul className="mt-7 space-y-3 text-[14.5px] text-ink-soft">
           {[
             'Unlimited tracked links',
-            'No “Shared with HTMLRadar” footer on recipient views',
+            'No “Powered by HTMLRadar” footer on recipient views',
             'Priority support',
             'Coming soon: custom domain (share.yourdomain.com)',
             'Coming soon: dynamic per-viewer watermark',

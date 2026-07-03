@@ -26,7 +26,7 @@ const POSTS: Post[] = [
     slug: 'how-we-built-htmlradar',
     title: 'How I built HTMLRadar in three packages',
     description:
-      'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, a 14 KB browser tracker, six SQL files. What each part owns and the calls behind them.',
+      'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, an 8 KB (gzipped) browser tracker, six SQL files. What each part owns and the calls behind them.',
     date: '2026-05-14',
     readingTime: '5 min',
   },

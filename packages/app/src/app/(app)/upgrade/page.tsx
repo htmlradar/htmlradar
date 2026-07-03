@@ -14,7 +14,9 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
   const quota = await readQuota(serverClient(), user.id);
   const isQuotaTrigger = reason === 'quota' || reason === 'share_quota' || quota.atCap;
 
-  void captureServerEvent({
+  // Awaited — un-awaited fetches get cancelled on the edge runtime and
+  // this event was being dropped ~6 times out of 7 (see auth/callback).
+  await captureServerEvent({
     event: 'upgrade.viewed',
     distinctId: user.id,
     userId: user.id,

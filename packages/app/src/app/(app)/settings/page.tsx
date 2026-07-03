@@ -193,12 +193,13 @@ async function signOut() {
   'use server';
   const supabase = serverClient();
   // Capture before signOut so we still have the user context.
-  // Fire-and-forget: don't let analytics latency block the redirect.
+  // Awaited — captureServerEvent never throws, and un-awaited fetches
+  // get cancelled on the edge runtime (see auth/callback).
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    void captureServerEvent({
+    await captureServerEvent({
       event: 'user.signed_out',
       distinctId: user.id,
       userId: user.id,

@@ -55,38 +55,49 @@ export async function GET(req: NextRequest) {
   // also the user's first sign-in, so capture signed_up too. Read the
   // anon fingerprint cookie (set client-side in events-client) so we can
   // alias pre-signup browsing to the user post-hoc.
-  // Fire-and-forget: never let analytics latency block the auth redirect.
+  // Awaited (not void) — this route runs on the edge, where an un-awaited
+  // fetch is cancelled the moment the redirect returns. `void` here
+  // silently dropped every signed_in/signed_up/$identify event since
+  // launch (zero in app_events as of 2026-07-03). captureServerEvent
+  // never throws, so awaiting costs one round-trip and cannot block auth.
   const user = data.user;
   if (user) {
     const fingerprint = req.cookies.get('hr:fp')?.value ?? null;
     const createdMs = new Date(user.created_at).getTime();
     const isNew = Date.now() - createdMs < 60_000;
     const provider = user.app_metadata?.['provider'] ?? null;
-    void captureServerEvent({
-      event: 'user.signed_in',
-      distinctId: user.id,
-      userId: user.id,
-      properties: { provider, fingerprint, email: user.email ?? null },
-    });
-    if (isNew) {
-      void captureServerEvent({
-        event: 'user.signed_up',
+    const captures = [
+      captureServerEvent({
+        event: 'user.signed_in',
         distinctId: user.id,
         userId: user.id,
         properties: { provider, fingerprint, email: user.email ?? null },
-      });
+      }),
+    ];
+    if (isNew) {
+      captures.push(
+        captureServerEvent({
+          event: 'user.signed_up',
+          distinctId: user.id,
+          userId: user.id,
+          properties: { provider, fingerprint, email: user.email ?? null },
+        }),
+      );
       // Alias event — same shape as PostHog's $identify. Lets a
       // dashboard query union events with distinct_id=user.id and
       // distinct_id=fingerprint as "same person".
       if (fingerprint) {
-        void captureServerEvent({
-          event: '$identify',
-          distinctId: user.id,
-          userId: user.id,
-          properties: { alias_fingerprint: fingerprint },
-        });
+        captures.push(
+          captureServerEvent({
+            event: '$identify',
+            distinctId: user.id,
+            userId: user.id,
+            properties: { alias_fingerprint: fingerprint },
+          }),
+        );
       }
     }
+    await Promise.all(captures);
   }
 
   return NextResponse.redirect(new URL(next, req.url));

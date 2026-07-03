@@ -311,8 +311,8 @@ const USE_CASES: Array<{
   },
   {
     n: '02',
-    title: 'B2B Proposals & Outreach Kits',
-    body: 'Open one follow-up with the exact section the buyer re-read — not "just checking in".',
+    title: 'Client Proposals & Deliverables',
+    body: 'Agencies and consultants send proposals, monthly reports, and concepts as tracked links. Follow up with the exact section the client re-read — not "just checking in".',
     mock: <ProposalMock />,
     caseKey: 'b2b-proposal',
   },
@@ -845,6 +845,23 @@ export default function LandingV2() {
               </AuthLink>
             ))}
           </div>
+          {/* In-body links to the deep-dive pages — the cards themselves
+              are sign-in CTAs, so the SEO pages get their homepage links
+              here instead of nested inside another anchor. */}
+          <p className="v2-reveal d3 mt-8 font-mono text-[12px] tracking-wide text-graphite">
+            Deep dives:{' '}
+            <Link href="/use-case/pitch-deck-tracking" className="text-signal-dark hover:underline">
+              pitch deck tracking
+            </Link>
+            {' · '}
+            <Link href="/use-case/proposal-tracking" className="text-signal-dark hover:underline">
+              client proposal tracking
+            </Link>
+            {' · '}
+            <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">
+              track any HTML deck
+            </Link>
+          </p>
         </div>
       </section>
 

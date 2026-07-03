@@ -34,4 +34,8 @@ regexes = [
   # Fake webhook-signature fixture in payments.test.ts — NOT a real secret,
   # used only to exercise the standardwebhooks HMAC round-trip in tests.
   '''whsec_abc123xyz789defghijklmnop''',
+  # PostHog PROJECT keys (phc_...) are public write-only tokens by design —
+  # PostHog ships them in every customer's client-side HTML. Personal keys
+  # (phx_...) are secret and deliberately NOT allowlisted.
+  '''phc_[A-Za-z0-9]{20,}''',
 ]

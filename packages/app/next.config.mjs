@@ -44,6 +44,10 @@ const nextConfig = {
     return [
       { source: '/v2', destination: '/', permanent: true },
       { source: '/dashboard', destination: '/docs', permanent: false },
+      // /compare/pitch was removed 2026-07-03: its core instruction
+      // ("export Pitch to HTML") described a feature Pitch doesn't have.
+      // Nearest honest page takes over the URL.
+      { source: '/compare/pitch', destination: '/use-case/track-html-deck', permanent: true },
     ];
   },
 };

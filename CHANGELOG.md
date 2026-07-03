@@ -14,7 +14,9 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 
 ### Changed
 
-- **www.htmlradar.com now 301s to the apex** (`packages/app/public/_redirects`) and every marketing page carries a canonical URL — Search Console was indexing both hosts as separate pages and splitting ranking signal.
+- **www.htmlradar.com now 301s to the apex** (via middleware) and every marketing page carries a canonical URL — Search Console was indexing both hosts as separate pages and splitting ranking signal.
+- **New marketing pages**: `/for/claude-artifacts`, `/for/reveal-js` (the own-HTML wedge nobody else can rank for), `/use-case/proposal-tracking` (the first paying customer is an agency sending proposals), and `/compare/docsend-vs-papermark` (third-party comparison). All linked from the homepage footer and sitemapped.
+- **Removed `/compare/pitch`** (301 → `/use-case/track-html-deck`): its core instruction — "export Pitch to HTML" — described a feature Pitch.com doesn't have (they export PDF/PPTX only). The same false claim family ("Gamma exports are HTML") was scrubbed from `/use-case/track-html-deck`; Gamma exports PDF/PNG/PPTX only.
 
 - **Free tier is now 2 tracked links (lifetime), not 10 documents.** Documents are uncapped; the tracked link (share) is the metered unit. Revoked and expired links still count, so slots can't be rotated by deleting and re-creating. Enforced server-side by `enforce_share_cap` (`schema/027_free_tier_share_cap.sql`, replacing the old `enforce_doc_cap`); Free users at the cap are routed to `/upgrade?reason=share_quota`. Pro ($15/mo) is unlimited tracked links.
 

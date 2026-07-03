@@ -1210,11 +1210,13 @@ export default function LandingV2() {
           <Link href="/why">Why</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/use-case/pitch-deck-tracking">Pitch deck tracking</Link>
+          <Link href="/use-case/proposal-tracking">Proposal tracking</Link>
           <Link href="/use-case/track-html-deck">Track HTML decks</Link>
+          <Link href="/for/claude-artifacts">For Claude artifacts</Link>
+          <Link href="/for/reveal-js">For reveal.js</Link>
           <Link href="/self-hosted">Self-hosted</Link>
           <Link href="/compare/docsend">vs DocSend</Link>
           <Link href="/compare/papermark">vs Papermark</Link>
-          <Link href="/compare/pitch">For Pitch.com</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/privacy">Privacy</Link>
           <a

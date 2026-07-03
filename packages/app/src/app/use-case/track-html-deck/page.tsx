@@ -1,6 +1,8 @@
 // /use-case/track-html-deck — "own-HTML" engine page. For people who
-// already have an HTML deck (Claude artifact, Gamma, reveal.js,
-// hand-rolled) and want read analytics without a PDF export.
+// already have an HTML deck (Claude artifact, reveal.js, hand-rolled)
+// and want read analytics without a PDF export. (Gamma/Tome/Pitch were
+// removed 2026-07-03 — none of them exports HTML; the old claim here
+// was wrong.)
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
@@ -14,7 +16,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Track an HTML Deck — Read Analytics for Web Decks | HTMLRadar',
   description:
-    'Built a deck in Claude, Gamma, or reveal.js? Share it as a tracked link and see who read each slide. No PDF export. Open-source.',
+    'Built a deck in Claude, reveal.js, or plain HTML? Share it as a tracked link and see who read each slide. No PDF export. Open-source.',
   path: '/use-case/track-html-deck',
 });
 
@@ -35,7 +37,7 @@ export default function TrackHtmlDeckPage() {
             Track the HTML deck you already built.
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            Your deck is already HTML — a Claude artifact, a Gamma export, a reveal.js build, a
+            Your deck is already HTML — a Claude artifact, a reveal.js build, a ChatGPT one-pager, a
             hand-rolled page. The old workflow says: flatten it to PDF so a tracker can handle it.
             HTMLRadar says: keep the HTML, send a tracked link, see who read each section.
           </p>
@@ -69,17 +71,17 @@ export default function TrackHtmlDeckPage() {
               Does it work with AI-generated decks?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              That&apos;s the point. Decks from Claude, Gamma, Tome, and Pitch.com exports are HTML
-              already; reveal.js and hand-coded decks always were. If it opens in a browser,
-              HTMLRadar can serve it through a tracked link — single-file HTML with embedded assets
-              works out of the box.
-            </p>
-            <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">
-              Making decks in Pitch.com? There&apos;s a{' '}
-              <Link href="/compare/pitch" className="text-signal-dark hover:underline">
-                three-step flow for tracking Pitch decks
+              That&apos;s the point. A{' '}
+              <Link href="/for/claude-artifacts" className="text-signal-dark hover:underline">
+                Claude artifact
               </Link>{' '}
-              without PDFifying them.
+              is a single HTML file; a{' '}
+              <Link href="/for/reveal-js" className="text-signal-dark hover:underline">
+                reveal.js deck
+              </Link>{' '}
+              always was HTML; so is anything ChatGPT, v0, or your own editor produced. If it opens
+              in a browser, HTMLRadar can serve it through a tracked link — single-file HTML with
+              embedded assets works out of the box.
             </p>
           </section>
 

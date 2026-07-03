@@ -13,6 +13,7 @@ export const metadata = {
   title: 'How I built HTMLRadar in three packages',
   description:
     'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, a 14 KB browser tracker, six SQL files. What each part owns, why I kept them separate, and the calls I made.',
+  alternates: { canonical: 'https://htmlradar.com/blog/how-we-built-htmlradar' },
 };
 
 export default function Post() {

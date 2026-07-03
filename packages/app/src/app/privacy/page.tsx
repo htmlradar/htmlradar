@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: 'Privacy',
   description:
     'How HTMLRadar handles the data it collects. The policy that applies to the hosted version at htmlradar.com.',
+  alternates: { canonical: 'https://htmlradar.com/privacy' },
 };
 
 export default function PrivacyPage() {

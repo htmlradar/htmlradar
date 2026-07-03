@@ -1,0 +1,6 @@
+# www → apex, permanent. Both hosts are attached to the Pages project, so
+# without this Google indexes www.htmlradar.com and htmlradar.com as two
+# separate sites and splits ranking signal between them (visible in Search
+# Console). Host-based rules only apply on the matching domain — preview
+# deployments (*.pages.dev) are unaffected.
+https://www.htmlradar.com/* https://htmlradar.com/:splat 301

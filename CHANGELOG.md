@@ -6,7 +6,15 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 
 ## Unreleased
 
+### Added
+
+- **Paid-conversion analytics events.** The Polar webhook now emits `payment.received`, `subscription.activated`, `subscription.canceled`, and `subscription.revoked` to `app_events` — the tier flip is no longer invisible to analytics. Signup/signin events also carry the user's email so people are recognizable in dashboards.
+- **app_events → PostHog replay** in the monitor worker (the "PostHog-shaped, replay later" plan from `schema/006`). Server-side only — no browser tracker, the `/privacy` promise is unchanged. Cursor table in `schema/029_analytics_replay_cursor.sql`; QA-bot traffic is filtered out.
+- **UTM tags on shared-doc surfaces** — the "Powered by HTMLRadar" badge, gate page, and error-page links now carry `utm_source`, so recipient→visitor conversion is attributable.
+
 ### Changed
+
+- **www.htmlradar.com now 301s to the apex** (`packages/app/public/_redirects`) and every marketing page carries a canonical URL — Search Console was indexing both hosts as separate pages and splitting ranking signal.
 
 - **Free tier is now 2 tracked links (lifetime), not 10 documents.** Documents are uncapped; the tracked link (share) is the metered unit. Revoked and expired links still count, so slots can't be rotated by deleting and re-creating. Enforced server-side by `enforce_share_cap` (`schema/027_free_tier_share_cap.sql`, replacing the old `enforce_doc_cap`); Free users at the cap are routed to `/upgrade?reason=share_quota`. Pro ($15/mo) is unlimited tracked links.
 

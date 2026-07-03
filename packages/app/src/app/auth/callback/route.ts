@@ -66,14 +66,14 @@ export async function GET(req: NextRequest) {
       event: 'user.signed_in',
       distinctId: user.id,
       userId: user.id,
-      properties: { provider, fingerprint },
+      properties: { provider, fingerprint, email: user.email ?? null },
     });
     if (isNew) {
       void captureServerEvent({
         event: 'user.signed_up',
         distinctId: user.id,
         userId: user.id,
-        properties: { provider, fingerprint },
+        properties: { provider, fingerprint, email: user.email ?? null },
       });
       // Alias event — same shape as PostHog's $identify. Lets a
       // dashboard query union events with distinct_id=user.id and

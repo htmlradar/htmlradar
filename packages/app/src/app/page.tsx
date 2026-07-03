@@ -1215,6 +1215,7 @@ export default function LandingV2() {
           <Link href="/compare/docsend">vs DocSend</Link>
           <Link href="/compare/papermark">vs Papermark</Link>
           <Link href="/compare/pitch">For Pitch.com</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/privacy">Privacy</Link>
           <a
             href="https://github.com/htmlradar/htmlradar"

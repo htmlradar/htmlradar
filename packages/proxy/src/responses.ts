@@ -262,7 +262,7 @@ ${FONTS_LINK}
 </head>
 <body>
 <div class="brand-mount">
-  <a class="brand" href="https://htmlradar.com" rel="noopener">${RADAR_MARK}<span>HTMLRadar</span></a>
+  <a class="brand" href="https://htmlradar.com/?utm_source=share-gate&utm_medium=shared-doc" rel="noopener">${RADAR_MARK}<span>HTMLRadar</span></a>
 </div>
 <div class="frame">
   <main class="card">
@@ -305,7 +305,7 @@ const ERROR_FOOTER = `
     Need a fresh link? Reply to the person who sent this to you — they can
     update or re-send in a few seconds.
   </p>
-  <a href="https://htmlradar.com" style="display:inline-block;color:#7A1F2E;text-decoration:none;border-bottom:1px dotted currentColor;font-size:13.5px;padding:4px 0;">What is HTMLRadar? &rarr;</a>
+  <a href="https://htmlradar.com/?utm_source=share-error-page&utm_medium=shared-doc" style="display:inline-block;color:#7A1F2E;text-decoration:none;border-bottom:1px dotted currentColor;font-size:13.5px;padding:4px 0;">What is HTMLRadar? &rarr;</a>
 </div>
 `.trim();
 

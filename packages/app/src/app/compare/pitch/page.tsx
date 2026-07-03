@@ -12,6 +12,7 @@ export const metadata = {
   title: 'HTMLRadar for Pitch.com decks',
   description:
     'How to track a Pitch deck without exporting to PDF: export Pitch to HTML, upload to HTMLRadar, share a tracked link. Real-time section dwell, not just open notifications.',
+  alternates: { canonical: 'https://htmlradar.com/compare/pitch' },
 };
 
 export default function PitchPage() {

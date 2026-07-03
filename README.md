@@ -42,11 +42,11 @@ Four packages, two storage backends.
 ```
 htmlradar/
 ├── packages/
-│   ├── tracker/      # 14 KB browser IIFE — embedded in the recipient's view
+│   ├── tracker/      # ~8 KB gzipped browser IIFE — embedded in the recipient's view
 │   ├── proxy/        # Cloudflare Worker at /r/{slug} — gates + HTML fetch + tracker inject + attachment serving
 │   ├── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
 │   └── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
-├── schema/           # 19 idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
+├── schema/           # 29 idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
 ├── examples/         # Demo HTML for trying it locally
 └── docs/             # Architecture, privacy, quickstart, self-hosting
 ```

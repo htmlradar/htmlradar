@@ -17,7 +17,7 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
    - **anon public key** → `SUPABASE_ANON_KEY`
    - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret — never put in client code)
 3. From `Project Settings → Database`, note your DB password.
-4. In `SQL Editor`, copy/paste each file under `schema/` in numeric order — 001 through 019 at v1.2. Each is idempotent; re-running is safe.
+4. In `SQL Editor`, copy/paste each file under `schema/` in numeric order — 001 through 029. Each is idempotent; re-running is safe.
 5. Resend secrets via Supabase Vault (not `ALTER DATABASE SET` — that needs superuser, which Supabase free doesn't grant). In `SQL Editor`:
    ```sql
    select vault.create_secret('re_your_resend_api_key', 'resend_api_key');

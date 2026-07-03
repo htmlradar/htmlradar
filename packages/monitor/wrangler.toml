@@ -16,6 +16,14 @@ crons = ["*/5 * * * *"]
 SUPABASE_URL = "https://ewennjnxuqjzsgawbzur.supabase.co"
 RESEND_FROM = "HTMLRadar <hello@htmlradar.com>"
 ALERT_TO = "hello@htmlradar.com"
+# PostHog ingest for the app_events replay (see replayAppEvents in
+# src/index.ts). The project key is a public write-only token — same
+# class as the committed Supabase anon key.
+POSTHOG_HOST = "https://us.i.posthog.com"
+POSTHOG_PROJECT_KEY = "phc_REDACTED_EXAMPLE"
+# QA bot smoke-test account (uuid, not a secret) — its rows are skipped
+# during replay so synthetic traffic never reaches the dashboards.
+QA_BOT_USER_ID = "98cefd41-1f0f-4055-a4a0-dff236d7df3a"
 
 [observability]
 enabled = true

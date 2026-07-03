@@ -37,6 +37,10 @@ export type AppEvent =
   | 'free_tier.share_cap_hit'
   | 'share.first_view'
   | 'viewer.hidden_toggled'
+  | 'payment.received'
+  | 'subscription.activated'
+  | 'subscription.canceled'
+  | 'subscription.revoked'
   | '$identify';
 
 interface CaptureOpts {

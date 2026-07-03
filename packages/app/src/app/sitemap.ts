@@ -21,8 +21,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/`, lastModified, changeFrequency: 'weekly', priority: 1 },
     { url: `${baseUrl}/why`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/pricing`, lastModified, changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${baseUrl}/feedback`, lastModified, changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${baseUrl}/sign-in`, lastModified, changeFrequency: 'yearly', priority: 0.3 },
+    // /sign-in and /feedback are deliberately NOT listed: both sat in
+    // Search Console's "Discovered – currently not indexed" bucket, and
+    // on a young domain the crawl budget they consume belongs to the
+    // compare//use-case pages. They stay crawlable (no noindex) — they
+    // just aren't advertised as content.
     { url: `${baseUrl}/privacy`, lastModified, changeFrequency: 'yearly', priority: 0.4 },
     {
       url: `${baseUrl}/compare/papermark`,

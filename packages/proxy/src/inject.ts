@@ -381,7 +381,7 @@ function extOf(filename: string): string {
 // injectTracker(opts.tier) and the pricing page's "No footer" bullet.
 function chromeFooter(): string {
   return [
-    `<a href="https://htmlradar.com" target="_blank" rel="noopener" `,
+    `<a href="https://htmlradar.com/?utm_source=powered-by-badge&utm_medium=shared-doc" target="_blank" rel="noopener" `,
     `style="position:fixed;bottom:10px;right:12px;z-index:2147483646;`,
     `display:inline-flex;align-items:center;gap:6px;`,
     `background:rgba(251,241,232,0.92);color:#3A2818;text-decoration:none;`,

@@ -20,6 +20,10 @@ export function pageMeta(opts: { title: string; description: string; path: strin
   return {
     title: { absolute: title },
     description,
+    // Canonical pins every page to the apex host — www.htmlradar.com
+    // serves the same content and Search Console indexes both, splitting
+    // ranking signal between two hosts without this.
+    alternates: { canonical: `${SITE_URL}${path}` },
     openGraph: {
       type: 'website',
       locale: 'en_US',

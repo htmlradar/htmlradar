@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Webhook, WebhookVerificationError } from 'standardwebhooks';
 import { logServerError } from '@/lib/error-log';
 import { computeTierUpdate } from '@/lib/payments';
+import { captureServerEvent, type AppEvent } from '@/lib/events';
 
 export const runtime = 'edge';
 
@@ -131,7 +132,7 @@ async function resolveProfileId(
 async function applySubscription(
   sb: ReturnType<typeof serviceClient>,
   sub: PolarSubscription,
-): Promise<void> {
+): Promise<string> {
   const resolution = await resolveProfileId(sb, sub);
   if (resolution.kind !== 'matched') {
     // Resolution failure messages are logged into webhook_events_log.error
@@ -149,16 +150,55 @@ async function applySubscription(
   const update = computeTierUpdate(sub, existing ?? null);
   const { error } = await sb.from('profiles').update(update).eq('id', resolution.profileId);
   if (error) throw new Error(`profile_update_failed:${error.code ?? 'unknown'}`);
+  return resolution.profileId;
 }
 
-async function handleOrder(sb: ReturnType<typeof serviceClient>, order: PolarOrder): Promise<void> {
+async function handleOrder(
+  sb: ReturnType<typeof serviceClient>,
+  order: PolarOrder,
+): Promise<string | null> {
   // Orders for one-time products won't carry a subscription_id — skip them
   // since HTMLRadar only sells the recurring Pro plan. For renewals and
   // for $0 (100% discount) checkouts, the order carries subscription_id;
   // fetch the full subscription to get accurate current_period_end.
-  if (!order.subscription_id) return;
+  if (!order.subscription_id) return null;
   const sub = await polarGet<PolarSubscription>(`/v1/subscriptions/${order.subscription_id}`);
-  await applySubscription(sb, sub);
+  return applySubscription(sb, sub);
+}
+
+// The conversion moment must be visible in app_events, not just as a
+// silent profiles.tier flip — it's the end of the land→signup→pay funnel.
+// Only high-signal Polar event types map to an analytics event; the noisy
+// subscription.updated / .created intermediates stay untracked.
+const ANALYTICS_EVENT: Record<string, AppEvent> = {
+  'order.paid': 'payment.received',
+  'subscription.active': 'subscription.activated',
+  'subscription.canceled': 'subscription.canceled',
+  'subscription.revoked': 'subscription.revoked',
+};
+
+// Awaited (not fire-and-forget) — on the edge runtime an un-awaited
+// fetch gets cancelled when the response returns, same reason the
+// Polar back-link PATCH above is awaited. captureServerEvent never throws.
+async function captureConversionEvent(
+  polarType: string,
+  profileId: string,
+  data: unknown,
+): Promise<void> {
+  const event = ANALYTICS_EVENT[polarType];
+  if (!event) return;
+  const d = data as { amount?: number; currency?: string; recurring_interval?: string };
+  await captureServerEvent({
+    event,
+    distinctId: profileId,
+    userId: profileId,
+    properties: {
+      polar_type: polarType,
+      amount: d.amount ?? null,
+      currency: d.currency ?? null,
+      interval: d.recurring_interval ?? null,
+    },
+  });
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -213,17 +253,21 @@ export async function POST(req: Request): Promise<Response> {
       case 'subscription.uncanceled':
       case 'subscription.past_due':
       case 'subscription.canceled':
-      case 'subscription.revoked':
-        await applySubscription(sb, event.data as PolarSubscription);
+      case 'subscription.revoked': {
+        const profileId = await applySubscription(sb, event.data as PolarSubscription);
+        await captureConversionEvent(event.type, profileId, event.data);
         break;
+      }
       case 'order.created':
-      case 'order.paid':
+      case 'order.paid': {
         // Renewals: Polar charges the card → fires order.* with
         // subscription_id — fetch sub to get fresh current_period_end
         // and extend pro_until. Also covers $0 (Test100 100% discount)
         // checkouts where subscription.created may not fire.
-        await handleOrder(sb, event.data as PolarOrder);
+        const profileId = await handleOrder(sb, event.data as PolarOrder);
+        if (profileId) await captureConversionEvent(event.type, profileId, event.data);
         break;
+      }
       default:
         break;
     }

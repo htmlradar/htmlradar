@@ -10,6 +10,7 @@ export const runtime = 'edge';
 export const metadata = {
   title: 'Blog',
   description: 'Engineering, design, and product writing from the HTMLRadar team.',
+  alternates: { canonical: 'https://htmlradar.com/blog' },
 };
 
 interface Post {

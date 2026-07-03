@@ -15,6 +15,7 @@ export const metadata = {
   title: 'Feedback',
   description:
     'Tell us what we missed, what broke, or what you wish HTMLRadar did. Goes straight to the founder.',
+  alternates: { canonical: 'https://htmlradar.com/feedback' },
 };
 
 export default async function FeedbackPage({

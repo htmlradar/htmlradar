@@ -115,6 +115,15 @@ async function cancelSubscriptionAction(
     } catch {
       // Feedback insert failure shouldn't block the cancellation.
     }
+    // The reason must reach the event stream too — the Polar webhook's
+    // subscription.canceled carries no reason, so without this a churn
+    // breakdown can't be built from analytics alone.
+    await captureServerEvent({
+      event: 'subscription.cancel_requested',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { reason, has_comment: !!comment.trim(), subscription_id: sub.id },
+    });
     // Skip revalidatePath — it has known issues on edge runtime via
     // next-on-pages and can crash the post-action re-render. The client
     // calls router.refresh() instead.
@@ -149,6 +158,12 @@ async function resumeSubscriptionAction(): Promise<{ ok: boolean; error?: string
     if (sub.canceling) {
       await patchSubscription(sub.id, { cancel_at_period_end: false });
     }
+    await captureServerEvent({
+      event: 'subscription.resume_requested',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { subscription_id: sub.id },
+    });
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';

@@ -24,7 +24,15 @@ export async function GET(req: NextRequest) {
   // so a transient failure doesn't strand the user away from where they were
   // headed (e.g. /upgrade?reason=quota). Only attach `next` when it's a real
   // destination, to avoid noisy `?next=/docs`.
-  const signInError = (errorCode: string) => {
+  const signInError = async (errorCode: string, providerError?: string | null) => {
+    // Awaited — edge runtime cancels un-awaited fetches on return.
+    // distinct_id falls back to the anon fingerprint so failed attempts
+    // still stitch to the person if they eventually sign up.
+    await captureServerEvent({
+      event: 'auth.callback_failed',
+      distinctId: req.cookies.get('hr:fp')?.value ?? 'anon',
+      properties: { code: errorCode, provider_error: providerError ?? null },
+    });
     const dest = new URL('/sign-in', req.url);
     dest.searchParams.set('error', errorCode);
     if (next !== '/docs') dest.searchParams.set('next', next);
@@ -39,7 +47,10 @@ export async function GET(req: NextRequest) {
     const providerError =
       url.searchParams.get('error_description') || url.searchParams.get('error');
     if (providerError) {
-      return signInError(/expired|otp/i.test(providerError) ? 'expired' : 'callback');
+      return signInError(
+        /expired|otp/i.test(providerError) ? 'expired' : 'callback',
+        providerError,
+      );
     }
     return NextResponse.redirect(new URL(next, req.url));
   }
@@ -47,7 +58,7 @@ export async function GET(req: NextRequest) {
   const supabase = serverClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return signInError('callback');
+    return signInError('callback', error.message);
   }
 
   // Always fire signed_in. If the user row was created in the last 60s

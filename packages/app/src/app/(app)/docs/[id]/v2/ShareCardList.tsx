@@ -13,6 +13,7 @@
 // the live /docs/[id] route. Rollback = swap one import.
 
 import { useState, useTransition } from 'react';
+import { captureClientEvent } from '@/lib/events-client';
 import {
   ChevronDown,
   Clock,
@@ -316,6 +317,10 @@ function LinkSection({
   const url = `https://htmlradar.com/r/${share.slug}`;
 
   const onCopy = async () => {
+    // "Copied the link" is the closest signal we have to "actually sent
+    // it" — the other copy surface (CopySlugButton on the post-create
+    // redirect) only sees the first copy, this one sees every revisit.
+    void captureClientEvent('share.copied', { slug: share.slug, source: 'share_card' });
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

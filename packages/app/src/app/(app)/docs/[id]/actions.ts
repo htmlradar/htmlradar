@@ -136,6 +136,9 @@ export async function createShareAction(formData: FormData) {
         has_domain_allowlist: !!domains,
         has_email_allowlist: !!emails,
         has_expiry: !!expiresAt,
+        lock_deck: lockDeck,
+        // quota was read before the cap check above — zero extra queries.
+        is_first_share: quota.used === 0,
       },
     });
 
@@ -315,6 +318,7 @@ export async function editShareAction(formData: FormData) {
         has_domain_allowlist: !!domains,
         has_email_allowlist: !!emails,
         has_expiry: !!expiresAt,
+        lock_deck: lockDeck,
       },
     });
 

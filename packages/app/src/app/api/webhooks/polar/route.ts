@@ -174,6 +174,7 @@ const ANALYTICS_EVENT: Record<string, AppEvent> = {
   'order.paid': 'payment.received',
   'subscription.active': 'subscription.activated',
   'subscription.canceled': 'subscription.canceled',
+  'subscription.uncanceled': 'subscription.resumed',
   'subscription.revoked': 'subscription.revoked',
 };
 

@@ -197,6 +197,29 @@ export async function verifySharePassword(
   return (await res.json()) === true ? 'ok' : 'bad';
 }
 
+// Best-effort analytics insert into app_events, owner-scoped (same
+// convention as the share.first_view trigger: the event belongs to the
+// document owner's funnel, never to a recipient identity). Never throws —
+// a failed analytics write must never change what the recipient sees.
+// Hygiene rule for gate events: never put a rejected third party's full
+// email address in properties; domain-only.
+export async function logAppEvent(
+  env: Env,
+  ownerId: string,
+  event: string,
+  properties: Record<string, unknown>,
+): Promise<void> {
+  await call(env, new URL(`${env.SUPABASE_URL}/rest/v1/app_events`), {
+    method: 'POST',
+    body: JSON.stringify({
+      distinct_id: ownerId,
+      event,
+      properties,
+      user_id: ownerId,
+    }),
+  }).catch(() => undefined);
+}
+
 // Best-effort: tell the DB a recipient hit a DISABLED link (revoked or
 // expired) so it can email the owner. There is no session or tracker on a
 // disabled open — the recipient gets an error shell — so the proxy is the

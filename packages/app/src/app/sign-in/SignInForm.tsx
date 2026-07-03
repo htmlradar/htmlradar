@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { browserClient } from '@/lib/supabase-browser';
 import { HeroRadar } from '@/components/HeroRadar';
 import { isDisposableEmail } from '@/lib/disposable-emails';
+import { captureClientEvent } from '@/lib/events-client';
 
 // Map server-side error codes (from /auth/callback failure paths) to a
 // human-readable message. Without this the form silently shows nothing
@@ -49,6 +50,7 @@ export function SignInForm({
 
   async function signInWithGoogle() {
     setBusy(true);
+    void captureClientEvent('auth.google_clicked');
     const supabase = browserClient();
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -57,6 +59,9 @@ export function SignInForm({
       },
     });
     if (err) {
+      // The iOS-Safari "400 on first try" flake (see comment near the
+      // Google button) was unmeasurable before this event existed.
+      void captureClientEvent('auth.google_failed', { message: err.message });
       setError(err.message);
       setBusy(false);
     }
@@ -67,6 +72,9 @@ export function SignInForm({
     setBusy(true);
     setError(null);
     if (isDisposableEmail(email)) {
+      // No raw email in properties — the address was rejected, so it never
+      // becomes account data we have a relationship with.
+      void captureClientEvent('auth.magic_link_failed', { reason: 'disposable_email' });
       setError(
         "Disposable email addresses aren't accepted for signup. Use a real work or personal email.",
       );
@@ -80,8 +88,16 @@ export function SignInForm({
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
-    if (err) setError(err.message);
-    else setSent(true);
+    if (err) {
+      void captureClientEvent('auth.magic_link_failed', {
+        reason: 'otp_error',
+        message: err.message,
+      });
+      setError(err.message);
+    } else {
+      void captureClientEvent('auth.magic_link_requested');
+      setSent(true);
+    }
     setBusy(false);
   }
 

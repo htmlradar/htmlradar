@@ -62,66 +62,86 @@ export async function createDocument(formData: FormData) {
   const title = String(formData.get('title') ?? '').trim() || 'Untitled document';
   const docId = crypto.randomUUID();
 
-  if (sourceType === 'url') {
-    const sourceUrl = String(formData.get('source_url') ?? '').trim();
-    const urlError = validateSourceUrl(sourceUrl);
-    if (urlError) throw new Error(urlError);
-    const { error } = await supabase.from('documents').insert({
-      id: docId,
-      title,
-      owner_id: user.id,
-      source_type: 'url',
-      source_url: sourceUrl,
-    });
-    if (error) throw new Error(error.message);
+  // Failures are caught, captured as an event, and surfaced inline on /new —
+  // previously any throw here fell through to the generic error boundary
+  // with no analytics trail. Redirects stay at top level (redirect() throws
+  // internally and must not be swallowed by this catch — house pattern from
+  // docs/[id]/actions.ts).
+  let errorMessage: string | null = null;
+  try {
+    if (sourceType === 'url') {
+      const sourceUrl = String(formData.get('source_url') ?? '').trim();
+      const urlError = validateSourceUrl(sourceUrl);
+      if (urlError) throw new Error(urlError);
+      const { error } = await supabase.from('documents').insert({
+        id: docId,
+        title,
+        owner_id: user.id,
+        source_type: 'url',
+        source_url: sourceUrl,
+      });
+      if (error) throw new Error(error.message);
 
-    // Seed version history (schema 018) with v1. Awaited because the Edge
-    // runtime may terminate the worker after redirect; retried + logged on
-    // failure rather than silently dropped (see seedFirstVersion).
-    await seedFirstVersion(supabase, user.id, {
-      document_id: docId,
-      filename: null,
-      bytes: null,
-      source_type: 'url',
-      source_url: sourceUrl,
-      r2_key: null,
-    });
-  } else {
-    const file = formData.get('file') as File | null;
-    if (!file || file.size === 0) throw new Error('No file uploaded');
-    if (file.size > MAX_UPLOAD_BYTES) throw new Error('File exceeds 30 MB');
-    if (!isHtmlFile(file.name, file.type)) {
-      throw new Error('Only HTML files are supported. Rename your export to .html and retry.');
+      // Seed version history (schema 018) with v1. Awaited because the Edge
+      // runtime may terminate the worker after redirect; retried + logged on
+      // failure rather than silently dropped (see seedFirstVersion).
+      await seedFirstVersion(supabase, user.id, {
+        document_id: docId,
+        filename: null,
+        bytes: null,
+        source_type: 'url',
+        source_url: sourceUrl,
+        r2_key: null,
+      });
+    } else {
+      const file = formData.get('file') as File | null;
+      if (!file || file.size === 0) throw new Error('No file uploaded');
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error('File exceeds 30 MB');
+      if (!isHtmlFile(file.name, file.type)) {
+        throw new Error('Only HTML files are supported. Rename your export to .html and retry.');
+      }
+
+      const key = r2Key(user.id, docId, 1);
+      const { error: insertError } = await supabase.from('documents').insert({
+        id: docId,
+        title,
+        owner_id: user.id,
+        source_type: 'upload',
+        r2_key: key,
+      });
+      if (insertError) throw new Error(insertError.message);
+
+      try {
+        await uploadHtml(key, new Uint8Array(await file.arrayBuffer()));
+      } catch (err) {
+        // Roll back the row so the user can retry without their cap moving.
+        await supabase.from('documents').delete().eq('id', docId);
+        throw err;
+      }
+
+      // Seed version history (schema 018) with v1, capturing the original
+      // filename + size. Retried + logged on failure (see seedFirstVersion).
+      await seedFirstVersion(supabase, user.id, {
+        document_id: docId,
+        filename: file.name || null,
+        bytes: file.size,
+        source_type: 'upload',
+        source_url: null,
+        r2_key: key,
+      });
     }
+  } catch (e) {
+    errorMessage = e instanceof Error ? e.message : 'Upload failed.';
+  }
 
-    const key = r2Key(user.id, docId, 1);
-    const { error: insertError } = await supabase.from('documents').insert({
-      id: docId,
-      title,
-      owner_id: user.id,
-      source_type: 'upload',
-      r2_key: key,
+  if (errorMessage) {
+    await captureServerEvent({
+      event: 'document.upload_failed',
+      distinctId: user.id,
+      userId: user.id,
+      properties: { source_type: sourceType, reason: errorMessage },
     });
-    if (insertError) throw new Error(insertError.message);
-
-    try {
-      await uploadHtml(key, new Uint8Array(await file.arrayBuffer()));
-    } catch (err) {
-      // Roll back the row so the user can retry without their cap moving.
-      await supabase.from('documents').delete().eq('id', docId);
-      throw err;
-    }
-
-    // Seed version history (schema 018) with v1, capturing the original
-    // filename + size. Retried + logged on failure (see seedFirstVersion).
-    await seedFirstVersion(supabase, user.id, {
-      document_id: docId,
-      filename: file.name || null,
-      bytes: file.size,
-      source_type: 'upload',
-      source_url: null,
-      r2_key: key,
-    });
+    redirect(`/new?upload_error=${encodeURIComponent(errorMessage)}`);
   }
 
   await captureServerEvent({

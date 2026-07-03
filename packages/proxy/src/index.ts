@@ -18,6 +18,7 @@ import {
   getAttachment,
   listAttachmentsForDocument,
   logAttachmentDownload,
+  logAppEvent,
   getViewerIdByShareEmail,
   verifySharePassword,
   notifyDisabledAttempt,
@@ -160,7 +161,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 
   if (subroute === 'auth') {
     if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
-    return handlePasswordSubmit(request, slug, env);
+    return handlePasswordSubmit(request, share, env);
   }
   if (subroute === 'email') {
     if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
@@ -243,13 +244,22 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   });
 }
 
-async function handlePasswordSubmit(request: Request, slug: string, env: Env): Promise<Response> {
+async function handlePasswordSubmit(request: Request, share: Share, env: Env): Promise<Response> {
+  const slug = share.slug;
   const form = await request.formData();
   const password = form.get('password');
   if (typeof password !== 'string' || password.length === 0) {
     return passwordForm(slug, 'Password is required.');
   }
   const verdict = await verifySharePassword(env, slug, password);
+  // Awaited (not waitUntil — no ctx here): the gate outcome is the one
+  // signal that separates "recipient bounced at the door" from "never
+  // visited", and the insert is a single fast REST call.
+  await logAppEvent(env, share.owner_id, 'share.password_submitted', {
+    result: verdict,
+    share_id: share.id,
+    document_id: share.document_id,
+  });
   if (verdict === 'rate_limited') {
     return passwordForm(slug, 'Too many attempts. Wait a minute, then try again.');
   }
@@ -267,18 +277,31 @@ async function handlePasswordSubmit(request: Request, slug: string, env: Env): P
 
 async function handleEmailSubmit(request: Request, share: Share, env: Env): Promise<Response> {
   const form = await request.formData();
+  const gateEvent = (result: string, domain: string | null) =>
+    logAppEvent(env, share.owner_id, 'share.email_submitted', {
+      result,
+      // Domain only, never the full address — a rejected visitor's email
+      // is a third party's PII the owner has no relationship with yet.
+      email_domain: domain,
+      share_id: share.id,
+      document_id: share.document_id,
+    });
   const raw = form.get('email');
   if (typeof raw !== 'string') return emailGateForm(share.slug, 'Email is required.');
   const email = raw.trim().toLowerCase();
   if (!EMAIL_REGEX.test(email)) {
+    await gateEvent('invalid_format', null);
     return emailGateForm(share.slug, 'Please enter a valid email address.');
   }
+  const domain = email.split('@')[1] ?? null;
   // Allowlist check happens here (post-format-validation) because we
   // need the full address to test both lists. Union semantics: if any
   // list is set, the address must match SOMETHING in at least one.
   if (!isEmailAllowed(share, email)) {
+    await gateEvent('not_allowed', domain);
     return emailGateForm(share.slug, "This document isn't shared with your address.");
   }
+  await gateEvent('ok', domain);
   return new Response(null, {
     status: 303,
     headers: {
@@ -388,6 +411,14 @@ async function handleAttachmentDownload(
       user_agent: request.headers.get('User-Agent'),
       viewer_id: viewerId,
       session_id: null,
+      filename: attachment.filename,
+      size_bytes: attachment.size_bytes,
+    });
+    // Mirror into app_events so downloads reach the analytics funnel —
+    // attachment_downloads is the product table, this is the telemetry.
+    await logAppEvent(env, share.owner_id, 'attachment.downloaded', {
+      share_id: share.id,
+      document_id: share.document_id,
       filename: attachment.filename,
       size_bytes: attachment.size_bytes,
     });

@@ -15,8 +15,11 @@ import { NewDocumentForm } from './NewDocumentForm';
 
 export const runtime = 'edge';
 
-export default async function NewDocumentPage() {
+type SearchParams = Promise<{ upload_error?: string }>;
+
+export default async function NewDocumentPage({ searchParams }: { searchParams: SearchParams }) {
   await requireUser();
+  const uploadError = (await searchParams).upload_error;
 
   return (
     <div className="mx-auto max-w-2xl py-8">
@@ -28,6 +31,12 @@ export default async function NewDocumentPage() {
         HTMLRadar tracks reads, scroll, and per-section dwell on HTML. Drop the deck here. PDFs,
         Excel, and ZIPs ride along as downloadable files once the HTML is up.
       </p>
+
+      {uploadError ? (
+        <p className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark">
+          That upload didn&apos;t go through: {uploadError}
+        </p>
+      ) : null}
 
       <div className="mt-10">
         <NewDocumentForm action={createDocument} />

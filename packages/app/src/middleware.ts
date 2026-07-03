@@ -17,6 +17,17 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 const PROTECTED_PREFIXES = ['/docs', '/dashboard', '/new', '/settings', '/upgrade'];
 
 export async function middleware(req: NextRequest) {
+  // www → apex, permanent. Both hosts are attached to the Pages project,
+  // so Search Console indexed them as two competing sites and split
+  // ranking signal. A `_redirects` host rule can't do this — Pages
+  // ignores it when an advanced-mode _worker.js (next-on-pages) serves
+  // the project — so the middleware owns the redirect.
+  if (req.headers.get('host') === 'www.htmlradar.com') {
+    const url = new URL(req.url);
+    url.hostname = 'htmlradar.com';
+    return NextResponse.redirect(url, 301);
+  }
+
   const res = NextResponse.next();
   const pathname = req.nextUrl.pathname;
   const requiresAuth = PROTECTED_PREFIXES.some(

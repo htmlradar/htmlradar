@@ -45,19 +45,41 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
     ? downloadGuard(opts.email ?? opts.share.recipient_label ?? null)
     : '';
 
+  // Order matters: guard first, so its styles/script land at the top of
+  // append-order, before materials and footer.
+  type AppendSink = { append(content: string, opts: { html: true }): unknown };
+  const appendBodyChrome = (sink: AppendSink): void => {
+    if (guardSnippet) sink.append(guardSnippet, { html: true });
+    if (materialsSnippet) sink.append(materialsSnippet, { html: true });
+    if (footerSnippet) sink.append(footerSnippet, { html: true });
+  };
+
+  // Fragment / malformed uploads have no <head> (or <body>) element for the
+  // streaming rewriter to hook, so the head/body handlers below never fire
+  // and the tracker script would be silently dropped — the doc serves, but
+  // with no session, no analytics, and no first-open email. (This bit a
+  // real customer doc on 2026-07-08.) We record whether each anchor fired
+  // and, at document end, append anything that didn't land onto the end of
+  // the stream so the browser still parses and executes it.
+  let headSeen = false;
+  let bodySeen = false;
   const rewriter = new HTMLRewriter()
     .on('head', {
       element(el) {
+        headSeen = true;
         el.append(headSnippet, { html: true });
       },
     })
     .on('body', {
       element(el) {
-        // Order matters: guard first, so its styles/script land at the
-        // top of <body> append-order, before materials and footer.
-        if (guardSnippet) el.append(guardSnippet, { html: true });
-        if (materialsSnippet) el.append(materialsSnippet, { html: true });
-        if (footerSnippet) el.append(footerSnippet, { html: true });
+        bodySeen = true;
+        appendBodyChrome(el);
+      },
+    })
+    .onDocument({
+      end(end) {
+        if (!headSeen) end.append(headSnippet, { html: true });
+        if (!bodySeen) appendBodyChrome(end);
       },
     });
 

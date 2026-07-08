@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { geoFromRequest, injectTracker } from '../src/inject.js';
 import type { Share } from '../src/supabase.js';
 
@@ -10,28 +10,42 @@ import type { Share } from '../src/supabase.js';
 // packages/app/e2e/. So we mock HTMLRewriter just enough to let
 // injectTracker assemble its snippet strings, capture them, and pass
 // through the body unchanged.
+// Which structural anchors the source doc "has". Real HTMLRewriter only
+// fires an element handler when that tag physically exists in the stream —
+// a fragment upload with no <head>/<body> fires neither. Tests flip these
+// to exercise the document-end fallback; afterEach resets to a normal doc.
+let mockPresence = { head: true, body: true };
+
 class FakeHTMLRewriter {
   private handlers: Record<string, { element(el: FakeElement): void }> = {};
-  private appended: { head: string[]; body: string[] } = { head: [], body: [] };
+  private docHandler: { end(end: FakeDocEnd): void } | null = null;
+  private appended: { head: string[]; body: string[]; doc: string[] } = {
+    head: [],
+    body: [],
+    doc: [],
+  };
   on(selector: string, handler: { element(el: FakeElement): void }): this {
     this.handlers[selector] = handler;
     return this;
   }
+  onDocument(handler: { end(end: FakeDocEnd): void }): this {
+    this.docHandler = handler;
+    return this;
+  }
   transform(res: Response): Response {
     const stash = this.appended;
-    const headHandler = this.handlers['head'];
-    if (headHandler) headHandler.element(new FakeElement(stash.head));
-    const bodyHandler = this.handlers['body'];
-    if (bodyHandler) bodyHandler.element(new FakeElement(stash.body));
-    const original = '__BODY__'; // placeholder; we only care about appends
-    const synthetic = [
-      '<html><head>',
-      stash.head.join(''),
-      '</head><body>',
-      original,
-      stash.body.join(''),
-      '</body></html>',
-    ].join('');
+    if (mockPresence.head && this.handlers['head']) {
+      this.handlers['head'].element(new FakeElement(stash.head));
+    }
+    if (mockPresence.body && this.handlers['body']) {
+      this.handlers['body'].element(new FakeElement(stash.body));
+    }
+    // Document end ALWAYS fires, exactly like the real rewriter.
+    if (this.docHandler) this.docHandler.end(new FakeDocEnd(stash.doc));
+    const head = mockPresence.head ? `<head>${stash.head.join('')}</head>` : '';
+    const body = mockPresence.body ? `<body>__BODY__${stash.body.join('')}</body>` : '__BODY__';
+    // Doc-end appends land after the document, mirroring end.append().
+    const synthetic = `<html>${head}${body}</html>${stash.doc.join('')}`;
     return new Response(synthetic, { status: res.status, headers: res.headers });
   }
 }
@@ -41,8 +55,18 @@ class FakeElement {
     this.appended.push(html);
   }
 }
+class FakeDocEnd {
+  constructor(private appended: string[]) {}
+  append(html: string, _opts: { html: true }): void {
+    this.appended.push(html);
+  }
+}
 (globalThis as unknown as { HTMLRewriter: typeof FakeHTMLRewriter }).HTMLRewriter =
   FakeHTMLRewriter;
+
+afterEach(() => {
+  mockPresence = { head: true, body: true };
+});
 
 function reqWith(cf: Record<string, unknown> | undefined, ua: string): Request {
   const r = new Request('https://htmlradar.com/r/x', {
@@ -290,5 +314,52 @@ describe('attachments panel — corner pill UI', () => {
     });
     expect(html).not.toContain('<script>alert(1)</script>.pdf');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;.pdf');
+  });
+});
+
+// Regression guard for the 2026-07-08 incident: a customer uploaded an HTML
+// fragment (no <head>/<html>/<body> tags). HTMLRewriter's element handlers
+// never fired, so the tracker script was silently dropped — the doc served
+// fine but recorded zero sessions, zero analytics, and sent no first-open
+// email. The document-end fallback must inject the tracker regardless.
+describe('fragment / headless document fallback', () => {
+  const opts = {
+    tier: 'pro' as const,
+    trackerUrl: 'https://htmlradar.com/v1/tracker.js',
+    supabaseUrl: 'https://example.supabase.co',
+    supabaseAnonKey: 'anon-key',
+  };
+
+  it('still injects the tracker when the upload has no <head> or <body>', async () => {
+    mockPresence = { head: false, body: false };
+    const res = injectTracker(new Response('<div class="wrap">just a fragment</div>'), {
+      share: makeShare({ lock_deck: false }),
+      ...opts,
+    });
+    const html = await res.text();
+    expect(html).toContain('https://htmlradar.com/v1/tracker.js');
+    expect(html).toContain('HTMLRadarConfig');
+  });
+
+  it('injects the tracker exactly once when <head> exists (no double-inject)', async () => {
+    const res = injectTracker(
+      new Response('<!doctype html><html><head></head><body></body></html>'),
+      { share: makeShare({ lock_deck: false }), ...opts },
+    );
+    const html = await res.text();
+    const count = (html.match(/HTMLRadarConfig/g) ?? []).length;
+    expect(count).toBe(1);
+  });
+
+  it('still injects the free-tier footer + lock guard on a headless doc', async () => {
+    mockPresence = { head: false, body: false };
+    const res = injectTracker(new Response('<div>frag</div>'), {
+      share: makeShare({ lock_deck: true }),
+      ...opts,
+      tier: 'free',
+    });
+    const html = await res.text();
+    expect(html).toContain('Powered by');
+    expect(html).toContain('htmlradar-guard-style');
   });
 });

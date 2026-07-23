@@ -1,6 +1,5 @@
-// /use-case/proposal-tracking — agencies/consultants sending client
-// proposals. Added 2026-07-03: the first paying customer is a creative
-// agency, and agencies send proposals every week (founders raise once).
+// /use-case/proposal-tracking — agencies/consultants sending recurring
+// client proposals.
 // Queries: "proposal tracking", "know when client opens proposal",
 // "track proposal open".
 

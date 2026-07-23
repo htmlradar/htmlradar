@@ -18,17 +18,18 @@ We do **not** collect: keystrokes, mouse positions, third-party trackers, anythi
 
 Separately from share-tracking above, the hosted app records first-party usage data:
 
-- **Product events**: when you sign in, upload a document, create or revoke a share, hit the free-tier cap, view the upgrade page, click a CTA, or submit feedback. Stored in an `app_events` table (PostHog-compatible schema — if we wire PostHog later we replay this table over).
+- **Product events**: when you sign in, upload a document, create or revoke a share, hit the free-tier cap, view the upgrade page, click a CTA, or submit feedback. These events are stored in the `app_events` table. The monitor worker sends a server-side copy to PostHog for product analytics; the browser does not load a PostHog script. Your account email is added to your PostHog user profile after sign-in. Owner-scoped share events can include a first open, gate outcome, country, device, or email domain, but not a recipient's raw email address.
 - **Page views**: when your browser loads a page on htmlradar.com. Path, referrer, and a random fingerprint (generated client-side, never linked to your email unless you're signed in).
 - **Crash and error reports**: JavaScript errors captured to an `error_log` table. We do not use Sentry or any third-party error service.
 - **Feedback**: anything submitted through `/feedback` is stored in a `feedback` table and emailed directly to the founder. Email field is optional.
 
-No third-party trackers (no Google Analytics, no Segment, no Mixpanel). No advertising cookies. No session replay.
+No third-party tracking scripts. No third-party analytics or advertising cookies. No session replay.
 
 ## Where data lives
 
 - Document HTML you upload — Cloudflare R2 (encrypted at rest, in the region of your bucket).
-- All other data — Supabase Postgres (encrypted at rest).
+- Primary application data — Supabase Postgres (encrypted at rest).
+- Product analytics events — PostHog, sent server-side from the monitor worker.
 
 ## Who can see your data
 
@@ -38,11 +39,11 @@ Operators of the hosted service have technical access to the underlying database
 
 ## Data retention
 
-By default, sessions and section events are retained indefinitely. Deleting a share removes all of its sessions, viewers, section events, and attachment-download records immediately (via Postgres `on delete cascade`). Deleting a document removes the document row, its `document_versions` history, and its uploaded HTML from R2 within 24 hours.
+Sessions and section events are currently retained indefinitely. Permanently deleting an individual share removes its viewers, sessions, section events, and attachment-download records from Supabase immediately. The in-app Delete document action archives the document: it removes document and share access, but retains the database rows and uploaded HTML for recovery.
 
 ## Right to delete
 
-Recipients can have their data removed by emailing `privacy@htmlradar.com` with their email address. We will remove all viewer rows and associated sessions linked to that email within 14 days.
+Recipients and account holders can request permanent deletion by emailing `privacy@htmlradar.com`. Include the email address tied to the data and, for account holders, the affected document. We complete verified requests within 14 days, including matching data in Supabase, R2, and PostHog where applicable.
 
 ## Opt-out
 

@@ -83,7 +83,10 @@ export default function PrivacyPage() {
                   click a CTA, or submit feedback. Stored in a table called{' '}
                   <code className="font-mono text-[14px] text-signal-dark">app_events</code>. The
                   monitor worker replays these first-party events to PostHog server-side for product
-                  analytics. The browser does not load a PostHog script.
+                  analytics. Your account email is added to your PostHog user profile after sign-in.
+                  Owner-scoped share events can include a first open, gate outcome, country, device,
+                  or email domain, but not a recipient's raw email address. The browser does not
+                  load a PostHog script.
                 </li>
                 <li>
                   <strong className="text-ink">Page views</strong> — when your browser loads a page
@@ -122,7 +125,10 @@ export default function PrivacyPage() {
                   Document HTML you upload — Cloudflare R2, encrypted at rest in the region of your
                   bucket.
                 </li>
-                <li>All other data — Supabase Postgres, encrypted at rest.</li>
+                <li>Primary application data — Supabase Postgres, encrypted at rest.</li>
+                <li>
+                  Product analytics events — PostHog, sent server-side from the monitor worker.
+                </li>
               </ul>
             </Section>
 
@@ -140,23 +146,26 @@ export default function PrivacyPage() {
 
             <Section title="Data retention">
               <p>
-                Sessions and section events are retained for 365 days by default. You can configure
-                shorter retention per document. Deleting a document removes all of its sessions,
-                section events, and uploaded HTML within 24 hours.
+                Sessions and section events are currently retained indefinitely. Permanently
+                deleting an individual share removes its viewers, sessions, section events, and
+                attachment-download records from Supabase immediately. The in-app Delete document
+                action archives the document: it removes document and share access, but retains the
+                database rows and uploaded HTML for recovery.
               </p>
             </Section>
 
             <Section title="Right to delete">
               <p>
-                Recipients can have their data removed by emailing{' '}
+                Recipients and account holders can request permanent deletion by emailing{' '}
                 <a
                   href="mailto:privacy@htmlradar.com"
                   className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
                 >
                   privacy@htmlradar.com
-                </a>{' '}
-                with their email address. All viewer rows and associated sessions linked to that
-                email are removed within 14 days.
+                </a>
+                . Include the email address tied to the data and, for account holders, the affected
+                document. We complete verified requests within 14 days, including matching data in
+                Supabase, R2, and PostHog where applicable.
               </p>
             </Section>
 

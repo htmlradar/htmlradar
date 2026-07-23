@@ -74,12 +74,12 @@ export default function TrackHtmlDeckPage() {
               <Link href="/for/claude-artifacts" className="text-signal-dark hover:underline">
                 Claude artifact
               </Link>{' '}
-              is a single HTML file; a{' '}
+              you can export as portable HTML, or a{' '}
               <Link href="/for/reveal-js" className="text-signal-dark hover:underline">
                 reveal.js deck
               </Link>{' '}
-              is HTML too. When you can save or export a deck as a single HTML file, upload it to
-              HTMLRadar instead of converting it to PDF first.
+              bundled as a standalone page, can go straight into HTMLRadar. You do not need to
+              convert it to PDF first.
             </p>
           </section>
 

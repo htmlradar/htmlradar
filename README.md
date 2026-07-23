@@ -3,7 +3,7 @@
 Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
 - **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 2 tracked links lifetime, $15/mo Pro for unlimited links
-- **Source**: this repo, AGPL-3.0. The changelog documents v1.2; the latest Git tag is v1.1.2.
+- **Source**: this repo, AGPL-3.0. The current tagged release is v1.2.
 - **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
 - **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
 
@@ -14,6 +14,10 @@ Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you already host), send a tracked link `htmlradar.com/r/{slug}`, see who opened it, which sections they dwelled on, and when they bounced. Section-level dwell, not "opened."
 
 The bigger pattern: teams that use LLMs heavily ship more and more of their work as HTML — specs, design mocks, reports, dashboards, internal briefs. ChatGPT, Claude, v0, Lovable, Anthropic Artifacts all produce HTML for the things that matter. PDFs are a pre-LLM artifact; the analytics tooling stayed on PDFs. HTMLRadar follows the deliverable.
+
+[Open the live Lumenforge example](https://htmlradar.com/r/lumenforge-demo) — no sign-in required.
+
+![HTMLRadar dashboard showing section-level reading analytics](./docs/assets/htmlradar-dashboard-demo.gif)
 
 ## What it does
 
@@ -65,7 +69,7 @@ The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled Po
 - **Email**: Resend, invoked from Postgres via `pg_net`
 - **Payments**: Polar.sh checkout link (Stripe Connect Express under the hood for Indian indie founders)
 
-Two vendors total: Cloudflare + Supabase. Free tiers cover personal use end-to-end.
+Core hosting runs on Cloudflare and Supabase. Resend is optional for notification email, and Polar handles billing for the hosted Pro plan.
 
 ---
 
@@ -77,7 +81,7 @@ Two vendors total: Cloudflare + Supabase. Free tiers cover personal use end-to-e
 4. Send the tracked link.
 5. Watch the dashboard. First-read email lands when the recipient crosses the three-second threshold.
 
-Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month): unlimited tracked links, no "Shared with HTMLRadar" chrome on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
+Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month): unlimited tracked links, no "Powered by HTMLRadar" footer on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
 
 ## Quick start — self-host
 

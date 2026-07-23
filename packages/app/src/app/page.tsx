@@ -413,6 +413,15 @@ export default function LandingV2() {
                   <polyline points="12 5 19 12 12 19" />
                 </svg>
               </AuthLink>
+              <a
+                href="/r/lumenforge-demo"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-cta="hero.live_demo"
+                className="v2-btn v2-btn-ghost"
+              >
+                View live demo
+              </a>
             </div>
 
             <div className="v2-trust">

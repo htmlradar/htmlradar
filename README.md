@@ -3,7 +3,7 @@
 Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
 - **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 2 tracked links lifetime, $15/mo Pro for unlimited links
-- **Source**: this repo, AGPL-3.0. The current tagged release is v1.2.
+- **Source**: this repo, AGPL-3.0. The changelog documents v1.2; the latest published Git tag is v1.1.2.
 - **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
 - **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
 

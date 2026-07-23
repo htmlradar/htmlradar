@@ -1,7 +1,7 @@
-// /compare/docsend-vs-papermark — third-party comparison play. People
-// choosing between the two incumbents search "docsend vs papermark";
-// neither incumbent will write a fair version of this page. We can —
-// and mention where the HTML-native option fits at the end.
+// /compare/docsend-vs-papermark answers the direct comparison query. It is
+// intentionally separate from the two HTMLRadar-vs-competitor pages: the
+// useful decision here is which document model the sender has, before a
+// product choice is made.
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
@@ -13,9 +13,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'DocSend vs Papermark — an Honest Comparison | HTMLRadar',
+  title: 'DocSend vs Papermark for Document Sharing | HTMLRadar',
   description:
-    'Choosing between DocSend and Papermark for document tracking? How they differ on licensing, self-hosting, pricing model, and analytics — from a third open-source project.',
+    'Compare DocSend and Papermark for shareable documents, then see when a live HTML deck needs a different kind of tracker.',
   path: '/compare/docsend-vs-papermark',
 });
 
@@ -33,69 +33,119 @@ export default function DocsendVsPapermarkPage() {
           />
           <SectionMark>HTMLRadar · Comparison</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            DocSend vs Papermark, judged fairly.
+            DocSend vs Papermark for document sharing.
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            We build a third document tracker, so read this with that in mind — but it also means
-            we&apos;ve studied both of these products closely and don&apos;t need to flatter either.
-            Here&apos;s how they actually differ, and how to pick.
+            This is a decision between two document-sharing products, not a claim that one is always
+            better. Start with the thing you need to send. If it is an uploaded office file, compare
+            DocSend and Papermark. If it is a live HTML deck, brief, or proposal, use a tracker
+            built to preserve that format.
           </p>
 
           <section className="mt-12">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              The short version
+              The deciding question: file or live web page?
             </h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              <strong className="text-ink">DocSend</strong> (acquired by Dropbox in 2021) is the
-              incumbent: proprietary, per-seat pricing, deeply established with VCs and sales teams,
-              built around uploading files — overwhelmingly PDFs — and tracking who viewed them,
-              with e-signature and data-room features attached.
-            </p>
-            <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">
-              <strong className="text-ink">Papermark</strong> is the open-source challenger:
-              AGPL-3.0, self-hostable, same core file-upload-and-track model, with data rooms and
-              custom domains, at a lower price point than DocSend. If your requirement is
-              &ldquo;DocSend, but open source and cheaper,&rdquo; Papermark is the obvious pick.
+            <div className="mt-5 overflow-x-auto border-y border-line">
+              <table className="w-full min-w-[620px] border-collapse text-left text-[15px] leading-relaxed text-ink-soft">
+                <thead className="border-b border-line text-[12px] uppercase tracking-[0.1em] text-graphite">
+                  <tr>
+                    <th className="py-3 pr-5 font-medium">Your starting point</th>
+                    <th className="py-3 pr-5 font-medium">Best fit</th>
+                    <th className="py-3 font-medium">Why</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-line">
+                    <td className="py-4 pr-5 text-ink">
+                      PDF, PowerPoint, Word, Keynote, or a file library
+                    </td>
+                    <td className="py-4 pr-5 text-ink">DocSend or Papermark</td>
+                    <td className="py-4">Both are built around sharing uploaded documents.</td>
+                  </tr>
+                  <tr className="border-b border-line">
+                    <td className="py-4 pr-5 text-ink">
+                      Self-hosted document sharing is a hard requirement
+                    </td>
+                    <td className="py-4 pr-5 text-ink">Papermark</td>
+                    <td className="py-4">
+                      Its public project describes a self-hosted, open-source document-sharing
+                      product.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-4 pr-5 text-ink">
+                      An HTML deck, brief, proposal, or product page
+                    </td>
+                    <td className="py-4 pr-5 text-ink">HTMLRadar</td>
+                    <td className="py-4">
+                      The recipient reads the original HTML, with section-level read analytics added
+                      when it is served.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-4 text-[14px] leading-relaxed text-ink-soft">
+              DocSend&apos;s supported-upload list includes PDFs, PowerPoint, Word, Keynote, media,
+              and spreadsheets, but not HTML. Papermark&apos;s public repository describes its own
+              self-hosted document-sharing model.{' '}
+              <a
+                href="https://help.docsend.com/hc/en-us/articles/206344058-Upload-files"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-signal-dark hover:underline"
+              >
+                DocSend source
+              </a>{' '}
+              and{' '}
+              <a
+                href="https://github.com/papermark/papermark"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-signal-dark hover:underline"
+              >
+                Papermark source
+              </a>
+              .
             </p>
           </section>
 
           <section className="mt-12">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              How to choose
+              When DocSend is the stronger choice
             </h2>
-            <ul className="mt-4 list-disc space-y-3 pl-5 text-[16px] leading-relaxed text-ink-soft">
-              <li>
-                <strong className="text-ink">Pick DocSend</strong> if you need the enterprise
-                surface: e-signatures, mature data rooms, an org that already standardized on it, or
-                investors who expect docsend.com links. You pay per seat for that maturity.
-              </li>
-              <li>
-                <strong className="text-ink">Pick Papermark</strong> if you want DocSend&apos;s
-                model without the lock-in — open source you can audit or self-host, flat pricing,
-                data rooms included. The trade is a younger product with a smaller team.
-              </li>
-              <li>
-                <strong className="text-ink">Neither fits</strong> if your documents aren&apos;t
-                files anymore. Both products are built around uploading a file and tracking that
-                file. If your decks, briefs, and proposals are HTML pages — written with Claude or
-                ChatGPT, built in reveal.js, shipped as living documents — flattening them to PDF so
-                a file-tracker can handle them throws away exactly what made them good.
-              </li>
-            </ul>
+            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
+              Pick DocSend when the source is a conventional document and your team needs its mature
+              file workflow: uploaded documents, spaces, access controls, watermarks, or
+              e-signatures. Its accepted-file list is broad. That is useful when fidelity means a
+              recipient sees a managed viewer for a familiar file format.
+            </p>
           </section>
 
           <section className="mt-12">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              Where HTMLRadar fits
+              When Papermark is the stronger choice
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              HTMLRadar is what Papermark is to DocSend, aimed at HTML instead of PDF: AGPL-3.0 open
-              source, self-hostable, $15/mo flat hosted. You upload an HTML file (or paste a URL),
-              send a tracked link, and get section-level dwell analytics — which parts got read, not
-              just whether the file was opened. If your documents are still PDFs, use Papermark; if
-              they&apos;ve moved to HTML,{' '}
+              Pick Papermark when the same document-sharing model is right, but source access and
+              self-hosting matter to you. Its public project offers shareable document links,
+              analytics, custom domains, and a self-hosted deployment path. Evaluate it on the
+              workflow you will actually run, not on a generic feature checklist.
+            </p>
+          </section>
+
+          <section className="mt-12">
+            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+              The case neither file tracker solves
+            </h2>
+            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
+              A growing number of decks and client documents start as HTML: a Claude artifact, a
+              reveal.js presentation, or a hand-built page. Turning one into a PDF removes the
+              interactions and layout it was made for. HTMLRadar stores or fetches the HTML, serves
+              it through a tracked link, and reports the sections that held attention.{' '}
               <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">
-                that&apos;s the case we built for
+                See the HTML deck workflow
               </Link>
               .
             </p>
@@ -104,16 +154,16 @@ export default function DocsendVsPapermarkPage() {
           <Faq
             items={[
               {
-                q: 'Is Papermark really open source?',
-                a: 'Yes — AGPL-3.0, same license HTMLRadar uses. Both codebases are public and self-hostable; both companies sell hosting so you don’t have to run it yourself.',
+                q: 'Do I need to replace DocSend or Papermark to use HTMLRadar?',
+                a: 'No. They solve the file-sharing case. HTMLRadar is for the separate case where the document itself is HTML and should stay that way for the reader.',
               },
               {
-                q: 'Does DocSend track HTML documents?',
-                a: 'DocSend is built around uploaded files — PDFs, decks, and similar formats — viewed inside its viewer. Tracking a live HTML page as itself is the gap HTML-native tools exist to fill.',
+                q: 'Does DocSend accept HTML files?',
+                a: 'DocSend’s published accepted-file list does not include HTML. It accepts common document, presentation, media, image, and spreadsheet formats instead.',
               },
               {
-                q: 'What does section-level tracking add over page-level?',
-                a: 'Page-level tells you the document was opened and how long it stayed open. Section-level tells you which parts held attention — pricing read twice, case studies skipped — which is what actually times your follow-up.',
+                q: 'How should I test the right product quickly?',
+                a: 'Send one real document. If a PDF or office file is the source of truth, test DocSend and Papermark. If the browser version is the source of truth, test the same HTML through HTMLRadar before converting it.',
               },
             ]}
           />

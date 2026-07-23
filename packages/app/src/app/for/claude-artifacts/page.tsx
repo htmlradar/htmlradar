@@ -1,7 +1,6 @@
-// /for/claude-artifacts — tool page for the core wedge: decks and docs
-// made in Claude (Artifacts) are HTML; HTMLRadar tracks them without a
-// PDF export. Zero-competition queries: "share claude artifact",
-// "track claude artifact", "claude artifact analytics".
+// /for/claude-artifacts addresses the portable-HTML workflow specifically.
+// Claude artifacts can be several formats, so this page must not imply every
+// artifact can be uploaded as a standalone document.
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
@@ -13,9 +12,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Share a Claude Artifact as a Tracked Link | HTMLRadar',
+  title: 'Track a Claude HTML Artifact as a Link | HTMLRadar',
   description:
-    'Made a deck, report, or one-pager as a Claude artifact? Send it as a tracked link and see who opened it, which sections they read, and for how long.',
+    'Export a standalone Claude HTML artifact, share it through a tracked link, and see active read time and section-level attention.',
   path: '/for/claude-artifacts',
 });
 
@@ -33,77 +32,95 @@ export default function ClaudeArtifactsPage() {
           />
           <SectionMark>HTMLRadar · Works with</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            Track who reads your Claude artifact.
+            Track a Claude artifact you can export as HTML.
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            You asked Claude for a deck, a report, a proposal — and got a polished HTML artifact.
-            Then comes the awkward part: how do you send it to someone and know they actually read
-            it? Screenshot it and lose the interactivity? Flatten it to PDF? HTMLRadar keeps the
-            artifact exactly as Claude made it and adds read analytics on top.
+            Claude artifacts can be documents, code, websites, or interactive apps. HTMLRadar fits
+            the website case: a standalone HTML page you can save or a public page you already host.
+            Keep the browser version intact, send a tracked link, and see whether the recipient read
+            the sections that matter.
           </p>
 
           <section className="mt-12">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              How do you share a Claude artifact as a tracked link?
+              A reliable Claude artifact workflow
             </h2>
             <ol className="mt-4 list-decimal space-y-3 pl-5 text-[16px] leading-relaxed text-ink-soft">
               <li>
-                In Claude, open the artifact and copy its code (or download it) — it&apos;s a single
-                HTML file.
+                In Claude&apos;s artifact view, open the code and copy or download the file.
+                Anthropic documents both options for artifacts, including single-page HTML websites.
               </li>
               <li>
-                Upload that file to HTMLRadar. You get a link like{' '}
-                <span className="font-mono text-[14px] text-ink">htmlradar.com/r/swift-falcon</span>{' '}
-                in about a minute.
+                Make it portable: use one HTML file with inline styles, scripts, and assets. If you
+                already host it, keep the page public and use absolute asset URLs.
               </li>
               <li>
-                Send the link. The recipient sees the artifact rendered exactly as Claude made it —
-                no signup required, no viewer wrapper around your content.
+                Upload the HTML to HTMLRadar, or paste that public URL. Create a tracked share link
+                when the document is ready to send.
               </li>
             </ol>
-            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              When Claude revises the artifact, upload the new version — every link you already sent
-              serves the update, and the version history keeps the old ones.
+            <p className="mt-4 text-[14px] leading-relaxed text-ink-soft">
+              <a
+                href="https://support.anthropic.com/en/articles/9487310-what-are-artifacts-and-how-do-i-use-them"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-signal-dark hover:underline"
+              >
+                Anthropic&apos;s artifact guide
+              </a>{' '}
+              covers viewing code, copying content, and downloading files.
             </p>
           </section>
 
           <section className="mt-12">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              What do you see when they open it?
+              What the recipient sees, and what you see
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              A per-viewer dashboard: who opened it, active read time, scroll depth, and time per
-              section — sections are auto-detected from the artifact&apos;s own headings. A
-              three-second dwell floor separates a real read from a scroll-past, and you get an
-              email the moment the first real read happens.
+              The recipient sees the HTML you supplied. HTMLRadar adds its tracker when the page is
+              served; free links also carry a small &ldquo;Powered by HTMLRadar&rdquo; badge. Your
+              source file stays unchanged. In the dashboard, headings become section labels, so you
+              can see active read time, scroll depth, and which parts received sustained attention.
             </p>
           </section>
 
           <section className="mt-12">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              Why not just publish the artifact?
+              Updating the artifact without changing the link
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              Claude&apos;s own publish link is great for broadcasting — but it tells you nothing
-              about who read it. HTMLRadar gives each recipient their own link with its own gate:
-              email-gate it, password it, expire it, or revoke it after the deal closes. Read
-              analytics only work when you know who the reader is.
+              For an uploaded file, replace the document with the revised HTML. Existing share links
+              then serve the current version. For a URL source, update the page at its original URL.
+              Keep a meaningful heading on each major section so the reader-facing page and your
+              dashboard use the same language.
+            </p>
+          </section>
+
+          <section className="mt-12">
+            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+              When to keep the artifact in Claude
+            </h2>
+            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
+              Keep an artifact in Claude when it depends on Claude&apos;s hosted AI features or
+              requires the reader to sign in there. Anthropic runs AI-powered artifacts on its
+              infrastructure. HTMLRadar tracks a portable HTML document; it does not move that
+              hosted capability into your uploaded file.
             </p>
           </section>
 
           <Faq
             items={[
               {
-                q: 'Does the artifact need any changes or tracking code?',
-                a: 'No. Upload the HTML exactly as Claude produced it — the tracker is injected when the doc is served through your tracked link, and your original file stays untouched.',
+                q: 'Does every Claude artifact work as a standalone HTML upload?',
+                a: 'No. The reliable case is a self-contained HTML page. Artifacts that depend on a build step, relative assets, or Claude-hosted AI behavior should stay hosted or be prepared as a portable page first.',
               },
               {
-                q: 'Do interactive artifacts work?',
-                a: 'Single-file HTML with inline scripts, styles, and embedded assets works out of the box — if it opens in a browser as one file, it can be served through a tracked link.',
+                q: 'Does HTMLRadar modify my saved artifact?',
+                a: 'No. The original source stays unchanged. HTMLRadar injects its tracker only into the page it serves through the tracked link; free links also show a small Powered by HTMLRadar badge.',
               },
               {
-                q: 'Can the recipient tell it is tracked?',
-                a: 'Free-tier links carry a small "Powered by HTMLRadar" badge in the corner, and the tracker is added when the page is served — your uploaded file itself is never modified. No mouse tracking, no keystrokes, no session replay — section dwell, scroll depth, and active time only, and recipients can opt out.',
+                q: 'Can I use a public URL instead of uploading a file?',
+                a: 'Yes, for a publicly reachable HTML page. Use absolute URLs for its assets so they keep resolving when the tracked page is served.',
               },
             ]}
           />
@@ -138,11 +155,8 @@ export default function ClaudeArtifactsPage() {
                 reveal.js deck analytics
               </Link>
               , and{' '}
-              <Link
-                href="/use-case/pitch-deck-tracking"
-                className="text-signal-dark hover:underline"
-              >
-                pitch deck tracking for founders
+              <Link href="/use-case/proposal-tracking" className="text-signal-dark hover:underline">
+                proposal tracking
               </Link>
               .
             </p>

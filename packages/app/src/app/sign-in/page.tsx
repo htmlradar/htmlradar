@@ -15,6 +15,13 @@ import { SignInForm } from './SignInForm';
 
 export const runtime = 'edge';
 
+export const metadata = {
+  title: 'Sign in',
+  description: 'Sign in to HTMLRadar to create and manage tracked HTML links.',
+  alternates: { canonical: 'https://htmlradar.com/sign-in' },
+  robots: { index: false, follow: true },
+};
+
 export default async function SignInPage({
   searchParams,
 }: {

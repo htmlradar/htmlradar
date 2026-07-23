@@ -16,6 +16,7 @@ export const metadata = {
   description:
     'Tell us what we missed, what broke, or what you wish HTMLRadar did. Goes straight to the founder.',
   alternates: { canonical: 'https://htmlradar.com/feedback' },
+  robots: { index: false, follow: true },
 };
 
 export default async function FeedbackPage({

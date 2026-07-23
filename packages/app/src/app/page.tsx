@@ -1234,6 +1234,7 @@ export default function LandingV2() {
           <Link href="/self-hosted">Self-hosted</Link>
           <Link href="/compare/docsend">vs DocSend</Link>
           <Link href="/compare/papermark">vs Papermark</Link>
+          <Link href="/compare/docsend-vs-papermark">DocSend vs Papermark</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/feedback">Feedback</Link>
           <Link href="/privacy">Privacy</Link>

@@ -15,9 +15,9 @@ Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you 
 
 The bigger pattern: teams that use LLMs heavily ship more and more of their work as HTML — specs, design mocks, reports, dashboards, internal briefs. ChatGPT, Claude, v0, Lovable, Anthropic Artifacts all produce HTML for the things that matter. PDFs are a pre-LLM artifact; the analytics tooling stayed on PDFs. HTMLRadar follows the deliverable.
 
-[Open the live Lumenforge example](https://htmlradar.com/r/lumenforge-demo) — no sign-in required.
+The walkthrough below uses synthetic sample data and shows the real HTMLRadar sender dashboard.
 
-![HTMLRadar dashboard showing section-level reading analytics](./docs/assets/htmlradar-dashboard-demo.gif)
+![HTMLRadar dashboard walkthrough using synthetic sample data](./docs/assets/htmlradar-dashboard-demo.gif)
 
 ## What it does
 

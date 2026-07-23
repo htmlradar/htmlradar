@@ -14,7 +14,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Self-Hosted, Open-Source Document Tracking | HTMLRadar',
   description:
-    'Run your own read-tracking on your own infrastructure. AGPL-3.0, self-hostable, no data leaves your servers. The private DocSend alternative.',
+    'Run open-source HTML document tracking in your own Cloudflare and Supabase accounts. AGPL-3.0, self-hostable, and fully under your control.',
   path: '/self-hosted',
 });
 
@@ -36,8 +36,9 @@ export default function SelfHostedPage() {
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             HTMLRadar is AGPL-3.0, end to end: the tracker, the proxy worker, the database schema,
-            the web app. Run the whole thing on your own infrastructure — your documents, your read
-            data, and your recipients&apos; emails never touch anyone else&apos;s servers.
+            and the web app. Run the whole thing in your own Cloudflare and Supabase accounts. Your
+            documents live in your R2 bucket, and your read data and recipient emails live in your
+            Supabase project.
           </p>
 
           <section className="mt-12">
@@ -45,9 +46,16 @@ export default function SelfHostedPage() {
               What do you need to run it?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              A Cloudflare account (Pages, Workers, R2) and a Supabase project. Both have free tiers
-              that cover personal use, so a solo self-host can genuinely cost nothing. The repo
-              includes a 15-minute self-hosting guide: clone, connect the two accounts, deploy.
+              A Cloudflare account for Pages, Workers, and R2; a Supabase project for the database
+              and authentication; and a domain. Resend is optional if you want first-read email
+              notifications. The{' '}
+              <a
+                href="https://github.com/htmlradar/htmlradar/blob/main/docs/self-hosting.md"
+                className="text-signal-dark hover:underline"
+              >
+                self-hosting guide
+              </a>{' '}
+              lists every required secret and deployment step.
             </p>
           </section>
 
@@ -58,12 +66,13 @@ export default function SelfHostedPage() {
             <ul className="mt-4 list-disc space-y-2 pl-5 text-[16px] leading-[1.7] text-ink-soft">
               <li>
                 <strong className="text-ink">Compliance.</strong> Banks, healthcare, and M&amp;A
-                teams that can&apos;t put deal documents in a third-party SaaS run the same stack on
-                infrastructure they control.
+                teams that need deal documents in their own cloud accounts can run the stack they
+                control.
               </li>
               <li>
                 <strong className="text-ink">Data locality.</strong> Read analytics and recipient
-                emails stay in your own database. Nothing to export, nothing to trust.
+                emails stay in your own Supabase project, while uploaded documents stay in your own
+                R2 bucket.
               </li>
               <li>
                 <strong className="text-ink">Auditability.</strong> The tracker code is open — you
@@ -79,9 +88,8 @@ export default function SelfHostedPage() {
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
               It isn&apos;t — that&apos;s the guarantee. The hosted product at htmlradar.com runs
-              the same public code. Self-hosting trades the $15/mo Pro plan for running your own
-              Cloudflare and Supabase, with no document caps. If you ever outgrow one, you can move
-              to the other; the stack is identical. Coming from DocSend? See{' '}
+              the same public code. Self-hosting means you configure and operate your own Cloudflare
+              and Supabase deployment instead of using the hosted service. Coming from DocSend? See{' '}
               <Link href="/compare/docsend" className="text-signal-dark hover:underline">
                 how HTMLRadar compares as an open-source DocSend alternative
               </Link>
@@ -93,19 +101,19 @@ export default function SelfHostedPage() {
             items={[
               {
                 q: 'Is self-hosting really free?',
-                a: 'The software is free under AGPL-3.0, forever. You pay your infrastructure providers directly — and the Cloudflare and Supabase free tiers cover personal use.',
+                a: 'The software is free under AGPL-3.0. You pay Cloudflare, Supabase, your domain registrar, and any optional email provider directly. Their free tiers can cover light personal use, but review each provider’s current limits before relying on them.',
               },
               {
                 q: 'What does the AGPL license require?',
                 a: 'You can run, modify, and use HTMLRadar commercially. If you offer a modified version to others over a network, you must share those changes under the same license.',
               },
               {
-                q: 'What if I can’t use AGPL (closed-source product, or company policy)?',
+                q: "What if I can't use AGPL (closed-source product, or company policy)?",
                 a: 'A commercial license is available — it removes the AGPL copyleft obligations so you can embed HTMLRadar in a closed-source product or run a hosted service without publishing your changes. Email hello@htmlradar.com, and see COMMERCIAL-LICENSE.md in the repo.',
               },
               {
-                q: 'How long does setup take?',
-                a: 'About 15 minutes with the guide in the repo: clone the source, connect Cloudflare and Supabase, deploy.',
+                q: 'What does setup involve?',
+                a: 'Run the database migrations in Supabase, configure Cloudflare Pages, Workers, and R2, set the required secrets, and point your domain at the deployment. The self-hosting guide covers the exact sequence.',
               },
             ]}
           />

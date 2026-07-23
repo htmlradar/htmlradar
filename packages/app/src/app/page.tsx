@@ -28,7 +28,7 @@ import './landing-v2.css';
 export const metadata = pageMeta({
   title: 'Track an HTML Document — See Who Read It | HTMLRadar',
   description:
-    'Send any HTML deck, brief, or proposal as a tracked link. See who opened it, which sections they read, and how long they stayed. Open-source. Free to start.',
+    'HTML tracker for decks, briefs, and proposals. Send an HTML document as a tracked link and see who opened it, which sections they read, and how long they stayed.',
   path: '/',
 });
 
@@ -400,8 +400,9 @@ export default function LandingV2() {
               </span>
             </h1>
             <p className="lede">
-              Share any HTML document as a tracked link. Watch in real time who opened it, how long
-              they stayed, and where they dwelled — down to the section and the second.
+              HTML tracker for decks, briefs, and proposals. Share any HTML document as a tracked
+              link. See who opened it, how long they stayed, and where they dwelled — down to the
+              section and the second.
             </p>
 
             <div className="cta-row">
@@ -804,8 +805,7 @@ export default function LandingV2() {
               One link, <em>every kind of deliverable</em>.
             </h2>
             <p className="v2-reveal d2">
-              HTMLRadar follows the document, not the file type. Sharper for the things you send
-              most.
+              Track the HTML documents you send most, from investor decks to client proposals.
             </p>
           </div>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
@@ -859,7 +859,7 @@ export default function LandingV2() {
             </Link>
             {' · '}
             <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">
-              track any HTML deck
+              track an HTML deck
             </Link>
           </p>
         </div>
@@ -886,8 +886,8 @@ export default function LandingV2() {
                 Drop your <em>HTML</em>.
               </h3>
               <p>
-                Single file or full system. We host it for you, version every replacement. Old links
-                keep working.
+                Upload one HTML file or paste a URL. We host uploaded files, version every
+                replacement, and keep old links working.
               </p>
             </div>
           </div>

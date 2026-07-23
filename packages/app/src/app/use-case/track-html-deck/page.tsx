@@ -16,7 +16,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Track an HTML Deck — Read Analytics for Web Decks | HTMLRadar',
   description:
-    'Built a deck in Claude, reveal.js, or plain HTML? Share it as a tracked link and see who read each slide. No PDF export. Open-source.',
+    'Upload an HTML deck or paste a URL, then see which sections people read. Built for Claude artifacts, reveal.js decks, and hand-written HTML.',
   path: '/use-case/track-html-deck',
 });
 
@@ -37,9 +37,9 @@ export default function TrackHtmlDeckPage() {
             Track the HTML deck you already built.
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            Your deck is already HTML — a Claude artifact, a reveal.js build, a ChatGPT one-pager, a
-            hand-rolled page. The old workflow says: flatten it to PDF so a tracker can handle it.
-            HTMLRadar says: keep the HTML, send a tracked link, see who read each section.
+            Your deck is already HTML — a Claude artifact, a reveal.js build, a ChatGPT one-pager,
+            or a hand-rolled page. HTMLRadar keeps it that way: send a tracked link and see which
+            sections people read.
           </p>
 
           <section className="mt-12">
@@ -47,10 +47,10 @@ export default function TrackHtmlDeckPage() {
               How do you share an HTML file as a tracked link?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              Upload the file or paste a URL. You get a link like{' '}
-              <span className="font-mono text-[14px] text-ink">htmlradar.com/r/swift-falcon</span>{' '}
-              about sixty seconds after signing in. Replace the file later and every link you
-              already sent serves the new version — old links keep working.
+              Upload a <span className="font-mono text-[14px] text-ink">.html</span> or{' '}
+              <span className="font-mono text-[14px] text-ink">.htm</span> file, or paste a URL you
+              already host. HTMLRadar gives you a share link for each recipient. Replace an uploaded
+              file later and every existing link serves the new version.
             </p>
           </section>
 
@@ -59,10 +59,9 @@ export default function TrackHtmlDeckPage() {
               What do you see when someone reads it?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              A live dashboard, per recipient: active read time, scroll depth, and time per section
-              — down to which heading they parked on and for how long. A three-second dwell floor
-              keeps scroll-pasts from counting as reads, and an email lands the moment a real read
-              happens.
+              A dashboard for each recipient: active read time, scroll depth, and time per section.
+              The tracker attributes reading time to the headings and slides they actually viewed. A
+              three-second dwell floor keeps quick scroll-pasts from counting as reads.
             </p>
           </section>
 
@@ -79,9 +78,8 @@ export default function TrackHtmlDeckPage() {
               <Link href="/for/reveal-js" className="text-signal-dark hover:underline">
                 reveal.js deck
               </Link>{' '}
-              always was HTML; so is anything ChatGPT, v0, or your own editor produced. If it opens
-              in a browser, HTMLRadar can serve it through a tracked link — single-file HTML with
-              embedded assets works out of the box.
+              is HTML too. When you can save or export a deck as a single HTML file, upload it to
+              HTMLRadar instead of converting it to PDF first.
             </p>
           </section>
 
@@ -89,7 +87,7 @@ export default function TrackHtmlDeckPage() {
             items={[
               {
                 q: 'Does HTMLRadar host the file?',
-                a: 'Yes. Upload the HTML and it is hosted and versioned for you — replace the file and old links keep working. Or paste a URL and the proxy serves it through your tracked link.',
+                a: 'Yes. Upload the HTML and it is hosted and versioned for you. Replace the file and old links keep working. Or paste a URL you already host and share it through a tracked link.',
               },
               {
                 q: 'Do I have to add a tracking snippet to my deck?',

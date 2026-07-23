@@ -26,37 +26,23 @@ interface Row {
 }
 
 const ROWS: Row[] = [
-  { feature: 'Source format', htmlradar: 'HTML (upload or URL)', docsend: 'PDF-first (files)' },
+  {
+    feature: 'Source format',
+    htmlradar: 'HTML files or public URLs',
+    docsend: 'PDF, presentations, documents, media, and spreadsheets',
+  },
   { feature: 'Open source', htmlradar: 'AGPL-3.0', docsend: false },
-  { feature: 'Self-hosting', htmlradar: 'Full self-host supported', docsend: false },
-  { feature: 'Per-recipient share links', htmlradar: true, docsend: true },
-  { feature: 'Section-level dwell tracking', htmlradar: true, docsend: 'Scroll depth only' },
   {
-    feature: 'Real-time read notifications',
-    htmlradar: 'Email on first dwell threshold',
-    docsend: 'Email on open',
-  },
-  { feature: 'Password gating', htmlradar: true, docsend: true },
-  { feature: 'Email gating', htmlradar: true, docsend: true },
-  { feature: 'Domain allow-list', htmlradar: true, docsend: 'Enterprise only' },
-  { feature: 'Custom share domain', htmlradar: 'Coming soon', docsend: 'Enterprise tier' },
-  {
-    feature: 'Pricing model',
-    htmlradar: '$15/mo flat OR free self-host',
-    docsend: 'Per seat, per month',
+    feature: 'Deployment',
+    htmlradar: 'Own Cloudflare and Supabase accounts',
+    docsend: 'Hosted service',
   },
   {
-    feature: 'Free tier',
-    htmlradar: '2 tracked links, unlimited reads',
-    docsend: 'Free trial',
+    feature: 'Reading analysis',
+    htmlradar: 'Section-level dwell',
+    docsend: 'Page-based analytics',
   },
-  {
-    feature: 'API for programmatic shares',
-    htmlradar: 'Not yet — planned',
-    docsend: 'Enterprise API',
-  },
-  { feature: 'Privacy: no third-party tracking on viewer side', htmlradar: true, docsend: false },
-  { feature: 'License audit (you can read the tracker code)', htmlradar: true, docsend: false },
+  { feature: 'License audit', htmlradar: 'Read the tracker source', docsend: false },
 ];
 
 function Cell({ v }: { v: string | boolean }) {
@@ -94,9 +80,10 @@ export default function ComparePage() {
             The open-source DocSend alternative built for HTML.
           </h1>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            DocSend is the category leader for document tracking. We built HTMLRadar because DocSend
-            is closed-source, PDF-only, and bills per seat. If those three things matter to you,
-            this comparison matters. If they don't, DocSend is fine.
+            DocSend is an established document-tracking product, and it supports PDFs,
+            presentations, documents, media, and spreadsheets. HTMLRadar is different on purpose: it
+            tracks HTML files and URLs, and it is open source and self-hostable. If you send HTML
+            decks, that difference matters. If you do not, DocSend may be the better fit.
           </p>
 
           <section className="mt-12">
@@ -121,11 +108,11 @@ export default function ComparePage() {
                   DocSend
                 </h3>
                 <p className="mt-3 font-serif text-[20px] leading-snug text-ink">
-                  PDF-first, closed source, priced per seat.
+                  Multi-format document tracking.
                 </p>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
-                  Decade-old category leader, polished UX, deep enterprise feature set. Owned by
-                  Dropbox. If your team is on a Dropbox Business plan already, DocSend is included.
+                  A hosted product for PDFs, presentations, documents, media, and spreadsheets. It
+                  does not list HTML among its accepted upload formats.
                 </p>
               </div>
             </div>
@@ -133,7 +120,7 @@ export default function ComparePage() {
 
           <section className="mt-14">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              Feature by feature
+              Where the products differ
             </h2>
             <div className="mt-5 overflow-x-auto rounded-2xl border border-line bg-paper">
               <table className="w-full text-[14px]">
@@ -167,14 +154,10 @@ export default function ComparePage() {
             </h2>
             <ul className="mt-4 list-disc space-y-2 pl-5 text-[16px] leading-[1.7] text-ink-soft">
               <li>
-                Your team is on Dropbox Business. DocSend is bundled; effective cost approaches
-                zero.
+                You send PDFs, presentations, office documents, media, or spreadsheets rather than
+                HTML.
               </li>
-              <li>You only send PDFs and have no intent to switch to HTML decks.</li>
-              <li>
-                You need enterprise features like virtual data rooms, eSignature integration, or
-                SSO. HTMLRadar v1.0 doesn't have these; v1.x is a backlog item.
-              </li>
+              <li>You need a mature hosted product built around broader document sharing.</li>
               <li>
                 You prefer not to think about open source licensing or self-hosting at all. Fair.
               </li>
@@ -187,17 +170,12 @@ export default function ComparePage() {
             </h2>
             <ul className="mt-4 list-disc space-y-2 pl-5 text-[16px] leading-[1.7] text-ink-soft">
               <li>
-                You send HTML decks (Claude artifacts, reveal.js builds, hand-rolled pages) and
-                don't want to PDFify them just to track.
-              </li>
-              <li>You bill per-seat allergies. $15/mo flat scales with usage, not headcount.</li>
-              <li>
-                You self-host because the tracker code reading rights, the data-locality rights, or
-                the no-vendor-dependence rights matter to your business.
+                You send HTML decks (Claude artifacts, reveal.js builds, hand-rolled pages) and want
+                to keep them as HTML when you track them.
               </li>
               <li>
-                You're an indie founder or small team where per-seat pricing is more than the flat
-                rate.
+                You want to read the tracker code or run the product in your own Cloudflare and
+                Supabase accounts.
               </li>
               <li>
                 You want section-level dwell time, not just scroll depth. Knowing the recipient
@@ -212,11 +190,9 @@ export default function ComparePage() {
               Migrating from DocSend
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              DocSend exports your existing tracked PDFs via their UI. We don't import them directly
-              because the formats differ. For new HTML decks you create after switching, the flow
-              is: bring your HTML deck (a Claude artifact, a reveal.js build, or a hand-written
-              page), upload to HTMLRadar, create per-recipient share links. The same tracking
-              happens, on a different file type.
+              HTMLRadar does not import existing DocSend files. For new HTML decks, bring a Claude
+              artifact, reveal.js build, or hand-written page; upload it to HTMLRadar; and create
+              per-recipient share links. The workflow stays in HTML from start to finish.
             </p>
             <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">
               If you need help with the cutover, email{' '}
@@ -242,7 +218,7 @@ export default function ComparePage() {
               },
               {
                 q: 'Can I self-host HTMLRadar?',
-                a: 'Yes. The full source is AGPL-3.0 on GitHub and runs on your own Cloudflare and Supabase accounts. The repo includes a 15-minute self-hosting guide.',
+                a: 'Yes. The full source is AGPL-3.0 on GitHub and runs in your own Cloudflare and Supabase accounts. The repository includes a self-hosting guide with the required setup steps.',
               },
             ]}
           />

@@ -15,58 +15,50 @@ const SITE_URL = 'https://htmlradar.com';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = SITE_URL;
-  const lastModified = new Date();
 
   const routes: MetadataRoute.Sitemap = [
-    { url: `${baseUrl}/`, lastModified, changeFrequency: 'weekly', priority: 1 },
-    { url: `${baseUrl}/why`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${baseUrl}/pricing`, lastModified, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${baseUrl}/`, changeFrequency: 'weekly', priority: 1 },
+    { url: `${baseUrl}/why`, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${baseUrl}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
     // /sign-in and /feedback are utility pages, not search results.
     // Their page metadata sets noindex, so they are deliberately omitted.
-    { url: `${baseUrl}/privacy`, lastModified, changeFrequency: 'yearly', priority: 0.4 },
+    { url: `${baseUrl}/privacy`, changeFrequency: 'yearly', priority: 0.4 },
     {
       url: `${baseUrl}/compare/papermark`,
-      lastModified,
       changeFrequency: 'weekly',
       priority: 0.5,
     },
-    { url: `${baseUrl}/compare/docsend`, lastModified, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${baseUrl}/compare/docsend`, changeFrequency: 'weekly', priority: 0.6 },
     {
       url: `${baseUrl}/compare/docsend-vs-papermark`,
-      lastModified,
       changeFrequency: 'monthly',
       priority: 0.5,
     },
     {
       url: `${baseUrl}/use-case/pitch-deck-tracking`,
-      lastModified,
       changeFrequency: 'monthly',
       priority: 0.7,
     },
     {
       url: `${baseUrl}/use-case/proposal-tracking`,
-      lastModified,
       changeFrequency: 'monthly',
       priority: 0.7,
     },
     {
       url: `${baseUrl}/use-case/track-html-deck`,
-      lastModified,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     {
       url: `${baseUrl}/for/claude-artifacts`,
-      lastModified,
       changeFrequency: 'monthly',
       priority: 0.7,
     },
-    { url: `${baseUrl}/for/reveal-js`, lastModified, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${baseUrl}/self-hosted`, lastModified, changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${baseUrl}/blog`, lastModified, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${baseUrl}/for/reveal-js`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${baseUrl}/self-hosted`, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${baseUrl}/blog`, changeFrequency: 'weekly', priority: 0.6 },
     {
       url: `${baseUrl}/blog/how-we-built-htmlradar`,
-      lastModified,
       changeFrequency: 'monthly',
       priority: 0.5,
     },

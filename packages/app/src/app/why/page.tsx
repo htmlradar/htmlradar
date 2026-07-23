@@ -9,16 +9,17 @@ import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
+import { pageMeta } from '@/lib/seo';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-static';
 
-export const metadata = {
-  title: 'Why HTMLRadar',
+export const metadata = pageMeta({
+  title: 'Why HTMLRadar Exists',
   description:
-    'The longer essay. Why HTML — not PDF — is the right format for the documents that actually matter, and what HTMLRadar does with that idea.',
-  alternates: { canonical: 'https://htmlradar.com/why' },
-};
+    'Why HTML is a better format for decks, briefs, and proposals, and how HTMLRadar shows what happens after you send one.',
+  path: '/why',
+});
 
 export default function WhyPage() {
   return (

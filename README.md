@@ -3,7 +3,7 @@
 Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
 
 - **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 2 tracked links lifetime, $15/mo Pro for unlimited links
-- **Source**: this repo, AGPL-3.0 · current release: **v1.2**
+- **Source**: this repo, AGPL-3.0. The changelog documents v1.2; the latest Git tag is v1.1.2.
 - **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
 - **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
 
@@ -46,7 +46,7 @@ htmlradar/
 │   ├── proxy/        # Cloudflare Worker at /r/{slug} — gates + HTML fetch + tracker inject + attachment serving
 │   ├── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
 │   └── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
-├── schema/           # 29 idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
+├── schema/           # Ordered idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
 ├── examples/         # Demo HTML for trying it locally
 └── docs/             # Architecture, privacy, quickstart, self-hosting
 ```
@@ -97,10 +97,10 @@ cd htmlradar
 pnpm install
 cp .env.example .env.local           # fill in keys (Supabase, R2, Resend)
 pnpm typecheck && pnpm test          # sanity check
-pnpm build                           # build all 3 packages
+pnpm build                           # build all 4 packages
 ```
 
-Schema setup: apply every file under `schema/` in numeric order via the Supabase SQL editor (001 through 019 at v1.2; check the directory for the current top number). Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe.
+Schema setup: apply every numbered SQL file under `schema/` in numeric order via the Supabase SQL editor. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe.
 
 Resend secrets go in Supabase Vault (works on free tier — no `ALTER DATABASE SET` required):
 
@@ -118,7 +118,7 @@ If you modify the source and run a network service from it, AGPL-3.0 requires yo
 ## Development
 
 ```bash
-pnpm dev                              # runs all 3 packages in parallel
+pnpm dev                              # runs all 4 packages in parallel
 pnpm typecheck                        # tsc --noEmit across packages
 pnpm lint                             # eslint + prettier
 pnpm test                             # vitest across tracker + proxy

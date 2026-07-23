@@ -1,22 +1,21 @@
-// /privacy — the public privacy policy. Mirrors docs/privacy.md in the
-// repo (the canonical version for self-hosters) but rendered as a
-// proper public page in HTMLRadar voice + palette. Linked from every
-// page footer. Must stay reachable without sign-in.
+// /privacy — the public policy for the hosted service, rendered in the
+// HTMLRadar voice + palette. Linked from every page footer and reachable
+// without sign-in.
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
-import type { Metadata } from 'next';
+import { pageMeta } from '@/lib/seo';
 
 export const dynamic = 'force-static';
 
-export const metadata: Metadata = {
+export const metadata = pageMeta({
   title: 'Privacy',
   description:
     'How HTMLRadar handles the data it collects. The policy that applies to the hosted version at htmlradar.com.',
-  alternates: { canonical: 'https://htmlradar.com/privacy' },
-};
+  path: '/privacy',
+});
 
 export default function PrivacyPage() {
   return (
@@ -82,8 +81,9 @@ export default function PrivacyPage() {
                   <strong className="text-ink">Product events</strong> — when you sign in, upload a
                   document, create or revoke a share, hit the free-tier cap, view the upgrade page,
                   click a CTA, or submit feedback. Stored in a table called{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">app_events</code>. Schema
-                  is PostHog-compatible — if we wire PostHog later, we'll port this table over.
+                  <code className="font-mono text-[14px] text-signal-dark">app_events</code>. The
+                  monitor worker replays these first-party events to PostHog server-side for product
+                  analytics. The browser does not load a PostHog script.
                 </li>
                 <li>
                   <strong className="text-ink">Page views</strong> — when your browser loads a page
@@ -111,8 +111,8 @@ export default function PrivacyPage() {
                 </li>
               </ul>
               <p className="mt-4">
-                No third-party trackers (no Google Analytics, no Segment, no Mixpanel). No
-                advertising cookies. No session replay.
+                No third-party tracking scripts. No third-party cookies for analytics or
+                advertising. No session replay.
               </p>
             </Section>
 
@@ -176,7 +176,7 @@ export default function PrivacyPage() {
               <p>
                 The hosted service uses session cookies for authentication, set when you sign in.
                 Tracked share links may set a temporary cookie when a password is required, scoped
-                to that share. No third-party analytics or advertising cookies.
+                to that share. We do not use third-party cookies for analytics or advertising.
               </p>
             </Section>
 

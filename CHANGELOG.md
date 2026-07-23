@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes between releases. Following [Keep a Changelog](https://keepachangelog.com/) loosely.
+Notable changes between releases. Following [Keep a Changelog](https://keepachangelog.com/) loosely. The latest Git tag is v1.1.2; v1.2 below is documented but was not tagged.
 
 ---
 

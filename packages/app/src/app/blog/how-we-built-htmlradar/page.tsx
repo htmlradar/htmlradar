@@ -6,15 +6,16 @@ import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
 import { ArticleLd, BreadcrumbLd } from '@/components/JsonLd';
+import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
 
-export const metadata = {
-  title: 'How I built HTMLRadar in three packages',
+export const metadata = pageMeta({
+  title: 'How I Built HTMLRadar',
   description:
-    'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, an 8 KB (gzipped) browser tracker, six SQL files. What each part owns, why I kept them separate, and the calls I made.',
-  alternates: { canonical: 'https://htmlradar.com/blog/how-we-built-htmlradar' },
-};
+    'How HTMLRadar is built: a Next.js app, two Cloudflare Workers, an 8 KB browser tracker, and a Supabase schema. What each part owns and why.',
+  path: '/blog/how-we-built-htmlradar',
+});
 
 export default function Post() {
   return (
@@ -23,7 +24,7 @@ export default function Post() {
       <main className="relative">
         <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
           <ArticleLd
-            headline="How I built HTMLRadar in three packages"
+            headline="How I built HTMLRadar"
             datePublished="2026-05-14"
             url="/blog/how-we-built-htmlradar"
           />
@@ -32,14 +33,14 @@ export default function Post() {
               { name: 'Home', url: '/' },
               { name: 'Blog', url: '/blog' },
               {
-                name: 'How I built HTMLRadar in three packages',
+                name: 'How I built HTMLRadar',
                 url: '/blog/how-we-built-htmlradar',
               },
             ]}
           />
           <SectionMark>HTMLRadar · Engineering</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.06] tracking-tightest text-ink md:text-[52px]">
-            How I built HTMLRadar in three packages.
+            How I built HTMLRadar.
           </h1>
           <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
             2026-05-14 &nbsp;·&nbsp; 5 min read &nbsp;·&nbsp; Engineering
@@ -79,7 +80,7 @@ export default function Post() {
             </p>
 
             <p>
-              The code splits into three packages. Each runs in a different place. Each is small and
+              The code splits into four packages. Each runs in a different place. Each is small and
               does one thing.
             </p>
 
@@ -108,6 +109,11 @@ export default function Post() {
                   <code className="font-mono text-[14px] text-signal-dark">&lt;script&gt;</code> tag
                   into every served document. The tracker identifies the viewer, prompts for email
                   if the share requires one, and streams session metrics to Supabase.
+                </p>
+                <p>
+                  <code className="font-mono text-[14px] text-signal-dark">packages/monitor</code>{' '}
+                  is a Cloudflare cron Worker. It checks the hosted service every five minutes and
+                  replays first-party product events from Supabase to PostHog server-side.
                 </p>
                 <p>
                   Splitting the proxy out keeps the recipient's bundle clean. The Worker has no
@@ -242,10 +248,9 @@ const cookie = \`\${payload}.\${mac}\`;`}
                   for after-the-fact reconciliation.
                 </p>
                 <p>
-                  The full schema is six SQL files at{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">code/schema/001_*</code>{' '}
-                  through <code className="font-mono text-[14px] text-signal-dark">006_*</code>.
-                  Each re-runs idempotently.
+                  The schema is a sequence of idempotent SQL migrations under{' '}
+                  <code className="font-mono text-[14px] text-signal-dark">schema/</code>. Apply
+                  every numbered file in order when self-hosting.
                 </p>
               </div>
             </section>
@@ -272,9 +277,9 @@ const cookie = \`\${payload}.\${mac}\`;`}
                   channel. Supabase Realtime goes in when paying customers ask.
                 </p>
                 <p>
-                  <strong className="text-ink">No third-party analytics.</strong> Events capture to
-                  a Supabase table that's schema-compatible with PostHog. Replay-able as a batch
-                  import if PostHog ever makes sense.
+                  <strong className="text-ink">No browser analytics SDK.</strong> Product events
+                  first land in Supabase. The monitor worker replays them to PostHog server-side for
+                  product analytics.
                 </p>
                 <p>
                   <strong className="text-ink">No Vercel.</strong> Cloudflare Pages runs Next.js on
@@ -289,8 +294,8 @@ const cookie = \`\${payload}.\${mac}\`;`}
               </h2>
               <div className="mt-4 space-y-4">
                 <p>
-                  Three packages, six SQL files, two vendors (Cloudflare and Supabase). The whole
-                  thing is AGPL-3.0 at{' '}
+                  Four packages, a versioned SQL schema, and two core infrastructure vendors:
+                  Cloudflare and Supabase. The whole thing is AGPL-3.0 at{' '}
                   <a
                     href="https://github.com/htmlradar/htmlradar"
                     className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
@@ -375,7 +380,7 @@ function ArchitectureDiagram() {
         <Arrow from={{ x: 390, y: 300 }} to={{ x: 460, y: 290 }} label="rpc" />
       </svg>
       <figcaption className="mt-4 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-        Two browsers, three packages, one database
+        Three request-path packages, plus a monitor worker
       </figcaption>
     </figure>
   );

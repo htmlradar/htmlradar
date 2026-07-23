@@ -4,14 +4,15 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
 
-export const metadata = {
+export const metadata = pageMeta({
   title: 'Blog',
   description: 'Engineering, design, and product writing from the HTMLRadar team.',
-  alternates: { canonical: 'https://htmlradar.com/blog' },
-};
+  path: '/blog',
+});
 
 interface Post {
   slug: string;
@@ -24,9 +25,9 @@ interface Post {
 const POSTS: Post[] = [
   {
     slug: 'how-we-built-htmlradar',
-    title: 'How I built HTMLRadar in three packages',
+    title: 'How I built HTMLRadar',
     description:
-      'The shape of HTMLRadar: a Next.js app, a Cloudflare Worker, an 8 KB (gzipped) browser tracker, six SQL files. What each part owns and the calls behind them.',
+      'How HTMLRadar is built: a Next.js app, two Cloudflare Workers, an 8 KB browser tracker, and a Supabase schema. What each part owns and why.',
     date: '2026-05-14',
     readingTime: '5 min',
   },

@@ -14,7 +14,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Pitch Deck Tracking Software for Founders | HTMLRadar',
   description:
-    'Know the moment an investor opens your deck, which slides they read, and when to follow up. Per-investor links and real-time read alerts. Free to start.',
+    'Know when an investor opens your deck, which slides they read, and when to follow up. Per-investor links and first-read alerts. Free to start.',
   path: '/use-case/pitch-deck-tracking',
 });
 
@@ -46,9 +46,8 @@ export default function PitchDeckTrackingPage() {
               How do you know when an investor opens your deck?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              An email lands the moment a real read happens — not on every pixel-load. HTMLRadar
-              uses a three-second dwell floor, so a scroll-past or an accidental click doesn&apos;t
-              ping you. When you get the notification, someone is actually reading.
+              HTMLRadar waits five seconds after the document loads before creating a session. The
+              first session requests an email notification; a fast backgrounded bounce does not.
             </p>
           </section>
 

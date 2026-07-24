@@ -53,23 +53,26 @@ export default function Post() {
           <div className="mt-12 space-y-10 text-[16.5px] leading-[1.7] text-ink-soft">
             <p>
               I built HTMLRadar because I wanted to send investor updates as HTML, branded the way
-              the rest of my company's site is branded, not flattened into a PDF. DocSend and the
-              other tracking tools only accept PDFs. So I built a tracker for HTML decks for myself,
-              then realised other founders had the same problem and open-sourced it.
+              the rest of my company's site is branded, not flattened into a PDF. Existing
+              document-tracking tools were built around PDF-first workflows. So I built a tracker
+              for HTML decks for myself, then realised other founders had the same problem and
+              open-sourced it.
             </p>
 
             <p>
-              The pattern is bigger than one founder's preference. Teams that use LLMs heavily ship
-              more and more of their work as HTML — specs, design mocks, reports, dashboards,
-              internal briefs. ChatGPT, Claude, v0, Lovable, and Anthropic Artifacts all produce
-              HTML for the things that matter. PDFs are a pre-LLM artifact; the new deliverable is
-              HTML. The analytics tooling stayed on PDFs. That's the gap HTMLRadar tries to fill.
+              The pattern is broader than one founder's preference. Teams can now produce specs,
+              design mocks, reports, dashboards, and internal briefs as HTML through hand-coded
+              workflows and tools such as ChatGPT, Claude, v0, Lovable, and Claude Artifacts. HTML
+              keeps responsive layouts, links, and interactive elements intact. The sending and
+              analytics workflow is still largely designed around static documents. That's the gap
+              HTMLRadar tries to fill.
             </p>
 
             <p>
               HTMLRadar is open-source DocSend for HTML. You upload an HTML deck (or paste a URL),
-              share a tracked link, and watch in real time who reads it, which sections they dwell
-              on, when they bounce. The repo is AGPL-3.0 at{' '}
+              share a tracked link, and see recipient sessions, section-level dwell, and exits in
+              the sender dashboard. The dashboard refreshes every 30 seconds while its tab is
+              visible. The repo is AGPL-3.0 at{' '}
               <a
                 href="https://github.com/htmlradar/htmlradar"
                 className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
@@ -107,8 +110,9 @@ export default function Post() {
                   <code className="font-mono text-[14px] text-signal-dark">packages/tracker</code>{' '}
                   is a 22 KB minified (8 KB gzipped) browser IIFE. The proxy injects a single{' '}
                   <code className="font-mono text-[14px] text-signal-dark">&lt;script&gt;</code> tag
-                  into every served document. The tracker identifies the viewer, prompts for email
-                  if the share requires one, and streams session metrics to Supabase.
+                  into every served document. The tracker creates the browser identifier, reads any
+                  email the proxy has already verified, and streams session metrics to Supabase
+                  after the warm-up.
                 </p>
                 <p>
                   <code className="font-mono text-[14px] text-signal-dark">packages/monitor</code>{' '}
@@ -146,21 +150,19 @@ export default function Post() {
 });`}
                 />
                 <p>
-                  The dwell tracker is a small state machine on the viewport. The tracker watches{' '}
-                  IntersectionObserver entries on{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">
-                    h1[id], h2[id], h3[id]
-                  </code>{' '}
-                  (the convention every static-site generator emits), treat the most
-                  recently-scrolled-past heading as the current section, and accumulate elapsed time
-                  on that section while the tab is visible.
+                  The dwell tracker samples the visible viewport. It first uses configured
+                  selectors, then falls back to headings, slide or page containers, and finally
+                  plain-prose anchors. Each sample divides active time among the sections that cover
+                  enough of the viewport. A section begins qualifying only after at least half of it
+                  stays visible for one continuous second, and the public read signal uses a
+                  three-second dwell floor.
                 </p>
                 <p>
                   Flush runs every 15 seconds and on{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">pagehide</code> with{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">keepalive: true</code> so
-                  the last second of analytics survives a close-tab. A single-flight mutex stops the
-                  15-second timer racing the visibility-change flush during scroll-then-tab-away.
+                  <code className="font-mono text-[14px] text-signal-dark">pagehide</code>. The
+                  page-hide path requests one final best-effort update with{' '}
+                  <code className="font-mono text-[14px] text-signal-dark">keepalive: true</code>. A
+                  single-flight guard prevents concurrent updates from racing.
                 </p>
               </div>
             </section>
@@ -236,11 +238,11 @@ const cookie = \`\${payload}.\${mac}\`;`}
                   Every subsequent update call must pass it back.
                 </p>
                 <p>
-                  When a recipient session crosses the dwell threshold for the first time, a
-                  Postgres trigger fires{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">pg_net</code> directly at
-                  the Resend API. No queue, no Lambda, no Vercel function. The Resend API key lives
-                  in Supabase Vault and is decrypted at trigger time. Trade-off:{' '}
+                  When a recipient creates their first session for a document, a Postgres trigger
+                  fires <code className="font-mono text-[14px] text-signal-dark">pg_net</code>{' '}
+                  directly at the Resend API. There is no application-owned queue, Lambda, or Vercel
+                  function. The Resend API key lives in Supabase Vault and is decrypted at trigger
+                  time. Trade-off:{' '}
                   <code className="font-mono text-[14px] text-signal-dark">pg_net</code> is
                   fire-and-forget so deliveries can fail silently; the trigger writes every dispatch
                   to{' '}

@@ -70,7 +70,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'HTMLRadar — Document tracking for HTML',
     description:
-      'Open-source read tracking for HTML decks, mocks, briefs, and updates. Section-level dwell, per-recipient shares, real-time read notifications.',
+      'Open-source read tracking for HTML decks, mocks, briefs, and updates. Section-level dwell, per-recipient shares, and first-read email notifications.',
     images: ['/og-card.png'],
   },
   robots: {

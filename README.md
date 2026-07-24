@@ -21,17 +21,17 @@ The walkthrough below uses synthetic sample data and shows the real HTMLRadar se
 
 ## What it does
 
-- **Section-level dwell — on any HTML.** Three-second floor separates a real read from a scroll-past. The tracker auto-detects sections from your HTML: explicit anchored headings → bare `h1/h2/h3` (slugged from text) → slide/page containers (`section`, `.slide`, `.page`) → paragraph buckets on plain prose. Dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12s on Problem, and skipped Market sizing.
+- **Section-level dwell — on any HTML.** At least half a section must stay visible for one continuous second before its dwell starts qualifying; the read signal fires after three qualified seconds. The tracker auto-detects sections from your HTML: explicit anchored headings → bare `h1/h2/h3` (slugged from text) → slide/page containers (`section`, `.slide`, `.page`) → paragraph buckets on plain prose. Dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12s on Problem, and skipped Market sizing.
 - **Per-viewer dashboard, aggregated across every share.** One row per person who actually opened the doc, with email + country + device + referrer + total time + scroll depth + visits + first/last seen. Updates live every 30 seconds while the tab is in focus.
 - **Per-recipient share links.** One document, many shares. Each share carries its own email gate, password, expiry, revocation, and email-domain or per-email allow-list.
 - **Files alongside the deck.** Attach PDFs, financial models, images, and ZIPs to any share. Recipients see a small corner pill that opens a side drawer; files are always available when present (the per-share "Lock the deck" toggle controls deck save/print only, never attachments). Every download is logged per viewer + per session + per filename.
 - **Version history.** Replace the HTML after partner feedback. Every existing share keeps the same link and serves the new version on next open. The `v{n}` chip on the doc page is a popover with every upload's original local filename, byte size, and timestamp.
 - **Retroactive share access.** Change a share's password, expiry, or allow-list without revoking. The proxy re-checks the allow-list on every request — removing an email kicks them out immediately on their next click, not their next browser session.
 - **Edit + preview without leaving the dashboard.** Preview the doc as the recipient sees it before sending (short-lived HMAC token, no gate). Both "Preview document" and "Preview as you" open in a new tab so your dashboard stays where you left it.
-- **Branded first-open email.** When a recipient crosses the dwell threshold, you get a properly designed HTML notification — viewer email + doc title + a single "See the read →" CTA back to the dashboard. Tease, not report.
+- **Branded first-open email.** When a recipient creates their first real session, HTMLRadar requests an HTML notification — viewer email + doc title + a single "See the read →" CTA back to the dashboard. Tease, not report.
 - **Engaged-time, not tab-open time.** Both per-section dwell and per-session active time apply a 5-second idle watchdog (keydown / scroll / touchstart, mousemove deliberately excluded). Same methodology as Chartbeat / Parse.ly engagement-time. A tab parked while the reader walked away stops counting after 5 seconds.
-- **Bot / accidental-tap filter.** Sessions only create after a 5-second warm-up; if the recipient backgrounded the tab or bounced before then, no session, no notification, no inflated viewer count.
-- **Privacy-respecting.** No mouse tracking, no keystrokes, no DOM snapshots, no session replay. Section dwell + scroll depth + active time only. Recipients can opt out via `window.HTMLRadar.optOut()`.
+- **Bot / accidental-tap filter.** After the document loads, HTMLRadar waits through a 5-second warm-up before creating the session. If the recipient backgrounds the tab or bounces during that wait, there is no session, notification request, or inflated viewer count.
+- **Privacy-respecting.** Recipient records contain an email when entered or a random browser ID, referrer, coarse device and location data, section dwell, scroll depth, and active time. HTMLRadar stores no raw IP address, keystrokes, mouse positions, DOM snapshots, or session replay. Recipients can opt out via `window.HTMLRadar.optOut()`.
 
 ## What it deliberately is not
 
@@ -79,7 +79,7 @@ Core hosting runs on Cloudflare and Supabase. Resend is optional for notificatio
 2. Upload an HTML file or paste a URL.
 3. Create a per-recipient share. Email gate / password / expiry / allow-list optional per share.
 4. Send the tracked link.
-5. Watch the dashboard. First-read email lands when the recipient crosses the three-second threshold.
+5. Watch the dashboard. HTMLRadar requests a first-read email when the recipient creates their first real session.
 
 Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month): unlimited tracked links, no "Powered by HTMLRadar" footer on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
 

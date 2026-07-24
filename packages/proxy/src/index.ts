@@ -235,6 +235,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   return injectTracker(html, {
     share,
     tier,
+    trackingEnabled: !isOwnerPreview,
     trackerUrl: env.TRACKER_URL,
     supabaseUrl: env.SUPABASE_URL,
     supabaseAnonKey: env.SUPABASE_ANON_KEY,

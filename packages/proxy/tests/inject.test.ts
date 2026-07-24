@@ -137,6 +137,7 @@ function inject(opts: { lockDeck: boolean; email?: string; recipientLabel?: stri
         ...(opts.recipientLabel !== undefined ? { recipient_label: opts.recipientLabel } : {}),
       }),
       tier: 'pro', // skip chrome footer so we don't fight with it in assertions
+      trackingEnabled: true,
       trackerUrl: 'https://htmlradar.com/v1/tracker.js',
       supabaseUrl: 'https://example.supabase.co',
       supabaseAnonKey: 'anon-key',
@@ -208,6 +209,7 @@ describe('download/screenshot guard injection (lock_deck semantic)', () => {
       {
         share: makeShare({ lock_deck: true }),
         tier: 'free',
+        trackingEnabled: true,
         trackerUrl: 'https://htmlradar.com/v1/tracker.js',
         supabaseUrl: 'https://example.supabase.co',
         supabaseAnonKey: 'anon-key',
@@ -233,6 +235,7 @@ describe('attachments panel — corner pill UI', () => {
       {
         share: makeShare({ lock_deck: args.lockDeck }),
         tier: 'pro',
+        trackingEnabled: true,
         trackerUrl: 'https://htmlradar.com/v1/tracker.js',
         supabaseUrl: 'https://example.supabase.co',
         supabaseAnonKey: 'anon-key',
@@ -325,6 +328,7 @@ describe('attachments panel — corner pill UI', () => {
 describe('fragment / headless document fallback', () => {
   const opts = {
     tier: 'pro' as const,
+    trackingEnabled: true,
     trackerUrl: 'https://htmlradar.com/v1/tracker.js',
     supabaseUrl: 'https://example.supabase.co',
     supabaseAnonKey: 'anon-key',
@@ -361,5 +365,47 @@ describe('fragment / headless document fallback', () => {
     const html = await res.text();
     expect(html).toContain('Powered by');
     expect(html).toContain('htmlradar-guard-style');
+  });
+});
+
+describe('recipient analytics boundaries', () => {
+  const baseOptions = {
+    share: makeShare({ lock_deck: false }),
+    trackerUrl: 'https://htmlradar.com/v1/tracker.js',
+    supabaseUrl: 'https://example.supabase.co',
+    supabaseAnonKey: 'anon-key',
+    trackingEnabled: true,
+  };
+
+  it('keeps tracking and the Powered by footer on a free recipient view', async () => {
+    const response = injectTracker(new Response('<html><head></head><body></body></html>'), {
+      ...baseOptions,
+      tier: 'free',
+    });
+    const html = await response.text();
+    expect(html).toContain('HTMLRadarConfig');
+    expect(html).toContain('Powered by');
+  });
+
+  it('keeps tracking but omits the Powered by footer on a Pro recipient view', async () => {
+    const response = injectTracker(new Response('<html><head></head><body></body></html>'), {
+      ...baseOptions,
+      tier: 'pro',
+    });
+    const html = await response.text();
+    expect(html).toContain('HTMLRadarConfig');
+    expect(html).not.toContain('Powered by');
+  });
+
+  it('shows the free-tier footer without creating recipient analytics in an owner preview', async () => {
+    const response = injectTracker(new Response('<html><head></head><body></body></html>'), {
+      ...baseOptions,
+      tier: 'free',
+      trackingEnabled: false,
+    });
+    const html = await response.text();
+    expect(html).toContain('Powered by');
+    expect(html).not.toContain('HTMLRadarConfig');
+    expect(html).not.toContain('https://htmlradar.com/v1/tracker.js');
   });
 });

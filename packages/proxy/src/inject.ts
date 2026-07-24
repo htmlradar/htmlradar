@@ -4,6 +4,7 @@ import { escapeHtml } from './escape.js';
 interface InjectOptions {
   share: Share;
   tier: 'free' | 'pro';
+  trackingEnabled: boolean;
   trackerUrl: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
@@ -26,7 +27,7 @@ interface InjectOptions {
 // a chrome footer before </body>. The document body is never modified.
 
 export function injectTracker(html: Response, opts: InjectOptions): Response {
-  const headSnippet = headInjection(opts);
+  const headSnippet = opts.trackingEnabled ? headInjection(opts) : '';
   const footerSnippet = opts.tier === 'free' ? chromeFooter() : '';
   // Attachments are ALWAYS surfaced to the recipient when present, per
   // the design decision: "if you don't want a file shared,
@@ -78,7 +79,7 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
     })
     .onDocument({
       end(end) {
-        if (!headSeen) end.append(headSnippet, { html: true });
+        if (!headSeen && headSnippet) end.append(headSnippet, { html: true });
         if (!bodySeen) appendBodyChrome(end);
       },
     });

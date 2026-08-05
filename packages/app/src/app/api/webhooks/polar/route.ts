@@ -108,8 +108,14 @@ async function resolveProfileId(
       // doesn't return before the in-flight fetch on Workers/edge where
       // un-awaited fetches get cancelled.
       if (customer.id) {
+        // Still non-fatal — the tier flip below must succeed regardless, and a
+        // missing back-link only costs us the email fallback on the next event.
+        // But never silent again: this call swallowed 401s from an expired
+        // POLAR_API_KEY for 40 days, so no customer was ever back-linked and
+        // nothing surfaced. A non-2xx here is the earliest signal the key died.
+        let backlinkFailure: string | null = null;
         try {
-          await fetch(`https://api.polar.sh/v1/customers/${customer.id}`, {
+          const res = await fetch(`https://api.polar.sh/v1/customers/${customer.id}`, {
             method: 'PATCH',
             headers: {
               Authorization: `Bearer ${POLAR_API_KEY}`,
@@ -117,10 +123,17 @@ async function resolveProfileId(
             },
             body: JSON.stringify({ external_id: data.id }),
           });
-        } catch {
-          // Backlink failure is non-fatal — the tier flip below still
-          // succeeds; the next event for this customer just falls through
-          // to email again.
+          if (!res.ok) backlinkFailure = `HTTP ${res.status}`;
+        } catch (e) {
+          backlinkFailure = e instanceof Error ? e.message : 'unknown';
+        }
+        if (backlinkFailure) {
+          await logServerError({
+            source: 'webhook.polar',
+            message: `external_id back-link failed → ${backlinkFailure}`,
+            route: '/api/webhooks/polar',
+            context: { polar_customer_id: customer.id },
+          });
         }
       }
       return { kind: 'matched', profileId: data.id };
@@ -140,15 +153,38 @@ async function applySubscription(
     // in the response body (it ends up in Polar's delivery log).
     throw new Error(`resolve_failed:${resolution.kind}`);
   }
-  // Read existing profile for coalescing pro_since / non-shrinking pro_until.
-  const { data: existing } = await sb
+  // Read existing profile for coalescing pro_since / non-shrinking pro_until,
+  // and for the comped check below. maybeSingle() rather than single(): a row
+  // that vanished between resolution and here is a legitimate empty result, not
+  // an error, and only maybeSingle() lets us tell that apart from a genuine read
+  // failure. That distinction now matters — a swallowed read error would present
+  // as "row absent", comped would read undefined, and we'd mutate an account
+  // that must never be touched.
+  const { data: existing, error: readErr } = await sb
     .from('profiles')
-    .select('pro_since, pro_until')
+    .select('pro_since, pro_until, comped')
     .eq('id', resolution.profileId)
-    .single();
+    .maybeSingle();
+  if (readErr) throw new Error(`profile_read_failed:${readErr.code ?? 'unknown'}`);
+
+  // Comped accounts are internal: permanently Pro, never billed, and outside
+  // Polar's authority entirely. No Polar event may write to them — above all a
+  // subscription.revoked for some long-dead test subscription, which would
+  // otherwise downgrade an internal account off the back of a cancelled trial.
+  // Still return the profileId so the caller's analytics capture is unchanged.
+  if (existing?.comped) return resolution.profileId;
 
   const update = computeTierUpdate(sub, existing ?? null);
-  const { error } = await sb.from('profiles').update(update).eq('id', resolution.profileId);
+  // comped is re-asserted in the WHERE clause, not just checked above. The read
+  // and the write are two round trips; if an account is comped in between them
+  // the early return has already been passed, and an in-flight Polar event would
+  // still downgrade it. Making the filter carry the invariant means the database
+  // enforces it at write time rather than this function remembering to.
+  const { error } = await sb
+    .from('profiles')
+    .update(update)
+    .eq('id', resolution.profileId)
+    .eq('comped', false);
   if (error) throw new Error(`profile_update_failed:${error.code ?? 'unknown'}`);
   return resolution.profileId;
 }

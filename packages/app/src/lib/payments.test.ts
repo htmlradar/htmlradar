@@ -70,6 +70,67 @@ describe('computeTierUpdate', () => {
     }
   });
 
+  // The real subscription.revoked payload Polar sent for viewer9@example.test.
+  // Status is 'canceled', not 'revoked', and the period end is still weeks away —
+  // only ended_at marks the revoke. This profile sat on tier=pro for weeks.
+  it('revoke delivered as canceled + past ended_at → free (the viewer9 case)', () => {
+    const update = computeTierUpdate(
+      {
+        status: 'canceled',
+        started_at: '2026-06-26T16:46:59Z',
+        current_period_end: '2026-07-26T16:46:59Z',
+        ended_at: '2026-07-17T20:00:05Z',
+      },
+      { pro_since: '2026-06-26T16:46:59Z', pro_until: '2026-07-26T16:46:59Z' },
+      new Date('2026-07-17T20:00:16Z'),
+    );
+    expect(update.tier).toBe('free');
+    if (update.tier === 'free') {
+      expect(update.pro_until).toBe('2026-07-17T20:00:05Z'); // when access really ended
+    }
+  });
+
+  // Guard on the other side of the ended_at rule: a paying customer who cancels
+  // is paid through the period and Polar leaves ended_at null. Downgrading here
+  // would cut off someone who has already paid.
+  it('cancel-at-period-end with no ended_at → pro through the paid period', () => {
+    const update = computeTierUpdate(
+      {
+        status: 'canceled',
+        started_at: '2026-05-01T00:00:00Z',
+        current_period_end: FUTURE,
+        ended_at: null,
+      },
+      { pro_since: '2026-05-01T00:00:00Z', pro_until: FUTURE },
+      FIXED_NOW,
+    );
+    expect(update.tier).toBe('pro');
+    if (update.tier === 'pro') {
+      expect(update.pro_until).toBe(FUTURE);
+    }
+  });
+
+  // Polar sets ended_at only once an end has actually happened (a scheduled end
+  // is ends_at, a different field we don't read). A future ended_at therefore
+  // shouldn't occur in practice — this pins the behaviour if provider clock skew
+  // or a schema change ever produces one: don't revoke on it.
+  it('ended_at in the FUTURE (provider clock skew) → still pro, no early revoke', () => {
+    const update = computeTierUpdate(
+      {
+        status: 'active',
+        started_at: '2026-05-01T00:00:00Z',
+        current_period_end: FUTURE,
+        ended_at: FUTURE,
+      },
+      null,
+      FIXED_NOW,
+    );
+    expect(update.tier).toBe('pro');
+    if (update.tier === 'pro') {
+      expect(update.pro_until).toBe(FUTURE);
+    }
+  });
+
   it('past_due status with active period → pro (dunning grace)', () => {
     const update = computeTierUpdate(
       {

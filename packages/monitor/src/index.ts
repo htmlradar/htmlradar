@@ -6,7 +6,8 @@
 //      min. This catches the migration-013 class of bug where a
 //      backend regression silently drops customer-facing emails.
 //   2. The four critical user-facing routes (/, /pricing, /docs,
-//      /sign-in) return HTTP 200. Catches deploy-broken-prod cases.
+//      /sign-in) return HTTP 200, retried before paging so a
+//      transient edge blip doesn't. Catches deploy-broken-prod cases.
 //   3. webhook_events_log has failed-and-unprocessed Polar events
 //      (checkWebhookHealth). See its comment block.
 //   4. The Pro expiry sweep (expirePro) demoted somebody. Not a
@@ -48,6 +49,12 @@ export interface Env {
 }
 
 const ROUTES = ['/', '/pricing', '/docs', '/sign-in'];
+
+// Route probing retries before it pages — see check 2 for why. Three attempts a
+// few seconds apart finishes well inside the 5-minute cron window.
+const ROUTE_ATTEMPTS = 3;
+const ROUTE_RETRY_MS = 3_000;
+const ROUTE_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // app_events → PostHog replay.
@@ -323,15 +330,41 @@ export default {
       alerts.push(`Couldn't read notifications_log: ${(err as Error).message}`);
     }
 
-    // Check 2: critical routes return 200
+    // Check 2: critical routes return 200, confirmed over several attempts.
+    //
+    // One probe is weak evidence. /sign-in and /docs run as Cloudflare edge
+    // functions (x-edge-runtime), and a transient edge 503 that heals in seconds
+    // looks identical to a real outage in a single sample. That false positive
+    // paged the founder on 2026-08-25 for a blip no user ever hit — zero traffic
+    // in the window, nothing in app_error_log. A genuine outage survives all
+    // three attempts; a blip does not.
+    //
+    // This is deliberately the OPPOSITE call to the webhook alarm above, which
+    // stays loud on a single failure. The difference is whether the condition can
+    // heal on its own: an edge blip does, an unprocessed payment never does.
     for (const path of ROUTES) {
-      try {
-        const res = await fetch(`https://htmlradar.com${path}`, { redirect: 'follow' });
-        if (res.status !== 200) {
-          alerts.push(`${path} returned HTTP ${res.status} (expected 200)`);
+      let problem: string | null = null;
+      for (let attempt = 1; attempt <= ROUTE_ATTEMPTS; attempt++) {
+        try {
+          const res = await fetch(`https://htmlradar.com${path}`, {
+            redirect: 'follow',
+            // Without this a hung request could stall the whole cron run.
+            signal: AbortSignal.timeout(ROUTE_TIMEOUT_MS),
+          });
+          if (res.status === 200) {
+            problem = null;
+            break;
+          }
+          problem = `returned HTTP ${res.status} (expected 200)`;
+        } catch (err) {
+          problem = `fetch threw: ${(err as Error).message}`;
         }
-      } catch (err) {
-        alerts.push(`${path} fetch threw: ${(err as Error).message}`);
+        if (attempt < ROUTE_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, ROUTE_RETRY_MS));
+        }
+      }
+      if (problem) {
+        alerts.push(`${path} ${problem} — failed all ${ROUTE_ATTEMPTS} attempts`);
       }
     }
 

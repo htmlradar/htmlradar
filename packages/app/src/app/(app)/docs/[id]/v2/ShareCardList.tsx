@@ -12,7 +12,7 @@
 // DocumentShareManager (1418 lines) is untouched and still serves
 // the live /docs/[id] route. Rollback = swap one import.
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { captureClientEvent } from '@/lib/events-client';
 import {
   ChevronDown,
@@ -60,6 +60,25 @@ export function ShareCardList(props: ShareCardListProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [showDraft, setShowDraft] = useState(false);
   const atShareCap = !!freeShareCap && freeShareCap.used >= freeShareCap.cap;
+
+  // Both paying customers converted here — on *seeing* they were at the limit,
+  // not on being blocked by it. Neither ever attempted a third link, so
+  // free_tier.share_cap_hit (which only fires on a blocked create) has never
+  // recorded a single event and never will for a normal user.
+  //
+  // This is the impression that actually precedes payment, so it is the
+  // denominator we were missing: how many people see this card versus how many
+  // click through to /upgrade. Without it we can see 2 of 3 upgrade-page views
+  // became payments, but not how many people saw the limit and shrugged — which
+  // is the number that tells us whether a cap of 2 is right.
+  useEffect(() => {
+    if (!atShareCap) return;
+    void captureClientEvent('free_tier.cap_card_seen', {
+      document_id: documentId,
+      used: freeShareCap!.used,
+      cap: freeShareCap!.cap,
+    });
+  }, [atShareCap, documentId, freeShareCap]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {

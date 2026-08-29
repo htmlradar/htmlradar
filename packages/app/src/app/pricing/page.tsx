@@ -1,7 +1,7 @@
 // /pricing — public pricing page, restyled to match the v2 landing.
 //
 // Tier model (pricing v4): free hosted with caps (2 tracked links
-// lifetime + 100 MB total attachments), Pro $15/mo lifts the caps and
+// lifetime + 100 MB total attachments), Pro $15/mo or $150/yr lifts the caps and
 // drops the footer chrome. Self-host under AGPL stays free, no caps.
 // Roadmap section is honest about what's NOT in Pro yet.
 //
@@ -11,9 +11,10 @@
 // buttons, kickers, and the dark "self-host" card.
 
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, Check } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { FaqLd } from '@/components/JsonLd';
+import { PricingTiers } from './PricingTiers';
 import { pageMeta } from '@/lib/seo';
 import '../landing-v2.css';
 
@@ -22,7 +23,7 @@ export const dynamic = 'force-static';
 export const metadata: Metadata = pageMeta({
   title: 'HTMLRadar Pricing — Free to Start, Open Source',
   description:
-    'Simple pricing for tracked HTML documents. Free for 2 tracked links, $15/mo Pro for unlimited links and no viewer footer. Or self-host free under AGPL-3.0.',
+    'Simple pricing for tracked HTML documents. Free for 2 tracked links, then $15/mo or $150/yr for unlimited links and no viewer footer. Or self-host free under AGPL-3.0.',
   path: '/pricing',
 });
 
@@ -33,11 +34,15 @@ const FAQ = [
   },
   {
     q: 'What does Pro add?',
-    a: 'Unlimited tracked links, no "Powered by HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat.',
+    a: 'Unlimited tracked links, no "Powered by HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat. Annual billing is $150 a year, which is two months free.',
   },
   {
     q: 'Can I run HTMLRadar for free forever?',
     a: 'Yes — self-host it. The full source is AGPL-3.0 on GitHub and runs on your own Cloudflare and Supabase accounts; their free tiers cover personal use.',
+  },
+  {
+    q: 'Can I cancel, and what happens if I do?',
+    a: 'Cancel yourself from settings at any time — no email required. Your plan stays active until the end of the period you have already paid for, then the account returns to the free tier. Payments already made are not refundable.',
   },
   {
     q: 'Do recipients need an account?',
@@ -46,10 +51,14 @@ const FAQ = [
 ];
 
 export default function PricingPage() {
-  // Fall back to /sign-in rather than a dead '#': post-sign-in the app's
-  // own /upgrade page builds the checkout link, so conversion still works
-  // even if the env var is missing at build time.
-  const stripeUrl = process.env['STRIPE_PAYMENT_LINK_URL'] ?? '/sign-in';
+  // Both Pro buttons point at /upgrade, never straight at Polar. This page
+  // is static and cannot tell who is signed in; /upgrade can, and it is the
+  // only place that attaches customer_external_id to the checkout so the
+  // payment webhook can match a payment to an account without guessing from
+  // the email address. It also turns away anyone already on Pro, which is
+  // what stops a monthly subscriber opening a second subscription by buying
+  // the annual plan on top of the one they already have.
+  const proHref = '/upgrade';
 
   return (
     <div className="v2-root">
@@ -111,52 +120,7 @@ export default function PricingPage() {
 
       {/* ─────────────────────── TIERS ─────────────────────── */}
       <section style={{ padding: '40px 56px 100px', maxWidth: 1180, margin: '0 auto' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 24,
-          }}
-          className="v2-pricing-grid"
-        >
-          <Tier
-            name="Hosted · Free"
-            price="$0"
-            cadence="forever"
-            description="Enough to try it on a deck or two."
-            features={[
-              '2 tracked links (lifetime)',
-              'Unlimited documents',
-              'Section-level dwell tracking, per recipient',
-              'Email gate, password, expiry, revoke per share',
-              'Email-domain and per-email allow-lists',
-              'Files attached to a deck: 20 files · 25 MB each · 100 MB per doc',
-              'Per-share download permission, every download logged',
-              'Real-time email when a real read happens',
-              '“Powered by HTMLRadar” footer on the viewer',
-            ]}
-            ctaLabel="Start free"
-            ctaHref="/sign-in"
-            ctaPrimary={false}
-          />
-          <Tier
-            name="Hosted · Pro"
-            price="$15"
-            cadence="per month, cancel anytime"
-            accent
-            description="For founders and consultants who send real diligence packages."
-            features={[
-              'Everything in Free, plus:',
-              'Unlimited tracked links',
-              'No “Powered by HTMLRadar” footer on recipient views',
-              'Priority email support, response inside one business day',
-            ]}
-            ctaLabel="Upgrade to Pro"
-            ctaHref={stripeUrl}
-            ctaPrimary
-            external
-          />
-        </div>
+        <PricingTiers proHref={proHref} />
       </section>
 
       {/* ─────────────────────── SELF-HOST (dark card) ─────────────────────── */}
@@ -399,172 +363,6 @@ export default function PricingPage() {
         }
       `}</style>
     </div>
-  );
-}
-
-/* ───────── Tier card ───────── */
-
-interface TierProps {
-  name: string;
-  price: string;
-  cadence: string;
-  description: string;
-  features: string[];
-  ctaLabel: string;
-  ctaHref: string;
-  ctaPrimary: boolean;
-  accent?: boolean;
-  external?: boolean;
-}
-
-function Tier({
-  name,
-  price,
-  cadence,
-  description,
-  features,
-  ctaLabel,
-  ctaHref,
-  ctaPrimary,
-  accent = false,
-  external = false,
-}: TierProps) {
-  return (
-    // Box shadows live in landing-v2.css rules (.pricing-tier and
-    // .pricing-tier[data-accent='true']) so the :hover variant can
-    // actually override them. Inline styles win over external CSS by
-    // specificity rules, so an inline boxShadow here would have left
-    // the hover state with a lift but no deepened shadow — caught by
-    // the static-audit pass on 2026-05-19.
-    <article
-      className="pricing-tier"
-      data-accent={accent ? 'true' : 'false'}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        background: accent ? 'var(--ink)' : 'var(--card)',
-        color: accent ? '#fff' : 'var(--ink)',
-        border: `1px solid ${accent ? 'var(--ink)' : 'var(--line)'}`,
-        borderRadius: 16,
-        padding: '32px 32px 28px',
-      }}
-    >
-      <div
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 11,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          fontWeight: 700,
-          color: accent ? 'var(--pop)' : 'var(--ink-3)',
-        }}
-      >
-        {name}
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 6,
-          marginTop: 18,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'var(--serif)',
-            fontSize: 'clamp(40px, 4.6vw, 64px)',
-            fontWeight: 700,
-            letterSpacing: '-0.03em',
-            lineHeight: 1,
-          }}
-        >
-          {price}
-        </span>
-        <span
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
-            letterSpacing: '0.04em',
-            color: accent ? 'rgba(255,255,255,0.55)' : 'var(--ink-3)',
-          }}
-        >
-          · {cadence}
-        </span>
-      </div>
-      <p
-        style={{
-          margin: '12px 0 0',
-          maxWidth: '32ch',
-          fontSize: 14,
-          lineHeight: 1.55,
-          color: accent ? 'rgba(255,255,255,0.7)' : 'var(--ink-2)',
-        }}
-      >
-        {description}
-      </p>
-      <ul
-        style={{
-          listStyle: 'none',
-          padding: 0,
-          margin: '24px 0 0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-          flex: 1,
-        }}
-      >
-        {features.map((f) => (
-          <li
-            key={f}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '14px 1fr',
-              gap: 10,
-              alignItems: 'flex-start',
-              fontSize: 13.5,
-              lineHeight: 1.55,
-              color: accent ? 'rgba(255,255,255,0.85)' : 'var(--ink-2)',
-            }}
-          >
-            <Check
-              aria-hidden
-              style={{
-                width: 14,
-                height: 14,
-                marginTop: 3,
-                color: accent ? 'var(--pop)' : 'var(--brand)',
-                flexShrink: 0,
-              }}
-              strokeWidth={2.2}
-            />
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
-      <div style={{ marginTop: 28 }}>
-        {ctaPrimary ? (
-          <a
-            href={ctaHref}
-            target={external ? '_blank' : undefined}
-            rel={external ? 'noopener noreferrer' : undefined}
-            data-cta="pricing.upgrade"
-            className="v2-btn"
-            style={{
-              background: 'var(--brand)',
-              color: '#fff',
-            }}
-          >
-            {ctaLabel}
-            <ArrowRight style={{ width: 16, height: 16 }} />
-          </a>
-        ) : (
-          <Link href={ctaHref} data-cta="pricing.start_free" className="v2-btn v2-btn-ghost">
-            {ctaLabel}
-            <ArrowRight style={{ width: 16, height: 16 }} />
-          </Link>
-        )}
-      </div>
-    </article>
   );
 }
 

@@ -3,14 +3,16 @@ import { ArrowRight, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
 import { readQuota } from '@/lib/quota';
+import { PlanChoice } from './PlanChoice';
 
 export const runtime = 'edge';
 
-type SearchParams = Promise<{ reason?: string }>;
+type SearchParams = Promise<{ reason?: string; plan?: string }>;
 
 export default async function UpgradePage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireUser();
-  const reason = (await searchParams).reason;
+  const params = await searchParams;
+  const reason = params.reason;
   const quota = await readQuota(serverClient(), user.id);
   const isQuotaTrigger = reason === 'quota' || reason === 'share_quota' || quota.atCap;
 
@@ -64,29 +66,37 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
   // the legacy name still set in some envs — read either, prefer the new
   // one, and refuse anything that isn't a Polar host so a bad rotation
   // can't route customers to the wrong processor.
-  const rawCheckoutUrl =
-    process.env['POLAR_CHECKOUT_URL'] ?? process.env['STRIPE_PAYMENT_LINK_URL'];
-  let checkoutHostOk = false;
-  if (rawCheckoutUrl && rawCheckoutUrl.startsWith('http')) {
+  // Each plan is sold through its own Polar checkout link. A plan whose
+  // env var is missing or points somewhere that isn't Polar is simply not
+  // offered — the other plan still sells, and if neither resolves the card
+  // falls back to the email route below.
+  //
+  // customer_external_id + customer_email are appended to whichever link is
+  // used so Polar's webhook payload identifies which HTMLRadar user paid,
+  // and the tier flip happens without anyone running SQL by hand.
+  const buildCheckoutUrl = (raw: string | undefined): string | null => {
+    if (!raw || raw === '#' || !raw.startsWith('http')) return null;
+    let u: URL;
     try {
-      const host = new URL(rawCheckoutUrl).hostname;
-      checkoutHostOk = host === 'buy.polar.sh' || host.endsWith('.polar.sh');
+      u = new URL(raw);
     } catch {
-      checkoutHostOk = false;
+      return null;
     }
-  }
-  const checkoutAvailable = !!rawCheckoutUrl && rawCheckoutUrl !== '#' && checkoutHostOk;
-  // Append customer_external_id + customer_email so Polar's webhook
-  // payload identifies which HTMLRadar user paid. Lets the v1.1 webhook
-  // handler auto-flip them to Pro without manual SQL.
-  const checkoutUrl = checkoutAvailable
-    ? (() => {
-        const u = new URL(rawCheckoutUrl as string);
-        u.searchParams.set('customer_external_id', user.id);
-        if (user.email) u.searchParams.set('customer_email', user.email);
-        return u.toString();
-      })()
-    : 'mailto:hello@htmlradar.com?subject=Upgrade%20to%20HTMLRadar%20Pro';
+    // Refuse anything that isn't a Polar host so a bad rotation can't route
+    // customers to the wrong processor.
+    if (u.hostname !== 'buy.polar.sh' && !u.hostname.endsWith('.polar.sh')) return null;
+    u.searchParams.set('customer_external_id', user.id);
+    if (user.email) u.searchParams.set('customer_email', user.email);
+    return u.toString();
+  };
+
+  // POLAR_CHECKOUT_URL is the canonical name; STRIPE_PAYMENT_LINK_URL is
+  // the legacy name still set in some envs — read either, prefer the new one.
+  const monthlyUrl = buildCheckoutUrl(
+    process.env['POLAR_CHECKOUT_URL'] ?? process.env['STRIPE_PAYMENT_LINK_URL'],
+  );
+  const annualUrl = buildCheckoutUrl(process.env['POLAR_CHECKOUT_URL_ANNUAL']);
+  const checkoutAvailable = !!monthlyUrl || !!annualUrl;
   return (
     <div className="mx-auto max-w-2xl space-y-8 py-8">
       <header>
@@ -124,13 +134,6 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
             Hosted, Pro
           </h2>
         </div>
-        <div className="mt-5 flex items-baseline gap-1">
-          <span className="font-serif text-[44px] leading-none tracking-tightest text-ink">
-            $15
-          </span>
-          <span className="font-mono text-[12px] text-graphite">· per month, cancel anytime</span>
-        </div>
-
         <ul className="mt-7 space-y-3 text-[14.5px] text-ink-soft">
           {[
             'Unlimited tracked links',
@@ -147,23 +150,34 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
           ))}
         </ul>
 
-        <a
-          href={checkoutUrl}
-          target={checkoutAvailable ? '_blank' : undefined}
-          rel={checkoutAvailable ? 'noopener noreferrer' : undefined}
-          data-cta="upgrade.checkout"
-          className="group mt-8 inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
-        >
-          {checkoutAvailable ? 'Upgrade to Pro' : 'Email us to upgrade'}
-          <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-        </a>
-
         {checkoutAvailable ? (
-          <p className="mt-4 text-[12px] leading-relaxed text-graphite">
-            Payment opens in a new tab. You'll be returned here once it's complete and your account
-            will upgrade automatically.
-          </p>
+          <PlanChoice
+            monthlyUrl={monthlyUrl}
+            annualUrl={annualUrl}
+            initialAnnual={params.plan === 'annual'}
+          />
         ) : (
+          <>
+            <div className="mt-5 flex items-baseline gap-1">
+              <span className="font-serif text-[44px] leading-none tracking-tightest text-ink">
+                $15
+              </span>
+              <span className="font-mono text-[12px] text-graphite">
+                · per month, cancel anytime
+              </span>
+            </div>
+            <a
+              href="mailto:hello@htmlradar.com?subject=Upgrade%20to%20HTMLRadar%20Pro"
+              data-cta="upgrade.checkout"
+              className="group mt-8 inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
+            >
+              Email us to upgrade
+              <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+            </a>
+          </>
+        )}
+
+        {checkoutAvailable ? null : (
           <p className="mt-4 inline-flex items-start gap-2 text-[12px] leading-relaxed text-alert">
             <AlertCircle aria-hidden className="mt-0.5 size-3.5 shrink-0" />
             Hosted checkout is being set up. Email{' '}

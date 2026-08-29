@@ -107,7 +107,7 @@ export default function PitchDeckTrackingPage() {
               },
               {
                 q: 'What does it cost for a fundraise?',
-                a: 'The free tier covers 2 tracked links so you can try it. Pro is $15/mo flat for unlimited links — enough for a full fundraise.',
+                a: 'The free tier covers 2 tracked links so you can try it. Pro is $15/mo flat for unlimited links, or $150/yr if you pay annually — enough for a full fundraise.',
               },
               {
                 q: 'Can I revoke access after the round closes?',

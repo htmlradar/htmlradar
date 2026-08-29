@@ -75,14 +75,15 @@ export default function TermsPage() {
             <Section title="Paying for it">
               <p>
                 The free tier gives you two tracked links, for as long as you want them. Pro is{' '}
-                <strong className="text-ink">$15 per month</strong>, billed through Polar, our
-                merchant of record. Polar handles the payment and any tax that applies where you
-                are.
+                <strong className="text-ink">$15 per month, or $150 per year</strong> if you pay
+                annually. Either way it is billed through Polar, our merchant of record, who handles
+                the payment and any tax that applies where you are.
               </p>
               <p className="mt-4">
-                Subscriptions renew automatically each month until you cancel. You can cancel at any
-                time from your settings, and you keep Pro access until the end of the period you
-                have already paid for. We do not charge you again after you cancel.
+                Subscriptions renew automatically — every month on the monthly plan, every year on
+                the annual one — until you cancel. You can cancel at any time from your settings,
+                and you keep Pro access until the end of the period you have already paid for. We do
+                not charge you again after you cancel.
               </p>
               <p className="mt-4">
                 If we ever change the price, existing subscribers keep their current price for as

@@ -96,7 +96,7 @@ export default function ComparePage() {
                   HTMLRadar
                 </h3>
                 <p className="mt-3 font-serif text-[20px] leading-snug text-ink">
-                  HTML-first, open source, $15/mo flat.
+                  HTML-first, open source, $15/mo or $150/yr flat.
                 </p>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
                   Track HTML decks from Claude, ChatGPT, v0, reveal.js, or hand-rolled HTML.
@@ -210,7 +210,7 @@ export default function ComparePage() {
             items={[
               {
                 q: 'Is HTMLRadar a free DocSend alternative?',
-                a: 'The hosted free tier covers 2 tracked links with full section-level analytics. Past that it is $15/mo flat — or self-host the AGPL-3.0 source for free on your own infrastructure.',
+                a: 'The hosted free tier covers 2 tracked links with full section-level analytics. Past that it is $15/mo flat, or $150/yr if you pay annually — or self-host the AGPL-3.0 source for free on your own infrastructure.',
               },
               {
                 q: 'Does HTMLRadar track PDFs like DocSend does?',

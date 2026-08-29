@@ -97,6 +97,21 @@ function toPostHogEvent(row: AppEventRow): Record<string, unknown> {
     // Merge the pre-signup anon fingerprint person into the user person.
     props['$anon_distinct_id'] = props['alias_fingerprint'];
   }
+  // First-touch attribution → PostHog PERSON properties, set once.
+  //
+  // The first_* keys already ride along as event properties via the spread
+  // above, but that only lets you filter events. $set_once promotes them to
+  // the person, which is what makes PostHog's own first-touch attribution and
+  // "which channel produced this customer" analysis work natively — and it is
+  // write-once, so a later pageview with a different referrer cannot overwrite
+  // where someone originally came from.
+  const firstTouch = Object.fromEntries(
+    Object.entries(props).filter(([k]) => k.startsWith('first_')),
+  );
+  if (Object.keys(firstTouch).length > 0) {
+    props['$set_once'] = { ...(props['$set_once'] as object | undefined), ...firstTouch };
+  }
+
   // Signup/signin carry email (auth/callback) — set it as a person
   // property so people are recognizable in the PostHog UI.
   if ((event === 'user.signed_up' || event === 'user.signed_in') && props['email']) {

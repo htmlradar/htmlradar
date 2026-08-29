@@ -1,23 +1,44 @@
 # HTMLRadar
 
-Open-source read tracking for HTML decks, briefs, and proposals. AGPL-3.0.
+### Read tracking for the HTML your LLM just generated.
 
-- **Hosted**: [htmlradar.com](https://htmlradar.com) — free for 2 tracked links lifetime, $15/mo (or $150/yr) Pro for unlimited links
-- **Source**: this repo, AGPL-3.0. The changelog documents v1.2; the latest published Git tag is v1.1.2.
-- **Discuss**: [GitHub issues](https://github.com/htmlradar/htmlradar/issues) — bug reports + PRs welcome
-- **Roadmap**: [issues labelled `roadmap`](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPLv3-7A1F2E)](./LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/htmlradar/htmlradar?style=flat&color=7A1F2E)](https://github.com/htmlradar/htmlradar/stargazers)
+[![Self-hostable](https://img.shields.io/badge/self--hostable-yes-7A1F2E)](#quick-start--self-host)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-7A1F2E)](https://github.com/htmlradar/htmlradar/issues)
+
+**Send an HTML deck, brief, or proposal as a tracked link. See who opened it,
+which sections they actually read, and how long they stayed — not just that it
+was opened.**
+
+[htmlradar.com](https://htmlradar.com) · free for 2 tracked links, $15/mo or
+$150/yr for unlimited · or self-host the whole thing.
+
+[Issues and PRs](https://github.com/htmlradar/htmlradar/issues) · [roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap) · [changelog](./CHANGELOG.md) documents v1.2; latest published tag is v1.1.2.
+
+![HTMLRadar dashboard walkthrough using synthetic sample data](./docs/assets/htmlradar-dashboard-demo.gif)
+
+<sub>Walkthrough uses synthetic sample data in the real sender dashboard.</sub>
+
+---
+
+## Why this exists
+
+Teams that use LLMs heavily ship more and more of their work as HTML — specs,
+reports, dashboards, design mocks, decks. ChatGPT, Claude, v0, Lovable and
+Anthropic Artifacts all produce HTML for the things that matter.
+
+The tracking tooling never followed. DocSend and everything like it is built
+around uploading a file and tracking that file. PDF was the print-era container.
+
+HTMLRadar tracks the document people actually send now, and reports reading at
+section level rather than a single "opened" flag.
 
 ---
 
 ## What this is
 
 Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you already host), send a tracked link `htmlradar.com/r/{slug}`, see who opened it, which sections they dwelled on, and when they bounced. Section-level dwell, not "opened."
-
-The bigger pattern: teams that use LLMs heavily ship more and more of their work as HTML — specs, design mocks, reports, dashboards, internal briefs. ChatGPT, Claude, v0, Lovable, Anthropic Artifacts all produce HTML for the things that matter. PDFs are a pre-LLM artifact; the analytics tooling stayed on PDFs. HTMLRadar follows the deliverable.
-
-The walkthrough below uses synthetic sample data and shows the real HTMLRadar sender dashboard.
-
-![HTMLRadar dashboard walkthrough using synthetic sample data](./docs/assets/htmlradar-dashboard-demo.gif)
 
 ## What it does
 

@@ -500,7 +500,8 @@ function ShareForm({
       <section>
         <SectionEyebrow>Link name</SectionEyebrow>
         <SectionNote>
-          A label just for you — the people you send the link to never see this.
+          Private. Use this to identify who this link is for in your analytics, such as a person,
+          company, or group.
         </SectionNote>
         <div className="mt-3">
           <input
@@ -579,6 +580,20 @@ function ShareForm({
           checked={emailGate}
           onChange={setEmailGate}
         />
+        {/* Without the gate, viewers still group into their own rows with full
+            section dwell — they are keyed on a random browser identifier
+            (ViewerInsights.tsx), not on a person. So the honest claim is that
+            reading data survives and identity does not, and that one person on
+            two devices counts twice. Saying "you lose individual analytics"
+            would be wrong. */}
+        {!emailGate && (
+          <p className="mt-2 rounded-md border border-line bg-paper-2/40 px-3 py-2 text-[12.5px] leading-relaxed text-graphite">
+            You&rsquo;ll still see which sections were read, but viewers will be anonymous. Each
+            browser shows up as Viewer 1, Viewer 2, and so on, so the same person may appear more
+            than once. If this link is going to one person, name it after them above so the report
+            makes sense later.
+          </p>
+        )}
         {emailGate && (
           <div className="mt-3 ml-0 space-y-4 border-l-2 border-signal/40 bg-paper-2/30 px-4 py-3 sm:ml-2">
             <FieldBlock

@@ -202,3 +202,86 @@ describe('X-Robots-Tag', () => {
     expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
   });
 });
+
+describe('CSP sandbox on every proxy response', () => {
+  // Customer documents are served on the same origin as the application and
+  // carry their own scripts, so every proxy response is sandboxed into an
+  // opaque origin.
+  //
+  // allow-same-origin must never appear here — its absence is the control.
+  it('is present on a served document', async () => {
+    const res = await get('/r/acme-proposal');
+    expect(res.status).toBe(200);
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+  });
+
+  it('is present on a not-found response', async () => {
+    getShareBySlug.mockResolvedValue(null);
+    const res = await get('/r/no-such-link');
+    expect(res.status).toBe(404);
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+  });
+
+  it('is present on a revoked link, which must still reveal nothing', async () => {
+    getShareBySlug.mockResolvedValue({ ...share, revoked_at: '2026-01-01T00:00:00Z' });
+    const res = await get('/r/acme-proposal');
+    expect(res.status).toBe(403);
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+    const body = await res.text();
+    expect(body).not.toContain('owner-1');
+    expect(body).not.toContain('doc-1');
+    expect(body).not.toContain('acme-proposal');
+  });
+
+  it('is present on an expired link', async () => {
+    getShareBySlug.mockResolvedValue({ ...share, expires_at: '2020-01-01T00:00:00Z' });
+    const res = await get('/r/acme-proposal');
+    expect(res.status).toBe(410);
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+  });
+
+  it('is present on the email gate', async () => {
+    getShareBySlug.mockResolvedValue({ ...share, require_email: true });
+    const res = await get('/r/acme-proposal');
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+  });
+
+  it('is present on a path that matches no route at all', async () => {
+    const res = await get('/definitely-not-a-route');
+    expect(res.status).toBe(404);
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+  });
+
+  // The header is added by rebuilding the response. A gate that lost its
+  // Set-Cookie on the way through would lock every recipient out of every
+  // password-protected link, so this is the one that must never regress.
+  it('does not cost the password gate its cookie', async () => {
+    getShareBySlug.mockResolvedValue({ ...share, require_password: true });
+    const res = await post('/r/acme-proposal/auth', { password: 'correct-horse' });
+    expect(res.status).toBe(303);
+    expect(res.headers.get('Set-Cookie')).toMatch(/^htmlradar_auth_acme-proposal=/);
+    expect(res.headers.get('Location')).toBe('/r/acme-proposal');
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('sandbox');
+    expect(csp).toContain('allow-scripts');
+    expect(csp).not.toContain('allow-same-origin');
+  });
+});

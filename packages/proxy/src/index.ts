@@ -58,6 +58,29 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function withNoIndex(res: Response): Response {
   const out = new Response(res.body, res);
   out.headers.set('X-Robots-Tag', 'noindex, nofollow');
+
+  // Sandbox every proxy response into an opaque origin.
+  //
+  // Customer-uploaded HTML is served from this worker on the same origin as
+  // the application, and inject.ts intentionally does not constrain
+  // script-src, because customer documents legitimately carry their own
+  // scripts. Omitting allow-same-origin gives those documents an opaque
+  // origin, so they cannot reach application storage or make same-origin
+  // requests to it. Their own scripts still run.
+  //
+  // Applied here rather than in inject.ts because the owner preview route
+  // builds its own Response and never calls injectTracker; this helper wraps
+  // every response, including the error path.
+  //
+  // append, not set: a response may already carry a policy from inject.ts,
+  // and multiple CSP headers combine restrictively.
+  //
+  // Interim hardening. Recipient documents should move to an origin that
+  // holds no application cookies.
+  out.headers.append(
+    'Content-Security-Policy',
+    'sandbox allow-scripts allow-forms allow-popups allow-downloads',
+  );
   return out;
 }
 

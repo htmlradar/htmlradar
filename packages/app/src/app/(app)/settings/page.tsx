@@ -5,13 +5,23 @@ import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
 import { logServerError } from '@/lib/error-log';
 import { readQuota } from '@/lib/quota';
+import {
+  shouldOfferAnnualSwitch,
+  switchToAnnual,
+  type ActiveSubscription,
+} from '@/lib/annual-switch';
 import { SectionMark } from '@/components/SectionMark';
 import { UpgradePending } from '@/components/UpgradePending';
 import { SubscriptionControls } from '@/components/SubscriptionControls';
+import { AnnualSwitch } from './AnnualSwitch';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
 export const runtime = 'edge';
+
+// These two names are not in the AppEvent union in lib/events.ts yet — that
+// file is outside this change's file boundary. Add them to the union there and
+// delete these two casts.
 
 async function polarGet<T>(path: string): Promise<T> {
   // Reads env inside the function — next-on-pages can resolve env at
@@ -38,11 +48,12 @@ type PolarSubLite = {
   status: string;
   cancel_at_period_end: boolean;
   created_at?: string;
+  recurring_interval?: string;
+  product_id?: string;
+  amount?: number;
 };
 
-async function getActiveSubscription(
-  externalId: string,
-): Promise<{ id: string; canceling: boolean } | null> {
+async function getActiveSubscription(externalId: string): Promise<ActiveSubscription | null> {
   type CustomersResp = { items: Array<{ id: string }> };
   type SubsResp = { items: PolarSubLite[] };
   const customers = await polarGet<CustomersResp>(
@@ -79,7 +90,16 @@ async function getActiveSubscription(
   const sub = items.reduce((newest, candidate) =>
     (candidate.created_at ?? '') > (newest.created_at ?? '') ? candidate : newest,
   );
-  return { id: sub.id, canceling: sub.cancel_at_period_end === true };
+  return {
+    id: sub.id,
+    canceling: sub.cancel_at_period_end === true,
+    // Empty string rather than a guess when Polar omits the field — the annual
+    // offer and the switch both require an explicit 'month', so a missing
+    // interval hides the offer and refuses the switch instead of charging.
+    recurringInterval: sub.recurring_interval ?? '',
+    productId: sub.product_id ?? '',
+    amount: sub.amount ?? 0,
+  };
 }
 
 async function patchSubscription(
@@ -207,6 +227,72 @@ async function resumeSubscriptionAction(): Promise<{ ok: boolean; error?: string
   }
 }
 
+// Charges money. Every guard here is deliberate:
+//  - the subscription is re-read from Polar, never taken from page state;
+//  - switchToAnnual() refuses anything that isn't a live monthly plan and
+//    returns success without a PATCH when the plan is already annual, so a
+//    double submit can't bill twice;
+//  - the customer-facing error is fixed text, so a raw Polar message can never
+//    reach the browser.
+const SWITCH_FAILED_MESSAGE =
+  'We could not switch your plan, and you have not been charged for the annual plan. Email hello@htmlradar.com and we will sort it out.';
+
+async function switchToAnnualAction(): Promise<{ ok: boolean; error?: string }> {
+  'use server';
+  const user = await requireUser();
+  try {
+    const sub = await getActiveSubscription(user.id);
+    await captureServerEvent({
+      event: 'subscription.switch_requested',
+      distinctId: user.id,
+      userId: user.id,
+      properties: {
+        from_interval: sub?.recurringInterval ?? null,
+        to_interval: 'year',
+        subscription_id: sub?.id ?? null,
+      },
+    });
+    const result = await switchToAnnual({
+      sub,
+      annualProductId: process.env['POLAR_PRODUCT_ID_ANNUAL'] ?? '',
+      patch: patchSubscription,
+    });
+    if (!result.ok) {
+      await logServerError({
+        source: 'settings.switch_annual',
+        message: `Refused monthly→annual switch: ${result.detail}`,
+        userId: user.id,
+        route: '/settings',
+        context: { reason: result.reason, subscription_id: sub?.id ?? null },
+      });
+      return { ok: false, error: SWITCH_FAILED_MESSAGE };
+    }
+    // Only a real PATCH counts as a switch — the idempotent no-op must not
+    // inflate the count of plans that actually moved.
+    if (result.patched) {
+      await captureServerEvent({
+        event: 'subscription.switch_succeeded',
+        distinctId: user.id,
+        userId: user.id,
+        properties: { from_interval: 'month', to_interval: 'year', subscription_id: sub!.id },
+      });
+    }
+    // No revalidatePath — same edge-runtime reason as the cancel action. The
+    // client calls router.refresh().
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    await logServerError({
+      source: 'settings.switch_annual',
+      message: msg,
+      userId: user.id,
+      route: '/settings',
+      context: { threw: true },
+    });
+    return { ok: false, error: SWITCH_FAILED_MESSAGE };
+  }
+}
+
 type SearchParams = Promise<{ upgraded?: string; checkout_id?: string }>;
 
 function ProSuccessBanner({ proUntil }: { proUntil: string | null }) {
@@ -265,7 +351,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   const quota = await readQuota(supabase, user.id);
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
-  let subState: { id: string; canceling: boolean } | null = null;
+  let subState: ActiveSubscription | null = null;
   if (tier === 'pro') {
     try {
       subState = await getActiveSubscription(user.id);
@@ -280,6 +366,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
       // Render Cancel link anyway; the real error surfaces on click.
     }
   }
+  const offerAnnual = shouldOfferAnnualSwitch({
+    tier,
+    sub: subState,
+    annualProductId: process.env['POLAR_PRODUCT_ID_ANNUAL'],
+  });
   const accountCreated = new Date(profile?.created_at ?? user.created_at).toLocaleDateString(
     undefined,
     {
@@ -345,6 +436,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                 />
               }
             />
+          ) : null}
+          {offerAnnual ? (
+            <Row label="Billing" value={<AnnualSwitch switchAction={switchToAnnualAction} />} />
           ) : null}
           <Row label="Account created" value={accountCreated} />
         </dl>

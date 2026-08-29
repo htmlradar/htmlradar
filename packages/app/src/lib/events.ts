@@ -18,6 +18,9 @@ export type AppEvent =
   | 'document.replaced'
   | 'version.v1_seed_failed'
   | 'share.created'
+  // Fired alongside share.created when the owner chose the link address
+  // rather than taking a generated one (Pro).
+  | 'share.custom_slug_used'
   | 'share.edited'
   | 'share.revoked'
   | 'share.reactivated'
@@ -43,6 +46,8 @@ export type AppEvent =
   | 'subscription.cancel_requested'
   | 'subscription.resumed'
   | 'subscription.resume_requested'
+  | 'subscription.switch_requested'
+  | 'subscription.switch_succeeded'
   | 'subscription.revoked'
   | '$identify';
 

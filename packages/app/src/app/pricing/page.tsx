@@ -34,7 +34,7 @@ const FAQ = [
   },
   {
     q: 'What does Pro add?',
-    a: 'Unlimited tracked links, no "Powered by HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat. Annual billing is $150 a year, which is two months free.',
+    a: 'Unlimited tracked links, your own link names (htmlradar.com/r/acme-proposal instead of a random one), no "Powered by HTMLRadar" footer on recipient views, and priority support. $15/mo flat — not per seat. Annual billing is $150 a year, which is two months free.',
   },
   {
     q: 'Can I run HTMLRadar for free forever?',

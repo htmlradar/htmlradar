@@ -81,7 +81,7 @@ Core hosting runs on Cloudflare and Supabase. Resend is optional for notificatio
 4. Send the tracked link.
 5. Watch the dashboard. HTMLRadar requests a first-read email when the recipient creates their first real session.
 
-Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month, or $150/year — two months free): unlimited tracked links, no "Powered by HTMLRadar" footer on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
+Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month, or $150/year — two months free): unlimited tracked links, your own link names (`htmlradar.com/r/acme-proposal` rather than a generated one), no "Powered by HTMLRadar" footer on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
 
 ## Quick start — self-host
 

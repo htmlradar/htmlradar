@@ -137,7 +137,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
         <ul className="mt-7 space-y-3 text-[14.5px] text-ink-soft">
           {[
             'Unlimited tracked links',
-            'Choose your own link ending',
+            'Name your own links: htmlradar.com/r/acme-proposal',
             'No “Powered by HTMLRadar” footer on recipient views',
             'Priority support',
             'Coming soon: custom domain (share.yourdomain.com)',

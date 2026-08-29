@@ -28,7 +28,7 @@ import './landing-v2.css';
 export const metadata = pageMeta({
   title: 'Track an HTML Document — See Who Read It | HTMLRadar',
   description:
-    'HTML tracker for decks, briefs, and proposals. Send an HTML document as a tracked link and see who opened it, which sections they read, and how long they stayed.',
+    'See who opened your HTML deck or proposal, which sections they read, and for how long. Free for 2 tracked links. Open source (AGPL-3.0).',
   path: '/',
 });
 

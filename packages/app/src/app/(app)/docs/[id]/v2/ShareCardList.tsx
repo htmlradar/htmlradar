@@ -6,7 +6,7 @@
 // - Save via editShareAction
 // - Revoke + Permanent delete (typed-confirm) at the bottom
 // - "Create a new share link" CTA opens a draft card with the same form
-//   shape, submitted via createShareAction
+//   shape, submitted via createShareFormAction
 //
 // All server actions reused verbatim from the existing live page —
 // DocumentShareManager (1418 lines) is untouched and still serves
@@ -14,6 +14,8 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { captureClientEvent } from '@/lib/events-client';
+import { createShareFormAction } from '../actions';
+import { normalizeSlugInput } from '@/lib/share-slug';
 import {
   ChevronDown,
   Clock,
@@ -39,7 +41,6 @@ interface ShareCardListProps {
     formData: FormData,
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   editShareAction: (formData: FormData) => Promise<void>;
-  createShareAction: (formData: FormData) => Promise<void>;
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
   // Free-tier link cap (pricing v4). null = pro (unlimited, no counter/gate).
@@ -52,11 +53,14 @@ export function ShareCardList(props: ShareCardListProps) {
     documentId,
     previewShareAction,
     editShareAction,
-    createShareAction,
     toggleShareAction,
     deleteShareAction,
     freeShareCap,
   } = props;
+  // freeShareCap is null exactly when the owner is Pro (see v2/page.tsx), so
+  // it doubles as the entitlement signal for the link-address field. The
+  // database is what actually enforces it (schema/033).
+  const isPro = !freeShareCap;
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [showDraft, setShowDraft] = useState(false);
   const atShareCap = !!freeShareCap && freeShareCap.used >= freeShareCap.cap;
@@ -135,7 +139,7 @@ export function ShareCardList(props: ShareCardListProps) {
       {showDraft && (
         <DraftShareCard
           documentId={documentId}
-          createShareAction={createShareAction}
+          isPro={isPro}
           onCancel={() => setShowDraft(false)}
         />
       )}
@@ -172,11 +176,11 @@ export function ShareCardList(props: ShareCardListProps) {
 
 function DraftShareCard({
   documentId,
-  createShareAction,
+  isPro,
   onCancel,
 }: {
   documentId: string;
-  createShareAction: (formData: FormData) => Promise<void>;
+  isPro: boolean;
   onCancel: () => void;
 }) {
   return (
@@ -203,7 +207,7 @@ function DraftShareCard({
         </button>
       </div>
       <div className="px-5 py-5">
-        <ShareForm mode="create" documentId={documentId} action={createShareAction} />
+        <ShareForm mode="create" documentId={documentId} isPro={isPro} />
       </div>
     </div>
   );
@@ -334,6 +338,7 @@ function LinkSection({
   const [isPreviewing, startPreview] = useTransition();
 
   const url = `https://htmlradar.com/r/${share.slug}`;
+  const customSlug = hasCustomSlug(share);
 
   const onCopy = async () => {
     // "Copied the link" is the closest signal we have to "actually sent
@@ -406,9 +411,33 @@ function LinkSection({
           {isPreviewing ? 'Opening…' : 'Preview as you'}
         </button>
       </div>
+      {customSlug && (
+        <p className="mt-2 text-[12px] text-ink-soft">
+          Permanent — the people you sent this to are using it.
+        </p>
+      )}
       {previewError && <p className="mt-2 text-[12px] text-alert">{previewError}</p>}
     </section>
   );
+}
+
+// slug_is_custom arrives from schema/033 but ShareRow is declared in
+// DocumentShareManager.tsx, which this component does not own. The page
+// selects '*', so the field is there at runtime; read it narrowly rather than
+// widening a type that belongs to another file.
+function hasCustomSlug(share: ShareRow): boolean {
+  return (share as ShareRow & { slug_is_custom?: boolean }).slug_is_custom === true;
+}
+
+// Convert the tz-less datetime-local expiry to a true UTC instant in the
+// browser (timezone known here) so the server stores the moment the owner
+// picked, not a UTC misparse. Empty = no expiry, left as-is. (Fixes the
+// [2] timezone bug on the live form — DocumentShareManager was dead.)
+function applyLocalExpiry(fd: FormData) {
+  const localExpiry = String(fd.get('expires_at') ?? '');
+  if (localExpiry) {
+    fd.set('expires_at', localInputToIso(localExpiry, new Date(localExpiry).getTimezoneOffset()));
+  }
 }
 
 function ShareForm({
@@ -416,32 +445,52 @@ function ShareForm({
   share,
   documentId,
   action,
+  isPro = false,
 }: {
   mode: 'create' | 'edit';
   share?: ShareRow;
   documentId: string;
-  action: (formData: FormData) => Promise<void>;
+  action?: (formData: FormData) => Promise<void>;
+  isPro?: boolean;
 }) {
   const [emailGate, setEmailGate] = useState(share?.require_email ?? true);
   const [passwordOn, setPasswordOn] = useState(share?.require_password ?? false);
   const [expiryOn, setExpiryOn] = useState(!!share?.expires_at);
+  // Link address (create + Pro only). Controlled so it can be lowercased as
+  // the customer types and so a pasted URL can be shortened to its last
+  // segment with a visible note.
+  const [slug, setSlug] = useState('');
+  const [slugShortened, setSlugShortened] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, startSubmit] = useTransition();
+  const isCreate = mode === 'create';
+
+  // Create submits through onSubmit rather than the form `action` prop on
+  // purpose. A rejected link address must leave the customer looking at the
+  // form they filled in — no navigation, no React form reset — so a taken
+  // address costs them one field, not the whole form.
+  const onCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    applyLocalExpiry(fd);
+    setFormError(null);
+    startSubmit(async () => {
+      const result = await createShareFormAction(fd);
+      // A success redirects and never returns.
+      if (result) setFormError(result.error);
+    });
+  };
 
   return (
     <form
-      action={(fd) => {
-        // Convert the tz-less datetime-local expiry to a true UTC instant in the
-        // browser (timezone known here) so the server stores the moment the owner
-        // picked, not a UTC misparse. Empty = no expiry, left as-is. (Fixes the
-        // [2] timezone bug on the live form — DocumentShareManager was dead.)
-        const localExpiry = String(fd.get('expires_at') ?? '');
-        if (localExpiry) {
-          fd.set(
-            'expires_at',
-            localInputToIso(localExpiry, new Date(localExpiry).getTimezoneOffset()),
-          );
-        }
-        return action(fd);
-      }}
+      {...(isCreate
+        ? { onSubmit: onCreateSubmit }
+        : {
+            action: (fd: FormData) => {
+              applyLocalExpiry(fd);
+              return action!(fd);
+            },
+          })}
       className="space-y-7"
     >
       <input type="hidden" name="document_id" value={documentId} />
@@ -463,6 +512,60 @@ function ShareForm({
           />
         </div>
       </section>
+
+      {/* Link address — set once at creation, never afterwards.
+          Nothing is copied here from the link name above: that field is
+          overwhelmingly the recipient's name or firm, and this one is public. */}
+      {isCreate &&
+        (isPro ? (
+          <section>
+            <SectionEyebrow>Link address</SectionEyebrow>
+            <SectionNote>
+              Public — this is the link your recipient receives. Optional: leave it blank and
+              we&apos;ll generate one. It cannot be changed once the link is created.
+            </SectionNote>
+            <div className="mt-3 flex items-stretch overflow-hidden rounded-md border border-line bg-paper focus-within:border-signal">
+              <span className="shrink-0 border-r border-line bg-paper-2/40 px-3 py-2 font-mono text-[12.5px] leading-normal text-graphite">
+                htmlradar.com/r/
+              </span>
+              <input
+                type="text"
+                name="slug"
+                value={slug}
+                onChange={(e) => {
+                  const next = normalizeSlugInput(e.target.value);
+                  setSlug(next.value);
+                  setSlugShortened(next.shortened);
+                }}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="off"
+                placeholder="acme-proposal"
+                aria-describedby="slug-note"
+                className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono text-[12.5px] text-ink focus:outline-none"
+              />
+            </div>
+            {slugShortened && (
+              <p id="slug-note" className="mt-2 text-[12px] text-ink-soft">
+                We kept the last part of what you pasted — the rest of the address is fixed.
+              </p>
+            )}
+          </section>
+        ) : (
+          <section>
+            <SectionEyebrow>Link address</SectionEyebrow>
+            <SectionNote>
+              Pro can choose the ending. Free links get a secure random ending.{' '}
+              <a
+                href="/upgrade?reason=custom_slug"
+                className="font-medium text-signal underline underline-offset-2 hover:text-signal-dark"
+              >
+                See Pro
+              </a>
+            </SectionNote>
+          </section>
+        ))}
 
       {/* Audience section */}
       <section>
@@ -579,13 +682,21 @@ function ShareForm({
         </div>
       </section>
 
-      <div className="flex items-center gap-3 border-t border-line/60 pt-5">
-        <button
-          type="submit"
-          className="inline-flex items-center gap-2 rounded-md bg-signal px-5 py-2 font-sans text-[14px] font-medium text-paper shadow-sm hover:bg-signal-dark"
-        >
-          {mode === 'create' ? 'Create link' : 'Save changes'}
-        </button>
+      <div className="border-t border-line/60 pt-5">
+        {formError && (
+          <p role="alert" className="mb-3 text-[13px] leading-relaxed text-alert">
+            {formError}
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center gap-2 rounded-md bg-signal px-5 py-2 font-sans text-[14px] font-medium text-paper shadow-sm hover:bg-signal-dark disabled:opacity-60"
+          >
+            {isCreate ? (submitting ? 'Creating…' : 'Create link') : 'Save changes'}
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -608,12 +719,19 @@ function ShareActions({
   const [showDelete, setShowDelete] = useState(false);
   const [typed, setTyped] = useState('');
   const canDelete = typed.trim().toUpperCase() === 'DELETE';
+  // A link whose address the owner chose is never destroyed: freeing the
+  // address would let a later customer take it, and a recipient opening an
+  // old email would land on a stranger's document. The database refuses the
+  // delete too (trg_block_custom_slug_delete, schema/033).
+  const customSlug = hasCustomSlug(share);
 
   return (
     <section className="border-t border-line/60 pt-5">
       <SectionEyebrow>Actions</SectionEyebrow>
       <SectionNote>
-        Revoke pauses the link (recoverable). Delete removes it forever (history goes with it).
+        {customSlug
+          ? 'Revoke switches the link off, and you can switch it back on. You chose this address, so it stays reserved to you and cannot be deleted.'
+          : 'Revoke pauses the link (recoverable). Delete removes it forever (history goes with it).'}
       </SectionNote>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -637,7 +755,7 @@ function ShareActions({
             )}
           </button>
         </form>
-        {!showDelete && (
+        {!showDelete && !customSlug && (
           <button
             type="button"
             onClick={() => {
@@ -652,7 +770,7 @@ function ShareActions({
         )}
       </div>
 
-      {showDelete && (
+      {showDelete && !customSlug && (
         <form
           action={deleteShareAction}
           className="mt-4 rounded-lg border border-alert/30 bg-alert/5 p-4"

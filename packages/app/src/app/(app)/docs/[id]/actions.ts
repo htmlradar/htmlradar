@@ -18,6 +18,7 @@ import {
   r2KeyForAttachment,
   validateFile,
 } from '@/lib/attachments';
+import { describeSlugError, validateShareSlug } from '@/lib/share-slug';
 
 // Shared parse for the two allowlist textareas. Domains in one field,
 // specific emails in another. Both accept comma- and newline-separated
@@ -45,7 +46,22 @@ function parseAllowlists(formData: FormData): {
   };
 }
 
-export async function createShareAction(formData: FormData) {
+// Returned when share creation fails for a reason the customer can fix. The
+// caller stays on the form and every field they filled in stays filled in —
+// losing a whole form because one link address was taken is the worst thing
+// this feature could do to somebody.
+export type CreateShareError = { error: string; field?: 'slug' };
+
+/**
+ * Share creation, returning its failure instead of redirecting to it.
+ *
+ * prop plumbing (v2/page.tsx → DocTabsClient) is typed against as
+ * `(formData) => Promise<void>`; the create form imports THIS function
+ * directly so it can receive the error and keep the customer's input.
+ * Once DocTabsClient/page.tsx can be touched, that prop should be deleted and
+ * the wrapper with it.
+ */
+export async function createShareFormAction(formData: FormData): Promise<CreateShareError | void> {
   const user = await requireUser();
   const supabase = serverClient();
   const documentId = String(formData.get('document_id'));
@@ -72,11 +88,32 @@ export async function createShareAction(formData: FormData) {
   // param. DocumentShareManager reads the param and displays it inline.
   let slug: string | null = null;
   let errorMessage: string | null = null;
+  let errorField: CreateShareError['field'];
+  // Set here so the analytics call below can see it after the try block.
+  let chosenSlug: string | null = null;
   try {
     const requirePassword = formData.get('require_password') === 'on';
     const password = String(formData.get('password') ?? '');
     if (requirePassword && password.length < 8) {
       throw new Error('Password must be at least 8 characters.');
+    }
+
+    // The customer-chosen link address (Pro). Blank = generate one, exactly
+    // as before. Trimmed and lowercased here as well as in create_share so
+    // the value we validate is the value we send. This check is a courtesy:
+    // the validate_share_slug trigger (schema/033) is the actual control,
+    // because RLS lets a signed-in customer write share rows directly.
+    chosenSlug = String(formData.get('slug') ?? '')
+      .trim()
+      .toLowerCase();
+    if (!chosenSlug) {
+      chosenSlug = null;
+    } else {
+      const problem = validateShareSlug(chosenSlug);
+      if (problem) {
+        errorField = 'slug';
+        throw new Error(problem);
+      }
     }
 
     const { domains, emails } = parseAllowlists(formData);
@@ -98,8 +135,18 @@ export async function createShareAction(formData: FormData) {
       p_allowed_email_domains: domains,
       p_allowed_emails: emails,
       p_expires_at: expiresAt,
+      p_slug: chosenSlug,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Translate the exceptions 033 raises into copy the customer can act
+      // on; anything else is not about the address and passes through.
+      const slugProblem = describeSlugError(error.message);
+      if (slugProblem) {
+        errorField = 'slug';
+        throw new Error(slugProblem);
+      }
+      throw new Error(error.message);
+    }
 
     slug =
       (Array.isArray(created) ? created[0]?.slug : (created as { slug?: string } | null)?.slug) ??
@@ -139,8 +186,18 @@ export async function createShareAction(formData: FormData) {
         lock_deck: lockDeck,
         // quota was read before the cap check above — zero extra queries.
         is_first_share: quota.used === 0,
+        custom_slug: !!chosenSlug,
       },
     });
+
+    if (chosenSlug) {
+      await captureServerEvent({
+        event: 'share.custom_slug_used',
+        distinctId: user.id,
+        userId: user.id,
+        properties: { document_id: documentId, slug: chosenSlug },
+      });
+    }
 
     revalidatePath(`/docs/${documentId}`);
   } catch (e) {
@@ -153,10 +210,13 @@ export async function createShareAction(formData: FormData) {
   if (errorMessage) {
     // Share-cap backstop: if the enforce_share_cap trigger fired (a race the
     // pre-check missed), route to upgrade instead of a generic error toast.
+    // Still a redirect: there is nothing to go back to a form for.
     if (/free_tier_share_cap_reached|tracked links, lifetime/i.test(errorMessage)) {
       redirect('/upgrade?reason=share_quota');
     }
-    redirect(`/docs/${documentId}?share_error=${encodeURIComponent(errorMessage)}`);
+    // Everything else hands the failure back so the form can stay on screen
+    // with the customer's input intact.
+    return errorField ? { error: errorMessage, field: errorField } : { error: errorMessage };
   }
   if (slug) {
     redirect(`/dashboard/${slug}?just_created=1`);
@@ -213,6 +273,13 @@ export async function toggleShareAction(formData: FormData) {
 // 404 (NOT 403/expired). Used only when the sender explicitly wants
 // the link destroyed forever — not just paused.
 //
+// EXCEPT for a link whose address the customer chose. Freeing one of those
+// would let a later customer take it, and a recipient opening an old email
+// would land on a stranger's document. Those links are revoked instead. The
+// database refuses the delete either way (trg_block_custom_slug_delete,
+// schema/033) — this branch exists so the customer gets an explanation
+// rather than a raw trigger error.
+//
 // The server action requires a typed-confirmation hidden field
 // (matches the client modal which makes the sender type DELETE) so
 // a stray POST can't accidentally trigger destruction.
@@ -231,6 +298,41 @@ export async function deleteShareAction(formData: FormData) {
     if (confirmation.trim().toUpperCase() !== 'DELETE') {
       throw new Error('Type DELETE to confirm — we need the exact word.');
     }
+
+    const { data: share, error: readErr } = await supabase
+      .from('document_shares')
+      .select('slug_is_custom')
+      .eq('id', shareId)
+      .single();
+    if (readErr) throw new Error(readErr.message);
+
+    if (share?.slug_is_custom) {
+      const { error: revokeErr } = await supabase
+        .from('document_shares')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('id', shareId)
+        .is('revoked_at', null);
+      if (revokeErr) throw new Error(revokeErr.message);
+
+      await captureServerEvent({
+        event: 'share.revoked',
+        distinctId: user.id,
+        userId: user.id,
+        properties: {
+          share_id: shareId,
+          document_id: docId,
+          instead_of_delete: true,
+          reason: 'custom_slug',
+        },
+      });
+      revalidatePath(`/docs/${docId}`);
+      // Not a failure, so it must not travel on the error channel. The page
+      // prefixes share_error with "Couldn't create the share:", which would
+      // turn this explanation into a contradiction. Its own parameter gets
+      // its own neutral banner.
+      redirect(`/docs/${docId}?share_kept=1`);
+    }
+
     // Hard delete. ON DELETE CASCADE on document_attachments + viewers +
     // sessions + section_events does the right cleanup. attachment_downloads
     // also cascades via the share_id FK.

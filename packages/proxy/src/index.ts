@@ -47,15 +47,29 @@ import {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Every response this worker produces is a recipient-facing page for somebody
+// else's document, and none of it should ever appear in a search result.
+// robots.txt asks crawlers not to fetch /r/, but robots.txt only governs
+// crawling — a memorable address found somewhere else (a forwarded email, a
+// pasted link in a public channel) can still be indexed from that reference
+// alone. X-Robots-Tag is the instruction that actually removes it. Applied
+// here, once, rather than in responses.ts, so no future response shape can be
+// added without it.
+function withNoIndex(res: Response): Response {
+  const out = new Response(res.body, res);
+  out.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return out;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      return await handleRequest(request, env, ctx);
+      return withNoIndex(await handleRequest(request, env, ctx));
     } catch (err) {
       // A transient Supabase failure must not masquerade as a deleted/missing
       // share ("this link doesn't open anything") — show the recipient the
       // try-again page. Genuine bugs still surface as a 500.
-      if (err instanceof UpstreamError) return sourceUnreachable();
+      if (err instanceof UpstreamError) return withNoIndex(sourceUnreachable());
       throw err;
     }
   },
@@ -118,7 +132,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   // and a sanitised filename, log the download event, return.
   const downloadMatch = /^\/r\/([a-z0-9-]+)\/m\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
   if (downloadMatch) {
-    const slug = downloadMatch[1]!;
+    const slug = downloadMatch[1]!.toLowerCase();
     const attachmentId = downloadMatch[2]!;
     if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
     return handleAttachmentDownload(request, slug, attachmentId, env);
@@ -126,7 +140,20 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 
   const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email))?\/?$/i.exec(url.pathname);
   if (!match) return new Response('Not Found', { status: 404 });
-  const slug = match[1]!;
+  // Lowercased rather than redirected to the canonical form. Every stored
+  // slug is lowercase (the format is enforced by the validate_share_slug
+  // trigger, schema/033) while the route regex is case-insensitive and the
+  // PostgREST lookup is not, so `/r/Acme-Proposal` retyped off a printed page
+  // or an email client that title-cased it would otherwise 404.
+  //
+  // A redirect would canonicalise the URL, but it costs a round trip and the
+  // two POST sub-routes (/auth, /email) would need 307/308 to keep their
+  // method — extra machinery for a cosmetic gain. Lowercasing here instead
+  // means one value flows through everything downstream: the lookup, the HMAC
+  // cookie scope (issued and verified against this same string), and the form
+  // targets. Duplicate-URL indexing is not a concern because every response
+  // carries X-Robots-Tag: noindex.
+  const slug = match[1]!.toLowerCase();
   const subroute = match[2];
 
   const share = await getShareBySlug(env, slug);

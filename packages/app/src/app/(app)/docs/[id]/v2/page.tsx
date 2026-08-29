@@ -27,7 +27,6 @@ import {
   deleteDocumentAction,
   previewShareAction,
   editShareAction,
-  createShareAction,
   toggleShareAction,
   deleteShareAction,
   uploadAttachmentsAction,
@@ -64,6 +63,7 @@ export default async function DocumentPageV2(props: {
     hide_error?: string;
     edited?: string;
     share_deleted?: string;
+    share_kept?: string;
   };
 }) {
   // Wrap the entire render so any exception lands in app_error_log
@@ -465,7 +465,6 @@ async function renderV2({
         analyticsByShareId={analyticsByShareId}
         previewShareAction={previewShareAction}
         editShareAction={editShareAction}
-        createShareAction={createShareAction}
         freeShareCap={freeShareCap}
         toggleShareAction={toggleShareAction}
         deleteShareAction={deleteShareAction}
@@ -498,16 +497,28 @@ async function renderV2({
 
 // ---------- helpers ----------
 
+const CUSTOM_SLUG_KEPT_MESSAGE =
+  'This link’s address is permanent — the people you sent it to are still using it. The link has been switched off instead, so the address can never point at anyone else’s document.';
+
 type BannerRow = { key: string; role: 'alert' | 'status'; message: string };
 
 function collectBanners(sp: NonNullable<Parameters<typeof DocumentPageV2>[0]['searchParams']>) {
   const out: BannerRow[] = [];
   if (!sp) return out;
+  if (sp.share_kept)
+    out.push({
+      key: 'share_kept',
+      role: 'status',
+      message: CUSTOM_SLUG_KEPT_MESSAGE,
+    });
+  // Not prefixed with "Couldn't create the share" — this parameter also
+  // carries failures from revoking and deleting a link, and the old wording
+  // mislabelled every one of them.
   if (sp.share_error)
     out.push({
       key: 'share_error',
       role: 'alert',
-      message: `Couldn't create the share: ${decodeURIComponent(sp.share_error)}`,
+      message: decodeURIComponent(sp.share_error),
     });
   if (sp.delete_error)
     out.push({

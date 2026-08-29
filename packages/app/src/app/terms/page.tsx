@@ -97,7 +97,7 @@ export default function TermsPage() {
                 You can cancel at any time. Your plan stays active until the end of the period you
                 have already paid for, and we do not charge you again after that.
               </p>
-              <p className="mt-4">Payments already made are not refundable.</p>
+              <p className="mt-4">Payments already made are not refundable when you cancel.</p>
             </Section>
 
             <Section title="Your documents stay yours">

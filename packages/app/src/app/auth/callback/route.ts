@@ -74,6 +74,17 @@ export async function GET(req: NextRequest) {
   const user = data.user;
   if (user) {
     const fingerprint = req.cookies.get('hr:fp')?.value ?? null;
+    // First-touch source, written by events-client on the visitor's very first
+    // page view and mirrored to a cookie so this server-side event can read it.
+    // Without this, a signup records nothing about where the person came from —
+    // which is why neither paying customer's source was ever in the dashboard.
+    let firstTouch: Record<string, unknown> = {};
+    try {
+      const raw = req.cookies.get('hr:src')?.value;
+      if (raw) firstTouch = JSON.parse(decodeURIComponent(raw)) as Record<string, unknown>;
+    } catch {
+      // A malformed cookie must never block sign-in.
+    }
     const createdMs = new Date(user.created_at).getTime();
     const isNew = Date.now() - createdMs < 60_000;
     const provider = user.app_metadata?.['provider'] ?? null;
@@ -82,7 +93,7 @@ export async function GET(req: NextRequest) {
         event: 'user.signed_in',
         distinctId: user.id,
         userId: user.id,
-        properties: { provider, fingerprint, email: user.email ?? null },
+        properties: { ...firstTouch, provider, fingerprint, email: user.email ?? null },
       }),
     ];
     if (isNew) {
@@ -91,7 +102,7 @@ export async function GET(req: NextRequest) {
           event: 'user.signed_up',
           distinctId: user.id,
           userId: user.id,
-          properties: { provider, fingerprint, email: user.email ?? null },
+          properties: { ...firstTouch, provider, fingerprint, email: user.email ?? null },
         }),
       );
       // Alias event — same shape as PostHog's $identify. Lets a

@@ -251,6 +251,9 @@ export default function PrivacyPage() {
               <Link href="/privacy" className="link-slide hover:text-signal-dark">
                 Privacy
               </Link>
+              <Link href="/terms" className="link-slide hover:text-signal-dark">
+                Terms
+              </Link>
             </nav>
           </div>
         </footer>

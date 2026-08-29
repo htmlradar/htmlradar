@@ -60,3 +60,4 @@ next-env.d.ts
 # macOS Finder duplicates (Cmd+D / iCloud sync artifacts)
 * 2.*
 * [0-9].*
+.secrets/

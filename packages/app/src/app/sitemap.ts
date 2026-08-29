@@ -23,6 +23,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // /sign-in and /feedback are utility pages, not search results.
     // Their page metadata sets noindex, so they are deliberately omitted.
     { url: `${baseUrl}/privacy`, changeFrequency: 'yearly', priority: 0.4 },
+    { url: `${baseUrl}/terms`, changeFrequency: 'yearly', priority: 0.4 },
     {
       url: `${baseUrl}/compare/papermark`,
       changeFrequency: 'weekly',

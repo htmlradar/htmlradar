@@ -14,7 +14,7 @@ export const dynamic = 'force-static';
 export const metadata = pageMeta({
   title: 'Terms',
   description:
-    'The terms that apply to the hosted version of HTMLRadar at htmlradar.com — subscriptions, refunds, your documents, and what happens if the service ends.',
+    'The terms that apply to the hosted version of HTMLRadar at htmlradar.com — subscriptions, cancelling, your documents, and what happens if the service ends.',
   path: '/terms',
 });
 
@@ -91,21 +91,12 @@ export default function TermsPage() {
               </p>
             </Section>
 
-            <Section title="Refunds">
+            <Section title="Cancelling">
               <p>
-                If HTMLRadar is not doing what you need, email{' '}
-                <a
-                  href="mailto:hello@htmlradar.com"
-                  className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
-                >
-                  hello@htmlradar.com
-                </a>{' '}
-                within 30 days of a charge and we will refund it. No form, no justification needed.
+                You can cancel at any time. Your plan stays active until the end of the period you
+                have already paid for, and we do not charge you again after that.
               </p>
-              <p className="mt-4">
-                After 30 days we will still look at it. If something went genuinely wrong on our
-                side, we will make it right.
-              </p>
+              <p className="mt-4">Payments already made are not refundable.</p>
             </Section>
 
             <Section title="Your documents stay yours">
@@ -172,7 +163,7 @@ export default function TermsPage() {
               </p>
               <p className="mt-4">
                 If we ever have a serious outage that affects your paid month, tell us and we will
-                credit or refund it.
+                credit it against your next one.
               </p>
             </Section>
 

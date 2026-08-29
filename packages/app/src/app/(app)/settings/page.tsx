@@ -33,7 +33,12 @@ async function polarGet<T>(path: string): Promise<T> {
   return (await r.json()) as T;
 }
 
-type PolarSubLite = { id: string; status: string; cancel_at_period_end: boolean };
+type PolarSubLite = {
+  id: string;
+  status: string;
+  cancel_at_period_end: boolean;
+  created_at?: string;
+};
 
 async function getActiveSubscription(
   externalId: string,
@@ -45,11 +50,35 @@ async function getActiveSubscription(
   );
   const customerId = customers.items?.[0]?.id;
   if (!customerId) return null;
+  // Ask for several, not one. A customer is only ever meant to hold a single
+  // active subscription — /upgrade refuses anyone already on Pro, which is what
+  // stops a monthly subscriber buying annual on top of what they have — but a
+  // raw Polar checkout link reached from an old email bypasses that. With
+  // limit=1 a second subscription would make cancel act on whichever of the two
+  // Polar happened to return first, so someone could press Cancel, see it
+  // succeed, and still be charged by the other one.
   const subs = await polarGet<SubsResp>(
-    `/v1/subscriptions/?customer_id=${customerId}&active=true&limit=1`,
+    `/v1/subscriptions/?customer_id=${customerId}&active=true&limit=10`,
   );
-  const sub = subs.items?.[0];
-  if (!sub) return null;
+  const items = subs.items ?? [];
+  if (items.length === 0) return null;
+  if (items.length > 1) {
+    // Not fatal, and deliberately not auto-resolved: cancelling the wrong one
+    // costs a customer money either way, so this surfaces for a human while the
+    // action below still operates on a deterministic choice rather than on
+    // whatever order Polar replied in.
+    await logServerError({
+      source: 'settings.subscription',
+      message: `Customer holds ${items.length} active subscriptions; acting on the newest`,
+      route: '/settings',
+      context: { subscription_ids: items.map((i) => i.id) },
+    });
+  }
+  // Newest wins — if someone did double-subscribe, the later one is the plan
+  // they actually meant to be on.
+  const sub = items.reduce((newest, candidate) =>
+    (candidate.created_at ?? '') > (newest.created_at ?? '') ? candidate : newest,
+  );
   return { id: sub.id, canceling: sub.cancel_at_period_end === true };
 }
 

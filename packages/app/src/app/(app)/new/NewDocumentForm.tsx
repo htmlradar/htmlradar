@@ -13,7 +13,7 @@ import { AlertCircle, ArrowRight, FileText, Link2, Upload } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { captureClientEvent } from '@/lib/events-client';
 
-type Mode = 'upload' | 'url';
+import type { NewDocumentMode as Mode } from '@/lib/new-document-mode';
 
 const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
 const HTML_MIME_TYPES = new Set([
@@ -25,10 +25,13 @@ const HTML_MIME_TYPES = new Set([
 
 interface NewDocumentFormProps {
   action: (formData: FormData) => Promise<void>;
+  // Which panel to open on. Optional and defaults to 'upload', so every
+  // existing caller keeps exactly the behaviour it had.
+  initialMode?: Mode;
 }
 
-export function NewDocumentForm({ action }: NewDocumentFormProps) {
-  const [mode, setMode] = useState<Mode>('upload');
+export function NewDocumentForm({ action, initialMode = 'upload' }: NewDocumentFormProps) {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [urlValue, setUrlValue] = useState('');

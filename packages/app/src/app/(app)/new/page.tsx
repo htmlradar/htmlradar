@@ -12,14 +12,17 @@ import { SectionMark } from '@/components/SectionMark';
 import { requireUser } from '@/lib/supabase-server';
 import { createDocument } from './actions';
 import { NewDocumentForm } from './NewDocumentForm';
+import { parseNewDocumentMode } from '@/lib/new-document-mode';
 
 export const runtime = 'edge';
 
-type SearchParams = Promise<{ upload_error?: string }>;
+type SearchParams = Promise<{ upload_error?: string; mode?: string }>;
 
 export default async function NewDocumentPage({ searchParams }: { searchParams: SearchParams }) {
   await requireUser();
-  const uploadError = (await searchParams).upload_error;
+  const params = await searchParams;
+  const uploadError = params.upload_error;
+  const initialMode = parseNewDocumentMode(params.mode);
 
   return (
     <div className="mx-auto max-w-2xl py-8">
@@ -39,7 +42,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
       ) : null}
 
       <div className="mt-10">
-        <NewDocumentForm action={createDocument} />
+        <NewDocumentForm action={createDocument} initialMode={initialMode} />
       </div>
     </div>
   );

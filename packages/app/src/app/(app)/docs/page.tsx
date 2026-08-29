@@ -264,16 +264,34 @@ function EmptyDocs() {
           Upload your first document.
         </h2>
         <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
-          A single HTML file or a URL you already host. Once uploaded, you create per-recipient
-          share links and watch reads land in the dashboard.
+          Once it&rsquo;s in, you create a share link for each recipient and watch reads land in the
+          dashboard.
         </p>
-        <Link
-          href="/new"
-          className="group mt-8 inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
-        >
-          Upload an HTML file
-          <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-        </Link>
+        {/* Two routes in, not one.
+            Of 25 accounts, 14 have never uploaded anything, and almost nobody hit
+            an error doing it — so the wall is at the start, not in the upload.
+            This screen used to offer a single button reading "Upload an HTML
+            file", which asks for a file the visitor may not have. /new has
+            always accepted a hosted URL as well; that option was simply
+            invisible until you had already committed to the page. Naming both
+            here costs nothing and removes the demand for a file from anyone who
+            already has a page on the web. */}
+        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href="/new"
+            className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"
+          >
+            Upload an HTML file
+            <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          </Link>
+          <Link
+            href="/new?mode=url"
+            className="group inline-flex items-center gap-2 rounded-md border border-line bg-paper px-6 py-3 text-[15px] font-medium text-ink-soft transition hover:border-signal/50 hover:text-ink"
+          >
+            Or track a page you already host
+            <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          </Link>
+        </div>
       </div>
     </div>
   );

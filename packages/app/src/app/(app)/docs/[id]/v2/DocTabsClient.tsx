@@ -38,7 +38,6 @@ interface DocTabsClientProps {
     formData: FormData,
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   editShareAction: (formData: FormData) => Promise<void>;
-  createShareAction: (formData: FormData) => Promise<void>;
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
   freeShareCap?: { used: number; cap: number } | null;
@@ -204,7 +203,6 @@ export function DocTabsClient(props: DocTabsClientProps) {
             hasShares={hasShares}
             previewShareAction={props.previewShareAction}
             editShareAction={props.editShareAction}
-            createShareAction={props.createShareAction}
             toggleShareAction={props.toggleShareAction}
             deleteShareAction={props.deleteShareAction}
             freeShareCap={props.freeShareCap ?? null}
@@ -279,7 +277,6 @@ function SharingPanel({
   hasShares,
   previewShareAction,
   editShareAction,
-  createShareAction,
   toggleShareAction,
   deleteShareAction,
   freeShareCap,
@@ -293,7 +290,6 @@ function SharingPanel({
     formData: FormData,
   ) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
   editShareAction: (formData: FormData) => Promise<void>;
-  createShareAction: (formData: FormData) => Promise<void>;
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
   freeShareCap?: { used: number; cap: number } | null;
@@ -315,7 +311,6 @@ function SharingPanel({
         analyticsByShareId={analyticsByShareId}
         previewShareAction={previewShareAction}
         editShareAction={editShareAction}
-        createShareAction={createShareAction}
         toggleShareAction={toggleShareAction}
         deleteShareAction={deleteShareAction}
         freeShareCap={freeShareCap ?? null}

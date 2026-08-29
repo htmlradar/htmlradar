@@ -40,6 +40,7 @@ const FREE_FEATURES = [
 const PRO_FEATURES = [
   'Everything in Free, plus:',
   'Unlimited tracked links',
+  'Choose your own link ending',
   'No “Powered by HTMLRadar” footer on recipient views',
   'Priority email support, response inside one business day',
 ];

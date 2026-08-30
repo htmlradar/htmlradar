@@ -44,11 +44,11 @@ export interface ShareRow {
   recipient_label: string | null;
   require_email: boolean;
   require_password: boolean;
-  // Domain allowlist (e.g. ['example-ventures.test', 'example-capital.test']). When the
+  // Domain allowlist (e.g. ['example.com', 'example.org']). When the
   // edit form opens for an existing share, we pre-fill this textarea from
   // the same value the proxy reads to enforce the allowlist at gate time.
   allowed_email_domains: string[] | null;
-  // Specific-email allowlist (e.g. ['marc@example-ventures.test', 'amrita@example-capital.test']).
+  // Specific-email allowlist (e.g. ['marc@example.com', 'amrita@example.org']).
   // Independent of allowed_email_domains; the gate accepts a match in
   // EITHER list (see proxy/src/index.ts isEmailAllowed).
   allowed_emails: string[] | null;
@@ -1040,9 +1040,7 @@ function ShareSettingsForm({
               setDomainsError(validateDomains(e.target.value));
             }}
             placeholder={
-              requireEmail
-                ? 'example-ventures.test, example-capital.test'
-                : 'Disabled — turn on email gate above'
+              requireEmail ? 'example.com, example.org' : 'Disabled — turn on email gate above'
             }
             className={cn(
               'mt-2 w-full resize-y rounded-md border bg-paper px-4 py-3 font-mono text-[16px] text-ink outline-none transition placeholder:text-graphite/70 focus:shadow-[0_0_0_3px_rgba(122,31,46,0.08)] disabled:cursor-not-allowed disabled:bg-paper-2/40 disabled:text-graphite md:text-[13.5px]',
@@ -1075,7 +1073,7 @@ function ShareSettingsForm({
             }}
             placeholder={
               requireEmail
-                ? 'marc@example-ventures.test\namrita@example-capital.test'
+                ? 'marc@example.com\namrita@example.org'
                 : 'Disabled — turn on email gate above'
             }
             className={cn(

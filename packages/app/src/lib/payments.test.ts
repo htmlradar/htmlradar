@@ -70,23 +70,24 @@ describe('computeTierUpdate', () => {
     }
   });
 
-  // The real subscription.revoked payload Polar sent for viewer9@example.test.
-  // Status is 'canceled', not 'revoked', and the period end is still weeks away —
-  // only ended_at marks the revoke. This profile sat on tier=pro for weeks.
-  it('revoke delivered as canceled + past ended_at → free (the viewer9 case)', () => {
+  // The shape Polar actually sends for subscription.revoked: status is
+  // 'canceled', not 'revoked', and the period end is still weeks away — only
+  // ended_at marks the revoke. Before this rule, such a profile sat on
+  // tier=pro for weeks after access had really ended.
+  it('revoke delivered as canceled + past ended_at → free (the late-revoke case)', () => {
     const update = computeTierUpdate(
       {
         status: 'canceled',
-        started_at: '2026-06-26T16:46:59Z',
-        current_period_end: '2026-07-26T16:46:59Z',
-        ended_at: '2026-07-17T20:00:05Z',
+        started_at: '2026-06-01T00:00:00Z',
+        current_period_end: '2026-07-01T00:00:00Z',
+        ended_at: '2026-06-20T00:00:00Z',
       },
-      { pro_since: '2026-06-26T16:46:59Z', pro_until: '2026-07-26T16:46:59Z' },
-      new Date('2026-07-17T20:00:16Z'),
+      { pro_since: '2026-06-01T00:00:00Z', pro_until: '2026-07-01T00:00:00Z' },
+      new Date('2026-06-20T00:00:10Z'),
     );
     expect(update.tier).toBe('free');
     if (update.tier === 'free') {
-      expect(update.pro_until).toBe('2026-07-17T20:00:05Z'); // when access really ended
+      expect(update.pro_until).toBe('2026-06-20T00:00:00Z'); // when access really ended
     }
   });
 

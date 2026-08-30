@@ -24,7 +24,7 @@
 --
 --   psql -v ON_ERROR_STOP=1 -f schema/001_init.sql   (…then 002, 003, 008,
 --                                                     027, 033, 034, 035)
---   psql -v ON_ERROR_STOP=1 -f schema/035_api_rate_limits_test.sql
+--   psql -v ON_ERROR_STOP=1 -f schema/tests/035_api_rate_limits_test.sql
 --
 -- A throwaway Postgres in Docker is the scratch database this was written
 -- against, exactly as 034's test file documents:

@@ -165,10 +165,10 @@ describe('download/screenshot guard injection (lock_deck semantic)', () => {
   });
 
   it('uses the recipient email in the watermark when present', async () => {
-    const html = await inject({ lockDeck: true, email: 'marc@acme.com' });
-    expect(html).toContain('marc@acme.com');
+    const html = await inject({ lockDeck: true, email: 'marc@example.com' });
+    expect(html).toContain('marc@example.com');
     // Watermark span should appear many times (tiled grid).
-    const count = (html.match(/marc@acme\.com/g) ?? []).length;
+    const count = (html.match(/marc@example\.com/g) ?? []).length;
     expect(count).toBeGreaterThan(20);
   });
 

@@ -78,7 +78,7 @@ create table if not exists document_shares (
   require_email       boolean not null default true,
   require_password    boolean not null default false,
   password_hash       text,                          -- bcrypt/argon2 hash
-  allowed_email_domains text[],                      -- e.g. {'example-ventures.test'} — nullable = any
+  allowed_email_domains text[],                      -- e.g. {'example.com'} — nullable = any
   expires_at          timestamptz,                   -- nullable = no expiry
   revoked_at          timestamptz,                   -- nullable = not revoked
   created_at          timestamptz not null default now(),

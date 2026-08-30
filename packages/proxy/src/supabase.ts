@@ -18,7 +18,7 @@ export interface Share {
   require_email: boolean;
   require_password: boolean;
   // Whole-domain allowlist: addresses at any of these domains pass the
-  // gate (e.g. ['example-capital.test'] → sarah@example-capital.test OK).
+  // gate (e.g. ['example.org'] → sarah@example.org OK).
   allowed_email_domains: string[] | null;
   // Specific-email allowlist: only these exact addresses pass the gate.
   // When both lists are non-empty the gate accepts a UNION — useful for

@@ -604,7 +604,7 @@ function ShareForm({
                 name="allowed_domains"
                 rows={2}
                 defaultValue={(share?.allowed_email_domains ?? []).join('\n')}
-                placeholder={'example-ventures.test\nexample-capital.test'}
+                placeholder={'example.com\nexample.org'}
                 className="w-full rounded-md border border-line bg-paper px-3 py-2 font-mono text-[12.5px] text-ink-soft focus:border-signal focus:outline-none"
               />
             </FieldBlock>
@@ -616,7 +616,7 @@ function ShareForm({
                 name="allowed_emails"
                 rows={2}
                 defaultValue={(share?.allowed_emails ?? []).join('\n')}
-                placeholder={'marc@example-ventures.test\namrita@example-capital.test'}
+                placeholder={'marc@example.com\namrita@example.org'}
                 className="w-full rounded-md border border-line bg-paper px-3 py-2 font-mono text-[12.5px] text-ink-soft focus:border-signal focus:outline-none"
               />
             </FieldBlock>

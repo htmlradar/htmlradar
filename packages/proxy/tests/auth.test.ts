@@ -76,14 +76,14 @@ describe('auth cookies', () => {
 
 describe('email cookies', () => {
   it('round-trips email + slug', async () => {
-    const cookie = await issueEmailCookie('swift-falcon-a3f2', 'marc@example-ventures.test', SECRET);
+    const cookie = await issueEmailCookie('swift-falcon-a3f2', 'marc@example.com', SECRET);
     const verified = await verifyEmailCookie(cookie.split('; ')[0]!, 'swift-falcon-a3f2', SECRET);
-    expect(verified?.email).toBe('marc@example-ventures.test');
+    expect(verified?.email).toBe('marc@example.com');
     expect(verified?.slug).toBe('swift-falcon-a3f2');
   });
 
   it('rejects an email cookie tampered to swap the email', async () => {
-    const cookie = await issueEmailCookie('swift-falcon-a3f2', 'marc@example-ventures.test', SECRET);
+    const cookie = await issueEmailCookie('swift-falcon-a3f2', 'marc@example.com', SECRET);
     const [name] = cookie.split('=');
     // Forge: known slug + adversary's email + same expiry + valid-looking mac
     const tampered = `${name}=swift-falcon-a3f2.bWFsbG9yeUBldmlsLmNvbQ.${Math.floor(Date.now() / 1000) + 1000}.deadbeef`;
@@ -92,7 +92,7 @@ describe('email cookies', () => {
   });
 
   it('rejects an email cookie issued under a different secret', async () => {
-    const cookie = await issueEmailCookie('swift-falcon-a3f2', 'marc@example-ventures.test', SECRET);
+    const cookie = await issueEmailCookie('swift-falcon-a3f2', 'marc@example.com', SECRET);
     const verified = await verifyEmailCookie(
       cookie.split('; ')[0]!,
       'swift-falcon-a3f2',

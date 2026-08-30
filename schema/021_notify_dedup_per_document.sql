@@ -5,10 +5,11 @@
 -- Migration 020 dedup'd at (viewer_id, share_id). But viewer_id is
 -- itself per (share, email) — so the SAME person opening TWO
 -- different shares of the SAME document produced two "FIRST OPEN"
--- emails. The 2026-05-19 screenshot showed viewer10@example.test triggering
--- two "First open" alerts for the same pitch deck, 57 min
--- apart. The label was technically correct (first open of THAT share
--- by THAT viewer-row), but it's the wrong scope to dedup on.
+-- emails. A production screenshot showed one recipient
+-- (person@example.test) triggering two "First open" alerts for the
+-- same document, under an hour apart. The label was technically
+-- correct (first open of THAT share by THAT viewer-row), but it's the
+-- wrong scope to dedup on.
 --
 -- NEW dedup: any prior session on ANY share of this DOCUMENT by the
 -- SAME recipient (matched by case-insensitive email, or fingerprint
@@ -16,8 +17,8 @@
 -- full stop. Repeat-open digest remains a roadmap / Pro-tier item.
 --
 -- Also reasserts the profiles.timezone column from 020 in case 020
--- never ran in prod (the viewer10 emails are still UTC-stamped, which
--- proves it didn't). Idempotent: no-op if the column already exists.
+-- never ran in prod (the notification emails were still UTC-stamped,
+-- which proved it hadn't). Idempotent: no-op if the column already exists.
 --
 -- Apply: paste into Supabase SQL editor, run once. After this, the
 -- repeat-open behavior is silent — confirm by re-opening a share you

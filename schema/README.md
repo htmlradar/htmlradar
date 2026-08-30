@@ -1,6 +1,6 @@
 # Schema
 
-Apply every file in numeric order via the Supabase SQL Editor (or `psql`). The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `035`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)

@@ -14,7 +14,7 @@ import {
 // These mirror schema/033_custom_share_slug.sql. The database is the control;
 // if these ever disagree with the trigger, the customer sees a confusing
 // error, so the cases below are deliberately the same cases as the SQL suite
-// in schema/033_custom_share_slug_test.sql.
+// in schema/tests/033_custom_share_slug_test.sql.
 
 describe('validateShareSlug', () => {
   it('accepts ordinary chosen addresses', () => {

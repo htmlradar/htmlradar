@@ -17,7 +17,13 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
    - **anon public key** → `SUPABASE_ANON_KEY`
    - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret — never put in client code)
 3. From `Project Settings → Database`, note your DB password.
-4. In `SQL Editor`, copy/paste each file under `schema/` in numeric order — 001 through 029. Each is idempotent; re-running is safe.
+4. In `SQL Editor`, copy/paste every numbered file directly under `schema/`, in order, `001` through `035` — and nothing in `schema/tests/`. The files in `schema/tests/` are destructive test programs for a scratch database and must never run against a real install. Each migration is idempotent; re-running is safe. The most recent migrations:
+   - `030_notification_email_utm.sql` — UTM parameters on the dashboard links inside notification emails.
+   - `031_notify_email_tell_a_friend.sql` — one "tell a friend" line in the first-read notification email.
+   - `032_comped_accounts.sql` — `profiles.comped` for internal / lifetime-Pro accounts (never billed, exempt from the expiry sweep) plus column-level lockdown of `profiles` updates. Put your own addresses in its placeholder list before running it.
+   - `033_custom_share_slug.sql` — Pro customers may choose a tracked link's address; the rules are enforced in the database.
+   - `034_api_keys.sql` — `api_keys` table (hash only) and the `create_share_as` RPC for the public API.
+   - `035_api_rate_limits.sql` — rate limits for the public API and a daily ceiling on API-key creation.
 5. Resend secrets via Supabase Vault (not `ALTER DATABASE SET` — that needs superuser, which Supabase free doesn't grant). In `SQL Editor`:
    ```sql
    select vault.create_secret('re_your_resend_api_key', 'resend_api_key');
@@ -55,11 +61,12 @@ wrangler secret put CLOUDFLARE_R2_ACCESS_KEY_ID
 wrangler secret put CLOUDFLARE_R2_SECRET_ACCESS_KEY
 wrangler deploy
 
-# Monitor cron worker
+# Monitor cron worker (full list of secrets in packages/monitor/README.md)
 cd ../monitor
-wrangler secret put SUPABASE_URL
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 wrangler secret put RESEND_API_KEY
+wrangler secret put POSTHOG_PROJECT_KEY        # optional: app_events replay into PostHog
+wrangler secret put QA_BOT_USER_ID             # optional: QA account excluded from the replay
 wrangler deploy
 
 # Web app (Cloudflare Pages — NOT Vercel)

@@ -125,10 +125,17 @@ cd htmlradar
 pnpm install
 cp .env.example .env.local           # fill in keys (Supabase, R2, Resend)
 pnpm typecheck && pnpm test          # sanity check
-pnpm build                           # build all 4 packages
+pnpm build                           # build all five packages
 ```
 
-Schema setup: apply every numbered SQL file under `schema/` in numeric order via the Supabase SQL editor. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe.
+Schema setup: apply every numbered SQL file directly under `schema/`, in order, `001` through `035`, via the Supabase SQL editor — and nothing in `schema/tests/`. The files in `schema/tests/` are destructive test programs for a scratch database (they create auth users and sample rows) and must never run against a real install. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe. The most recent migrations:
+
+- `030_notification_email_utm.sql` — UTM parameters on the dashboard links inside notification emails.
+- `031_notify_email_tell_a_friend.sql` — one "tell a friend" line in the first-read notification email.
+- `032_comped_accounts.sql` — `profiles.comped` for internal / lifetime-Pro accounts (never billed, exempt from the expiry sweep) plus column-level lockdown of `profiles` updates. Put your own addresses in its placeholder list before running it.
+- `033_custom_share_slug.sql` — Pro customers may choose a tracked link's address; the rules are enforced in the database.
+- `034_api_keys.sql` — `api_keys` table (hash only) and the `create_share_as` RPC for the public API.
+- `035_api_rate_limits.sql` — rate limits for the public API and a daily ceiling on API-key creation.
 
 Resend secrets go in Supabase Vault (works on free tier — no `ALTER DATABASE SET` required):
 
@@ -202,7 +209,7 @@ If you modify the source and run a network service from it, AGPL-3.0 requires yo
 ## Development
 
 ```bash
-pnpm dev                              # runs all 4 packages in parallel
+pnpm dev                              # runs all five packages in parallel
 pnpm typecheck                        # tsc --noEmit across packages
 pnpm lint                             # eslint + prettier
 pnpm test                             # vitest across tracker + proxy + mcp

@@ -21,25 +21,19 @@ description = "Cloudflare API token"
 regex = '''(?i)cloudflare[_-]?api[_-]?token["'\s]*[:=]["'\s]*[A-Za-z0-9_-]{40,}'''
 keywords = ["cloudflare"]
 
+# No path-level allow-list on purpose: docs/ and .env.example are scanned like
+# every other file, so a real value pasted there fails CI. .env.example holds
+# only blank values and non-secret defaults (a bucket name, a sender address,
+# a host URL), none of which is secret-shaped, so it needs no line-level
+# exception either.
 [allowlist]
-description = "Allow placeholders + example files"
-paths = [
-  '''\.env\.example$''',
-  '''docs/''',
-]
+description = "Exact non-secret values that look like secrets"
 regexes = [
-  '''SUPABASE_ANON_KEY=$''',
-  '''eyJ\.\.\.''',
-  '''re_xxxxxxxx''',
   # Fake webhook-signature fixture in payments.test.ts — NOT a real secret,
   # used only to exercise the standardwebhooks HMAC round-trip in tests.
   '''whsec_abc123xyz789defghijklmnop''',
-  # PostHog PROJECT keys (phc_...) are public write-only tokens by design —
-  # PostHog ships them in every customer's client-side HTML. Personal keys
-  # (phx_...) are secret and deliberately NOT allowlisted.
-  '''phc_[A-Za-z0-9]{20,}''',
   # IndexNow key: public by protocol design (must be served at htmlradar.com/<key>.txt
-  # for search engines to verify ownership). Flagged once in commit 66009b0; now read
-  # from the environment.
+  # for search engines to verify ownership). The file under packages/app/public is
+  # that proof.
   '''aa73fbe8e79ef39105fe22e99a64e50c''',
 ]

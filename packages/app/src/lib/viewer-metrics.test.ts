@@ -4,7 +4,11 @@ import { countDistinctViewers } from './viewer-metrics';
 describe('countDistinctViewers', () => {
   it('dedupes by case-insensitive, trimmed email', () => {
     expect(
-      countDistinctViewers([{ email: 'A@x.com' }, { email: 'a@x.com' }, { email: ' a@x.com ' }]),
+      countDistinctViewers([
+        { email: 'A@example.com' },
+        { email: 'a@example.com' },
+        { email: ' a@example.com ' },
+      ]),
     ).toBe(1);
   });
 
@@ -15,9 +19,9 @@ describe('countDistinctViewers', () => {
   it('mixes deduped emails with anonymous rows', () => {
     expect(
       countDistinctViewers([
-        { email: 'a@x.com' },
-        { email: 'a@x.com' },
-        { email: 'b@x.com' },
+        { email: 'a@example.com' },
+        { email: 'a@example.com' },
+        { email: 'b@example.com' },
         { email: null },
       ]),
     ).toBe(3);

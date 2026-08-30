@@ -62,3 +62,13 @@ next-env.d.ts
 * [0-9].*
 .secrets/
 __pycache__/
+
+# Private operations helpers — live in ../ops, never in the public repo
+.scripts/
+ops/
+
+# Tool caches
+.impeccable/
+.claude/
+.playwright-mcp/
+graphify-out/

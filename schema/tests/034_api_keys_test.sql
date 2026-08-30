@@ -25,7 +25,7 @@
 --
 --   psql -v ON_ERROR_STOP=1 -f schema/001_init.sql   (…then 002, 003, 008,
 --                                                     027, 033, 034)
---   psql -v ON_ERROR_STOP=1 -f schema/034_api_keys_test.sql
+--   psql -v ON_ERROR_STOP=1 -f schema/tests/034_api_keys_test.sql
 --
 -- A throwaway Postgres in Docker is the scratch database this was written
 -- against, and is the easiest one to get:

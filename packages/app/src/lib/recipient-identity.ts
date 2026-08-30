@@ -25,7 +25,7 @@
 //      Secondary lines based on viewer count:
 //        - 0 viewers: secondary = null ("not opened yet")
 //        - 1 viewer with email: secondary = that email
-//        - N viewers with email: secondary = "first@x.com +N-1"
+//        - N viewers with email: secondary = "first@example.com +N-1"
 //        - N viewers no email: secondary = "N viewers"
 //      Exception: when label matches the only viewer's email
 //      case-insensitively, drop secondary to avoid duplication.

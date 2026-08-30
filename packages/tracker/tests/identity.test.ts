@@ -19,7 +19,7 @@ describe('EMAIL_REGEX', () => {
     expect(EMAIL_REGEX.test('a.@b')).toBe(false); // no TLD
     expect(EMAIL_REGEX.test('@.')).toBe(false);
     expect(EMAIL_REGEX.test('a@b.')).toBe(false);
-    expect(EMAIL_REGEX.test('a b@c.com')).toBe(false); // whitespace
+    expect(EMAIL_REGEX.test('a b@example.com')).toBe(false); // whitespace
   });
 });
 
@@ -36,12 +36,12 @@ describe('identity storage', () => {
   });
 
   it('persists email + reads it back', () => {
-    setStoredEmail('marc@example-ventures.test');
-    expect(getStoredEmail()).toBe('marc@example-ventures.test');
+    setStoredEmail('marc@example.com');
+    expect(getStoredEmail()).toBe('marc@example.com');
   });
 
   it('optOut clears fingerprint+email and sets flag', () => {
-    setStoredEmail('marc@example-ventures.test');
+    setStoredEmail('marc@example.com');
     getFingerprint();
     optOut();
     expect(isOptedOut()).toBe(true);

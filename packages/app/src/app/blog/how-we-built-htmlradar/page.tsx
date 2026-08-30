@@ -222,8 +222,7 @@ const cookie = \`\${payload}.\${mac}\`;`}
                   Rate limiting is a small{' '}
                   <code className="font-mono text-[14px] text-signal-dark">rate_limits</code> table
                   keyed on slug + viewer identity rather than IP, because the tracker can't see the
-                  IP from the browser. Five attempts per 60s per identity. Forging viewers means
-                  fabricating distinct identities per request, which is a reasonable bar for v1.0.
+                  IP from the browser.
                 </p>
                 <p>
                   Per-session bearer tokens live in{' '}

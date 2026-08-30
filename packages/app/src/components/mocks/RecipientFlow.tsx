@@ -28,7 +28,7 @@ export function RecipientFlow() {
               Marc · please enter your email
             </span>
             <div className="w-full max-w-[200px] rounded-md border border-line bg-paper px-3 py-2 font-mono text-[12px] text-ink">
-              marc<span className="opacity-50">@example-ventures.test</span>
+              marc<span className="opacity-50">@example.com</span>
               <span className="ml-0.5 inline-block h-[14px] w-[1px] translate-y-[2px] bg-ink-soft align-middle" />
             </div>
             <button

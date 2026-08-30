@@ -67,7 +67,7 @@ describe('resolveConfig', () => {
 
   it('propagates proxy-injected email + geo when present', () => {
     window.HTMLRadarConfig = {
-      email: 'marc@example-ventures.test',
+      email: 'marc@example.com',
       geo: { country: 'US', city: 'NYC', deviceType: 'desktop', os: 'macOS', browser: 'Safari' },
     };
     const config = resolveConfig(
@@ -77,7 +77,7 @@ describe('resolveConfig', () => {
         'data-share-slug': 's',
       }),
     );
-    expect(config?.email).toBe('marc@example-ventures.test');
+    expect(config?.email).toBe('marc@example.com');
     expect(config?.geo?.country).toBe('US');
     expect(config?.geo?.browser).toBe('Safari');
   });

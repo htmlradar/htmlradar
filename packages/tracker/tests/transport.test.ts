@@ -39,7 +39,7 @@ describe('transport', () => {
     const t = createTransport({ supabaseUrl: ORIGIN, anonKey: 'anon' });
     const result = await t.startSession({
       shareSlug: 'swift-falcon-a3f2',
-      email: 'marc@x.com',
+      email: 'marc@example.com',
       fingerprint: null,
       referrer: '',
       userAgent: 'jsdom',
@@ -91,7 +91,7 @@ describe('transport', () => {
     try {
       await t.startSession({
         shareSlug: 'x',
-        email: 'a@b.co',
+        email: 'a@example.org',
         fingerprint: null,
         referrer: '',
         userAgent: '',

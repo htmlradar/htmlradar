@@ -39,17 +39,23 @@ alter table profiles
 comment on column profiles.comped is
   'Internal / lifetime account: keeps Pro entitlement permanently, is never billed, and is exempt from the pro_until expiry sweep.';
 
--- The two internal accounts. Matched on id, not email — ids are immutable and
--- authoritative, while an email can be changed in auth.users at any time.
---   aaaaaaaa-... = owner@example.test
---   bbbbbbbb-... = viewer9@example.test
-update profiles
+-- SELF-HOSTERS: PUT YOUR OWN ADDRESSES HERE. The comped_addresses list below
+-- is a placeholder — replace the reserved example addresses with the sign-in
+-- addresses of your internal / lifetime-Pro accounts (one quoted address per
+-- row), then run once. Addresses are resolved to profile ids through
+-- auth.users at run time; an address with no account is skipped. If you have
+-- no comped accounts, leave the list as-is: the examples match nothing.
+with comped_addresses(email) as (
+  values
+    ('founder@example.test'),
+    ('teammate@example.test')
+)
+update profiles p
 set comped = true,
     tier   = 'pro'
-where id in (
-  'aaaaaaaa-0000-4000-8000-000000000001',
-  'bbbbbbbb-0000-4000-8000-000000000002'
-);
+from auth.users u
+join comped_addresses c on lower(u.email) = lower(c.email)
+where p.id = u.id;
 
 -- No index on (comped, pro_until): profiles is ~17 rows, so the sweep's
 -- "tier = 'pro' and comped = false and pro_until < now()" is a sequential scan

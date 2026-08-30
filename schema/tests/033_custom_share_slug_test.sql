@@ -11,7 +11,7 @@
 -- undo a mistake made against production, so point psql at a scratch copy.
 --
 --   psql -v ON_ERROR_STOP=1 -f schema/001_init.sql   (…then 008, 027, 033)
---   psql -v ON_ERROR_STOP=1 -f schema/033_custom_share_slug_test.sql
+--   psql -v ON_ERROR_STOP=1 -f schema/tests/033_custom_share_slug_test.sql
 --
 -- Output is one NOTICE per test. Any failure raises and aborts the run.
 -- ------------------------------------------------------------

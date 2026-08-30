@@ -58,6 +58,9 @@ vi.mock('../src/supabase.js', async () => {
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
     getDocument: vi.fn(async () => doc),
     getProfileTier: vi.fn(async () => 'free'),
+    // No attachment by this id. Enough to prove the download path was handled
+    // where the request arrived rather than redirected away from it.
+    getAttachment: vi.fn(async () => null),
     listAttachmentsForDocument: vi.fn(async () => []),
     logAppEvent: vi.fn(async () => undefined),
     verifySharePassword: vi.fn(async () => 'ok'),
@@ -138,13 +141,18 @@ describe('a legacy host redirects readers to the share host', () => {
     expect(res.headers.get('Location')).toBe('https://htmlradar.page/r/acme-proposal');
   });
 
-  it('redirects the attachment-download path too', async () => {
+  it('redirects the attachment-download path too, query and all', async () => {
+    // A recipient who clicks a supporting-material link in an old email has to
+    // land on the file, not on a 404 — and whatever the link carried has to
+    // survive the hop with it.
     const res = await fetchAs(
-      'https://htmlradar.com/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      'https://htmlradar.com/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?v=2',
     );
+    expect(res.status).toBe(301);
     expect(res.headers.get('Location')).toBe(
-      'https://htmlradar.page/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      'https://htmlradar.page/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?v=2',
     );
+    expect(getShareBySlug).not.toHaveBeenCalled();
   });
 
   it('still carries the noindex header, so the hop is never indexed', async () => {
@@ -287,6 +295,19 @@ describe('an empty legacy list turns the redirect off', () => {
     const res = await fetchAs('https://htmlradar.com/r/acme-proposal?x=1', {}, noRedirect);
     expect(res.status).toBe(200);
     expect(res.headers.get('Location')).toBeNull();
+  });
+
+  it('serves the attachment path in place as well, query and all', async () => {
+    // 404 because the mocked lookup has no attachment by that id — the point
+    // is that the download route ran here at all instead of answering 301.
+    const res = await fetchAs(
+      'https://htmlradar.com/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?v=2',
+      {},
+      noRedirect,
+    );
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Location')).toBeNull();
+    expect(getShareBySlug).toHaveBeenCalledWith(noRedirect, 'acme-proposal');
   });
 
   it('still upgrades plain HTTP, which is a separate rule from the host', async () => {

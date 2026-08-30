@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
+import { SHARE_HOST } from '@/lib/share-url';
 import { SectionHead } from '@/components/doc-dashboard/SectionHead';
 import type { ShareRow, ShareAnalyticsData } from './DocumentShareManager';
 
@@ -146,7 +147,7 @@ export function SharesTable({
                       </div>
                     )}
                     <div className="mt-0.5 truncate font-mono text-[10.5px] text-graphite">
-                      htmlradar.com/r/{share.slug}
+                      {SHARE_HOST}/r/{share.slug}
                     </div>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">

@@ -19,6 +19,7 @@ import {
   validateFile,
 } from '@/lib/attachments';
 import { describeSlugError, validateShareSlug } from '@/lib/share-slug';
+import { SHARE_BASE, shareUrl } from '@/lib/share-url';
 
 // Shared parse for the two allowlist textareas. Domains in one field,
 // specific emails in another. Both accept comma- and newline-separated
@@ -478,7 +479,7 @@ export async function previewShareAction(
     }
 
     const token = await issueOwnerPreviewToken(share.slug, secret);
-    const url = `https://htmlradar.com/r/${share.slug}?owner_preview=${encodeURIComponent(token)}`;
+    const url = `${shareUrl(share.slug)}?owner_preview=${encodeURIComponent(token)}`;
 
     await captureServerEvent({
       event: 'share.preview_opened',
@@ -746,7 +747,7 @@ export async function previewDocumentAction(
     }
 
     const token = await issueOwnerDocPreviewToken(doc.id, secret);
-    const url = `https://htmlradar.com/r/_doc/${doc.id}?owner_doc_preview=${encodeURIComponent(token)}`;
+    const url = `${SHARE_BASE}/r/_doc/${doc.id}?owner_doc_preview=${encodeURIComponent(token)}`;
 
     await captureServerEvent({
       event: 'document.preview_opened',

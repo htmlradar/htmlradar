@@ -15,6 +15,7 @@
 import { cn } from '@/lib/cn';
 import { CopySlugButton } from '@/components/CopySlugButton';
 import { countDistinctViewers } from '@/lib/viewer-metrics';
+import { shareUrl } from '@/lib/share-url';
 import { SessionsList } from '@/components/SessionsList';
 import type { Viewer, Session } from '@/lib/types';
 
@@ -212,7 +213,7 @@ function WaitingState({
   recipientLabel: string | null;
   shareStatus?: 'live' | 'revoked' | 'expired';
 }) {
-  const fullUrl = `https://htmlradar.com/r/${shareSlug}`;
+  const fullUrl = shareUrl(shareSlug);
   const who = recipientLabel ?? 'the recipient';
 
   // Revoked/expired with no reads: don't tell the owner to send a link that

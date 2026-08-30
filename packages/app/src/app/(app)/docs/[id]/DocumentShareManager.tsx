@@ -36,6 +36,7 @@ import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { GateTag } from '@/components/doc-dashboard/GateTag';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
 import { localInputToIso } from '@/lib/datetime-local';
+import { shareUrl } from '@/lib/share-url';
 import type { Viewer, Session } from '@/lib/types';
 
 export interface ShareRow {
@@ -402,7 +403,7 @@ function SharePane({
   const isRevoked = !!share.revoked_at;
   const isExpired = !!share.expires_at && new Date(share.expires_at) < new Date();
   const isLive = !isRevoked && !isExpired;
-  const fullUrl = `https://htmlradar.com/r/${share.slug}`;
+  const fullUrl = shareUrl(share.slug);
 
   // Use the same identity resolver as the rail + tables so the
   // SharePane heading reads consistently across the page. Without
@@ -641,7 +642,7 @@ function WaitingInline({
       </div>
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper px-4 py-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">
-          {`https://htmlradar.com/r/${shareSlug}`}
+          {shareUrl(shareSlug)}
         </span>
         <CopyInline slug={shareSlug} />
       </div>
@@ -1313,14 +1314,14 @@ function CopyInline({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
   const handle = async () => {
     try {
-      await navigator.clipboard.writeText(`https://htmlradar.com/r/${slug}`);
+      await navigator.clipboard.writeText(shareUrl(slug));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
       // navigator.clipboard fails in non-secure contexts; fall back to a
       // hidden-textarea copy so the action never silently no-ops.
       const el = document.createElement('textarea');
-      el.value = `https://htmlradar.com/r/${slug}`;
+      el.value = shareUrl(slug);
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');

@@ -1,5 +1,5 @@
 // The last segment of a tracked link's public address — the "acme-proposal"
-// in htmlradar.com/r/acme-proposal. Pro customers may choose it; everyone
+// in htmlradar.page/r/acme-proposal. Pro customers may choose it; everyone
 // else gets a generated one.
 //
 // THIS FILE IS NOT THE CONTROL. The RLS policy on document_shares lets any

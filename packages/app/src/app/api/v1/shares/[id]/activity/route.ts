@@ -21,6 +21,7 @@ import type { NextRequest } from 'next/server';
 import { authenticateApiKey, errorResponse, jsonResponse, serviceClient } from '@/lib/api-auth';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import { SHARE_SLUG_PATTERN } from '@/lib/share-slug';
+import { SHARE_HOST, shareUrl } from '@/lib/share-url';
 import type { Session, SectionEvent, Viewer } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -32,7 +33,14 @@ const NOT_FOUND = { status: 404, body: { error: 'not_found' } };
 // The link as the app prints it, or the path part of it. Nothing looser: this
 // is a lookup key, and "close enough" here is a way to hand someone the
 // wrong share's activity.
-const LINK = /^(?:(?:https:\/\/)?htmlradar\.com)?\/r\/([^/]+)$/;
+//
+// Two hosts are accepted. Recipient links live on the content domain now, and
+// every link handed out before that move named the application domain — an
+// agent reading a slug off an old email must still be understood. Any other
+// host is rejected, so a link that merely looks like ours cannot be used to
+// probe for shares.
+const LINK_HOSTS = [SHARE_HOST, new URL(SITE_URL).host].join('|').replace(/\./g, '\\.');
+const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
 
 /**
  * The slug in what the caller passed, or null.
@@ -85,7 +93,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // a key must not be usable to probe for share ids.
   if (!share || share.owner_id !== caller.userId) return errorResponse(NOT_FOUND);
 
-  const shareUrl = `${SITE_URL}/r/${share.slug}`;
+  const url = shareUrl(share.slug);
 
   const [{ data: viewerRows }, { data: sessionRows }] = await Promise.all([
     supabase.from('viewers').select('*').eq('share_id', share.id),
@@ -108,7 +116,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (sessions.length === 0) {
     return jsonResponse(200, {
       share_id: share.id,
-      url: shareUrl,
+      url,
       opened: false,
       viewers: [],
     });
@@ -182,7 +190,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   return jsonResponse(200, {
     share_id: share.id,
-    url: shareUrl,
+    url,
     opened: out.length > 0,
     viewers: out,
   });

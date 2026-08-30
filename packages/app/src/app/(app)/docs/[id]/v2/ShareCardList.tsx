@@ -32,6 +32,7 @@ import {
 import type { ShareRow, ShareAnalyticsData } from '../DocumentShareManager';
 import { cn } from '@/lib/cn';
 import { localInputToIso } from '@/lib/datetime-local';
+import { SHARE_HOST, shareUrl } from '@/lib/share-url';
 
 interface ShareCardListProps {
   documentId: string;
@@ -337,7 +338,7 @@ function LinkSection({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewing, startPreview] = useTransition();
 
-  const url = `https://htmlradar.com/r/${share.slug}`;
+  const url = shareUrl(share.slug);
   const customSlug = hasCustomSlug(share);
 
   const onCopy = async () => {
@@ -527,7 +528,7 @@ function ShareForm({
             </SectionNote>
             <div className="mt-3 flex items-stretch overflow-hidden rounded-md border border-line bg-paper focus-within:border-signal">
               <span className="shrink-0 border-r border-line bg-paper-2/40 px-3 py-2 font-mono text-[12.5px] leading-normal text-graphite">
-                htmlradar.com/r/
+                {SHARE_HOST}/r/
               </span>
               <input
                 type="text"

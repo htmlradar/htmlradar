@@ -108,7 +108,7 @@ function BrowserFrame({
         <span className="size-1.5 rounded-full bg-paper-3" />
         <span className="size-1.5 rounded-full bg-paper-3" />
         <span className="ml-2 truncate font-mono text-[9px] text-graphite">
-          htmlradar.com/r/swift-falcon-a3f2
+          htmlradar.page/r/swift-falcon-a3f2
         </span>
       </div>
       <div className="min-h-[120px]">{children}</div>

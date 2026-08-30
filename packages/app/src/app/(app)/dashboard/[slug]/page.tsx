@@ -21,6 +21,7 @@ import { requireUser, serverClient } from '@/lib/supabase-server';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { CopySlugButton } from '@/components/CopySlugButton';
 import { isMetaSectionTitle } from '@/lib/section-filter';
+import { SHARE_HOST } from '@/lib/share-url';
 
 export const runtime = 'edge';
 
@@ -152,7 +153,7 @@ export default async function ShareAnalyticsPage({
     : share.expires_at && new Date(share.expires_at) < new Date()
       ? ('expired' as const)
       : ('live' as const);
-  const fullUrl = `htmlradar.com/r/${share.slug}`;
+  const fullUrl = `${SHARE_HOST}/r/${share.slug}`;
 
   return (
     <div className="py-8">

@@ -66,7 +66,7 @@ const OWN = {
   status: 200,
   body: {
     share_id: OWN_ID,
-    url: 'https://htmlradar.com/r/qa-smoke-deck',
+    url: 'https://htmlradar.page/r/qa-smoke-deck',
     opened: false,
     viewers: [],
   },
@@ -85,7 +85,11 @@ describe('GET /api/v1/shares/{id}/activity — finding the share', () => {
     expect(db.lastFilters).toEqual({ owner_id: 'user-1', slug: 'qa-smoke-deck' });
   });
 
+  // Both hosts: the content domain links point at now, and the application
+  // domain every link handed out before the move named.
   it('by the link itself, or its /r/ path', async () => {
+    expect(await activity('https://htmlradar.page/r/qa-smoke-deck')).toEqual(OWN);
+    expect(await activity('htmlradar.page/r/qa-smoke-deck')).toEqual(OWN);
     expect(await activity('https://htmlradar.com/r/qa-smoke-deck')).toEqual(OWN);
     expect(await activity('htmlradar.com/r/qa-smoke-deck')).toEqual(OWN);
     expect(await activity('/r/qa-smoke-deck')).toEqual(OWN);
@@ -94,7 +98,7 @@ describe('GET /api/v1/shares/{id}/activity — finding the share', () => {
   it("does not find another account's share by id or by slug", async () => {
     expect(await activity(THEIRS_ID)).toEqual(NOT_FOUND);
     expect(await activity('their-deck')).toEqual(NOT_FOUND);
-    expect(await activity('https://htmlradar.com/r/their-deck')).toEqual(NOT_FOUND);
+    expect(await activity('https://htmlradar.page/r/their-deck')).toEqual(NOT_FOUND);
   });
 
   it('treats anything that is neither an id nor a well-formed slug as not found', async () => {
@@ -104,9 +108,10 @@ describe('GET /api/v1/shares/{id}/activity — finding the share', () => {
       '-qa-smoke-deck', // leading hyphen
       'qa smoke deck',
       'a'.repeat(61),
-      'https://htmlradar.com/r/qa-smoke-deck/auth',
-      'https://htmlradar.com/r/qa-smoke-deck?x=1',
+      'https://htmlradar.page/r/qa-smoke-deck/auth',
+      'https://htmlradar.page/r/qa-smoke-deck?x=1',
       'https://evil.example/r/qa-smoke-deck',
+      'https://htmlradar.page.evil.example/r/qa-smoke-deck',
       'r/qa-smoke-deck',
       '',
     ]) {

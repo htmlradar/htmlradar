@@ -31,6 +31,7 @@ import { deleteR2Object, r2Key } from '@/lib/r2';
 import { readQuota } from '@/lib/quota';
 import { captureServerEvent } from '@/lib/events';
 import { logServerError } from '@/lib/error-log';
+import { shareUrl } from '@/lib/share-url';
 
 export const runtime = 'edge';
 
@@ -395,7 +396,7 @@ export async function POST(req: NextRequest) {
   return jsonResponse(201, {
     share_id: share.id,
     document_id: documentId,
-    url: `${SITE_URL}/r/${share.slug}`,
+    url: shareUrl(share.slug),
     dashboard_url: `${SITE_URL}/docs/${documentId}`,
   });
 }

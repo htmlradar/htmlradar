@@ -1,6 +1,8 @@
 # HTMLRadar
 
-### Read tracking for the HTML your LLM just generated.
+### The open-source DocSend alternative for HTML files.
+
+Read tracking for the HTML your LLM just generated.
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPLv3-7A1F2E)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/htmlradar/htmlradar?style=flat&color=7A1F2E)](https://github.com/htmlradar/htmlradar/stargazers)

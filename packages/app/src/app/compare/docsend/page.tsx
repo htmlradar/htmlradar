@@ -217,7 +217,7 @@ export default function ComparePage() {
             items={[
               {
                 q: 'Is HTMLRadar a free DocSend alternative?',
-                a: 'The hosted free tier covers 2 tracked links with full section-level analytics. Past that it is $15/mo flat, or $150/yr if you pay annually — which also lets you name your own links, so a client receives htmlradar.com/r/acme-proposal rather than a random string. Or self-host the AGPL-3.0 source for free on your own infrastructure.',
+                a: 'The hosted free tier covers 2 tracked links with full section-level analytics. Past that it is $15/mo flat, or $150/yr if you pay annually — which also lets you name your own links, so a client receives htmlradar.page/r/acme-proposal rather than a random string. Or self-host the AGPL-3.0 source for free on your own infrastructure.',
               },
               {
                 q: 'Does HTMLRadar track PDFs like DocSend does?',

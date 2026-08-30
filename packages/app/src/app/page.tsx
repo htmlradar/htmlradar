@@ -931,7 +931,7 @@ export default function LandingV2() {
           <div className="v2-flow-mock v2-mock-share v2-reveal d1">
             <div className="mock-kicker">/ share</div>
             <div className="url-row">
-              <span className="url">htmlradar.com/r/swift-falcon</span>
+              <span className="url">htmlradar.page/r/swift-falcon</span>
               <span className="copy">Copy</span>
             </div>
             <div className="toggles">
@@ -1114,7 +1114,7 @@ export default function LandingV2() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                htmlradar.com/r/swift-falcon-a3f2
+                htmlradar.page/r/swift-falcon-a3f2
               </div>
               <p
                 style={{

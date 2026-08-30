@@ -101,7 +101,7 @@ export default function Post() {
                   <code className="font-mono text-[14px] text-signal-dark">packages/proxy</code> is
                   a Cloudflare Worker that owns the share URL. When someone opens{' '}
                   <code className="font-mono text-[14px] text-signal-dark">
-                    htmlradar.com/r/swift-falcon-a3f2
+                    htmlradar.page/r/swift-falcon-a3f2
                   </code>
                   , the request hits this worker. It runs the email gate, fetches the HTML from R2
                   or an external URL, injects the tracker, streams the page back.

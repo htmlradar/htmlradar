@@ -34,14 +34,14 @@ const FREE_FEATURES = [
   'Files attached to a deck: 20 files · 25 MB each · 100 MB per doc',
   'Per-share download permission, every download logged',
   'Real-time email when a real read happens',
-  'Link names are picked for you: htmlradar.com/r/swift-falcon-a3f9c2',
+  'Link names are picked for you: htmlradar.page/r/swift-falcon-a3f9c2',
   '“Powered by HTMLRadar” footer on the viewer',
 ];
 
 const PRO_FEATURES = [
   'Everything in Free, plus:',
   'Unlimited tracked links',
-  'Name your own links: htmlradar.com/r/acme-proposal',
+  'Name your own links: htmlradar.page/r/acme-proposal',
   'No “Powered by HTMLRadar” footer on recipient views',
   'Priority email support, response inside one business day',
 ];

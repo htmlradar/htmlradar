@@ -9,7 +9,7 @@ A fictional seed-stage company. Used as the canonical demo for HTMLRadar.
 
 ## How it's used
 
-Once deployed, this lives at `htmlradar.com/r/lumenforge-demo` — a public share with no email gate. The landing page links to it as the live demo.
+Once deployed, this lives at `htmlradar.page/r/lumenforge-demo` — a public share with no email gate. The landing page links to it as the live demo.
 
 ## Editing
 

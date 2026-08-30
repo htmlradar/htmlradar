@@ -115,7 +115,7 @@ describe('share_html request and response', () => {
     const fetchMock = mockFetch(201, {
       share_id: 'shr_1',
       document_id: 'doc_1',
-      url: 'https://htmlradar.com/r/acme',
+      url: 'https://htmlradar.page/r/acme',
       dashboard_url: 'https://htmlradar.com/d/doc_1',
     });
 
@@ -140,11 +140,11 @@ describe('share_html request and response', () => {
     mockFetch(201, {
       share_id: 'shr_1',
       document_id: 'doc_1',
-      url: 'https://htmlradar.com/r/acme',
+      url: 'https://htmlradar.page/r/acme',
       dashboard_url: 'https://htmlradar.com/d/doc_1',
     });
     const text = body(await shareHtml(config, { html: '<h1>Deck</h1>', require_email: true }));
-    expect(text).toContain('https://htmlradar.com/r/acme');
+    expect(text).toContain('https://htmlradar.page/r/acme');
     expect(text).toContain('https://htmlradar.com/d/doc_1');
     expect(text).toContain('shr_1');
     expect(text).toMatch(/asked for their email/);
@@ -282,7 +282,7 @@ describe('get_share_activity', () => {
   it('summarises viewers, ranks sections by time, and appends the raw JSON', async () => {
     mockFetch(200, {
       share_id: 'shr_1',
-      url: 'https://htmlradar.com/r/acme',
+      url: 'https://htmlradar.page/r/acme',
       opened: true,
       viewers: [
         {

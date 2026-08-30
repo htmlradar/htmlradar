@@ -353,6 +353,9 @@ export default function LandingV2() {
             <a href="#how">How it works</a>
           </li>
           <li>
+            <Link href="/tools/html-to-link">Tools</Link>
+          </li>
+          <li>
             <Link href="/pricing">Pricing</Link>
           </li>
         </ul>

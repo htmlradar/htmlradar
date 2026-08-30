@@ -90,8 +90,9 @@ export default function WhyPage() {
 
             <Reveal delay={0.48}>
               <p className="border-t border-line pt-7 text-ink">
-                HTMLRadar tracks who reads HTML at the section level. It sends an email the moment a
-                real read happens, and tells you which sections kept them past three seconds.
+                HTMLRadar tracks who reads HTML at the section level. It sends an email the moment
+                the document is first opened, and tells you which sections kept them past three
+                seconds.
               </p>
             </Reveal>
           </div>

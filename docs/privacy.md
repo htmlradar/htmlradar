@@ -14,6 +14,8 @@ When a recipient opens a tracked share, we record:
 
 We do **not** collect: keystrokes, mouse positions, third-party trackers, anything from outside the document, or anything that identifies the recipient beyond the email they provided.
 
+Recipient documents are served from a separate domain, htmlradar.page, which shares no cookies or browser storage with htmlradar.com, and old htmlradar.com links redirect there automatically.
+
 ## What we collect when you use the app yourself
 
 Separately from share-tracking above, the hosted app records first-party usage data:

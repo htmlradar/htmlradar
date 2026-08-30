@@ -69,6 +69,11 @@ export default function PrivacyPage() {
                 outside the document, or anything that identifies the recipient beyond the email
                 they provided.
               </p>
+              <p className="mt-4">
+                Recipient documents are served from a separate domain, htmlradar.page, which shares
+                no cookies or browser storage with htmlradar.com, and old htmlradar.com links
+                redirect there automatically.
+              </p>
             </Section>
 
             <Section title="What we collect when you use the app yourself">

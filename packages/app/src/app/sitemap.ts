@@ -66,6 +66,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    { url: `${baseUrl}/tools`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${baseUrl}/tools/html-to-link`, changeFrequency: 'monthly', priority: 0.7 },
     {
       url: `${baseUrl}/tools/claude-artifact-to-link`,

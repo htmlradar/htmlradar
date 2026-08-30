@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { FaqLd } from '@/components/JsonLd';
-import { ListedOn } from '@/components/ListedOn';
+import { V2Footer } from '@/components/V2Footer';
 import { PricingTiers } from './PricingTiers';
 import { pageMeta } from '@/lib/seo';
 import '../landing-v2.css';
@@ -77,6 +77,9 @@ export default function PricingPage() {
           </li>
           <li>
             <Link href="/#how">How it works</Link>
+          </li>
+          <li>
+            <Link href="/tools">Tools</Link>
           </li>
           <li>
             <Link href="/pricing">Pricing</Link>
@@ -333,29 +336,7 @@ export default function PricingPage() {
       </section>
 
       {/* ─────────────────────── FOOTER ─────────────────────── */}
-      <footer className="v2-foot">
-        <div>
-          HTML
-          <span style={{ color: 'var(--brand)', fontFamily: 'var(--serif)', fontStyle: 'italic' }}>
-            radar
-          </span>
-          {' · Document tracking for HTML. Open source · AGPL-3.0.'}
-        </div>
-        <div style={{ display: 'flex', gap: 24 }}>
-          <Link href="/">Home</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/privacy">Privacy</Link>
-          <a
-            href="https://github.com/htmlradar/htmlradar"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-          <Link href="/sign-in">Sign in</Link>
-        </div>
-        <ListedOn />
-      </footer>
+      <V2Footer />
 
       {/* responsive tweaks scoped inline so they ship without polluting CSS */}
       <style>{`

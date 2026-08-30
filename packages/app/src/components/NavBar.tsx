@@ -27,7 +27,7 @@ export async function NavBar() {
             <Link href="/docs" className="text-ink-soft hover:text-signal-dark">
               Documents
             </Link>
-            <Link href="/tools/html-to-link" className="text-ink-soft hover:text-signal-dark">
+            <Link href="/tools" className="text-ink-soft hover:text-signal-dark">
               Tools
             </Link>
             {/* Analytics tab removed 2026-05-17 — was a flat list of all
@@ -51,7 +51,7 @@ export async function NavBar() {
             >
               GitHub
             </a>
-            <Link href="/tools/html-to-link" className="text-ink-soft hover:text-signal-dark">
+            <Link href="/tools" className="text-ink-soft hover:text-signal-dark">
               Tools
             </Link>
             <Link href="/pricing" className="text-ink-soft hover:text-signal-dark">

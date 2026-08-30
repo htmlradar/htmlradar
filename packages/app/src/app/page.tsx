@@ -19,7 +19,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
-import { ListedOn } from '@/components/ListedOn';
+import { V2Footer } from '@/components/V2Footer';
 import { SoftwareApplicationLd } from '@/components/JsonLd';
 import { pageMeta } from '@/lib/seo';
 import { LandingEffects } from './LandingEffects';
@@ -354,7 +354,7 @@ export default function LandingV2() {
             <a href="#how">How it works</a>
           </li>
           <li>
-            <Link href="/tools/html-to-link">Tools</Link>
+            <Link href="/tools">Tools</Link>
           </li>
           <li>
             <Link href="/pricing">Pricing</Link>
@@ -1222,37 +1222,7 @@ export default function LandingV2() {
       </section>
 
       {/* ─────────────────────── FOOTER ─────────────────────── */}
-      <footer className="v2-foot">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <Logo size="sm" />
-          <span>· Document tracking for HTML. Open source · AGPL-3.0.</span>
-        </div>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <Link href="/why">Why</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/use-case/pitch-deck-tracking">Pitch deck tracking</Link>
-          <Link href="/use-case/proposal-tracking">Proposal tracking</Link>
-          <Link href="/use-case/track-html-deck">Track HTML decks</Link>
-          <Link href="/for/claude-artifacts">For Claude artifacts</Link>
-          <Link href="/for/reveal-js">For reveal.js</Link>
-          <Link href="/self-hosted">Self-hosted</Link>
-          <Link href="/compare/docsend">vs DocSend</Link>
-          <Link href="/compare/papermark">vs Papermark</Link>
-          <Link href="/compare/docsend-vs-papermark">DocSend vs Papermark</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/feedback">Feedback</Link>
-          <Link href="/privacy">Privacy</Link>
-          <a
-            href="https://github.com/htmlradar/htmlradar"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-          <Link href="/sign-in">Sign in</Link>
-        </div>
-        <ListedOn />
-      </footer>
+      <V2Footer />
     </div>
   );
 }

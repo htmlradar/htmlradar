@@ -420,6 +420,7 @@ export const emailGateForm = (slug: string, error?: string): Response =>
          ${error ? 'class="invalid" aria-invalid="true"' : ''}
        />
        <div class="error" role="alert" aria-live="polite">${error ? escapeHtml(error) : ''}</div>
+       <p class="lede">Reading activity on this document is shared with the sender. <a href="https://htmlradar.com/privacy">How HTMLRadar handles this</a></p>
        <button type="submit">Continue</button>
      </form>`,
     error ? 401 : 200,

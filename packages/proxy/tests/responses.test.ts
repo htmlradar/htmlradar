@@ -111,4 +111,29 @@ describe('recipient error shells (Batch D)', () => {
       expect(await bodyOf(passwordForm('xyz-789'))).toContain('action="/r/xyz-789/auth"');
     });
   });
+
+  // The tracking disclosure belongs to the email gate alone: that is the one
+  // screen where the recipient hands over an identity. The document itself is
+  // built by fetch-html + inject and never passes through this module, so it
+  // cannot pick the sentence up.
+  describe('tracking disclosure on the email gate only', () => {
+    const DISCLOSURE = 'Reading activity on this document is shared with the sender.';
+
+    it('emailGateForm shows the disclosure and the privacy link', async () => {
+      const body = await bodyOf(emailGateForm('abc-123'));
+      expect(body).toContain(DISCLOSURE);
+      expect(body).toContain('href="https://htmlradar.com/privacy"');
+      expect(body).toContain('How HTMLRadar handles this');
+    });
+
+    it.each([
+      ['passwordForm', () => passwordForm('xyz-789')],
+      ['notFound', notFound],
+      ['revoked', revoked],
+      ['expired', expired],
+      ['sourceUnreachable', sourceUnreachable],
+    ])('%s does not show the disclosure', async (_name, fn) => {
+      expect(await bodyOf(fn())).not.toContain(DISCLOSURE);
+    });
+  });
 });

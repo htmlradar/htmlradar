@@ -6,8 +6,10 @@
 //      min. This catches the migration-013 class of bug where a
 //      backend regression silently drops customer-facing emails.
 //   2. The four critical user-facing routes (/, /pricing, /docs,
-//      /sign-in) return HTTP 200, retried before paging so a
-//      transient edge blip doesn't. Catches deploy-broken-prod cases.
+//      /sign-in) return HTTP 200, and the content domain that serves
+//      recipient documents answers on both a share path and
+//      robots.txt. Retried before paging so a transient edge blip
+//      doesn't. Catches deploy-broken-prod cases.
 //   3. webhook_events_log has failed-and-unprocessed Polar events
 //      (checkWebhookHealth). See its comment block.
 //   4. The Pro expiry sweep (expirePro) demoted somebody. Not a
@@ -60,13 +62,76 @@ export interface Env {
   TELEGRAM_CHAT_ID?: string;
 }
 
-const ROUTES = ['/', '/pricing', '/docs', '/sign-in'];
+// What a healthy production answers, one entry per probe.
+//
+// The four application routes on htmlradar.com are the original check. The
+// two on htmlradar.page are the content domain, where recipient documents are
+// served: it carries the customer links, so an outage there is invisible to
+// the founder and total for the reader.
+//
+// Neither content-domain probe can be a 200 on a real page, because that host
+// has no pages. A missing share is a 404 BY DESIGN, so 404 is the healthy
+// answer and anything else — a 200, a 502, a redirect to the marketing site —
+// means the worker route came loose. robots.txt is the one path that must
+// answer 200, and its body has to keep saying Disallow, because that is what
+// keeps somebody else's document out of a search result.
+interface Check {
+  url: string;
+  status: number;
+  /** Substring the body must contain. Omitted means the status is enough. */
+  body?: string;
+}
+
+export const CHECKS: Check[] = [
+  ...['/', '/pricing', '/docs', '/sign-in'].map((path) => ({
+    url: `https://htmlradar.com${path}`,
+    status: 200,
+  })),
+  { url: 'https://htmlradar.page/r/nonexistent-smoke-test', status: 404 },
+  { url: 'https://htmlradar.page/robots.txt', status: 200, body: 'Disallow: /' },
+];
 
 // Route probing retries before it pages — see check 2 for why. Three attempts a
 // few seconds apart finishes well inside the 5-minute cron window.
 const ROUTE_ATTEMPTS = 3;
 const ROUTE_RETRY_MS = 3_000;
 const ROUTE_TIMEOUT_MS = 10_000;
+
+/**
+ * One probe, retried. Returns null when the target answered as it should, or
+ * the reason it did not once every attempt has been spent.
+ *
+ * Exported for the tests; `retryMs` is a parameter for the same reason, so a
+ * failing case does not sit through three real back-offs.
+ */
+export async function probe(
+  check: Check,
+  retryMs: number = ROUTE_RETRY_MS,
+): Promise<string | null> {
+  let problem: string | null = null;
+  for (let attempt = 1; attempt <= ROUTE_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(check.url, {
+        redirect: 'follow',
+        // Without this a hung request could stall the whole cron run.
+        signal: AbortSignal.timeout(ROUTE_TIMEOUT_MS),
+      });
+      if (res.status !== check.status) {
+        problem = `returned HTTP ${res.status} (expected ${check.status})`;
+      } else if (check.body && !(await res.text()).includes(check.body)) {
+        problem = `returned ${res.status} but the body no longer contains '${check.body}'`;
+      } else {
+        return null;
+      }
+    } catch (err) {
+      problem = `fetch threw: ${(err as Error).message}`;
+    }
+    if (attempt < ROUTE_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, retryMs));
+    }
+  }
+  return problem;
+}
 
 // ---------------------------------------------------------------------------
 // app_events → PostHog replay.
@@ -604,7 +669,8 @@ export default {
       alerts.push(`Couldn't read notifications_log: ${(err as Error).message}`);
     }
 
-    // Check 2: critical routes return 200, confirmed over several attempts.
+    // Check 2: every route in CHECKS answers as it should, confirmed over
+    // several attempts.
     //
     // One probe is weak evidence. /sign-in and /docs run as Cloudflare edge
     // functions (x-edge-runtime), and a transient edge 503 that heals in seconds
@@ -616,29 +682,10 @@ export default {
     // This is deliberately the OPPOSITE call to the webhook alarm above, which
     // stays loud on a single failure. The difference is whether the condition can
     // heal on its own: an edge blip does, an unprocessed payment never does.
-    for (const path of ROUTES) {
-      let problem: string | null = null;
-      for (let attempt = 1; attempt <= ROUTE_ATTEMPTS; attempt++) {
-        try {
-          const res = await fetch(`https://htmlradar.com${path}`, {
-            redirect: 'follow',
-            // Without this a hung request could stall the whole cron run.
-            signal: AbortSignal.timeout(ROUTE_TIMEOUT_MS),
-          });
-          if (res.status === 200) {
-            problem = null;
-            break;
-          }
-          problem = `returned HTTP ${res.status} (expected 200)`;
-        } catch (err) {
-          problem = `fetch threw: ${(err as Error).message}`;
-        }
-        if (attempt < ROUTE_ATTEMPTS) {
-          await new Promise((resolve) => setTimeout(resolve, ROUTE_RETRY_MS));
-        }
-      }
+    for (const check of CHECKS) {
+      const problem = await probe(check);
       if (problem) {
-        alerts.push(`${path} ${problem} — failed all ${ROUTE_ATTEMPTS} attempts`);
+        alerts.push(`${check.url} ${problem} — failed all ${ROUTE_ATTEMPTS} attempts`);
       }
     }
 

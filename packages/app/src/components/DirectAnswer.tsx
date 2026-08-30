@@ -20,7 +20,7 @@ export function DirectAnswer({
   return (
     <div className="mt-6 max-w-2xl border-l-2 border-signal pl-5">
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-        {label} {updated}
+        {`${label} ${updated}`}
       </p>
       <p className="mt-2 text-[17px] leading-relaxed text-ink">{children}</p>
     </div>

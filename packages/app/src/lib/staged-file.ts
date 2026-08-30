@@ -63,6 +63,19 @@ export function validateStagedFile(row: unknown, now: number = Date.now()): Stag
   };
 }
 
+// The panel's restore-on-mount question — "is there still a file to put back
+// on screen?" — is this same rule, under the name of the caller that asks it.
+export const restorableStagedFile = validateStagedFile;
+
+// Which failures are ours to clean up. An expired record is: nobody is coming
+// back for it. A record we simply don't recognise is not — throwing away
+// someone's file because a field check we may have got wrong said no is worse
+// than ignoring it and reading it again on the next visit.
+export function shouldDiscardStagedRow(row: unknown, now: number = Date.now()): boolean {
+  const stagedAt = (row as { stagedAt?: unknown } | null | undefined)?.stagedAt;
+  return typeof stagedAt === 'number' && isStale(stagedAt, now);
+}
+
 // The resume rule, in one place: a staged file is only turned into a document
 // when the URL carries the exact token that was minted when it was staged.
 export function canResume(file: StagedFile | null, urlToken: string | null | undefined): boolean {
@@ -102,15 +115,18 @@ export function clearStagedFile(): Promise<undefined> {
   return run('readwrite', (store) => store.delete(KEY));
 }
 
+let warnedOnce = false;
+
 export async function readStagedFile(): Promise<StagedFile | null> {
   const row = await run<unknown>('readonly', (store) => store.get(KEY));
   if (row === undefined) return null;
-  const valid = validateStagedFile(row);
-  // Present but expired or malformed: drop it rather than leave it to be
-  // re-read on every future visit.
-  if (!valid) {
+  const valid = restorableStagedFile(row);
+  if (valid) return valid;
+  if (shouldDiscardStagedRow(row)) {
     await clearStagedFile();
-    return null;
+  } else if (!warnedOnce) {
+    warnedOnce = true;
+    console.warn('[staged-file] ignoring a staged record this build does not recognise');
   }
-  return valid;
+  return null;
 }

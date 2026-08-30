@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   canResume,
   isStale,
+  restorableStagedFile,
+  shouldDiscardStagedRow,
   validateStagedFile,
   MAX_STAGED_BYTES,
   STAGE_MAX_AGE_MS,
@@ -78,6 +80,46 @@ describe('validateStagedFile', () => {
     expect(validateStagedFile({ ...good, stagedAt: '2026-08-30' }, NOW)).toBeNull();
     expect(validateStagedFile({ ...good, stagedAt: NaN }, NOW)).toBeNull();
     expect(validateStagedFile({ ...good, stagedAt: NOW - STAGE_MAX_AGE_MS - 1 }, NOW)).toBeNull();
+  });
+});
+
+// What the tool panel asks on every mount, and what readStagedFile does with
+// the answer: a usable record goes back on screen, an expired one is deleted,
+// and a record we don't recognise is left alone.
+describe('restore on mount', () => {
+  it('hands back a file staged an hour ago, so a back-navigation can show it again', () => {
+    expect(restorableStagedFile({ ...good, stagedAt: NOW - 3_600_000 }, NOW)).toEqual({
+      ...good,
+      stagedAt: NOW - 3_600_000,
+    });
+  });
+
+  it('has nothing to restore when the record is expired or malformed', () => {
+    expect(restorableStagedFile({ ...good, stagedAt: NOW - STAGE_MAX_AGE_MS - 1 }, NOW)).toBeNull();
+    expect(restorableStagedFile({ ...good, name: 'deck.pdf' }, NOW)).toBeNull();
+  });
+
+  it('discards a record only for being expired', () => {
+    expect(shouldDiscardStagedRow({ ...good, stagedAt: NOW - STAGE_MAX_AGE_MS - 1 }, NOW)).toBe(
+      true,
+    );
+  });
+
+  it('keeps a record that merely fails a shape check', () => {
+    // Deleting someone's file because a field check said no loses the file for
+    // good; ignoring the record costs one wasted read.
+    for (const row of [
+      { ...good, name: 'deck.pdf' },
+      { ...good, token: '' },
+      { ...good, contents: 42 },
+      { ...good, stagedAt: 'yesterday' },
+      { ...good, stagedAt: NaN },
+      'not a record',
+      null,
+    ]) {
+      expect(restorableStagedFile(row, NOW)).toBeNull();
+      expect(shouldDiscardStagedRow(row, NOW)).toBe(false);
+    }
   });
 });
 

@@ -71,6 +71,12 @@ export function HtmlToolPanel({
   // say so plainly and send them to the signed-in upload page instead.
   const [storageBlocked, setStorageBlocked] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
+  // Put back from IndexedDB on mount rather than dropped just now — the file
+  // survives a back-navigation even though React state does not.
+  const [restored, setRestored] = useState(false);
+  // Arrived on a `?resume=` URL whose record is gone: the document it names
+  // was already created.
+  const [resumeSpent, setResumeSpent] = useState(false);
 
   const isPdfMode = !action;
 
@@ -87,6 +93,7 @@ export function HtmlToolPanel({
       return;
     }
     setError(null);
+    setRestored(false);
     setStaged({
       name: file.name,
       type: file.type || 'text/html',
@@ -98,14 +105,15 @@ export function HtmlToolPanel({
     });
   }, []);
 
-  // Coming back from sign-in: pick the staged file up and create the document.
+  // One read of the staged record per mount, doing two jobs. Coming back from
+  // sign-in on a matching `?resume=` URL it creates the document. On any other
+  // load it puts the file back on screen: iOS Safari throws this component's
+  // state away when you navigate back to it, so without this the file is still
+  // in IndexedDB but the page looks like you never dropped anything.
   useEffect(() => {
-    const create = action;
-    if (!create || !resumeToken) return;
-
     let cancelled = false;
     void (async () => {
-      setBusy(true);
+      if (resumeToken) setBusy(true);
       let waiting: StagedFile | null = null;
       try {
         waiting = await readStagedFile();
@@ -118,15 +126,22 @@ export function HtmlToolPanel({
       }
       if (cancelled) return;
       if (!waiting) {
-        // Nothing staged, or it aged out after 24 hours. Fall back to the
-        // ordinary empty state so they can drop the file again.
+        // Nothing staged, or it aged out after 24 hours. A resume URL with
+        // nothing behind it means the document was already created — the
+        // record is deleted before the create — so say where it went.
+        if (resumeToken) setResumeSpent(true);
         setBusy(false);
         return;
       }
-      setStaged(waiting);
-      if (!canResume(waiting, resumeToken)) {
-        // A crafted link, a refresh after the file was already created, or a
-        // second tab. Show the file and its button; create nothing.
+      const found = waiting;
+      // Never clobber a file dropped while this read was in flight.
+      setStaged((current) => current ?? found);
+      const create = action;
+      if (!create || !canResume(found, resumeToken)) {
+        // A plain visit, a crafted link, a refresh after the file was already
+        // created, a second tab, or the PDF tool. Show the file and its
+        // button; create nothing.
+        setRestored(true);
         setBusy(false);
         return;
       }
@@ -271,6 +286,16 @@ export function HtmlToolPanel({
         </p>
       ) : null}
 
+      {resumeSpent && !staged ? (
+        <p className="mt-3 text-[13px] leading-relaxed text-graphite">
+          That file was already turned into a link — find it under{' '}
+          <a href="/docs" className="underline underline-offset-4">
+            Documents
+          </a>
+          .
+        </p>
+      ) : null}
+
       {storageBlocked ? (
         <p className="mt-3 text-[13px] leading-relaxed text-alert">
           This browser will not let the page hold your file while you sign in. Sign in first, then
@@ -326,7 +351,7 @@ export function HtmlToolPanel({
             <p className="text-[13px] leading-relaxed text-graphite">
               {isPdfMode
                 ? 'Opens your browser print dialog. Choose "Save as PDF" as the destination.'
-                : needsSignIn
+                : needsSignIn || restored
                   ? 'Your file is still here. Sign in and it becomes a tracked link.'
                   : 'Your file uploads only after you sign in. First 2 tracked links are free.'}
             </p>

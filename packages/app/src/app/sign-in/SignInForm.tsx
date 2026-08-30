@@ -4,11 +4,12 @@
 // here; the server shell (page.tsx) gates entry and redirects
 // already-authed users to /docs before we ever render the form.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { browserClient } from '@/lib/supabase-browser';
 import { HeroRadar } from '@/components/HeroRadar';
 import { isDisposableEmail } from '@/lib/disposable-emails';
 import { captureClientEvent } from '@/lib/events-client';
+import { readStagedFile } from '@/lib/staged-file';
 
 // Map server-side error codes (from /auth/callback failure paths) to a
 // human-readable message. Without this the form silently shows nothing
@@ -40,6 +41,13 @@ export function SignInForm({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(errorCopy(errorCode));
   const [busy, setBusy] = useState(false);
+  const [stagedName, setStagedName] = useState<string | null>(null);
+  const busySince = useRef(0);
+
+  function beginBusy() {
+    busySince.current = Date.now();
+    setBusy(true);
+  }
 
   // If the parent re-renders with a new errorCode (rare in this flow),
   // mirror it. Without this hydration step the user sees a fresh-looking
@@ -48,8 +56,40 @@ export function SignInForm({
     setError(errorCopy(errorCode));
   }, [errorCode]);
 
+  // iOS Safari restores this page from the back-forward cache with the React
+  // state it had when it left for Google, so `busy` comes back true and both
+  // buttons stay disabled with no way to un-stick them. A bfcache restore is
+  // exactly the case where the sign-in did not happen, so clear it.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setBusy(false);
+    };
+    // Belt and braces for the restores that don't report as persisted: back
+    // from a tab switch or an app switch long after the click.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - busySince.current > 20_000) {
+        setBusy(false);
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  // Arriving from a /tools page with a file waiting in IndexedDB: name it, so
+  // signing in reads as the next step of the thing they were already doing.
+  useEffect(() => {
+    if (!/^\/tools\/[^?]+\?resume=/.test(next)) return;
+    void readStagedFile()
+      .then((file) => setStagedName(file?.name ?? null))
+      .catch(() => undefined);
+  }, [next]);
+
   async function signInWithGoogle() {
-    setBusy(true);
+    beginBusy();
     void captureClientEvent('auth.google_clicked');
     const supabase = browserClient();
     const { error: err } = await supabase.auth.signInWithOAuth({
@@ -69,7 +109,7 @@ export function SignInForm({
 
   async function signInWithEmail(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    beginBusy();
     setError(null);
     if (isDisposableEmail(email)) {
       // No raw email in properties — the address was rejected, so it never
@@ -120,6 +160,12 @@ export function SignInForm({
         <h1 className="text-letterpress font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[48px]">
           Sign in.
         </h1>
+        {stagedName ? (
+          <p className="mt-3 text-[15px] text-ink-soft">
+            Signing in to create a link for{' '}
+            <span className="font-medium text-ink">{stagedName}</span>
+          </p>
+        ) : null}
         <p className="mt-3 text-[15px] text-ink-soft">
           Continue with Google, or enter your email and we'll send you a one-click sign-in link — no
           password to remember.

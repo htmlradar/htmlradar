@@ -32,20 +32,45 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const wellFormedKey = 'hr_live_' + '0123456789abcdef0123456789abcdef01234567';
+
 describe('loadConfig', () => {
   it('refuses to start without an API key, and says where to get one', () => {
     expect(() => loadConfig({})).toThrow(/HTMLRADAR_API_KEY is not set/);
     expect(() => loadConfig({})).toThrow(/htmlradar\.com\/settings/);
+    expect(() => loadConfig({ HTMLRADAR_API_KEY: '  ' })).toThrow(/is not set/);
   });
 
-  it('defaults to the hosted API and strips trailing slashes', () => {
-    expect(loadConfig({ HTMLRADAR_API_KEY: ' k ' })).toEqual({
-      apiKey: 'k',
+  // Claude Code passes `${HTMLRADAR_API_KEY}` from the plugin's .mcp.json
+  // through literally when the variable is not exported, and then reports the
+  // server as connected.
+  it('names an unresolved placeholder and says to export the variable first', () => {
+    const attempt = () => loadConfig({ HTMLRADAR_API_KEY: '${HTMLRADAR_API_KEY}' });
+    expect(attempt).toThrow(/unresolved placeholder "\$\{HTMLRADAR_API_KEY\}"/);
+    expect(attempt).toThrow(/export it in your shell/i);
+    expect(attempt).toThrow(/before starting Claude Code/);
+    expect(attempt).toThrow(/htmlradar\.com\/settings/);
+  });
+
+  it('rejects a value that is not a key', () => {
+    for (const value of ['k', 'hr_live_short', 'hr_live_' + 'G'.repeat(40), wellFormedKey + '0']) {
+      expect(() => loadConfig({ HTMLRADAR_API_KEY: value })).toThrow(
+        /does not look like an HTMLRadar API key.*40 hexadecimal characters/,
+      );
+    }
+  });
+
+  it('accepts a well-formed key, defaults to the hosted API and strips trailing slashes', () => {
+    expect(loadConfig({ HTMLRADAR_API_KEY: ` ${wellFormedKey} ` })).toEqual({
+      apiKey: wellFormedKey,
       baseUrl: 'https://htmlradar.com',
     });
     expect(
-      loadConfig({ HTMLRADAR_API_KEY: 'k', HTMLRADAR_API_URL: 'http://localhost:3000//' }),
-    ).toEqual({ apiKey: 'k', baseUrl: 'http://localhost:3000' });
+      loadConfig({
+        HTMLRADAR_API_KEY: wellFormedKey,
+        HTMLRADAR_API_URL: 'http://localhost:3000//',
+      }),
+    ).toEqual({ apiKey: wellFormedKey, baseUrl: 'http://localhost:3000' });
   });
 });
 

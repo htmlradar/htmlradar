@@ -212,7 +212,7 @@ function failure(message: string): CallToolResult {
 
 export function createServer(config: Config): McpServer {
   const server = new McpServer(
-    { name: 'htmlradar', version: '0.1.0' },
+    { name: 'htmlradar', version: '0.1.1' },
     {
       instructions:
         'HTMLRadar turns an HTML document into a tracked link. Use share_html once you have ' +

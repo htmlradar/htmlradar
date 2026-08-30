@@ -8,7 +8,7 @@
 import { spawn } from 'node:child_process';
 
 const child = spawn('node', ['dist/index.js'], {
-  env: { ...process.env, HTMLRADAR_API_KEY: 'hr_live_smoketest' },
+  env: { ...process.env, HTMLRADAR_API_KEY: 'hr_live_' + '0'.repeat(40) },
   stdio: ['pipe', 'pipe', 'inherit'],
 });
 

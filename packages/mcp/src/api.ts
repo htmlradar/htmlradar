@@ -51,13 +51,34 @@ export interface MeResponse {
   free_links_cap: number | null;
 }
 
+// The shape the app generates (packages/app/src/lib/api-auth.ts): the prefix
+// and 20 random bytes as lowercase hex. Checked at startup because a client
+// that launches this server with a wrong value still reports it as connected;
+// the user would only find out on the first tool call, from a message that
+// says the key was rejected when in fact no key was ever given.
+const API_KEY_PATTERN = /^hr_live_[0-9a-f]{40}$/;
+
+const WHERE_TO_GET_A_KEY =
+  'Create a key at https://htmlradar.com/settings (under "API keys") and pass it to this ' +
+  'server as the HTMLRADAR_API_KEY environment variable.';
+
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const apiKey = env['HTMLRADAR_API_KEY']?.trim();
   if (!apiKey) {
+    throw new Error(`HTMLRADAR_API_KEY is not set. ${WHERE_TO_GET_A_KEY}`);
+  }
+  if (apiKey.includes('${')) {
     throw new Error(
-      'HTMLRADAR_API_KEY is not set. Create a key at https://htmlradar.com/settings ' +
-        '(under "API keys") and pass it to this server as the HTMLRADAR_API_KEY ' +
-        'environment variable.',
+      `HTMLRADAR_API_KEY is the unresolved placeholder "${apiKey}", which means the variable ` +
+        'was not set in the environment the client started from. Export it in your shell ' +
+        '(export HTMLRADAR_API_KEY=hr_live_...) before starting Claude Code or the client that ' +
+        `launches this server. ${WHERE_TO_GET_A_KEY}`,
+    );
+  }
+  if (!API_KEY_PATTERN.test(apiKey)) {
+    throw new Error(
+      'HTMLRADAR_API_KEY does not look like an HTMLRadar API key. Keys are "hr_live_" followed ' +
+        `by 40 hexadecimal characters. ${WHERE_TO_GET_A_KEY}`,
     );
   }
   // Trailing slashes make every request path double-slashed, which some

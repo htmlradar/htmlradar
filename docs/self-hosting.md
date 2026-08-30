@@ -88,11 +88,11 @@ You can run both roles on one domain if you are self-hosting for a team that onl
 
 Three settings carry the split, and they have to agree:
 
-| Setting                  | Where                                      | What it does                                                                                                                                                  |
-| ------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SHARE_HOST`             | `[vars]` in `packages/proxy/wrangler.toml` | The host the worker serves documents on. Anything on it that is not a share is a 404, and `/robots.txt` there disallows everything. Default `htmlradar.page`. |
-| `LEGACY_HOSTS`           | `[vars]` in `packages/proxy/wrangler.toml` | Comma-separated hosts that used to serve `/r/` and now only redirect to `SHARE_HOST`. Default `htmlradar.com`. Empty if you never moved.                      |
-| `NEXT_PUBLIC_SHARE_BASE` | build-time env for `packages/app`          | The base the app puts in every link it creates or prints, scheme included. Default `https://htmlradar.page`. Must be `https://` + `SHARE_HOST`.               |
+| Setting                  | Where                                      | What it does                                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SHARE_HOST`             | `[vars]` in `packages/proxy/wrangler.toml` | The host the worker serves documents on. Anything on it that is not a share is a 404, and `/robots.txt` there disallows everything. Default `htmlradar.page`.                                                               |
+| `LEGACY_HOSTS`           | `[vars]` in `packages/proxy/wrangler.toml` | Comma-separated hosts that used to serve `/r/` and now only redirect to `SHARE_HOST`. Empty in the shipped file, which means no host redirects and every host serves documents in place. Leave it empty if you never moved. |
+| `NEXT_PUBLIC_SHARE_BASE` | build-time env for `packages/app`          | The base the app puts in every link it creates or prints, scheme included. Default `https://htmlradar.page`. Must be `https://` + `SHARE_HOST`.                                                                             |
 
 Links created before a move are not rewritten in the database. A `GET` or `HEAD` on a legacy host is answered with a `301` to the same path and query on `SHARE_HOST`, so old links keep opening. A `POST` is served where it was sent instead, because a `301` would turn it into a `GET` and drop the body — that keeps the password gate, the email gate and the opt-out confirmation working in tabs that were already open when the switch happened. Serving `POST` in place only matters for about thirty days after a move; after that the redirect can cover every method.
 

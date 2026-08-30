@@ -56,6 +56,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     { url: `${baseUrl}/for/reveal-js`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${baseUrl}/tools/html-to-link`, changeFrequency: 'monthly', priority: 0.7 },
+    {
+      url: `${baseUrl}/tools/claude-artifact-to-link`,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/tools/claude-artifact-to-pdf`,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
     { url: `${baseUrl}/self-hosted`, changeFrequency: 'monthly', priority: 0.7 },
     {
       url: `${baseUrl}/pl/alternatywa-dla-docsend`,

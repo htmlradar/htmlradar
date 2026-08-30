@@ -89,6 +89,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.5,
     },
+    {
+      url: `${baseUrl}/blog/why-i-built-read-tracking-for-html`,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
   ];
 
   return routes;

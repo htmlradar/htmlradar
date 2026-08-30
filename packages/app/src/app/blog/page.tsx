@@ -24,6 +24,14 @@ interface Post {
 
 const POSTS: Post[] = [
   {
+    slug: 'why-i-built-read-tracking-for-html',
+    title: 'Decks moved to HTML. I built the read tracking for it.',
+    description:
+      'Send-side analytics for HTML decks and proposals: section dwell, active read time, scroll depth. No session replay, no mouse tracking. Open source, AGPL-3.0.',
+    date: '2026-08-30',
+    readingTime: '4 min',
+  },
+  {
     slug: 'how-we-built-htmlradar',
     title: 'How I built HTMLRadar',
     description:

@@ -1,15 +1,38 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+
+// api-auth reaches for the error log when the rate limiter's database call
+// fails. Stubbed because error-log.ts imports Next's `server-only`, a module
+// that resolves inside the Next build and nowhere else.
+vi.mock('./error-log', () => ({ logServerError: vi.fn() }));
+
+// The Supabase client authenticateApiKey builds for itself. Each test that
+// needs one puts it here; nothing else in this file touches the network.
+const supabase = vi.hoisted(() => ({ current: null as unknown }));
+vi.mock('@supabase/supabase-js', () => ({ createClient: () => supabase.current }));
+
 import {
   apiKeyPrefix,
   API_KEY_PREFIX,
+  authenticateApiKey,
+  BODY_TIMED_OUT,
   FREE_LIMIT_REACHED,
   generateApiKey,
   hashApiKey,
+  errorResponse,
   mapCreateShareError,
   parseBearerKey,
+  rateLimited,
+  readBodyCapped,
+  REQUEST_TIMEOUT,
   tooLarge,
+  URL_MODE_DISABLED,
   validationError,
 } from './api-auth';
+import { logServerError } from './error-log';
+
+beforeEach(() => {
+  vi.mocked(logServerError).mockReset();
+});
 
 const VALID = `${API_KEY_PREFIX}${'a1b2c3d4'.repeat(5)}`; // 40 hex characters
 
@@ -133,9 +156,11 @@ describe('mapping a create_share failure to a response', () => {
 
 describe('the other error responses the contract fixes', () => {
   it('413 carries the byte cap', () => {
-    expect(tooLarge(31457280)).toEqual({
+    // 5 MB — the API's own ceiling, well under the 30 MB the browser upload
+    // takes, because an edge isolate has to decode this one in memory.
+    expect(tooLarge(5 * 1024 * 1024)).toEqual({
       status: 413,
-      body: { error: 'too_large', max_bytes: 31457280 },
+      body: { error: 'too_large', max_bytes: 5242880 },
     });
   });
 
@@ -143,6 +168,272 @@ describe('the other error responses the contract fixes', () => {
     expect(validationError('Provide either "html" or "url".')).toEqual({
       status: 422,
       body: { error: 'validation', message: 'Provide either "html" or "url".' },
+    });
+  });
+});
+
+describe('rate limiting', () => {
+  it('429 carries the wait in the body and the header, saying the same thing twice', async () => {
+    const err = rateLimited(1800);
+    expect(err).toEqual({
+      status: 429,
+      body: { error: 'rate_limited', retry_after_seconds: 1800 },
+      headers: { 'retry-after': '1800' },
+    });
+
+    const res = errorResponse(err);
+    expect(res.status).toBe(429);
+    expect(res.headers.get('retry-after')).toBe('1800');
+    expect(await res.json()).toEqual({ error: 'rate_limited', retry_after_seconds: 1800 });
+  });
+
+  it('leaves a response with no headers of its own alone', () => {
+    const res = errorResponse(validationError('nope'));
+    expect(res.headers.get('retry-after')).toBeNull();
+    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+  });
+});
+
+// The shares route's read cap. Above the 5 MB document ceiling by half a
+// megabyte, which is the room JSON string escaping needs.
+const MAX_REQUEST_BYTES = 5.5 * 1024 * 1024;
+
+/**
+ * A POST whose body arrives in chunks and declares no Content-Length — which
+ * is what a chunked request actually looks like, and the shape the header
+ * check on its own cannot see. `pulled` counts the chunks the stream was asked
+ * for, so a test can tell "refused" from "refused after reading all of it".
+ */
+function chunkedRequest(chunks: Uint8Array[]): { req: Request; pulled: () => number } {
+  let sent = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      const chunk = chunks[sent];
+      if (!chunk) {
+        controller.close();
+        return;
+      }
+      sent++;
+      controller.enqueue(chunk);
+    },
+  });
+  const req = new Request('https://htmlradar.com/api/v1/shares', {
+    method: 'POST',
+    body: stream,
+    duplex: 'half', // required by Node/undici for a streamed request body
+  } as RequestInit);
+  return { req, pulled: () => sent };
+}
+
+/** A POST whose first chunk arrives and whose second never does. */
+function stalledRequest(first: Uint8Array): Request {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(first);
+    },
+    pull: () => new Promise<void>(() => {}), // the rest of the body never comes
+  });
+  return new Request('https://htmlradar.com/api/v1/shares', {
+    method: 'POST',
+    body: stream,
+    duplex: 'half',
+  } as RequestInit);
+}
+
+describe('reading a request body under a cap', () => {
+  it('reads a chunked body that declares no Content-Length', async () => {
+    const enc = new TextEncoder();
+    const { req } = chunkedRequest([enc.encode('{"html":'), enc.encode('"<p>hi</p>"}')]);
+    expect(req.headers.get('content-length')).toBeNull();
+    expect(await readBodyCapped(req, MAX_REQUEST_BYTES)).toBe('{"html":"<p>hi</p>"}');
+  });
+
+  // The finding this closes: no Content-Length means the header check sees
+  // nothing, and buffering first means the isolate holds the whole body before
+  // anyone measures it.
+  it('refuses a chunked body over the cap without reading it to the end', async () => {
+    const oneMb = new Uint8Array(1024 * 1024);
+    const { req, pulled } = chunkedRequest(Array.from({ length: 100 }, () => oneMb));
+    expect(req.headers.get('content-length')).toBeNull();
+    expect(await readBodyCapped(req, MAX_REQUEST_BYTES)).toBeNull();
+    // 5.5 MB of budget: the sixth megabyte is the one that goes over. What
+    // matters is that the remaining 94 never arrive.
+    expect(pulled()).toBeGreaterThanOrEqual(6);
+    expect(pulled()).toBeLessThan(12);
+  });
+
+  it('accepts a body exactly at the cap and refuses one byte more', async () => {
+    const enc = new TextEncoder();
+    expect(await readBodyCapped(chunkedRequest([enc.encode('abcde')]).req, 5)).toBe('abcde');
+    expect(await readBodyCapped(chunkedRequest([enc.encode('abcdef')]).req, 5)).toBeNull();
+  });
+
+  it('keeps a multi-byte character that straddles two chunks', async () => {
+    const euro = new TextEncoder().encode('€'); // three bytes
+    const { req } = chunkedRequest([euro.slice(0, 1), euro.slice(1)]);
+    expect(await readBodyCapped(req, 10)).toBe('€');
+  });
+
+  // A missing body is a 422 about JSON at the call site, not a 413. Reading it
+  // as oversized would tell the caller the opposite of what went wrong.
+  it('treats an absent body as empty rather than oversized', async () => {
+    const req = new Request('https://htmlradar.com/api/v1/shares', { method: 'POST' });
+    expect(await readBodyCapped(req, MAX_REQUEST_BYTES)).toBe('');
+  });
+
+  // The finding this closes: the cap ends a body that is too big, and nothing
+  // ended a body that simply stopped. Staying under the cap and never closing
+  // the connection left reader.read() pending for as long as the platform
+  // allowed, with the isolate held open behind it.
+  it('gives up on a body that stops arriving, far below the cap', async () => {
+    vi.useFakeTimers();
+    try {
+      const req = stalledRequest(new TextEncoder().encode('{"html":"<p>'));
+      const reading = readBodyCapped(req, MAX_REQUEST_BYTES, { timeoutMs: 1_000 });
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await reading).toBe(BODY_TIMED_OUT);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves no timer behind when the body arrives', async () => {
+    vi.useFakeTimers();
+    try {
+      const enc = new TextEncoder();
+      const { req } = chunkedRequest([enc.encode('{"html":'), enc.encode('"<p>hi</p>"}')]);
+      const reading = readBodyCapped(req, MAX_REQUEST_BYTES);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(await reading).toBe('{"html":"<p>hi</p>"}');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Sol, round 3: `void reader.cancel()` let a source whose cancel rejects
+  // surface as an unhandled rejection. The read still gives its answer; the
+  // failed cancel is nobody's problem.
+  it('survives a stream whose cancel rejects, on both the cap and the deadline', async () => {
+    const unhandled: unknown[] = [];
+    const capture = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', capture);
+    vi.useFakeTimers();
+    try {
+      const failingCancel = (chunk: Uint8Array, stall: boolean) =>
+        new Request('https://htmlradar.com/api/v1/shares', {
+          method: 'POST',
+          body: new ReadableStream<Uint8Array>({
+            start: (controller) => controller.enqueue(chunk),
+            pull: stall ? () => new Promise<void>(() => {}) : (controller) => controller.close(),
+            cancel: () => Promise.reject(new Error('cancel failed')),
+          }),
+          duplex: 'half',
+        } as RequestInit);
+
+      expect(await readBodyCapped(failingCancel(new Uint8Array(6), false), 5)).toBeNull();
+
+      const reading = readBodyCapped(failingCancel(new Uint8Array(6), true), MAX_REQUEST_BYTES, {
+        timeoutMs: 1_000,
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await reading).toBe(BODY_TIMED_OUT);
+
+      await vi.advanceTimersByTimeAsync(0); // let any rejection reach the process
+      expect(unhandled).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      process.off('unhandledRejection', capture);
+    }
+  });
+
+  it('says 408 rather than 413 or 422, because nothing was wrong with the request', () => {
+    expect(REQUEST_TIMEOUT).toEqual({ status: 408, body: { error: 'request_timeout' } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The limiter when the database is the thing that is broken.
+// ---------------------------------------------------------------------------
+
+interface Chain {
+  update: () => Chain;
+  select: () => Chain;
+  eq: () => Chain;
+  is: () => Chain;
+  maybeSingle: () => Promise<{ data: unknown }>;
+}
+
+/** The two calls authenticateApiKey makes, with the limiter RPC handed over. */
+function stubSupabase(rpc: (bucket: string) => Promise<{ data: unknown; error: unknown }>) {
+  const rows: Record<string, unknown> = {
+    api_keys: { id: 'key-1', user_id: 'user-1' },
+    profiles: { tier: 'free' },
+  };
+  const query = (table: string): Chain => {
+    const chain: Chain = {
+      update: () => chain,
+      select: () => chain,
+      eq: () => chain,
+      is: () => chain,
+      maybeSingle: () => Promise.resolve({ data: rows[table] ?? null }),
+    };
+    return chain;
+  };
+  return {
+    from: (table: string) => query(table),
+    rpc: (_name: string, args: { p_key: string }) => rpc(args.p_key),
+  };
+}
+
+const apiRequest = (): Request =>
+  new Request('https://htmlradar.com/api/v1/shares', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${VALID}`, 'cf-connecting-ip': '203.0.113.9' },
+  });
+
+const SHARES_LIMIT = { name: 'shares', per: 'account', max: 30, perIpMax: 120 } as const;
+
+describe('the rate limiter when the database is the thing that is broken', () => {
+  it('fails open on a thrown error and still checks the address budget', async () => {
+    const buckets: string[] = [];
+    supabase.current = stubSupabase((bucket) => {
+      buckets.push(bucket);
+      return Promise.reject(new Error('connection reset'));
+    });
+
+    const auth = await authenticateApiKey(apiRequest(), SHARES_LIMIT);
+
+    // Fails open: a Supabase outage is not the caller's doing.
+    expect(auth).toEqual({ caller: { userId: 'user-1', tier: 'free' } });
+    // And the second budget is still spent, rather than skipped by the throw.
+    expect(buckets).toEqual(['api:shares:user-1', 'api:shares-ip:203.0.113.9']);
+    // Silence is the part that is not acceptable: both failures are logged.
+    expect(vi.mocked(logServerError)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(logServerError).mock.calls[0]?.[0]).toMatchObject({
+      source: 'api.rate_limit',
+      context: { bucket: 'api:shares:user-1', code: 'exception' },
+    });
+  });
+
+  it('fails open even when the logger is down too', async () => {
+    vi.mocked(logServerError).mockRejectedValue(new Error('log sink unreachable'));
+    supabase.current = stubSupabase(() => Promise.reject(new Error('connection reset')));
+
+    await expect(authenticateApiKey(apiRequest(), SHARES_LIMIT)).resolves.toEqual({
+      caller: { userId: 'user-1', tier: 'free' },
+    });
+  });
+});
+
+describe('URL mode', () => {
+  it('is a 422 that tells the caller what to do instead', () => {
+    expect(URL_MODE_DISABLED).toEqual({
+      status: 422,
+      body: {
+        error: 'validation',
+        message: 'URL mode is not yet available through the API; upload the HTML instead.',
+      },
     });
   });
 });

@@ -351,6 +351,12 @@ async function createApiKeyAction(label: string): Promise<{
     // insert policy lets a signed-in session write key rows straight through
     // PostgREST — a check here alone would be one anyone could walk around.
     // So the limit arrives as an exception, and this turns it into a sentence.
+    if (error.message.includes('api_key_daily_limit')) {
+      return {
+        ok: false,
+        error: 'You have created 20 keys today. Try again tomorrow.',
+      };
+    }
     if (error.message.includes('api_key_limit')) {
       return {
         ok: false,

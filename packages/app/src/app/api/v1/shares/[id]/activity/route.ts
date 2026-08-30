@@ -18,13 +18,7 @@
 // reused here is the filtering rules, not a copy of its output shape.
 
 import type { NextRequest } from 'next/server';
-import {
-  authenticateApiKey,
-  errorResponse,
-  INVALID_KEY,
-  jsonResponse,
-  serviceClient,
-} from '@/lib/api-auth';
+import { authenticateApiKey, errorResponse, jsonResponse, serviceClient } from '@/lib/api-auth';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import type { Session, SectionEvent, Viewer } from '@/lib/types';
 
@@ -45,8 +39,12 @@ interface ViewerOut {
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const caller = await authenticateApiKey(req);
-  if (!caller) return errorResponse(INVALID_KEY);
+  // 300 an hour per key. Polling for "has it been read yet?" is the whole
+  // point of this endpoint, so the budget is the loosest of the three; the
+  // read itself is the expensive part, hence a ceiling at all.
+  const auth = await authenticateApiKey(req, { name: 'activity', per: 'key', max: 300 });
+  if ('error' in auth) return errorResponse(auth.error);
+  const { caller } = auth;
 
   // A malformed id is a 404, not a Postgres cast error surfaced to the caller.
   if (!UUID.test(params.id)) return errorResponse(NOT_FOUND);

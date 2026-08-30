@@ -14,15 +14,18 @@ import {
   errorResponse,
   FREE_LIMIT_REACHED,
   INTERNAL,
-  INVALID_KEY,
   jsonResponse,
   mapCreateShareError,
+  BODY_TIMED_OUT,
+  readBodyCapped,
+  REQUEST_TIMEOUT,
   serviceClient,
   STORAGE_FAILED,
   tooLarge,
+  URL_MODE_DISABLED,
   validationError,
 } from '@/lib/api-auth';
-import { createDocumentForUser, MAX_UPLOAD_BYTES } from '@/lib/create-document';
+import { createDocumentForUser } from '@/lib/create-document';
 import { validateSourceUrl } from '@/lib/html-source';
 import { deleteR2Object, r2Key } from '@/lib/r2';
 import { readQuota } from '@/lib/quota';
@@ -34,13 +37,25 @@ export const runtime = 'edge';
 const SITE_URL = 'https://htmlradar.com';
 const ROUTE = '/api/v1/shares';
 
+// The largest document the API will store. Deliberately far below the 30 MB
+// the browser upload accepts: a worker has 128 MB of memory and Cloudflare
+// will hand it a body of up to 100 MB, so the API's ceiling is set by what an
+// edge isolate can decode without trouble rather than by what R2 can hold.
+// The web app's own limit is untouched.
+const MAX_API_HTML_BYTES = 5 * 1024 * 1024;
+
 // The largest request body we will read at all, as opposed to the largest
-// document we will store (MAX_UPLOAD_BYTES, checked on the decoded bytes
-// below). The gap is room for JSON string escaping — worst case a document of
-// control characters grows six-fold, but a realistic HTML document grows by a
-// fraction of a percent, so 2 MB of slack is generous for anything that was
+// document we will store (checked on the decoded bytes below). The gap is
+// room for JSON string escaping — worst case a document of control characters
+// grows six-fold, but a realistic HTML document grows by a fraction of a
+// percent, so half a megabyte of slack is generous for anything that was
 // going to be accepted anyway.
-const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 5.5 * 1024 * 1024;
+
+// URL mode is written, tested and switched off: the proxy that fetches the
+// address does not yet reject every non-public network location (2026-08-30
+// API/MCP audit, server-side request forgery). Flip to true only once it does.
+const API_URL_MODE_ENABLED: boolean = false;
 
 interface CreateShareBody {
   html?: unknown;
@@ -116,21 +131,40 @@ async function rollbackDocument(
 }
 
 export async function POST(req: NextRequest) {
-  const caller = await authenticateApiKey(req);
-  if (!caller) return errorResponse(INVALID_KEY);
+  // 30 creations an hour per account, and 120 an hour from any one address.
+  // The account budget is counted on the account rather than the key so a
+  // second key is not a second budget; the address budget is what a script
+  // signing up for accounts in bulk runs into, which the account one cannot
+  // see.
+  const auth = await authenticateApiKey(req, {
+    name: 'shares',
+    per: 'account',
+    max: 30,
+    perIpMax: 120,
+  });
+  if ('error' in auth) return errorResponse(auth.error);
+  const { caller } = auth;
 
-  // Refused on the header, before req.json() materialises anything. A worker
-  // has 128 MB of memory and Cloudflare will hand it a body of up to 100 MB,
-  // so measuring after buffering means any valid key can spend most of a
-  // worker on a request that was always going to be a 413.
+  // Two checks, because the header alone is not one. An honest oversized
+  // request says so in Content-Length and is refused here without a byte being
+  // read; a chunked request carries no Content-Length at all, and a dishonest
+  // one carries whatever the caller typed. So the header is the cheap refusal
+  // and readBodyCapped below is the real one: it counts the bytes as they
+  // arrive and abandons the read the moment they pass the cap. A worker has
+  // 128 MB of memory and Cloudflare will hand it a body of up to 100 MB, so
+  // measuring after buffering means any valid key can spend most of a worker
+  // on a request that was always going to be a 413.
   const declared = Number(req.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > MAX_REQUEST_BYTES) {
-    return errorResponse(tooLarge(MAX_UPLOAD_BYTES));
+    return errorResponse(tooLarge(MAX_API_HTML_BYTES));
   }
 
   let body: CreateShareBody;
   try {
-    body = (await req.json()) as CreateShareBody;
+    const raw = await readBodyCapped(req, MAX_REQUEST_BYTES);
+    if (raw === null) return errorResponse(tooLarge(MAX_API_HTML_BYTES));
+    if (raw === BODY_TIMED_OUT) return errorResponse(REQUEST_TIMEOUT);
+    body = JSON.parse(raw) as CreateShareBody;
   } catch {
     return errorResponse(validationError('Body must be JSON.'));
   }
@@ -152,11 +186,12 @@ export async function POST(req: NextRequest) {
   if (html !== null) {
     bytes = new TextEncoder().encode(html);
     // Checked before anything is written or uploaded.
-    if (bytes.byteLength > MAX_UPLOAD_BYTES) return errorResponse(tooLarge(MAX_UPLOAD_BYTES));
+    if (bytes.byteLength > MAX_API_HTML_BYTES) return errorResponse(tooLarge(MAX_API_HTML_BYTES));
     if (!/<[a-z!/]/i.test(html)) {
       return errorResponse(validationError('"html" does not look like HTML.'));
     }
   } else {
+    if (!API_URL_MODE_ENABLED) return errorResponse(URL_MODE_DISABLED);
     const urlProblem = validateSourceUrl(url!);
     if (urlProblem) return errorResponse(validationError(urlProblem));
     if (!/^https:\/\//i.test(url!)) {

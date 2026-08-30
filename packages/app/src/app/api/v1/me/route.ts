@@ -3,20 +3,17 @@
 // than at the moment somebody is trying to send a deck.
 
 import type { NextRequest } from 'next/server';
-import {
-  authenticateApiKey,
-  errorResponse,
-  INVALID_KEY,
-  jsonResponse,
-  serviceClient,
-} from '@/lib/api-auth';
+import { authenticateApiKey, errorResponse, jsonResponse, serviceClient } from '@/lib/api-auth';
 import { readQuota } from '@/lib/quota';
 
 export const runtime = 'edge';
 
 export async function GET(req: NextRequest) {
-  const caller = await authenticateApiKey(req);
-  if (!caller) return errorResponse(INVALID_KEY);
+  // 60 an hour per key. The MCP server calls this once at startup, so a
+  // budget this size is only ever reached by something in a loop.
+  const auth = await authenticateApiKey(req, { name: 'me', per: 'key', max: 60 });
+  if ('error' in auth) return errorResponse(auth.error);
+  const { caller } = auth;
 
   const quota = await readQuota(serviceClient(), caller.userId);
   return jsonResponse(200, {

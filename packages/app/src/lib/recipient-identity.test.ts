@@ -4,11 +4,14 @@ import { resolveRecipientIdentity } from './recipient-identity';
 describe('resolveRecipientIdentity', () => {
   describe('label-driven (sender chose a label)', () => {
     it('shows label primary + first viewer email secondary with multiple viewers', () => {
-      const r = resolveRecipientIdentity({ recipient_label: 'Investor list', require_email: true }, [
-        { email: 'ana@example.test', first_seen: '2026-01-01T10:00:00Z' },
-        { email: 'ben@example.test', first_seen: '2026-01-01T11:00:00Z' },
-        { email: 'cai@example.test', first_seen: '2026-01-01T12:00:00Z' },
-      ]);
+      const r = resolveRecipientIdentity(
+        { recipient_label: 'Investor list', require_email: true },
+        [
+          { email: 'ana@example.test', first_seen: '2026-01-01T10:00:00Z' },
+          { email: 'ben@example.test', first_seen: '2026-01-01T11:00:00Z' },
+          { email: 'cai@example.test', first_seen: '2026-01-01T12:00:00Z' },
+        ],
+      );
       expect(r.primary).toBe('Investor list');
       expect(r.secondary).toBe('ana@example.test +2');
     });

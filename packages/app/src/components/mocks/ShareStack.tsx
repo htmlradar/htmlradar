@@ -24,8 +24,20 @@ const SHARES: ShareCard[] = [
     slug: 'swift-falcon-a3f2',
     status: 'opened',
   },
-  { initial: 'S', name: 'Sarah', org: 'Example Partners', slug: 'cobalt-ember-9b21', status: 'live' },
-  { initial: 'T', name: 'Tom', org: 'Example Capital', slug: 'iris-meadow-1e74', status: 'pending' },
+  {
+    initial: 'S',
+    name: 'Sarah',
+    org: 'Example Partners',
+    slug: 'cobalt-ember-9b21',
+    status: 'live',
+  },
+  {
+    initial: 'T',
+    name: 'Tom',
+    org: 'Example Capital',
+    slug: 'iris-meadow-1e74',
+    status: 'pending',
+  },
 ];
 
 export function ShareStack() {

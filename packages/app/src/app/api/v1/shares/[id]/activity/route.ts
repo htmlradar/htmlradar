@@ -20,6 +20,7 @@
 import type { NextRequest } from 'next/server';
 import { authenticateApiKey, errorResponse, jsonResponse, serviceClient } from '@/lib/api-auth';
 import { isMetaSectionTitle } from '@/lib/section-filter';
+import { SHARE_SLUG_PATTERN } from '@/lib/share-slug';
 import type { Session, SectionEvent, Viewer } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -27,6 +28,25 @@ export const runtime = 'edge';
 const SITE_URL = 'https://htmlradar.com';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NOT_FOUND = { status: 404, body: { error: 'not_found' } };
+
+// The link as the app prints it, or the path part of it. Nothing looser: this
+// is a lookup key, and "close enough" here is a way to hand someone the
+// wrong share's activity.
+const LINK = /^(?:(?:https:\/\/)?htmlradar\.com)?\/r\/([^/]+)$/;
+
+/**
+ * The slug in what the caller passed, or null.
+ *
+ * An agent that was not the one to call share_html knows the share by what
+ * the dashboard and the link show, which is the slug, not the id. So the
+ * path segment may be a bare slug, the `/r/<slug>` path or the whole link;
+ * the shape is then checked against the same rule the database enforces on
+ * every slug it stores, so a malformed value costs a regex and not a query.
+ */
+function slugOf(raw: string): string | null {
+  const candidate = LINK.exec(raw)?.[1] ?? raw;
+  return SHARE_SLUG_PATTERN.test(candidate) ? candidate : null;
+}
 
 interface ViewerOut {
   label: string | null;
@@ -46,15 +66,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if ('error' in auth) return errorResponse(auth.error);
   const { caller } = auth;
 
-  // A malformed id is a 404, not a Postgres cast error surfaced to the caller.
-  if (!UUID.test(params.id)) return errorResponse(NOT_FOUND);
-
   const supabase = serviceClient();
-  const { data: share } = await supabase
-    .from('document_shares')
-    .select('id, slug, owner_id, recipient_label')
-    .eq('id', params.id)
-    .maybeSingle();
+  let lookup = supabase.from('document_shares').select('id, slug, owner_id, recipient_label');
+  if (UUID.test(params.id)) {
+    lookup = lookup.eq('id', params.id);
+  } else {
+    // A slug is only ever looked up within the caller's own shares, so a slug
+    // that belongs to another account is not found rather than found and then
+    // refused: the query cannot say whether it exists. A malformed value is
+    // a 404 too, not a Postgres cast error surfaced to the caller.
+    const slug = slugOf(params.id);
+    if (!slug) return errorResponse(NOT_FOUND);
+    lookup = lookup.eq('owner_id', caller.userId).eq('slug', slug);
+  }
+  const { data: share } = await lookup.maybeSingle();
 
   // Someone else's link is indistinguishable from one that does not exist —
   // a key must not be usable to probe for share ids.

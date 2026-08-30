@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { loadConfig, type Config } from '../src/api.js';
 import {
+  createServer,
   formatDuration,
   formatScroll,
   getShareActivity,
@@ -204,7 +207,25 @@ describe('get_share_activity', () => {
     const fetchMock = mockFetch(200, {});
     const result = await getShareActivity(config, { share_id: '  ' });
     expect(result.isError).toBe(true);
+    expect(body(result)).toContain("the id returned by share_html, the share's slug, or its link");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // An agent that did not call share_html itself knows the share by what the
+  // dashboard and the link show. The schema has to say the slug and the link
+  // are accepted, or the agent answers "no such share" from the tool's own
+  // description without trying.
+  it('tells the agent the slug or the link will do as well as the id', async () => {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await createServer(config).connect(serverSide);
+    const client = new Client({ name: 'test', version: '0.0.0' });
+    await client.connect(clientSide);
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'get_share_activity');
+    const shareId = tool?.inputSchema.properties?.['share_id'] as { description?: string };
+    expect(shareId.description).toBe(
+      "The share id returned by share_html, or the share's slug (the part after /r/ in its link), or the link itself.",
+    );
+    await client.close();
   });
 
   it('summarises viewers, ranks sections by time, and appends the raw JSON', async () => {

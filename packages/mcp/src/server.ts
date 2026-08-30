@@ -95,7 +95,11 @@ export async function getShareActivity(
   args: { share_id: string },
 ): Promise<CallToolResult> {
   const shareId = args.share_id?.trim();
-  if (!shareId) return failure('`share_id` is required — pass the id returned by share_html.');
+  if (!shareId) {
+    return failure(
+      "`share_id` is required — pass the id returned by share_html, the share's slug, or its link.",
+    );
+  }
 
   const result = await apiFetch<ActivityResponse>(
     config,
@@ -253,7 +257,14 @@ export function createServer(config: Config): McpServer {
         'Report whether a tracked HTMLRadar link has been opened, by whom, for how long, how ' +
         'far they scrolled, and which sections held their attention. Use it when the user asks ' +
         'whether something they sent has been read.',
-      inputSchema: { share_id: z.string().describe('The share id returned by share_html.') },
+      inputSchema: {
+        share_id: z
+          .string()
+          .describe(
+            "The share id returned by share_html, or the share's slug (the part after /r/ in " +
+              'its link), or the link itself.',
+          ),
+      },
       annotations: {
         title: 'Check who read a tracked link',
         readOnlyHint: true,

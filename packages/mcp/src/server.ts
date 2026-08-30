@@ -3,7 +3,6 @@
 // Handlers are exported separately from `createServer` so the tests can call
 // them with a mocked `fetch` and no transport.
 
-import { readFile, stat } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod/v4';
@@ -11,23 +10,22 @@ import {
   apiFetch,
   type ActivityResponse,
   type ActivityViewer,
-  type ApiResult,
   type Config,
   type MeResponse,
   type ShareResponse,
 } from './api.js';
 
-export const MAX_HTML_BYTES = 30 * 1024 * 1024;
+// The API's own ceiling. Checked here so a document that was never going to
+// be accepted does not travel the network first.
+export const MAX_HTML_BYTES = 5 * 1024 * 1024;
 
 const shareHtmlShape = {
   html: z
     .string()
-    .optional()
-    .describe('The HTML markup to publish. Provide this or `file_path`, not both.'),
-  file_path: z
-    .string()
-    .optional()
-    .describe('Absolute path to a .html or .htm file to publish. Provide this or `html`.'),
+    .describe(
+      'The HTML markup to publish, in full. If the document is a file on disk, read it with ' +
+        'your own file tools and pass the contents here.',
+    ),
   title: z.string().optional().describe('Name shown on your dashboard. Recipients do not see it.'),
   recipient_label: z
     .string()
@@ -66,17 +64,16 @@ const OPTIONAL_SHARE_FIELDS = [
 export type ShareHtmlArgs = z.infer<z.ZodObject<typeof shareHtmlShape>>;
 
 export async function shareHtml(config: Config, args: ShareHtmlArgs): Promise<CallToolResult> {
-  if ((args.html === undefined) === (args.file_path === undefined)) {
-    return failure(
-      'Provide exactly one of `html` (the markup) or `file_path` (a .html or .htm file on disk).',
-    );
+  const html = args.html;
+  if (typeof html !== 'string' || html.trim() === '') {
+    return failure('`html` is required — pass the HTML markup to publish.');
   }
 
-  let html = args.html;
-  if (html === undefined) {
-    const read = await readHtmlFile(args.file_path as string);
-    if (!read.ok) return failure(read.message);
-    html = read.data;
+  const bytes = Buffer.byteLength(html, 'utf8');
+  if (bytes > MAX_HTML_BYTES) {
+    return failure(
+      `That document is ${formatBytes(bytes)}; the limit is ${formatBytes(MAX_HTML_BYTES)}.`,
+    );
   }
 
   const body: Record<string, unknown> = { html, require_email: args.require_email };
@@ -126,33 +123,6 @@ export async function whoami(config: Config): Promise<CallToolResult> {
   const result = await apiFetch<MeResponse>(config, '/api/v1/me');
   if (!result.ok) return failure(result.message);
   return text(formatMe(result.data));
-}
-
-export async function readHtmlFile(filePath: string): Promise<ApiResult<string>> {
-  if (!/\.html?$/i.test(filePath)) {
-    return {
-      ok: false,
-      message: `HTMLRadar tracks HTML documents only, and ${filePath} is not a .html or .htm file.`,
-    };
-  }
-  let size: number;
-  try {
-    const stats = await stat(filePath);
-    if (!stats.isFile()) return { ok: false, message: `${filePath} is not a file.` };
-    size = stats.size;
-  } catch (error) {
-    return {
-      ok: false,
-      message: `Could not read ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-  if (size > MAX_HTML_BYTES) {
-    return {
-      ok: false,
-      message: `${filePath} is ${formatBytes(size)}; the limit is ${formatBytes(MAX_HTML_BYTES)}.`,
-    };
-  }
-  return { ok: true, data: await readFile(filePath, 'utf8') };
 }
 
 export function formatShare(share: ShareResponse, requireEmail: boolean): string {
@@ -259,7 +229,9 @@ export function createServer(config: Config): McpServer {
         'Publish an HTML document as a tracked HTMLRadar link. Returns a URL to send to the ' +
         'recipient and a dashboard URL for the sender. Use it after producing an HTML deck, ' +
         'proposal, report or one-pager that the user is going to send to someone else and ' +
-        'wants to know whether it was read. Pass either `html` or `file_path`, never both. ' +
+        'wants to know whether it was read. Pass the markup itself in `html`; this tool does ' +
+        'not read files, so if the document is already on disk, read it with your own file ' +
+        'tools first — that way the permissions the user set on those tools still apply. ' +
         'Ask the user before publishing anything you did not just write for them.',
       inputSchema: shareHtmlShape,
       annotations: {

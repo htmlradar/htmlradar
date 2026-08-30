@@ -146,7 +146,20 @@ Full guide with deployment commands in [`docs/self-hosting.md`](./docs/self-host
 HTMLRadar ships an MCP server, so the agent that wrote the HTML can publish it as a tracked link —
 and ask, the next day, whether anyone read it.
 
-In Claude Code, install the plugin. It adds the tools plus a skill that knows when to offer a
+Create an API key at [htmlradar.com/settings](https://htmlradar.com/settings) under **API keys**,
+then export it, so the key never becomes a command-line argument that lands in your shell history:
+
+```bash
+export HTMLRADAR_API_KEY=hr_live_xxx
+```
+
+**Claude Code**
+
+```
+claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlradar-mcp
+```
+
+Or install the plugin, which wires up the same server and adds a skill that knows when to offer a
 tracked link and when to stay quiet:
 
 ```
@@ -154,17 +167,33 @@ tracked link and when to stay quiet:
 /plugin install htmlradar@htmlradar
 ```
 
-Or add the MCP server on its own:
+**Cursor** — put this in `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` to make it
+global. Cursor expands `${env:NAME}` inside `env`, which keeps the key out of a file you might
+commit:
+
+```json
+{
+  "mcpServers": {
+    "htmlradar": {
+      "command": "npx",
+      "args": ["-y", "htmlradar-mcp"],
+      "env": { "HTMLRADAR_API_KEY": "${env:HTMLRADAR_API_KEY}" }
+    }
+  }
+}
+```
+
+There is a one-click **Add to Cursor** button on [htmlradar.com/mcp](https://htmlradar.com/mcp). It
+installs the server with a placeholder key, which you then replace with your own.
+
+**Codex CLI**
 
 ```
-claude mcp add htmlradar -e HTMLRADAR_API_KEY=hr_live_xxx -- npx -y htmlradar-mcp
+codex mcp add htmlradar --env HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlradar-mcp
 ```
 
-Three tools: `share_html`, `get_share_activity`, `whoami`. Create an API key at
-[htmlradar.com/settings](https://htmlradar.com/settings) under **API keys**.
-
-Cursor and Codex CLI install lines — and the from-repo path to use until `htmlradar-mcp` is
-published to npm — are in [`packages/mcp/README.md`](./packages/mcp/README.md).
+Three tools: `share_html`, `get_share_activity`, `whoami`. Every option, the self-hosting variable
+and the privacy notes are in [`packages/mcp/README.md`](./packages/mcp/README.md).
 
 If you modify the source and run a network service from it, AGPL-3.0 requires you to make your modifications available. See [`LICENSE`](./LICENSE).
 

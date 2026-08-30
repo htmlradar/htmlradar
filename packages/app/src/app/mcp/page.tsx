@@ -43,11 +43,17 @@ const FAQ = [
   },
 ];
 
+// Cursor's documented install deeplink:
+//   cursor://anysphere.cursor-deeplink/mcp/install?name=$NAME&config=$BASE64_ENCODED_CONFIG
+// config is base64 of {"command":"npx","args":["-y","htmlradar-mcp"],"env":{"HTMLRADAR_API_KEY":"YOUR_KEY"}}
+const CURSOR_INSTALL_LINK =
+  'cursor://anysphere.cursor-deeplink/mcp/install?name=htmlradar&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImh0bWxyYWRhci1tY3AiXSwiZW52Ijp7IkhUTUxSQURBUl9BUElfS0VZIjoiWU9VUl9LRVkifX0=';
+
 const TOOLS = [
   [
     'share_html',
     'Publish HTML as a tracked link',
-    'Takes the markup itself or a path to a .html file, plus optional recipient label, email gate, password, allowed email domains, expiry and custom link name. Returns the tracked link, the dashboard link and the share id.',
+    'Takes the HTML markup itself, up to 5 MB, plus optional recipient label, email gate, password, allowed email domains, expiry and custom link name. It never reads files itself — the agent reads the file with its own tools, so your permissions still apply. Returns the tracked link, the dashboard link and the share id.',
   ],
   [
     'get_share_activity',
@@ -166,6 +172,18 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               you might commit. A literal <span className="font-mono text-[13px]">hr_live_…</span>{' '}
               there also works.
             </p>
+            <a
+              href={CURSOR_INSTALL_LINK}
+              className="mt-5 inline-flex items-center gap-2 rounded-md border border-line bg-paper px-4 py-2.5 text-[14px] font-medium text-ink transition hover:border-signal hover:text-signal-dark"
+            >
+              Add to Cursor
+            </a>
+            <p className="mt-3 text-[13px] leading-relaxed text-graphite">
+              The button installs the server with the placeholder key{' '}
+              <span className="font-mono text-[12px]">YOUR_KEY</span>. Open the MCP settings in
+              Cursor afterwards and replace it with your own key, otherwise the first tool call
+              fails.
+            </p>
 
             <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
               Codex CLI
@@ -175,20 +193,6 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               code={`export HTMLRADAR_API_KEY=hr_live_…
 codex mcp add htmlradar --env HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlradar-mcp`}
             />
-
-            <p className="mt-6 rounded-2xl border border-line bg-paper-2/40 p-5 text-[14px] leading-relaxed text-ink-soft">
-              <span className="font-medium text-ink">npm publish is pending.</span> Until{' '}
-              <span className="font-mono text-[13px]">htmlradar-mcp</span> is on npm, clone the
-              repository, run{' '}
-              <span className="font-mono text-[13px]">
-                pnpm install &amp;&amp; pnpm --filter ./packages/mcp build
-              </span>
-              , and replace the launch command with{' '}
-              <span className="font-mono text-[13px]">
-                node /path/to/htmlradar/packages/mcp/dist/index.js
-              </span>
-              .
-            </p>
           </section>
 
           <section className="mt-14">

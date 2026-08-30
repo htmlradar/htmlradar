@@ -3,8 +3,3 @@
 # Prettier reformatting a minified file only bloats it (it did once:
 # 22 KB -> 29 KB) without changing behavior.
 packages/app/public/v1/tracker.js
-
-# Build artifact — the bundled MCP server that ships inside the Claude Code
-# plugin. Built from packages/mcp/src by `pnpm --filter ./packages/mcp build`;
-# it is minified on purpose and reformatting it only makes it bigger.
-plugins/htmlradar/server/index.js

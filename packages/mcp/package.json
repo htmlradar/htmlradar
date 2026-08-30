@@ -7,33 +7,36 @@
   "homepage": "https://htmlradar.com/mcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/htmlradar/htmlradar.git",
+    "url": "git+https://github.com/htmlradar/htmlradar.git",
     "directory": "packages/mcp"
   },
   "bugs": "https://github.com/htmlradar/htmlradar/issues",
   "type": "module",
-  "mcpName": "com.htmlradar/share",
+  "mcpName": "io.github.htmlradar/share",
   "bin": {
     "htmlradar-mcp": "dist/index.js"
   },
   "files": [
     "dist",
-    "server.json",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "mcp",
-    "modelcontextprotocol",
+    "model-context-protocol",
     "htmlradar",
-    "document-tracking",
     "html",
-    "docsend"
+    "tracked-link",
+    "docsend-alternative",
+    "claude-code",
+    "cursor"
   ],
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=18"
   },
   "scripts": {
     "build": "node esbuild.config.mjs",
+    "prepublishOnly": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -23,8 +23,5 @@ module.exports = {
     '*.config.*',
     // Public assets that ship compiled bundles (tracker IIFE etc.)
     'packages/app/public/',
-    // Bundled MCP server carried inside the Claude Code plugin — build
-    // output of packages/mcp/src, not source.
-    'plugins/htmlradar/server/',
   ],
 };

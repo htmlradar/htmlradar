@@ -47,12 +47,6 @@ nothing to paste at all:
 /plugin install htmlradar@htmlradar
 ```
 
-From this repository, before the npm release:
-
-```
-claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- node /path/to/htmlradar/packages/mcp/dist/index.js
-```
-
 The literal form — `-e HTMLRADAR_API_KEY=hr_live_xxx` — works too, and is fine for a throwaway key
 you are about to revoke. For a key you intend to keep, prefer the environment variable.
 
@@ -66,22 +60,6 @@ Put this in `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` to make 
     "htmlradar": {
       "command": "npx",
       "args": ["-y", "htmlradar-mcp"],
-      "env": {
-        "HTMLRADAR_API_KEY": "hr_live_xxx"
-      }
-    }
-  }
-}
-```
-
-From this repository, before the npm release, swap the command:
-
-```json
-{
-  "mcpServers": {
-    "htmlradar": {
-      "command": "node",
-      "args": ["/path/to/htmlradar/packages/mcp/dist/index.js"],
       "env": {
         "HTMLRADAR_API_KEY": "hr_live_xxx"
       }
@@ -114,15 +92,6 @@ env = { HTMLRADAR_API_KEY = "hr_live_xxx" }
 Again, a key passed as a literal argument lands in your shell history; a key read from the
 environment does not.
 
-From this repository, before the npm release:
-
-```toml
-[mcp_servers.htmlradar]
-command = "node"
-args = ["/path/to/htmlradar/packages/mcp/dist/index.js"]
-env = { HTMLRADAR_API_KEY = "hr_live_xxx" }
-```
-
 ### Any other MCP client
 
 It is a plain stdio server. Run `npx -y htmlradar-mcp` (or `node dist/index.js`) with
@@ -143,16 +112,18 @@ It is a plain stdio server. Run `npx -y htmlradar-mcp` (or `node dist/index.js`)
 
 ### `share_html`
 
-Publishes HTML as a tracked link. Pass either `html` (the markup itself) or `file_path` (a `.html`
-or `.htm` file on disk, up to 30 MB). Everything else is optional: `title`, `recipient_label`,
-`require_email` (on by default), `password`, `allowed_email_domains`, `expires_in_hours`, `slug`.
+Publishes HTML as a tracked link. Pass the markup itself in `html`, up to 5 MB. The tool does not
+read files: if the document is already on disk, the agent reads it with its own file tools and
+passes the contents, so whatever permissions you set on those tools still apply. Everything else is
+optional: `title`, `recipient_label`, `require_email` (on by default), `password`,
+`allowed_email_domains`, `expires_in_hours`, `slug`.
 
 Returns the tracked link, the sender dashboard link, the share id, and a reminder of what the
 recipient sees — the document, and nothing about the tracking.
 
 > Share this deck with Acme as a tracked link, email gate on.
 
-> Turn ./proposal.html into a tracked link for hello@acme.com, expiring in 72 hours.
+> Read ./proposal.html and turn it into a tracked link for hello@acme.com, expiring in 72 hours.
 
 ### `get_share_activity`
 
@@ -196,8 +167,7 @@ pnpm --filter ./packages/mcp test       # vitest, fetch mocked, no network
 pnpm --filter ./packages/mcp smoke      # starts the built server and lists its tools over stdio
 ```
 
-`build` also refreshes the copy of the bundle that ships inside the Claude Code plugin at
-`plugins/htmlradar/server/index.js`. See that directory's README for why the plugin carries its own
-copy instead of pointing at `packages/mcp/dist`.
+To run an unpublished build, point your client at `node /path/to/htmlradar/packages/mcp/dist/index.js`
+instead of `npx -y htmlradar-mcp`.
 
 Licensed AGPL-3.0-or-later, like the rest of HTMLRadar.

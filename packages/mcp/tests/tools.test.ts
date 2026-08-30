@@ -1,13 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, rm, truncate, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig, type Config } from '../src/api.js';
 import {
   formatDuration,
   formatScroll,
   getShareActivity,
-  readHtmlFile,
+  MAX_HTML_BYTES,
   shareHtml,
   whoami,
 } from '../src/server.js';
@@ -55,67 +52,32 @@ describe('loadConfig', () => {
 describe('share_html argument validation', () => {
   const base = { require_email: true };
 
-  it('rejects neither html nor file_path', async () => {
-    const result = await shareHtml(config, { ...base });
-    expect(result.isError).toBe(true);
-    expect(body(result)).toMatch(/exactly one of `html`/);
+  // The tool takes markup and nothing else. There is no file_path: reading a
+  // file is the host's job, where the user's own file permissions apply, and
+  // a path argument here would be an upload channel that walks around them
+  // (2026-08-30 API/MCP audit, the MCP client).
+  it('rejects a missing or empty html argument', async () => {
+    const missing = await shareHtml(config, { ...base } as never);
+    expect(missing.isError).toBe(true);
+    expect(body(missing)).toMatch(/`html` is required/);
+
+    const blank = await shareHtml(config, { ...base, html: '   ' });
+    expect(blank.isError).toBe(true);
+    expect(body(blank)).toMatch(/`html` is required/);
   });
 
-  it('rejects both html and file_path', async () => {
-    const result = await shareHtml(config, {
-      ...base,
-      html: '<p>hi</p>',
-      file_path: '/tmp/a.html',
-    });
+  it('refuses a document over 5 MB before it reaches the network', async () => {
+    const fetchMock = mockFetch(201, {});
+    const result = await shareHtml(config, { ...base, html: 'x'.repeat(MAX_HTML_BYTES + 1) });
     expect(result.isError).toBe(true);
-    expect(body(result)).toMatch(/exactly one of `html`/);
+    expect(body(result)).toMatch(/the limit is 5\.0 MB/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('never reaches the network when the arguments are wrong', async () => {
     const fetchMock = mockFetch(201, {});
-    await shareHtml(config, { ...base });
+    await shareHtml(config, { ...base } as never);
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('readHtmlFile', () => {
-  let dir: string;
-
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'htmlradar-mcp-'));
-  });
-
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  it('reads .html and .htm', async () => {
-    const file = join(dir, 'deck.htm');
-    await writeFile(file, '<h1>Deck</h1>');
-    await expect(readHtmlFile(file)).resolves.toEqual({ ok: true, data: '<h1>Deck</h1>' });
-  });
-
-  it('refuses anything that is not HTML', async () => {
-    const file = join(dir, 'notes.txt');
-    await writeFile(file, 'hello');
-    const result = await readHtmlFile(file);
-    expect(result).toMatchObject({ ok: false });
-    expect(result.ok === false && result.message).toMatch(/not a \.html or \.htm file/);
-  });
-
-  it('refuses a file over 30 MB', async () => {
-    const file = join(dir, 'huge.html');
-    await writeFile(file, '');
-    await truncate(file, 31 * 1024 * 1024);
-    const result = await readHtmlFile(file);
-    expect(result).toMatchObject({ ok: false });
-    expect(result.ok === false && result.message).toMatch(/the limit is 30\.0 MB/);
-  });
-
-  it('explains a missing file rather than throwing', async () => {
-    const result = await readHtmlFile(join(dir, 'gone.html'));
-    expect(result).toMatchObject({ ok: false });
-    expect(result.ok === false && result.message).toMatch(/Could not read/);
   });
 });
 

@@ -46,8 +46,9 @@ Sensible defaults, unless the user says otherwise:
 Use `allowed_email_domains` when the user names a company, `expires_in_hours` when they mention a
 deadline, and `password` only when they ask for one.
 
-Pass either `html` or `file_path`, never both. Prefer `file_path` when the document is already
-written to disk — it avoids pushing the whole file back through the conversation.
+Pass the markup itself in `html`, up to 5 MB. The tool does not take a file path: if the document
+is already written to disk, read it with your own file tools first and pass the contents. That
+keeps the user's file permissions in charge of what gets published.
 
 ## After you call it
 

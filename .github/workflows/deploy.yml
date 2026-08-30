@@ -264,8 +264,10 @@ jobs:
       #
       # GIT_SHA is bound into the Worker as a plain var so the verify
       # steps below can prove that THIS commit is what got deployed.
-      # No continue-on-error: `wrangler deploy` also syncs [[routes]] on
-      # the zone, so the token needs zone Workers Routes:Edit.
+      # No continue-on-error: `wrangler deploy` also syncs [[routes]], and
+      # there are two of them now — htmlradar.page for recipient documents
+      # and htmlradar.com/r/* for the redirect that keeps old links open — so
+      # the token needs Workers Routes:Edit on both zones.
       - name: Deploy proxy worker (packages/proxy)
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         env:
@@ -296,13 +298,17 @@ jobs:
       # The proxy stamps every response with X-HTMLRadar-Version = GIT_SHA
       # (see withNoIndex in packages/proxy/src/index.ts). Reading it from
       # the live route proves the new version is what the edge serves.
+      #
+      # Read on htmlradar.page: that is the host recipient documents are
+      # served from. htmlradar.com/r/ only redirects there now, which the
+      # next step checks.
       - name: Verify proxy worker serves this commit
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -e
           for attempt in 1 2 3 4 5; do
-            live=$(curl -sS -o /dev/null -w '%header{x-htmlradar-version}' "https://htmlradar.com/r/nonexistent-smoke-test")
+            live=$(curl -sS -o /dev/null -w '%header{x-htmlradar-version}' "https://htmlradar.page/r/nonexistent-smoke-test")
             if [ "$live" = "$HEAD_SHA" ]; then
               echo "Proxy verified — X-HTMLRadar-Version matches $HEAD_SHA."
               exit 0
@@ -312,6 +318,20 @@ jobs:
           done
           echo "::error::Proxy is not serving commit $HEAD_SHA."
           exit 1
+
+      # Every tracked link sent before the content domain existed points at
+      # htmlradar.com/r/. A permanent redirect to htmlradar.page is the only
+      # thing keeping those open, including two paying customers' links, so
+      # it is checked on every deploy.
+      - name: Verify legacy share links still redirect
+        run: |
+          set -e
+          location=$(curl -sS -o /dev/null -w '%{redirect_url}' "https://htmlradar.com/r/nonexistent-smoke-test")
+          if [ "$location" != "https://htmlradar.page/r/nonexistent-smoke-test" ]; then
+            echo "::error::htmlradar.com/r/ did not redirect to the content domain (got '$location')."
+            exit 1
+          fi
+          echo "Legacy links verified — htmlradar.com/r/ redirects to htmlradar.page."
 
       # The monitor has no HTTP route (cron only), so read the GIT_SHA
       # binding of the active version back from the Workers API instead.

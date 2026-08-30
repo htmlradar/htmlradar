@@ -1,4 +1,5 @@
-// Pre-deploy smoke test — runs against prod (https://htmlradar.com).
+// Pre-deploy smoke test — runs against prod: the application on
+// https://htmlradar.com, recipient documents on https://htmlradar.page.
 //
 // What this catches (and why each assertion exists):
 //
@@ -42,7 +43,12 @@ const SUPABASE_URL = need('NEXT_PUBLIC_SUPABASE_URL');
 const SERVICE_ROLE = need('SUPABASE_SERVICE_ROLE_KEY');
 const TEST_SHARE_SLUG = process.env.QA_TEST_SHARE_SLUG ?? 'qa-smoke-deck';
 const TEST_SHARE_ID = process.env.QA_TEST_SHARE_ID ?? '';
-const SHARE_URL = `/r/${TEST_SHARE_SLUG}`;
+// Recipient documents are served from the content domain, not from the
+// application domain the rest of this file's baseURL points at. Absolute on
+// purpose: a relative /r/ would hit the legacy host and be redirected here,
+// which tests the redirect rather than the document.
+const SHARE_BASE = process.env.PLAYWRIGHT_SHARE_BASE ?? 'https://htmlradar.page';
+const SHARE_URL = `${SHARE_BASE}/r/${TEST_SHARE_SLUG}`;
 
 function need(name: string): string {
   const v = process.env[name];
@@ -68,7 +74,7 @@ async function supabaseQuery(path: string): Promise<unknown[]> {
 // ──────────────────────────────────────────────────────────────────
 test.describe('proxy error responses', () => {
   test('404 / not-found returns Cache-Control no-store', async ({ request }) => {
-    const res = await request.get('/r/this-share-definitely-does-not-exist-xyz');
+    const res = await request.get(`${SHARE_BASE}/r/this-share-definitely-does-not-exist-xyz`);
     expect(res.status()).toBe(404);
     const cc = res.headers()['cache-control'] ?? '';
     expect(cc, 'error pages must not be cached — see proxy/src/responses.ts SHELL').toMatch(

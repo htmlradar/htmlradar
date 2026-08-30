@@ -46,7 +46,7 @@ SHARE_HOST = "htmlradar.page"
 # every htmlradar.com/r/ link answers 301 to the same path and query on
 # SHARE_HOST. Setting it back to "" and deploying is the whole rollback; no
 # data is touched either way.
-LEGACY_HOSTS = ""
+LEGACY_HOSTS = "htmlradar.com"
 
 # Secrets — set via `wrangler secret put`:
 #   SUPABASE_URL

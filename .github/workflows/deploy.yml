@@ -10,10 +10,13 @@ name: Deploy
 #
 # Required secrets:
 #   - CLOUDFLARE_API_TOKEN — a cfut_ token with Pages:Edit and
-#     Workers Scripts:Edit (account scope) plus Workers Routes:Edit on the
+#     Workers Scripts:Edit (account scope), Workers Routes:Edit on the
 #     htmlradar.com and htmlradar.page zones (the proxy deploy syncs
-#     [[routes]] and fails without it). CLOUDFLARE_ZONE_ID is optional
-#     (cache purge only).
+#     [[routes]] and fails without it), and Cache Purge:Edit on both zones
+#     (the purge below is mandatory and fails the deploy).
+#   - CLOUDFLARE_ZONE_ID — the htmlradar.com zone.
+#   - CLOUDFLARE_ZONE_ID_PAGE — the htmlradar.page zone, which serves every
+#     recipient document.
 # Required repository variables:
 #   - CLOUDFLARE_ACCOUNT_ID — the Cloudflare account id (not a secret).
 #
@@ -319,20 +322,6 @@ jobs:
           echo "::error::Proxy is not serving commit $HEAD_SHA."
           exit 1
 
-      # Every tracked link sent before the content domain existed points at
-      # htmlradar.com/r/. A permanent redirect to htmlradar.page is the only
-      # thing keeping those open, including two paying customers' links, so
-      # it is checked on every deploy.
-      - name: Verify legacy share links still redirect
-        run: |
-          set -e
-          location=$(curl -sS -o /dev/null -w '%{redirect_url}' "https://htmlradar.com/r/nonexistent-smoke-test")
-          if [ "$location" != "https://htmlradar.page/r/nonexistent-smoke-test" ]; then
-            echo "::error::htmlradar.com/r/ did not redirect to the content domain (got '$location')."
-            exit 1
-          fi
-          echo "Legacy links verified — htmlradar.com/r/ redirects to htmlradar.page."
-
       # The monitor has no HTTP route (cron only), so read the GIT_SHA
       # binding of the active version back from the Workers API instead.
       - name: Verify monitor worker carries this commit
@@ -351,43 +340,82 @@ jobs:
           fi
           echo "Monitor verified — deployed GIT_SHA matches $HEAD_SHA."
 
-      # Purge Cloudflare edge cache after every successful deploy.
-      # Belt-and-suspenders: static assets use hashed filenames so a
-      # new build is referenced by new URLs anyway, but if any HTML
-      # response was opportunistically cached, this clears it. The
-      # 2026-05-18 /docs/[id] incident took an extra hard-refresh
-      # cycle to confirm — automated purge removes that variable
-      # from future incident diagnosis.
+      # Purge Cloudflare edge cache after every successful deploy, on both
+      # zones, and fail the deploy if either purge does not succeed.
       #
-      # `continue-on-error: true` — the existing CLOUDFLARE_API_TOKEN
-      # is scoped to Pages:Edit + Workers:Edit; it may NOT have
-      # zone-level Cache:Purge. If the call returns 403/Auth 10000
-      # we treat as a benign no-op rather than failing the deploy
-      # (the deploy already succeeded by this point). To make the
-      # purge load-bearing, widen the token to include the zone's
-      # Cache Purge:Edit permission.
-      #
-      # Requires CLOUDFLARE_ZONE_ID secret on the repo. If missing,
-      # the step skips itself rather than erroring.
-      - name: Purge Cloudflare edge cache
-        continue-on-error: true
+      # Belt-and-suspenders for the application: static assets use hashed
+      # filenames so a new build is referenced by new URLs anyway. Not
+      # belt-and-suspenders for htmlradar.com/r/, which is why this is no
+      # longer allowed to fail quietly. That path can be a 301 to
+      # htmlradar.page or the document served in place, depending on
+      # LEGACY_HOSTS, and a stale cached copy of the wrong one is a
+      # customer's link answering yesterday's deploy. The step used to carry
+      # continue-on-error because the token might lack Cache Purge:Edit; the
+      # answer to that is a wider token, not a silent no-op, and Sol's review
+      # of the switch plan called for exactly this.
+      - name: Purge Cloudflare edge cache (both zones)
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_ZONE_ID_PAGE: ${{ secrets.CLOUDFLARE_ZONE_ID_PAGE }}
         run: |
-          if [ -z "$CF_ZONE_ID" ]; then
-            echo "::warning::CLOUDFLARE_ZONE_ID secret not set — skipping cache purge."
-            exit 0
-          fi
-          response=$(curl -sS -X POST \
-            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
-            -H "Authorization: Bearer ${CF_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data '{"purge_everything":true}')
-          # Only success + error codes; the full response carries zone ids.
-          echo "$response" | jq -c '{success, errors: [.errors[]?.code]}'
-          if [ "$(echo "$response" | jq -r .success)" = "true" ]; then
-            echo "Cache purged successfully."
+          set -e
+          purge_zone() {
+            zone_name="$1"
+            zone_id="$2"
+            if [ -z "$zone_id" ]; then
+              echo "::error::Zone id secret for ${zone_name} is not set — cache cannot be purged."
+              exit 1
+            fi
+            response=$(curl -sS -X POST \
+              "https://api.cloudflare.com/client/v4/zones/${zone_id}/purge_cache" \
+              -H "Authorization: Bearer ${CF_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data '{"purge_everything":true}')
+            # Only success + error codes; the full response carries zone ids.
+            echo "${zone_name}: $(echo "$response" | jq -c '{success, errors: [.errors[]?.code]}')"
+            if [ "$(echo "$response" | jq -r .success)" != "true" ]; then
+              echo "::error::Cache purge failed for ${zone_name} — the token needs Cache Purge:Edit on that zone."
+              exit 1
+            fi
+            echo "${zone_name} cache purged."
+          }
+          purge_zone htmlradar.com "$CF_ZONE_ID"
+          purge_zone htmlradar.page "$CF_ZONE_ID_PAGE"
+
+      # What a recipient holding an old link actually gets, read after the
+      # purge so no cached answer can flatter it, and on a real share rather
+      # than a made-up slug that would miss the cache anyway.
+      #
+      # The expected answer is whatever the proxy was just configured for, so
+      # this step stays true on both sides of the switch: LEGACY_HOSTS empty
+      # means htmlradar.com still serves the document in place (200, gate page
+      # included), and a non-empty LEGACY_HOSTS means the permanent redirect
+      # is on (301 to the same path on the content domain). Reading the mode
+      # out of the deployed wrangler.toml is what makes the check follow the
+      # deploy instead of having to be edited alongside it.
+      - name: Verify the legacy host answers in the mode it was deployed in
+        run: |
+          set -e
+          legacy=$(sed -n 's/^LEGACY_HOSTS[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' packages/proxy/wrangler.toml)
+          if [ -n "$legacy" ]; then
+            expected=301
+            mode="redirect ON (LEGACY_HOSTS = '${legacy}')"
           else
-            echo "::warning::Cache purge did not return success — token may lack Cache Purge:Edit on the zone."
+            expected=200
+            mode="redirect OFF (LEGACY_HOSTS empty — both hosts serve)"
           fi
+          headers=$(curl -sI "https://htmlradar.com/r/qa-smoke-deck")
+          status=$(printf '%s' "$headers" | awk 'NR==1 {print $2}')
+          location=$(printf '%s' "$headers" | awk 'tolower($1) == "location:" {print $2}' | tr -d '\r')
+          echo "Configured: ${mode} — expected HTTP ${expected}"
+          echo "Live:       HTTP ${status} ${location}"
+          if [ "$status" != "$expected" ]; then
+            echo "::error::htmlradar.com/r/qa-smoke-deck answered HTTP ${status}, but the deployed proxy is configured for ${expected} (${mode})."
+            exit 1
+          fi
+          if [ "$expected" = "301" ] && [ "$location" != "https://htmlradar.page/r/qa-smoke-deck" ]; then
+            echo "::error::Redirect points at '${location}', expected https://htmlradar.page/r/qa-smoke-deck."
+            exit 1
+          fi
+          echo "Legacy host verified."

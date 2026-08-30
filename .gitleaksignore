@@ -1,4 +1,0 @@
-# Historical finding only: the PostHog project key (write-only ingestion token) that lived in
-# packages/monitor/wrangler.toml until commit 34168c7 moved it to a Worker secret. Scoped to the
-# commit that introduced it; the history rewrite of 30 Aug 2026 replaces the literal.
-1ebf78828d4f77bcbb488f7bb39abefb6dfdaee1:packages/monitor/wrangler.toml:generic-api-key:23

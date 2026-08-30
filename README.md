@@ -125,7 +125,7 @@ cd htmlradar
 pnpm install
 cp .env.example .env.local           # fill in keys (Supabase, R2, Resend)
 pnpm typecheck && pnpm test          # sanity check
-pnpm build                           # build all five packages
+pnpm build                           # build app, tracker, mcp (the only packages with a build script)
 ```
 
 Schema setup: apply every numbered SQL file directly under `schema/`, in order, `001` through `035`, via the Supabase SQL editor — and nothing in `schema/tests/`. The files in `schema/tests/` are destructive test programs for a scratch database (they create auth users and sample rows) and must never run against a real install. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe. The most recent migrations:
@@ -209,10 +209,10 @@ If you modify the source and run a network service from it, AGPL-3.0 requires yo
 ## Development
 
 ```bash
-pnpm dev                              # runs all five packages in parallel
+pnpm dev                              # runs app, monitor, proxy, tracker in parallel (mcp has no dev script)
 pnpm typecheck                        # tsc --noEmit across packages
 pnpm lint                             # eslint + prettier
-pnpm test                             # vitest across tracker + proxy + mcp
+pnpm test                             # vitest across app + proxy + tracker + mcp
 ```
 
 Local URLs after `pnpm dev`:

@@ -50,8 +50,10 @@ export interface Env {
   RESEND_FROM: string;
   ALERT_TO: string;
   POSTHOG_HOST: string;
-  POSTHOG_PROJECT_KEY: string;
-  QA_BOT_USER_ID: string;
+  // Worker secrets (`wrangler secret put`), not [vars]. Optional: without a
+  // PostHog key the replay no-ops; without a QA id nothing is filtered.
+  POSTHOG_PROJECT_KEY?: string;
+  QA_BOT_USER_ID?: string;
   // Thread scan (see scanThreads). Optional: absent means the scan no-ops
   // rather than the worker failing to boot.
   TELEGRAM_BOT_TOKEN?: string;

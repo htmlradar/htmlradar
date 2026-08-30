@@ -66,9 +66,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // alone. X-Robots-Tag is the instruction that actually removes it. Applied
 // here, once, rather than in responses.ts, so no future response shape can be
 // added without it.
-function withNoIndex(res: Response): Response {
+function withNoIndex(res: Response, env: Env): Response {
   const out = new Response(res.body, res);
   out.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  // Deploy verification reads this back from the live route to prove the
+  // commit it just uploaded is the one the edge serves.
+  out.headers.set('X-HTMLRadar-Version', env.GIT_SHA ?? 'dev');
 
   // Sandbox every proxy response into an opaque origin.
   //
@@ -98,12 +101,12 @@ function withNoIndex(res: Response): Response {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      return withNoIndex(await handleRequest(request, env, ctx));
+      return withNoIndex(await handleRequest(request, env, ctx), env);
     } catch (err) {
       // A transient Supabase failure must not masquerade as a deleted/missing
       // share ("this link doesn't open anything") — show the recipient the
       // try-again page. Genuine bugs still surface as a 500.
-      if (err instanceof UpstreamError) return withNoIndex(sourceUnreachable());
+      if (err instanceof UpstreamError) return withNoIndex(sourceUnreachable(), env);
       throw err;
     }
   },

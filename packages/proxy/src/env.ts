@@ -11,6 +11,9 @@ export interface Env {
 
   // Vars
   TRACKER_URL: string;
+  // Git commit bound at deploy time (`wrangler deploy --var GIT_SHA:...` from
+  // .github/workflows/deploy.yml); absent under `wrangler dev` and in tests.
+  GIT_SHA?: string;
 
   // Bindings
   DOCS_BUCKET: R2Bucket;

@@ -7,7 +7,8 @@ workers_dev = false  # cron-only worker, no HTTP entrypoint exposed
 # Every 5 minutes. Cheapest possible cadence that still catches a
 # 15-min-or-less regression before the founder checks email.
 [triggers]
-crons = ["*/5 * * * *"]
+# Second cron: 04:00 UTC / 09:30 IST — daily thread scan, Telegram only.
+crons = ["*/5 * * * *", "0 4 * * *"]
 
 # Non-sensitive config travels in [vars] so they're visible in the
 # wrangler.toml diff. Secrets (SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY)

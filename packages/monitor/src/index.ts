@@ -30,6 +30,12 @@
 // we already own. Replay failures log to console, never email — a
 // lagging dashboard is not pageable.
 //
+// And one job that isn't monitoring at all: a once-a-day scan of Hacker News
+// and Reddit for people asking the question this product answers, Telegrammed
+// to the founder so he can reply as himself (see scanThreads). It lives here
+// because this worker already has a cron, a fetch, and nothing else to do at
+// 04:00 UTC — a second worker for five HTTP calls a day would be silly.
+//
 // Not in scope (deliberately): tracker bundle version, R2 health,
 // section_events capture rate. Those are real signals but the bar
 // here is "the simplest thing that would have caught the email
@@ -46,6 +52,10 @@ export interface Env {
   POSTHOG_HOST: string;
   POSTHOG_PROJECT_KEY: string;
   QA_BOT_USER_ID: string;
+  // Thread scan (see scanThreads). Optional: absent means the scan no-ops
+  // rather than the worker failing to boot.
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
 }
 
 const ROUTES = ['/', '/pricing', '/docs', '/sign-in'];
@@ -307,8 +317,255 @@ async function checkWebhookHealth(env: Env): Promise<string | null> {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Daily thread scan.
+//
+// The one acquisition channel that works here is the founder answering a real
+// question in a real thread, as himself, the same day it was asked. The part
+// that kills it is the searching — nobody greps Hacker News and Reddit every
+// morning. So the worker does that half and Telegrams the shortlist: five
+// queries, two keyless sources, one message a day, replies still human.
+//
+// Deliberately stateless: no scoring, no "already seen" table. A 26-hour
+// window against a once-a-day cron means the occasional repeat, which costs
+// one glance — cheaper than a KV namespace to remember what was read. Zero
+// hits sends nothing at all; a daily "found nothing" message is how a channel
+// gets muted, and a muted channel is worse than no channel.
+
+interface ThreadHit {
+  source: string;
+  title: string;
+  url: string;
+  angle: string;
+}
+
+// Each query carries the line the founder can open a reply with. Plain, no
+// pitch — threads punish marketing voice, and he has to be able to say it in
+// his own words in under five minutes.
+const SCAN_QUERIES: { query: string; angle: string }[] = [
+  {
+    query: '"docsend alternative"',
+    angle: 'Open-source alternative that tracks HTML rather than uploaded PDFs; free for 2 links.',
+  },
+  {
+    query: '"share claude artifact"',
+    angle:
+      'A published artifact gives you a URL and nothing else; HTMLRadar adds who opened it and which sections they read.',
+  },
+  {
+    query: '"share html file" link',
+    angle: 'Paste or upload the HTML, get a link that keeps it a live page and shows reads.',
+  },
+  {
+    query: 'papermark alternative',
+    angle: 'Both open source; HTMLRadar is for HTML, not file uploads.',
+  },
+  {
+    query: '"track who opened" proposal',
+    angle: 'Per-client link, email gate optional, section-level read timeline.',
+  },
+];
+
+// 26 hours, not 24, so a run that slips can't open a gap the next one skips over.
+const SCAN_WINDOW_MS = 26 * 60 * 60_000;
+const SCAN_TIMEOUT_MS = 8_000;
+// Reddit rate-limits anonymous search to roughly one call a minute per address,
+// so five back-to-back queries get four 429s and Reddit contributes nothing.
+// Spacing them costs wall-clock time, which a once-a-day cron has in abundance
+// (timers burn no CPU): 3-of-5 queries landed at 30s versus 1-of-5 with no gap,
+// and 45s buys the rest of the margin toward Reddit's roughly-one-a-minute
+// ceiling. ponytail: 45s is a measured compromise, not a limit Reddit
+// documents — raise it toward 60s if queries still come back throttled.
+const SCAN_QUERY_GAP_MS = 45_000;
+const SCAN_MAX_ITEMS = 10;
+// Telegram hard-caps a message at 4096 chars. Stop short of it rather than
+// find out in prod which item got sliced in half.
+const SCAN_MAX_CHARS = 3_800;
+const SCAN_TITLE_CHARS = 120;
+
+const ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+};
+
+// HN comment bodies are HTML; Reddit's Atom fields are entity-escaped. Same
+// cleanup serves both. Tags become a space, not nothing, so a stripped <p>
+// doesn't glue two sentences together.
+function clean(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&#(x[0-9a-fA-F]{1,6}|\d{1,7});/g, (m, code: string) => {
+      const n = code[0] === 'x' ? parseInt(code.slice(1), 16) : parseInt(code, 10);
+      return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : m;
+    })
+    .replace(/&(?:amp|lt|gt|quot);/g, (m) => ENTITIES[m] ?? m)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+interface HNHit {
+  objectID: string;
+  title: string | null;
+  story_title: string | null;
+  comment_text: string | null;
+}
+
+// Both sources pad their results: the HN index is configured allOptional, so
+// once the real matches run out Algolia fills the page with hits sharing a
+// single word — "papermark alternative" comes back nine-tenths threads
+// containing only "alternative" — and Reddit's search widens the same way.
+// nbHits counts the padding too, so the only reliable filter is checking the
+// words are actually there. Whole-word and case-insensitive: "html" must not
+// match "htmlspecialchars", and thread titles are written in any casing.
+// Without this the daily message is mostly noise.
+function matchesQuery(query: string, haystack: string): boolean {
+  const words = query.match(/[a-zA-Z0-9]+/g) ?? [];
+  return words.every((word) =>
+    new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(haystack),
+  );
+}
+
+async function scanHN(query: string, sinceSec: number): Promise<{ title: string; url: string }[]> {
+  const res = await fetch(
+    'https://hn.algolia.com/api/v1/search_by_date' +
+      `?query=${encodeURIComponent(query)}&tags=(story,comment)` +
+      `&numericFilters=created_at_i>${sinceSec}&hitsPerPage=10`,
+    { signal: AbortSignal.timeout(SCAN_TIMEOUT_MS) },
+  );
+  if (!res.ok) throw new Error(`algolia HTTP ${res.status}`);
+  const body = (await res.json()) as { hits?: HNHit[] };
+  // story_title carries the thread a comment lives under, which is where the
+  // query words usually sit when the hit is a reply rather than a story.
+  return (body.hits ?? [])
+    .filter((hit) =>
+      matchesQuery(query, `${hit.title ?? ''} ${hit.story_title ?? ''} ${hit.comment_text ?? ''}`),
+    )
+    .map((hit) => ({
+      // Stories have a title; comments only have their body.
+      title: clean(hit.title ?? hit.comment_text ?? ''),
+      url: `https://news.ycombinator.com/item?id=${hit.objectID}`,
+    }));
+}
+
+// Reddit blocks datacentre IPs often enough that treating a refusal as an
+// error would take the HN half of the scan down with it. Anything that isn't
+// a 200 of XML is a silent skip for that query.
+async function scanReddit(
+  query: string,
+  sinceMs: number,
+): Promise<{ title: string; url: string }[]> {
+  const res = await fetch(
+    `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`,
+    {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+          '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    },
+  );
+  if (!res.ok || !(res.headers.get('content-type') ?? '').includes('xml')) return [];
+  const xml = await res.text();
+  const out: { title: string; url: string }[] = [];
+  for (const match of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const entry = match[1] ?? '';
+    // t=week, not t=day: Reddit's own filter keys off post time rather than
+    // activity, so a day-wide ask drops threads that were posted earlier and
+    // are only now being answered. The real window is the 26 hours re-applied
+    // right here against <updated>; t=week just stops Reddit narrowing it first.
+    const updated = /<updated>([^<]+)<\/updated>/.exec(entry)?.[1];
+    if (!updated || Date.parse(updated) < sinceMs) continue;
+    const url = /<link[^>]*href="([^"]+)"/.exec(entry)?.[1];
+    const title = /<title[^>]*>([\s\S]*?)<\/title>/.exec(entry)?.[1];
+    if (!url || !title) continue;
+    const content = /<content[^>]*>([\s\S]*?)<\/content>/.exec(entry)?.[1] ?? '';
+    if (!matchesQuery(query, clean(`${title} ${content}`))) continue;
+    out.push({ title: clean(title), url: clean(url) });
+  }
+  return out;
+}
+
+async function scanThreads(env: Env): Promise<void> {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
+    // eslint-disable-next-line no-console
+    console.log('[scan] no Telegram credentials set — skipping');
+    return;
+  }
+
+  const sinceMs = Date.now() - SCAN_WINDOW_MS;
+  const sinceSec = Math.floor(sinceMs / 1000);
+  // Keyed by URL: the same thread surfaces under several queries, and the
+  // first query to find it owns the angle.
+  const hits = new Map<string, ThreadHit>();
+
+  for (const [i, { query, angle }] of SCAN_QUERIES.entries()) {
+    for (const source of ['HN', 'Reddit'] as const) {
+      try {
+        const found =
+          source === 'HN' ? await scanHN(query, sinceSec) : await scanReddit(query, sinceMs);
+        for (const { title, url } of found) {
+          if (title && !hits.has(url)) hits.set(url, { source, title, url, angle });
+        }
+      } catch (err) {
+        // One dead source or one bad query must not cost the whole scan.
+        // eslint-disable-next-line no-console
+        console.error(`[scan] ${source} "${query}" failed:`, (err as Error).message);
+      }
+    }
+    if (i < SCAN_QUERIES.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, SCAN_QUERY_GAP_MS));
+    }
+  }
+  if (hits.size === 0) return;
+
+  // Plain text on purpose — no parse_mode, so a stray underscore in a thread
+  // title can't 400 the whole message.
+  let text = `HTMLRadar thread scan — ${new Date().toISOString().slice(0, 10)}`;
+  let sent = 0;
+  for (const hit of hits.values()) {
+    if (sent >= SCAN_MAX_ITEMS) break;
+    const block =
+      `\n\n${hit.source} — ${hit.title.slice(0, SCAN_TITLE_CHARS)}` +
+      `\n${hit.url}\nAngle: ${hit.angle}`;
+    if (text.length + block.length > SCAN_MAX_CHARS) break;
+    text += block;
+    sent++;
+  }
+
+  const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: env.TELEGRAM_CHAT_ID,
+      text,
+      disable_web_page_preview: true,
+    }),
+    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+  });
+  const tg = (await res.json()) as { ok?: boolean; description?: string };
+  // eslint-disable-next-line no-console
+  console.log(
+    `[scan] ${sent} of ${hits.size} item(s) sent — telegram ok:${tg.ok === true}`,
+    tg.description ?? '',
+  );
+}
+
 export default {
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    // The daily 04:00 UTC trigger (see wrangler.toml) is the thread scan and
+    // nothing else. Cloudflare calls scheduled() once per matching cron
+    // expression, so returning here costs the 5-minute health checks nothing.
+    if (event.cron === '0 4 * * *') {
+      await scanThreads(env).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[scan] failed:', (err as Error).message);
+      });
+      return;
+    }
+
     // Analytics replay runs alongside the health checks; failures log
     // only (cursor doesn't advance, next run retries).
     ctx.waitUntil(

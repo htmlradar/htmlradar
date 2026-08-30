@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -12,9 +13,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Self-Hosted, Open-Source Document Tracking | HTMLRadar',
+  title: 'Self-Hosted DocSend Alternative, Open Source (AGPL) | HTMLRadar',
   description:
-    'Run open-source HTML document tracking in your own Cloudflare and Supabase accounts. AGPL-3.0, self-hostable, and fully under your control.',
+    'HTMLRadar is a self-hosted, open-source DocSend alternative for HTML documents. AGPL-3.0, runs in your own Cloudflare and Supabase accounts, your documents and read data stay in your own accounts.',
   path: '/self-hosted',
 });
 
@@ -32,8 +33,14 @@ export default function SelfHostedPage() {
           />
           <SectionMark>HTMLRadar · Self-host</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            Self-hosted document tracking you fully control.
+            The self-hosted, open-source DocSend alternative for HTML.
           </h1>
+          <DirectAnswer updated="August 2026">
+            HTMLRadar is a self-hosted, open-source DocSend alternative for HTML. The whole product
+            is AGPL-3.0: run it in your own Cloudflare and Supabase accounts, keep documents and
+            read data in your own storage, and see who read what. Or use the hosted version, free
+            for two tracked links.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             HTMLRadar is AGPL-3.0, end to end: the tracker, the proxy worker, the database schema,
             and the web app. Run the whole thing in your own Cloudflare and Supabase accounts. Your

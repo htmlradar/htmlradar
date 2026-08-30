@@ -4,13 +4,11 @@
 
 import { FaqLd, type FaqItem } from './JsonLd';
 
-export function Faq({ items }: { items: FaqItem[] }) {
+export function Faq({ items, title = 'Common questions' }: { items: FaqItem[]; title?: string }) {
   return (
     <section className="mt-14">
       <FaqLd items={items} />
-      <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-        Common questions
-      </h2>
+      <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">{title}</h2>
       <dl className="mt-5 space-y-6">
         {items.map(({ q, a }) => (
           <div key={q}>

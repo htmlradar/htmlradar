@@ -3,6 +3,7 @@ import { NavBar } from '@/components/NavBar';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
@@ -45,6 +46,12 @@ export default function ComparePapermarkPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             The Papermark alternative for HTML decks.
           </h1>
+          <DirectAnswer updated="August 2026">
+            HTMLRadar is a Papermark alternative for people who send HTML rather than uploaded
+            files. It keeps the deck as a live page, gives each recipient their own link, and
+            reports which headings or slides were read. Both are open source; HTMLRadar is AGPL-3.0,
+            free for two tracked links, then $15 a month.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Papermark is a broader document-sharing and data-room product. HTMLRadar is narrower:
             upload an HTML file or paste a URL, send a tracked link, and see which sections the

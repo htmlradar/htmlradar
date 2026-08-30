@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -35,6 +36,12 @@ export default function ProposalTrackingPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Know the moment your proposal gets read.
           </h1>
+          <DirectAnswer updated="August 2026">
+            Proposal tracking shows you the moment a client opens your proposal, which sections they
+            read and where they paused. HTMLRadar does this for proposals sent as HTML: a private
+            link per client, an email gate if you want names, and a section-by-section read report
+            to time your follow-up. Free for two tracked links.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             You sent the proposal Tuesday. It&apos;s Friday. Do you follow up — or is that pushy?
             Proposal tracking replaces that guess with a fact: the client opened it Thursday at 4pm,

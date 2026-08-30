@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -79,6 +80,12 @@ export default function ComparePage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             The open-source DocSend alternative built for HTML.
           </h1>
+          <DirectAnswer updated="August 2026">
+            HTMLRadar is an open-source DocSend alternative for HTML files. Upload an HTML deck,
+            brief or proposal, or paste a URL you already host, send a tracked link, and see who
+            opened it, which sections they read and for how long. AGPL-3.0, self-hostable, free for
+            two tracked links, then $15 a month or $150 a year.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             DocSend is an established document-tracking product, and it supports PDFs,
             presentations, documents, media, and spreadsheets. HTMLRadar is different on purpose: it

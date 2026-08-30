@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -34,6 +35,12 @@ export default function ClaudeArtifactsPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Track a Claude artifact you can export as HTML.
           </h1>
+          <DirectAnswer updated="August 2026">
+            To see who opened a Claude artifact, export it as HTML, upload it to HTMLRadar, and send
+            the tracked link instead of the artifact URL. You get who opened it, which sections they
+            read and for how long, plus an optional email gate, password and expiry. Free for two
+            tracked links, open source.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Claude artifacts can be documents, code, websites, or interactive apps. HTMLRadar fits
             the website case: a standalone HTML page you can save or a public page you already host.

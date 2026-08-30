@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -34,6 +35,12 @@ export default function RevealJsPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Track attention on a reveal.js deck, slide by slide.
           </h1>
+          <DirectAnswer updated="August 2026">
+            HTMLRadar tracks a reveal.js deck slide by slide. Upload the built HTML or paste the URL
+            you host, send a tracked link, and see which slides each viewer read and how long they
+            stayed. The deck stays a live reveal.js presentation; nothing is flattened to PDF. Free
+            for two tracked links.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             reveal.js is an open-source HTML presentation framework. When your deck is already a
             browser experience, keep it that way: share the working HTML instead of flattening it to

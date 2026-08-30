@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -35,6 +36,12 @@ export default function DocsendVsPapermarkPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             DocSend vs Papermark for document sharing.
           </h1>
+          <DirectAnswer updated="August 2026">
+            DocSend and Papermark are both built around uploading a file and tracking that file;
+            Papermark is the open-source one. HTMLRadar is built around HTML: if what you send is a
+            web page, an HTML deck or a Claude artifact, it keeps that format and reports reading by
+            section. This page compares all three.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             This is a decision between two document-sharing products, not a claim that one is always
             better. Start with the thing you need to send. If it is an uploaded office file, compare

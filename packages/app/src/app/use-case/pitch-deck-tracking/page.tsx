@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -34,6 +35,12 @@ export default function PitchDeckTrackingPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             See exactly how investors read your pitch deck.
           </h1>
+          <DirectAnswer updated="August 2026">
+            Pitch deck tracking means knowing which investor opened your deck, which slides they
+            read and how long they stayed. HTMLRadar does this for decks sent as HTML: one tracked
+            link per investor, an alert on first open, and a per-viewer dashboard. Free for two
+            tracked links, no credit card.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             You sent the deck on Tuesday. It&apos;s Thursday. Did the partner open it? Skim it?
             Forward it? Most founders are guessing. HTMLRadar replaces the guessing with a live

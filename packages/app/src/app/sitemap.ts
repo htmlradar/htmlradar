@@ -57,6 +57,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     { url: `${baseUrl}/for/reveal-js`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${baseUrl}/self-hosted`, changeFrequency: 'monthly', priority: 0.7 },
+    {
+      url: `${baseUrl}/pl/alternatywa-dla-docsend`,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
     { url: `${baseUrl}/blog`, changeFrequency: 'weekly', priority: 0.6 },
     {
       url: `${baseUrl}/blog/how-we-built-htmlradar`,

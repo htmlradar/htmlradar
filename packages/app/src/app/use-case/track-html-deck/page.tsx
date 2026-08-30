@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
+import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
@@ -36,6 +37,12 @@ export default function TrackHtmlDeckPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Track the HTML deck you already built.
           </h1>
+          <DirectAnswer updated="August 2026">
+            To track an HTML deck, upload the file or paste the URL you already host, and HTMLRadar
+            gives you a tracked link that keeps the deck as a live page. You see who opened it,
+            which sections or slides they read, active time and scroll depth. Free for two tracked
+            links, open source.
+          </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Your deck is already HTML — a Claude artifact, a reveal.js build, a ChatGPT one-pager,
             or a hand-rolled page. HTMLRadar keeps it that way: send a tracked link and see which

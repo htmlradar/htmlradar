@@ -1,7 +1,8 @@
-// Blog post #2 — the launch piece. v2, 30 Aug 2026: opens on why HTML became
-// the format documents are generated in, states what is recorded as a spec
-// rather than a defence. Body is the dev.to/Hashnode launch post; this URL is
-// the canonical one those syndications point at.
+// Blog post #2 — the launch piece. v4, 30 Aug 2026: opens on the two things
+// that changed (the writer, the reader), then what it does, how it works,
+// what is recorded, the MCP server, and self-hosting. Body is word-for-word
+// the dev.to/Hashnode launch post; this URL is the canonical one those
+// syndications point at.
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
@@ -14,7 +15,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Decks moved to HTML. I built the read tracking for it.',
   description:
-    'Send-side analytics for HTML decks and proposals: section dwell, active read time, scroll depth. No session replay, no mouse tracking. Open source, AGPL-3.0.',
+    'Decks and proposals are HTML now, so I built the read tracking: time per section, active reading time, scroll depth. No session replay. Open source, AGPL-3.0.',
   path: '/blog/why-i-built-read-tracking-for-html',
 });
 
@@ -49,195 +50,186 @@ export default function Post() {
 
           <div className="mt-12 space-y-10 text-[16.5px] leading-[1.7] text-ink-soft">
             <p>
-              PDF was built for paper: a page meant to come out the same on every printer, back when
-              the last thing to happen to a document was printing it. The layout froze because it
-              was about to become a physical object.
+              I&apos;m writing this to explain why HTMLRadar exists, because the reason came out of
+              my own week, not a market map.
             </p>
 
             <p>
-              Printing isn&apos;t the last step any more, and a growing share of what I send was
-              generated rather than typed. An agent writes the spec, the weekly update, the research
-              summary, the first pass at the deck. What comes back is HTML, because HTML carries
-              what a plan actually needs: a table that holds its shape, an SVG diagram, a layout
-              that reflows on a phone.
+              I run an AI company. Last year I stopped sending investor decks as PDFs, and the
+              specs, weekly updates, board pre-reads and client proposals followed. Most of what I
+              send now was not typed by a person. An agent wrote the first pass, and what came back
+              was HTML.
+            </p>
+
+            <p>That is not a quirk of one tool. Two things changed at once.</p>
+
+            <p>
+              <strong className="font-semibold text-ink">The writer changed.</strong> When an agent
+              produces a document, HTML is the natural output, because it is the one format that
+              holds everything a plan needs in a single file: a table that keeps its shape, a
+              diagram as SVG, a chart that recalculates when you change a number, a section that
+              unfolds when the reader wants the detail. It reflows on a phone and still prints if
+              someone insists. Nobody reads a hundred-line markdown file. The HTML version gets
+              read. PDF was built for the printer; the documents I send now never reach one.
             </p>
 
             <p>
-              The Claude blog has a good public version of that argument, on why HTML beats markdown
-              as what an agent gives you: a hundred-line markdown file doesn&apos;t get read, and
-              the HTML version does.
+              <strong className="font-semibold text-ink">The reader changed.</strong> A PDF arrives
+              as an attachment. An HTML link is a page the recipient opens on a phone, in an inbox,
+              and increasingly next to an assistant of their own: they hand it over, headings and
+              tables intact, and ask questions about it. The documents that matter now end in .html,
+              and they are read by people and by the tools those people bring with them.
             </p>
 
             <p>
-              The other half is that HTML is legible to whatever sits in the next tab. A PDF arrives
-              as an attachment. An HTML link is a page the recipient can read, hand to whichever
-              assistant they use, and ask questions about.
-            </p>
-
-            <p>
-              I run an AI company, and at some point last year I stopped sending investor decks as
-              PDFs. The specs, the weekly updates, the board pre-reads and the client proposals
-              followed. Then I wanted to know whether anybody had read one, since the argument for
-              HTML is that it gets read. I had no way to check. My document was live HTML, and I
-              wanted to see how it got read. So I built that, and it&apos;s open source.
+              Then I wanted to know whether anyone had read one. That is the whole point of sending
+              HTML, and I had no way to check. My document was a live page, not a file. So I built
+              the tracking for HTML, and it is open source.
             </p>
 
             <section>
               <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
                 What it does
               </h2>
-              <div className="mt-4 space-y-4">
-                <p>
-                  HTMLRadar is send-side analytics for HTML documents. You upload an HTML file or
-                  paste a URL you already host, create one tracked link per recipient, and send it.
-                  The dashboard gives you one row per viewer who opened it: which sections they
-                  read, how much active reading time they spent, how far they scrolled. You also get
-                  an email the first time someone opens it.
-                </p>
-                <p>
-                  Every share carries its own controls - email gate, password, expiry date, an
-                  allow-list by domain or exact address, and revocation. One document, many shares.
-                  The password, expiry and allow-list can be changed after you&apos;ve sent the
-                  link.
-                </p>
-              </div>
+
+              <figure className="mt-8">
+                <img
+                  src="/brand/dashboard-demo.gif"
+                  width={960}
+                  height={540}
+                  loading="eager"
+                  alt="HTMLRadar dashboard: one row per viewer, time per section, scroll depth, first-open email"
+                  className="w-full max-w-full rounded-xl border border-line"
+                  style={{ maxWidth: '100%', height: 'auto' }}
+                />
+                <figcaption className="mt-3 text-[13px] leading-relaxed text-graphite">
+                  Demo dashboard with synthetic data
+                </figcaption>
+              </figure>
+
+              <ul className="mt-8 ml-5 list-disc space-y-4 marker:text-signal-dark">
+                <li>
+                  Upload an HTML file or paste a URL you already host, create one tracked link per
+                  recipient, send it.
+                </li>
+                <li>
+                  The dashboard shows one row per viewer: which sections they read, how long they
+                  actively read, how far they scrolled. An email arrives on the first open.
+                </li>
+                <li>
+                  Each link has its own email gate, password, expiry, allow-list by domain or
+                  address, and a revoke switch. One document, many links. Password, expiry and
+                  allow-list stay editable after sending.
+                </li>
+                <li>
+                  Attachments ride under the same link (the model, the cap table, a ZIP), and each
+                  download is tagged to the recipient. Replace the file and every link you already
+                  sent shows the new version.
+                </li>
+                <li>
+                  The point is the follow-up: you write back about the section they re-read, not
+                  &quot;just checking in&quot;.
+                </li>
+              </ul>
             </section>
 
             <section>
               <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
-                How it works, in six sentences
+                How it works
               </h2>
-              <div className="mt-4 space-y-4">
-                <p>
-                  The mechanics are the interesting part, so I&apos;ll keep this to six sentences.
-                </p>
-                <ol className="ml-5 list-decimal space-y-4 marker:font-mono marker:text-[13px] marker:text-signal-dark">
-                  <li>
-                    A Cloudflare Worker sits at{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">/r/{'{slug}'}</code>,
-                    checks that share&apos;s gates, fetches your HTML, and injects the tracker with
-                    HTMLRewriter on the way through, so the recipient sees <em>your</em> document,
-                    not a re-rendered copy of it.
-                  </li>
-                  <li>
-                    The tracker itself is roughly 8 KB gzipped, and since the source is public you
-                    can read the whole thing before you decide whether to trust it.
-                  </li>
-                  <li>
-                    Section detection runs a fallback chain over your markup: headings first (
-                    <code className="font-mono text-[14px] text-signal-dark">h1</code>,{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">h2</code>,{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">h3</code>, or a
-                    selector you configure), then slide or page containers such as{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">section</code>,{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">article</code> and
-                    anything with{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">slide</code> or{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">page</code> in its
-                    class name, and finally paragraph buckets for plain prose.
-                  </li>
-                  <li>
-                    Time on a section only starts counting once at least 50% of it has stayed
-                    visible for one continuous second, and the read signal fires after three
-                    qualified seconds, so scrolling fast past a slide never registers as having read
-                    it.
-                  </li>
-                  <li>
-                    Both section dwell and session active time run a five-second idle watchdog:
-                    session time resets on keydown, scroll and touchstart; section dwell also resets
-                    on mousedown and wheel; mousemove is deliberately excluded, because a twitching
-                    cursor isn&apos;t reading.
-                  </li>
-                  <li>
-                    Every proxied response carries a{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">sandbox</code>{' '}
-                    Content-Security-Policy without{' '}
-                    <code className="font-mono text-[14px] text-signal-dark">
-                      allow-same-origin
-                    </code>
-                    , so the recipient&apos;s document runs in an opaque origin and can&apos;t reach
-                    application storage.
-                  </li>
-                </ol>
-              </div>
+              <p className="mt-4">
+                The mechanics, briefly, because they are what you are trusting.
+              </p>
+              <ul className="mt-4 ml-5 list-disc space-y-4 marker:text-signal-dark">
+                <li>
+                  A Cloudflare Worker serves your document at{' '}
+                  <code className="font-mono text-[14px] text-signal-dark">/r/{'{slug}'}</code>,
+                  checks the link&apos;s gates, and injects the tracker on the way through. The
+                  recipient sees your document, not a re-rendered copy.
+                </li>
+                <li>The tracker is about 8 KB gzipped, and the source is public.</li>
+                <li>
+                  Sections come from your markup: headings first, then slide or page containers,
+                  then paragraph buckets for plain prose.
+                </li>
+                <li>
+                  A section starts counting only after it has stayed half visible for a full second,
+                  and a read counts after three such seconds. Scrolling past a slide never counts. A
+                  five-second idle watchdog stops the clock when nothing happens; mouse movement is
+                  ignored on purpose.
+                </li>
+                <li>
+                  Every document runs in a sandbox with no access to the application&apos;s storage.
+                </li>
+              </ul>
             </section>
 
             <section>
               <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
                 What gets recorded
               </h2>
-              <div className="mt-4 space-y-4">
-                <p>
-                  The whole list, so you can decide before you send anything. An email address when
-                  the recipient enters one at a gate, or a random browser ID when they don&apos;t;
-                  then the time of each open, referrer, the browser&apos;s user-agent string and the
-                  device type, browser and operating system read from it, coarse location,
-                  per-section dwell, scroll depth and active reading time, and, if the document has
-                  attachments, which ones were downloaded. There&apos;s no mouse tracking, no
-                  keystroke capture, no DOM snapshots, no session replay and no raw IP address. A
-                  recipient can start an opt-out with{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">
-                    window.HTMLRadar.optOut()
-                  </code>{' '}
-                  and confirm on the page that opens.
-                </p>
-                <p>
-                  I send decks to investors and clients; I wouldn&apos;t send them a link that
-                  records more than that.
-                </p>
-              </div>
+              <p className="mt-4">
+                The whole list, so you can decide before you send anything: an email address when
+                the recipient enters one at a gate, otherwise a random browser id; the time of each
+                open, the referrer, the user-agent string and the device, browser and OS read from
+                it, coarse location, time per section, scroll depth, active reading time, and which
+                attachments were downloaded. No mouse tracking, no keystrokes, no DOM snapshots, no
+                session replay, no raw IP address. A recipient can opt out with{' '}
+                <code className="font-mono text-[14px] text-signal-dark">
+                  window.HTMLRadar.optOut()
+                </code>{' '}
+                and confirm on the page that opens.
+              </p>
             </section>
 
             <section>
               <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
                 The part I did not expect to matter
               </h2>
-              <div className="mt-4 space-y-4">
-                <p>
-                  HTMLRadar ships an MCP server, so the agent that wrote the HTML can publish it as
-                  a tracked link, and you can ask that same agent the next morning whether anyone
-                  opened it. There are three tools over stdio -{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">share_html</code>,{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">get_share_activity</code>{' '}
-                  and <code className="font-mono text-[14px] text-signal-dark">whoami</code> - and
-                  they work in Claude Code, Cursor and Codex CLI. In Claude Code a plugin layers a
-                  skill on top, so the agent knows when to offer a tracked link and when to stay
-                  quiet. I built it as a side path, but it&apos;s now the part I use most.
-                </p>
-              </div>
+
+              <figure className="mt-8">
+                <img
+                  src="/brand/mcp-transcript.png"
+                  width={880}
+                  height={1143}
+                  loading="lazy"
+                  alt='Claude Code with the HTMLRadar plugin answering "did anyone read the deck, and which sections?"'
+                  className="w-full max-w-full rounded-xl border border-line"
+                  style={{ maxWidth: '100%', height: 'auto' }}
+                />
+                <figcaption className="mt-3 text-[13px] leading-relaxed text-graphite">
+                  A real Claude Code session with the HTMLRadar plugin
+                </figcaption>
+              </figure>
+
+              <p className="mt-8">
+                HTMLRadar ships an MCP server. The agent that wrote the HTML publishes it as a
+                tracked link, and the next morning you ask the same agent whether anyone opened it.
+                Three tools over stdio (
+                <code className="font-mono text-[14px] text-signal-dark">share_html</code>,{' '}
+                <code className="font-mono text-[14px] text-signal-dark">get_share_activity</code>,{' '}
+                <code className="font-mono text-[14px] text-signal-dark">whoami</code>), working in
+                Claude Code, Cursor and Codex CLI; in Claude Code a plugin adds a skill so the agent
+                knows when to offer a link. I built it as a side path. It is now the part I use
+                most.
+              </p>
             </section>
 
             <section>
               <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
-                Self-hosting
+                Self-hosting and price
               </h2>
               <div className="mt-4 space-y-4">
                 <p>
-                  If you&apos;d rather your documents didn&apos;t sit on somebody else&apos;s
-                  infrastructure, the whole stack self-hosts. You need a Cloudflare account
-                  (Workers, R2 and Pages), a Supabase project, and a domain on Cloudflare DNS.
-                  Cloudflare and Supabase both have free tiers. Resend, which sends the emails, is
-                  optional; without it the first-open trigger writes a{' '}
-                  <code className="font-mono text-[14px] text-signal-dark">skipped</code> row and
-                  everything else carries on working. The schema is a folder of numbered, idempotent
-                  SQL migrations you paste into the Supabase editor in order. The self-hosting guide
-                  is in the repo, and the hosted version is deployed from the same repository.
-                </p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="font-serif text-[26px] leading-snug text-ink md:text-[28px]">
-                Where to find it
-              </h2>
-              <div className="mt-4 space-y-4">
-                <p>
-                  The hosted version is free for two tracked links, then $15 a month or $150 a year
-                  for unlimited ones. Self-hosting has no licence fee and never will, because the
-                  code is AGPL.
+                  The whole stack self-hosts on Cloudflare (Workers, R2, Pages) and Supabase, both
+                  with free tiers, plus a domain on Cloudflare DNS; email through Resend is
+                  optional. The schema is numbered SQL migrations you paste in order, the guide is
+                  in the repo, and the hosted version deploys from the same repository. Hosted: free
+                  for two tracked links, then $15 a month or $150 a year. Self-hosting has no
+                  licence fee and never will; the code is AGPL.
                 </p>
                 <p>
-                  Source, issues and the roadmap:{' '}
+                  Source, issues and roadmap:{' '}
                   <a
                     href="https://github.com/htmlradar/htmlradar"
                     className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
@@ -246,10 +238,9 @@ export default function Post() {
                   </a>
                 </p>
                 <p>
-                  Happy to hear your thoughts, particularly on the section-detection heuristics -
-                  the part I&apos;m least confident about. Plain prose with no headings is hard to
-                  bucket well, and I suspect somebody reading this has a better idea than paragraph
-                  groups.
+                  I&apos;d like to hear where the section detection goes wrong on your documents.
+                  Plain prose with no headings is the part I am least sure of, and someone reading
+                  this probably has a better idea than paragraph buckets.
                 </p>
                 <p>
                   Cheers,

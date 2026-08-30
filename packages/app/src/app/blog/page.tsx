@@ -27,7 +27,7 @@ const POSTS: Post[] = [
     slug: 'why-i-built-read-tracking-for-html',
     title: 'Decks moved to HTML. I built the read tracking for it.',
     description:
-      'Send-side analytics for HTML decks and proposals: section dwell, active read time, scroll depth. No session replay, no mouse tracking. Open source, AGPL-3.0.',
+      'Decks and proposals are HTML now, so I built the read tracking: time per section, active reading time, scroll depth. No session replay. Open source, AGPL-3.0.',
     date: '2026-08-30',
     readingTime: '4 min',
   },

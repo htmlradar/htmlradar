@@ -38,6 +38,12 @@ export type AppEvent =
   | 'share.first_view'
   | 'share.disabled_open_attempt'
   | 'viewer.hidden_toggled'
+  // Public API credentials. Never carry key material — label and id only.
+  | 'api_key.created'
+  | 'api_key.revoked'
+  // POST /api/v1/shares could not undo a document after the link was refused.
+  // Carries the document id and which half failed, never any content.
+  | 'api.rollback_failed'
   | 'auth.callback_failed'
   | 'document.upload_failed'
   | 'payment.received'

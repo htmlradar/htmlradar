@@ -13,7 +13,9 @@ import {
 import { SectionMark } from '@/components/SectionMark';
 import { UpgradePending } from '@/components/UpgradePending';
 import { SubscriptionControls } from '@/components/SubscriptionControls';
+import { apiKeyPrefix, generateApiKey, hashApiKey } from '@/lib/api-auth';
 import { AnnualSwitch } from './AnnualSwitch';
+import { ApiKeys, type ApiKeyRow } from './ApiKeys';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -319,6 +321,89 @@ function ProSuccessBanner({ proUntil }: { proUntil: string | null }) {
   );
 }
 
+// A key is generated, hashed, and the hash is what is written. The plaintext
+// exists only in this function's return value and in the browser tab that
+// asked for it — there is deliberately no way to read it back afterwards.
+//
+// The insert goes through the cookie-scoped client, so the api_keys RLS
+// policies (schema/034) are what bind the row to this user; the service role
+// is not involved and cannot be talked into writing a key for someone else.
+async function createApiKeyAction(label: string): Promise<{
+  ok: boolean;
+  key?: string;
+  error?: string;
+}> {
+  'use server';
+  const user = await requireUser();
+  const cleanLabel = label.trim().slice(0, 60) || 'API key';
+  const key = generateApiKey();
+
+  const { error } = await serverClient()
+    .from('api_keys')
+    .insert({
+      user_id: user.id,
+      key_hash: await hashApiKey(key),
+      key_prefix: apiKeyPrefix(key),
+      label: cleanLabel,
+    });
+  if (error) {
+    // The ten-live-keys cap is a trigger on api_keys (schema/034), because the
+    // insert policy lets a signed-in session write key rows straight through
+    // PostgREST — a check here alone would be one anyone could walk around.
+    // So the limit arrives as an exception, and this turns it into a sentence.
+    if (error.message.includes('api_key_limit')) {
+      return {
+        ok: false,
+        error: 'You already have 10 active keys. Revoke one to create another.',
+      };
+    }
+    await logServerError({
+      source: 'settings.api_key_create',
+      message: error.message,
+      userId: user.id,
+      route: '/settings',
+    });
+    return { ok: false, error: 'Could not create the key. Try again.' };
+  }
+
+  // Label only. A key or any part of one must never reach the event stream.
+  await captureServerEvent({
+    event: 'api_key.created',
+    distinctId: user.id,
+    userId: user.id,
+    properties: { label: cleanLabel },
+  });
+  return { ok: true, key };
+}
+
+async function revokeApiKeyAction(id: string): Promise<{ ok: boolean; error?: string }> {
+  'use server';
+  const user = await requireUser();
+  // RLS scopes this to the caller's own keys, so an id belonging to somebody
+  // else updates nothing rather than revoking their key.
+  const { error } = await serverClient()
+    .from('api_keys')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('revoked_at', null);
+  if (error) {
+    await logServerError({
+      source: 'settings.api_key_revoke',
+      message: error.message,
+      userId: user.id,
+      route: '/settings',
+    });
+    return { ok: false, error: 'Could not revoke the key. Try again.' };
+  }
+  await captureServerEvent({
+    event: 'api_key.revoked',
+    distinctId: user.id,
+    userId: user.id,
+    properties: { api_key_id: id },
+  });
+  return { ok: true };
+}
+
 async function signOut() {
   'use server';
   const supabase = serverClient();
@@ -349,6 +434,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   const supabase = serverClient();
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   const quota = await readQuota(supabase, user.id);
+  const { data: apiKeys } = await supabase
+    .from('api_keys')
+    .select('id, label, key_prefix, created_at, last_used_at, revoked_at')
+    .order('created_at', { ascending: false });
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
   let subState: ActiveSubscription | null = null;
@@ -453,6 +542,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
           </Link>
         )}
       </div>
+
+      <ApiKeys
+        keys={(apiKeys ?? []) as ApiKeyRow[]}
+        createAction={createApiKeyAction}
+        revokeAction={revokeApiKeyAction}
+      />
 
       <form action={signOut} className="mt-12 border-t border-line pt-8">
         <button

@@ -1,9 +1,26 @@
-// Worker entry. Routes:
+// Worker entry.
+//
+// HOSTS. Recipient documents are served from their own registrable domain,
+// `SHARE_HOST` (htmlradar.page in production). A customer's HTML therefore
+// never shares an origin with the application's session cookies, and a
+// phishing page pushed through us cannot wear the primary domain's
+// certificate or its reputation with the blocklists.
+//
+// `LEGACY_HOSTS` (htmlradar.com in production) is where every link sent
+// before the move points. Those links keep working — see the legacy-host block
+// at the top of handleRequest.
+//
+// Routes (on SHARE_HOST, and on a legacy host for POST only):
 //   GET  /r/{slug}            serves the document, gates as needed
 //   POST /r/{slug}/auth       password submission
 //   POST /r/{slug}/email      email submission for allow-list shares
 //   GET  /r/{slug}/m/{att_id} downloads a supporting-material attachment
 //   GET  /r/_doc/{doc_id}     sender-side raw-doc preview (HMAC-gated)
+//   GET  /v1/tracker.js       the tracker, first-party to the document
+//   GET  /robots.txt          Disallow: / — SHARE_HOST is not a website
+//
+// Anything else on SHARE_HOST is a 404, and every response carries
+// X-Robots-Tag: noindex (see withNoIndex).
 //
 // The share route also carries the recipient's own switch for read tracking:
 //   GET  /r/{slug}?optout=1|0 asks the question and mints a token
@@ -57,6 +74,54 @@ import {
 } from './responses.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Defaults, so `wrangler dev` and the tests behave without configuration.
+// Production values are the [vars] block in wrangler.toml.
+const SHARE_HOST_DEFAULT = 'htmlradar.page';
+const LEGACY_HOSTS_DEFAULT = 'htmlradar.com';
+
+const shareHostOf = (env: Env): string => env.SHARE_HOST ?? SHARE_HOST_DEFAULT;
+
+// Where the injected <script> points, and the path this worker answers it on.
+// Relative, so the tracker is always first-party to the document that loads
+// it: same host, no second DNS lookup, and nothing for a third-party script
+// blocker to recognise. env.TRACKER_URL is the upstream this worker fetches
+// it from (Cloudflare Pages, on the application domain).
+const TRACKER_PATH = '/v1/tracker.js';
+
+const isLocal = (hostname: string): boolean =>
+  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+
+function isLegacyHost(hostname: string, env: Env): boolean {
+  return (env.LEGACY_HOSTS ?? LEGACY_HOSTS_DEFAULT)
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(hostname.toLowerCase());
+}
+
+/**
+ * The move off the primary domain, for links that were already sent.
+ *
+ * A GET or HEAD on a legacy host is answered with a permanent redirect to the
+ * same path and query on SHARE_HOST, so a recipient who kept an old email
+ * still opens the document — one extra hop, nothing else changes.
+ *
+ * A POST is served in place instead. Three things post to /r/: the password
+ * gate, the email gate, and the opt-out confirmation. A 301 turns a POST into
+ * a GET and drops the body, so redirecting them would break the gate for
+ * anyone whose tab was already open when the switch happened. Serving them
+ * where they were sent keeps those tabs working.
+ *
+ * WINDOW: this in-place POST handling only matters while pre-switch tabs are
+ * still open. Thirty days after the switch — from 30 September 2026 — it can
+ * be deleted, and the redirect can cover every method. The redirect itself
+ * stays for as long as old links are in circulation, which is indefinitely.
+ *
+ * A recipient who submits a gate on a legacy host after the switch sets the
+ * cookie on that host, is redirected to SHARE_HOST on the following GET, and
+ * is asked once more there. One retype, not a dead end.
+ */
 
 // Every response this worker produces is a recipient-facing page for somebody
 // else's document, and none of it should ever appear in a search result.
@@ -114,6 +179,36 @@ export default {
 
 async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
+
+  // Two reasons to send the reader somewhere else, answered in one hop.
+  //
+  // Wrong host: a legacy host only redirects, and only for methods that
+  // survive a redirect (see the note above).
+  //
+  // Wrong scheme: a recipient document must never travel in the clear. The
+  // .page top-level domain is HTTPS-only by browser policy anyway, so in
+  // production this fires only for a client that asked for http:// itself.
+  // `wrangler dev` serves plain HTTP on localhost, which is exempt so local
+  // runs behave.
+  const wrongHost = isLegacyHost(url.hostname, env) && request.method !== 'POST';
+  if (wrongHost) url.hostname = shareHostOf(env);
+  const wrongScheme = url.protocol === 'http:' && !isLocal(url.hostname);
+  if (wrongScheme) url.protocol = 'https:';
+  if (wrongHost || wrongScheme) {
+    return new Response(null, { status: 301, headers: { Location: url.toString() } });
+  }
+
+  if (url.pathname === TRACKER_PATH) {
+    return fetch(env.TRACKER_URL);
+  }
+
+  // SHARE_HOST carries documents, not a website. Nothing on it should ever be
+  // crawled; the 404 below covers every path that is not a share.
+  if (url.pathname === '/robots.txt') {
+    return new Response('User-agent: *\nDisallow: /\n', {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
 
   // Sender's "Preview document" — minted by /docs/[id] in the app when
   // the doc owner clicks the Preview button. Bound to a doc_id (not a
@@ -320,7 +415,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     share,
     tier,
     trackingEnabled: !isOwnerPreview && !optedOut,
-    trackerUrl: env.TRACKER_URL,
+    trackerUrl: TRACKER_PATH,
     supabaseUrl: env.SUPABASE_URL,
     supabaseAnonKey: env.SUPABASE_ANON_KEY,
     ...(verifiedEmail ? { email: verifiedEmail } : {}),

@@ -4,15 +4,37 @@ compatibility_date = "2026-05-01"
 compatibility_flags = []
 workers_dev = false  # We don't want this exposed at *.workers.dev — only via the zone route
 
-# Production route — the worker intercepts htmlradar.com/r/* and serves the
-# tracked HTML with our tracker injected. Anything else on the apex falls
+# Production routes.
+#
+# htmlradar.page is the content domain: recipient documents are served there
+# and nothing else lives on it, so the worker takes the whole zone and 404s
+# everything that is not a share.
+#
+# htmlradar.com/r/* stays routed because every link sent before the move
+# points at it. The worker answers those with a 301 to htmlradar.page (see
+# legacy-host block in src/index.ts). Anything else on the apex still falls
 # through to Cloudflare Pages (the Next.js app).
+#
+# DEPLOY PERMISSION: `wrangler deploy` syncs this block, so the API token
+# needs Workers Routes: Edit on BOTH zones. Adding the second zone is
+# PENDING-ON-ABHI P-30.
+[[routes]]
+pattern = "htmlradar.page/*"
+zone_name = "htmlradar.page"
+
 [[routes]]
 pattern = "htmlradar.com/r/*"
 zone_name = "htmlradar.com"
 
 [vars]
+# Upstream for the tracker bundle. Documents load it from their own host,
+# /v1/tracker.js, which this worker answers by fetching this URL.
 TRACKER_URL = "https://htmlradar.com/v1/tracker.js"
+# Host that serves recipient documents; everything else on it is a 404.
+SHARE_HOST = "htmlradar.page"
+# Comma-separated hosts that only redirect to SHARE_HOST. Self-hosters who
+# never moved leave this empty.
+LEGACY_HOSTS = "htmlradar.com"
 
 # Secrets — set via `wrangler secret put`:
 #   SUPABASE_URL

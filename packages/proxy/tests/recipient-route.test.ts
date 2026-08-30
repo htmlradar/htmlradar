@@ -102,7 +102,7 @@ const ctx = {
 
 async function get(path: string): Promise<Response> {
   const worker = (await import('../src/index.js')).default;
-  return worker.fetch(new Request(`https://htmlradar.com${path}`), env, ctx);
+  return worker.fetch(new Request(`https://htmlradar.page${path}`), env, ctx);
 }
 
 async function post(path: string, body: Record<string, string>): Promise<Response> {
@@ -110,7 +110,7 @@ async function post(path: string, body: Record<string, string>): Promise<Respons
   const form = new FormData();
   for (const [k, v] of Object.entries(body)) form.set(k, v);
   return worker.fetch(
-    new Request(`https://htmlradar.com${path}`, { method: 'POST', body: form }),
+    new Request(`https://htmlradar.page${path}`, { method: 'POST', body: form }),
     env,
     ctx,
   );

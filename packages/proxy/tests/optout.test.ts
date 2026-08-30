@@ -127,7 +127,7 @@ const ctx = {
 
 async function get(path: string, headers: Record<string, string> = {}): Promise<Response> {
   const worker = (await import('../src/index.js')).default;
-  return worker.fetch(new Request(`https://htmlradar.com${path}`, { headers }), env, ctx);
+  return worker.fetch(new Request(`https://htmlradar.page${path}`, { headers }), env, ctx);
 }
 
 async function post(path: string, body: Record<string, string>): Promise<Response> {
@@ -135,7 +135,7 @@ async function post(path: string, body: Record<string, string>): Promise<Respons
   const form = new FormData();
   for (const [k, v] of Object.entries(body)) form.append(k, v);
   return worker.fetch(
-    new Request(`https://htmlradar.com${path}`, { method: 'POST', body: form }),
+    new Request(`https://htmlradar.page${path}`, { method: 'POST', body: form }),
     env,
     ctx,
   );
@@ -153,7 +153,9 @@ function tokenFrom(html: string): string {
 const CONFIRM_OFF = 'Turn off read tracking for HTMLRadar links in this browser?';
 const CONFIRM_ON = 'Turn read tracking back on?';
 
-const TRACKER_TAG = 'https://htmlradar.com/v1/tracker.js';
+// Relative on purpose: the tracker is served from the document's own host,
+// so it is first-party to the document (see TRACKER_PATH in src/index.ts).
+const TRACKER_TAG = 'src="/v1/tracker.js"';
 
 function expectSandboxed(res: Response): void {
   const csp = res.headers.get('Content-Security-Policy') ?? '';

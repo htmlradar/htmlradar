@@ -1,10 +1,18 @@
-// sections-v2.ts — viewport-coverage-weighted section dwell tracker.
+// sections-v2.ts — range-based section dwell tracker.
 //
-// Replaces winner-takes-all (sections-legacy.ts, four prior attempts)
-// with proportional distribution: every visible section accumulates
-// time proportional to the fraction of the viewport it occupies, gated
-// by the IAB Viewable Impression Standard (≥50% self-coverage for ≥1s
-// before credit qualifies).
+// A section is a RANGE of the document, not one element: for a heading, the
+// heading plus everything under it up to the next heading of the same or
+// higher level. Its geometry is the union of its members' boxes, read fresh
+// each sample; no wrapper is ever inserted into the customer's document.
+//
+// Each sample credits exactly one section — the one covering most of the
+// window — gated by the IAB Viewable Impression Standard (≥50% coverage of
+// the range, or of the window once the range is the taller of the two, for
+// ≥1s continuously before credit qualifies). Two earlier shapes are gone and
+// should not come back: measuring a heading's own 40 pixels, which stopped
+// counting the moment the reader scrolled past the heading into the section
+// it names; and splitting each sample across every visible section, which
+// billed a section and its own subsection for the same second.
 //
 // Public contract is identical to sections-legacy.ts (Session imports
 // `SectionTracker` and calls start/stop/pause/resume/snapshot only) so
@@ -27,9 +35,11 @@ const SAMPLE_INTERVAL_MS = 250;
 // Parse.ly engagement-time methodology.
 const ACTIVITY_IDLE_MS = 5_000;
 
-// IAB Viewable Impression Standard: a section needs to occupy at least
-// 50% of its own height in the viewport to count as "visible." Filters out
-// tail-of-section noise during fast scrolls.
+// IAB Viewable Impression Standard: a section needs half of it on screen to
+// count as "visible" — half of its own height, or half the window once the
+// section is taller than the window, whichever is the smaller measure. A
+// section three screens long can never put half of ITSELF on screen, and the
+// reader parked inside it is reading it all the same.
 const MIN_COVERAGE = 0.5;
 
 // IAB qualified dwell: 1 continuous second above MIN_COVERAGE before the
@@ -46,9 +56,16 @@ interface Section {
   title: string;
   depth: number;
   ordinal: number;
-  element: HTMLElement;
-  // Gross time credited via viewport-share weighting. Includes time before
-  // the section qualified — useful for debugging, not surfaced.
+  // The elements the section covers, in document order. For slides, prose
+  // buckets and a configured selector that is one element per section, and
+  // the range reduces to it. For headings it is the heading plus its body —
+  // see rangeMembers.
+  members: HTMLElement[];
+  // Ordinal of the section that closes this one, so a section knows which
+  // later sections are nested inside it. `ordinal + 1` when nothing is.
+  endOrdinal: number;
+  // Gross time credited to this section. Includes time before the section
+  // qualified — useful for debugging, not surfaced.
   totalMs: number;
   // Time credited AFTER the section sustained ≥50% coverage for ≥1s.
   // This is what we report to the dashboard.
@@ -209,66 +226,78 @@ export class SectionTracker {
     this.scheduleTick();
   };
 
-  // Distribute `dt` ms across every section currently ≥MIN_COVERAGE-visible,
-  // weighted by what fraction of the viewport each occupies.
+  // Credit `dt` ms to exactly one section: the one the reader is in, which is
+  // the one covering the most of the window. Splitting `dt` across every
+  // visible section was what let a section and its own subsection bill for
+  // the same second twice.
   private sample(dt: number): void {
     const vp = typeof window !== 'undefined' ? window.visualViewport : null;
     const vpH = vp?.height ?? (typeof window !== 'undefined' ? window.innerHeight : 0);
     const vpTop = vp?.offsetTop ?? 0;
     if (vpH <= 0) return;
 
-    const visible: Array<{ section: Section; viewportShare: number }> = [];
-    let totalCoverage = 0;
+    // In ordinal order, so the `>` below leaves ties with the earlier one.
+    const candidates: Array<{ section: Section; fraction: number }> = [];
 
     for (const s of this.sections) {
-      const r = s.element.getBoundingClientRect();
-      const visTop = Math.max(r.top, vpTop);
-      const visBot = Math.min(r.bottom, vpTop + vpH);
-      const visPx = Math.max(0, visBot - visTop);
-      if (visPx <= 0) continue;
+      // Geometry is re-read every sample. The sampler is already a
+      // requestAnimationFrame callback throttled to SAMPLE_INTERVAL_MS, so a
+      // scroll, a resize, a lazily loaded image or a collapsed block is
+      // picked up on the next tick without a listener of its own.
+      const range = unionRect(s.members);
+      const height = range.bottom - range.top;
+      const visPx =
+        height > 0
+          ? Math.max(0, Math.min(range.bottom, vpTop + vpH) - Math.max(range.top, vpTop))
+          : 0;
+      const fraction = height > 0 ? visPx / Math.min(height, vpH) : 0;
 
-      const selfCoverage = r.height > 0 ? visPx / r.height : 0;
-      if (selfCoverage < MIN_COVERAGE) continue;
-
-      const viewportShare = visPx / vpH;
-      visible.push({ section: s, viewportShare });
-      totalCoverage += viewportShare;
-    }
-
-    if (totalCoverage <= 0) {
-      // Nothing meets the threshold this sample. Reset every section's
-      // continuous-visible counter — they can't claim sustained visibility
-      // through a gap.
-      for (const s of this.sections) s.continuousVisibleMs = 0;
-      return;
-    }
-
-    const visibleIds = new Set<string>();
-    for (const { section, viewportShare } of visible) {
-      visibleIds.add(section.id);
-      const weight = viewportShare / totalCoverage;
-      const credited = dt * weight;
-      section.totalMs += credited;
-      section.continuousVisibleMs += dt;
-
-      if (!this.enteredOnce.has(section.id)) {
-        this.enteredOnce.add(section.id);
-        this.opts.onSectionEnter?.(toInfo(section));
+      if (fraction < MIN_COVERAGE) {
+        // No sustained visibility through a gap: the streak restarts.
+        s.continuousVisibleMs = 0;
+        continue;
       }
-
-      if (section.continuousVisibleMs >= QUALIFIED_DWELL_MS) {
-        section.qualifiedMs += credited;
-        if (!section.hasReadFired && section.qualifiedMs >= this.opts.minDwellMs) {
-          section.hasReadFired = true;
-          this.opts.onSectionRead?.(toInfo(section));
-        }
+      // Visible counts as entered even for a section that goes on to be
+      // skipped below, so "scrolled through, did not settle" still reports.
+      if (!this.enteredOnce.has(s.id)) {
+        this.enteredOnce.add(s.id);
+        this.opts.onSectionEnter?.(toInfo(s));
       }
+      candidates.push({ section: s, fraction });
     }
 
-    // Sections not visible this sample lose their continuous-visible
-    // streak. Next time they re-enter view, they have to re-qualify.
-    for (const s of this.sections) {
-      if (!visibleIds.has(s.id)) s.continuousVisibleMs = 0;
+    let winner: { section: Section; fraction: number } | null = null;
+    for (const c of candidates) {
+      // A section that encloses another candidate is not the one being read;
+      // the enclosed one is. Without this an <h1>, whose range runs to the
+      // next <h1> and so usually to the end of the document, would tie at a
+      // full window with every <h2> under it and, being earlier, take all of
+      // their time.
+      const enclosesACandidate = candidates.some(
+        (other) =>
+          other.section.ordinal > c.section.ordinal && other.section.ordinal < c.section.endOrdinal,
+      );
+      if (enclosesACandidate) {
+        // Its streak stops too. A streak that kept running while a subsection
+        // held the credit would be spent the instant the subsection dropped
+        // out — the enclosing section would take the boundary sample without
+        // ever having earned its own continuous second.
+        c.section.continuousVisibleMs = 0;
+        continue;
+      }
+      c.section.continuousVisibleMs += dt;
+      if (!winner || c.fraction > winner.fraction) winner = c;
+    }
+    if (!winner) return;
+
+    const section = winner.section;
+    section.totalMs += dt;
+    if (section.continuousVisibleMs >= QUALIFIED_DWELL_MS) {
+      section.qualifiedMs += dt;
+      if (!section.hasReadFired && section.qualifiedMs >= this.opts.minDwellMs) {
+        section.hasReadFired = true;
+        this.opts.onSectionRead?.(toInfo(section));
+      }
     }
   }
 
@@ -341,12 +370,39 @@ export class SectionTracker {
             ? 1
             : depthFromTag(el.tagName),
         ordinal: i,
-        element: el,
+        members: [el],
+        endOrdinal: i + 1,
         totalMs: 0,
         qualifiedMs: 0,
         continuousVisibleMs: 0,
         hasReadFired: false,
       });
+    });
+
+    // A heading is a label, not a section: 40 pixels that leave the window the
+    // moment the reader starts reading what they name. So a heading's section
+    // is the RANGE from the heading to the element before the next heading of
+    // the same or higher level — an <h1> closes an <h2>'s range, an <h2>
+    // closes an <h3>'s, and a heading of its own level closes it too.
+    //
+    // Keyed on the tag, not on which strategy found it: the default selector
+    // is `h1, h2, h3`, so an ordinary report arrives here as 'configured'
+    // and never as 'headings'. Slide containers and prose buckets are not
+    // headings, so they keep their element as their whole section.
+    const els = candidates.elements;
+    const levels = els.map((el) => headingLevel(el.tagName));
+    this.sections.forEach((section, i) => {
+      const level = levels[i]!;
+      if (!level) return;
+      let end = els.length;
+      for (let j = i + 1; j < els.length; j++) {
+        if (levels[j] && levels[j]! <= level) {
+          end = j;
+          break;
+        }
+      }
+      section.endOrdinal = end;
+      section.members = rangeMembers(els[i]!, els[end] ?? null);
     });
   }
 }
@@ -357,6 +413,63 @@ export class SectionTracker {
 // dependencies and the legacy file can be deleted without touching this one)
 // =============================================================================
 
+// The elements a heading section covers: the heading and everything after it
+// in document order, up to but not including the heading that closes the
+// range. The customer's DOM is never touched — no wrapper is inserted to
+// measure against — so the range is carried as the list of elements it spans
+// and its geometry is their union.
+//
+// Strictly forward. An earlier version anchored the walk on an ancestor when
+// the heading had no sibling to grow into, which put that ancestor's own
+// content — including whatever sat ABOVE the heading — inside the range. An
+// ancestor always begins before the heading, so no ancestor is ever a member;
+// the walk climbs out of one only to carry on past it.
+function rangeMembers(heading: HTMLElement, stop: HTMLElement | null): HTMLElement[] {
+  const members: HTMLElement[] = [heading];
+  let node: HTMLElement = heading;
+
+  for (;;) {
+    let next = node.nextElementSibling as HTMLElement | null;
+
+    if (!next) {
+      // The run ends here. Step out of the container and continue after it,
+      // without taking the container itself.
+      const parent = node.parentElement;
+      if (!parent || parent === document.body || parent === document.documentElement) break;
+      node = parent;
+      continue;
+    }
+
+    // A wrapper holding the closing heading is not stepped over: what sits
+    // inside it BEFORE that heading is still part of this section, so the
+    // walk descends into it instead. The wrapper is never a member — it runs
+    // on past the point where the next section starts.
+    while (stop && next && next !== stop && next.contains(stop)) {
+      next = next.firstElementChild as HTMLElement | null;
+    }
+    if (!next || next === stop) break;
+
+    members.push(next);
+    node = next;
+  }
+  return members;
+}
+
+// The range's geometry: the union of its members' boxes, in window
+// coordinates. The same rectangle a wrapper element would have had, without
+// putting one in someone else's document.
+function unionRect(members: HTMLElement[]): { top: number; bottom: number } {
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const el of members) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue; // display:none, detached
+    if (r.top < top) top = r.top;
+    if (r.bottom > bottom) bottom = r.bottom;
+  }
+  return Number.isFinite(top) ? { top, bottom } : { top: 0, bottom: 0 };
+}
+
 function nowMs(): number {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
     return performance.now();
@@ -364,17 +477,13 @@ function nowMs(): number {
   return Date.now();
 }
 
+// 1, 2 or 3 for a heading; 0 for anything else.
+function headingLevel(tag: string): number {
+  return tag === 'H1' ? 1 : tag === 'H2' ? 2 : tag === 'H3' ? 3 : 0;
+}
+
 function depthFromTag(tag: string): number {
-  switch (tag) {
-    case 'H1':
-      return 1;
-    case 'H2':
-      return 2;
-    case 'H3':
-      return 3;
-    default:
-      return 4;
-  }
+  return headingLevel(tag) || 4;
 }
 
 type Strategy = 'configured' | 'headings' | 'slides' | 'prose';

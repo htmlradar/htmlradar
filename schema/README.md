@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `035`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `036`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -52,7 +52,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `document_shares` — per-recipient tracked links; password / expiry / revoke / `allowed_email_domains` / `allowed_emails` / `lock_deck` per share.
 - `document_attachments` (009) — file metadata per share (PDF / Office / image / ZIP), bytes in R2.
 - `attachment_downloads` (016) — per-viewer download log keyed on viewer_id + session_id + filename + size_bytes.
-- `viewers` — recipient identities (email or anonymous fingerprint), scoped per share; `is_internal` flag (012) hides owner-self test reads.
+- `viewers` — recipient identities (email or anonymous fingerprint), scoped per share; `is_internal` flag (012) hides owner-self test reads — narrowed in `036_internal_viewers_owner_only.sql` to the owner's own address, so colleagues on the sender's own email domain are ordinary, visible recipients.
 - `sessions` — one row per page-open; `token` is the per-session bearer credential returned to the tracker. `document_version` records which version this session saw.
 - `section_events` — section-level dwell records, deduped via `unique (session_id, section_id)`.
 - `notifications_log` (003) — observability for the `notify_on_first_open` trigger; status enum `queued / delivered / failed / skipped`.

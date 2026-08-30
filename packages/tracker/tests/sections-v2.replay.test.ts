@@ -79,7 +79,7 @@ function simulate(
 
   tracker.start();
   const internal = tracker as unknown as {
-    sections: Array<{ id: string; title: string; element: HTMLElement; qualifiedMs: number }>;
+    sections: Array<{ id: string; title: string; members: HTMLElement[]; qualifiedMs: number }>;
   };
   const sections = internal.sections;
   if (sections.length === 0) {
@@ -106,9 +106,14 @@ function simulate(
     } as DOMRect;
   };
 
+  // A section is a range of elements, not one element, so every member gets
+  // the same box: the union is then the section's own box, which is what this
+  // trace means to place.
   const setScrollPosition = (currentIdx: number) => {
     sections.forEach((s, ord) => {
-      s.element.getBoundingClientRect = vi.fn().mockReturnValue(positionFor(0, currentIdx, ord));
+      for (const member of s.members) {
+        member.getBoundingClientRect = vi.fn().mockReturnValue(positionFor(0, currentIdx, ord));
+      }
     });
   };
 

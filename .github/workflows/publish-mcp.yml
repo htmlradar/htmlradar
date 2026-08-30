@@ -1,0 +1,118 @@
+name: Publish MCP Server
+
+# Publishes htmlradar-mcp to npm (with provenance) and to the MCP registry
+# (https://registry.modelcontextprotocol.io) when an `mcp-v*` tag is pushed,
+# e.g. mcp-v0.1.0. The registry namespace is io.github.htmlradar/* via GitHub
+# OIDC, so no registry secret is needed. npm needs the NPM_TOKEN repository
+# secret (an npm Automation token with publish access to htmlradar-mcp).
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, publish to npm, publish to MCP registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm --provenance and mcp-publisher login github-oidc
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter ./packages/mcp build
+
+      - name: Unit tests
+        run: pnpm --filter ./packages/mcp test
+
+      - name: Publish package to npm
+        working-directory: packages/mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
+
+      # The SHA-256 is the mcp-publisher_linux_amd64 line from the release's
+      # registry_<version>_checksums.txt; bump both together.
+      - name: Install mcp-publisher
+        working-directory: packages/mcp
+        run: |
+          set -e
+          MCP_PUBLISHER_VERSION=1.8.1
+          MCP_PUBLISHER_SHA256=a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+          curl -sSfL -o mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        working-directory: packages/mcp
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server to MCP Registry
+        working-directory: packages/mcp
+        run: ./mcp-publisher publish
+
+      - name: Verify publish
+        env:
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          set -e
+          VERSION="${GITHUB_REF#refs/tags/mcp-v}"
+          echo "Expecting published version: $VERSION"
+
+          echo "Checking npm registry..."
+          npm_version=""
+          for attempt in 1 2 3; do
+            npm_version=$(npm view htmlradar-mcp version 2>/dev/null || true)
+            if [ "$npm_version" = "$VERSION" ]; then
+              echo "  npm OK -- htmlradar-mcp@$npm_version"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "  not yet visible (got '$npm_version'), retrying in 10s..."
+              sleep 10
+            fi
+          done
+          if [ "$npm_version" != "$VERSION" ]; then
+            echo "::error::npm view htmlradar-mcp version returned '$npm_version', expected '$VERSION'."
+            exit 1
+          fi
+
+          echo "Checking MCP registry..."
+          found=0
+          response=""
+          for attempt in 1 2 3; do
+            response=$(curl -sS "https://registry.modelcontextprotocol.io/v0/servers?search=htmlradar")
+            if echo "$response" | grep -q "htmlradar"; then
+              found=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "  not yet visible, retrying in 10s..."
+              sleep 10
+            fi
+          done
+          if [ "$found" -ne 1 ]; then
+            echo "::error::MCP registry search for 'htmlradar' did not return a result."
+            echo "$response"
+            exit 1
+          fi
+          echo "  MCP registry OK."

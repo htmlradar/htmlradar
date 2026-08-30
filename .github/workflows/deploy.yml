@@ -9,8 +9,13 @@ name: Deploy
 # and prod keeps serving the last known-good deploy.
 #
 # Required secrets:
-#   - CLOUDFLARE_API_TOKEN — a cfut_ token with Pages:Edit + Workers:Edit
-#   - CLOUDFLARE_ACCOUNT_ID — REDACTED_CLOUDFLARE_ACCOUNT_ID
+#   - CLOUDFLARE_API_TOKEN — a cfut_ token with Pages:Edit and
+#     Workers Scripts:Edit (account scope) plus Workers Routes:Edit on the
+#     htmlradar.com and htmlradar.page zones (the proxy deploy syncs
+#     [[routes]] and fails without it). CLOUDFLARE_ZONE_ID is optional
+#     (cache purge only).
+# Required repository variables:
+#   - CLOUDFLARE_ACCOUNT_ID — the Cloudflare account id (not a secret).
 #
 # Required to be committed at repo root in `.env.production`:
 #   - NEXT_PUBLIC_SUPABASE_URL — public, anon-key-only, safe to commit
@@ -24,9 +29,15 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-main
   cancel-in-progress: false
+
+env:
+  WRANGLER_VERSION: 3.114.17
 
 jobs:
   deploy:
@@ -38,15 +49,15 @@ jobs:
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.event == 'push')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -58,6 +69,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -e
           if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
@@ -66,6 +78,10 @@ jobs:
           fi
           if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
             echo "::error::Secret NEXT_PUBLIC_SUPABASE_ANON_KEY is not set on the repository."
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Repository variable CLOUDFLARE_ACCOUNT_ID is not set."
             exit 1
           fi
           # Write a runner-local .env.production. This file lives only on
@@ -114,7 +130,7 @@ jobs:
         id: preview-url
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -e
@@ -125,7 +141,7 @@ jobs:
           while :; do
             attempt=$((attempt + 1))
             echo "Preview deploy attempt $attempt..."
-            if npx --yes wrangler@3 pages deploy packages/app/.vercel/output/static \
+            if npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy packages/app/.vercel/output/static \
                 --project-name=htmlradar \
                 --branch=ci-preview \
                 --commit-hash="$HEAD_SHA" \
@@ -213,7 +229,7 @@ jobs:
       - name: Promote preview → prod (deploy to main branch) with retry
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -e
@@ -222,7 +238,7 @@ jobs:
           while :; do
             attempt=$((attempt + 1))
             echo "Prod promotion attempt $attempt..."
-            if npx --yes wrangler@3 pages deploy packages/app/.vercel/output/static \
+            if npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy packages/app/.vercel/output/static \
                 --project-name=htmlradar \
                 --branch=main \
                 --commit-hash="$HEAD_SHA" \
@@ -245,61 +261,74 @@ jobs:
       # 'shipped' to git but not live until manually `wrangler deploy`d
       # is the bug this step prevents.
       #
-      # `continue-on-error: true` — `wrangler deploy` does two operations:
-      #   1. Upload + activate the new worker version (Account scope:
-      #      Workers Scripts: Edit). This is the deploy that matters.
-      #   2. Sync the [[routes]] block from wrangler.toml (Zone scope:
-      #      Workers Routes: Edit). Routes are already configured at the
-      #      zone level — this is a no-op confirmation call.
-      #
-      # The CLOUDFLARE_API_TOKEN we use has scope (1) but NOT scope (2)
-      # — adding zone-level Routes:Edit requires recreating the token in
-      # the dashboard. Step (1) succeeds (verified: new worker versions
-      # appear in `wrangler deployments list` and serve on prod routes
-      # correctly), so the deploy IS happening. Step (2) errors with
-      # Authentication 10000, which we treat as non-blocking. If the
-      # token is later widened to include zone Routes:Edit, this flag
-      # can be removed.
+      # GIT_SHA is bound into the Worker as a plain var so the verify
+      # steps below can prove that THIS commit is what got deployed.
+      # No continue-on-error: `wrangler deploy` also syncs [[routes]] on
+      # the zone, so the token needs zone Workers Routes:Edit.
       - name: Deploy proxy worker (packages/proxy)
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
+        env:
+          GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           workingDirectory: packages/proxy
           command: deploy
+          vars: GIT_SHA
 
       # Monitor cron worker (packages/monitor) — same pattern as the
-      # proxy step. Same continue-on-error rationale: wrangler may
-      # error on a follow-up routes/triggers API call our token can't
-      # touch; the worker upload itself uses the Account-scope token
-      # which works. Without this step the cron monitor sits at
-      # whatever version was last manually deployed.
+      # proxy step. Without this step the cron monitor sits at whatever
+      # version was last manually deployed.
       - name: Deploy monitor worker (packages/monitor)
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
+        env:
+          GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           workingDirectory: packages/monitor
           command: deploy
+          vars: GIT_SHA
 
-      # Independent verification that the proxy IS serving a recent
-      # version, regardless of the above step's exit code. If this
-      # check fails it means the worker upload itself broke (a real
-      # regression), so this step does NOT continue-on-error.
-      - name: Verify proxy is serving (independent of wrangler exit code)
+      # The proxy stamps every response with X-HTMLRadar-Version = GIT_SHA
+      # (see withNoIndex in packages/proxy/src/index.ts). Reading it from
+      # the live route proves the new version is what the edge serves.
+      - name: Verify proxy worker serves this commit
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -e
-          code=$(curl -sL -o /tmp/r-resp -w "%{http_code}" "https://htmlradar.com/r/nonexistent-smoke-test")
-          if [ "$code" != "404" ]; then
-            echo "::error::/r/<missing> returned HTTP $code (expected 404 from the proxy)"
+          for attempt in 1 2 3 4 5; do
+            live=$(curl -sS -o /dev/null -w '%header{x-htmlradar-version}' "https://htmlradar.com/r/nonexistent-smoke-test")
+            if [ "$live" = "$HEAD_SHA" ]; then
+              echo "Proxy verified — X-HTMLRadar-Version matches $HEAD_SHA."
+              exit 0
+            fi
+            echo "Proxy reports '$live' (attempt $attempt), expected $HEAD_SHA — retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::Proxy is not serving commit $HEAD_SHA."
+          exit 1
+
+      # The monitor has no HTTP route (cron only), so read the GIT_SHA
+      # binding of the active version back from the Workers API instead.
+      - name: Verify monitor worker carries this commit
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -e
+          live=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/scripts/htmlradar-monitor/settings" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            | jq -r '.result.bindings[] | select(.name == "GIT_SHA") | .text')
+          if [ "$live" != "$HEAD_SHA" ]; then
+            echo "::error::Monitor worker GIT_SHA is '$live', expected $HEAD_SHA."
             exit 1
           fi
-          if ! grep -q "no-store\|Not Found" /tmp/r-resp; then
-            echo "::warning::Proxy returned 404 but body looks unusual — manual check recommended."
-          fi
-          echo "Proxy verified — /r/* path returns 404 for missing slug as expected."
+          echo "Monitor verified — deployed GIT_SHA matches $HEAD_SHA."
 
       # Purge Cloudflare edge cache after every successful deploy.
       # Belt-and-suspenders: static assets use hashed filenames so a
@@ -334,8 +363,9 @@ jobs:
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
             --data '{"purge_everything":true}')
-          echo "$response"
-          if echo "$response" | grep -q '"success":true'; then
+          # Only success + error codes; the full response carries zone ids.
+          echo "$response" | jq -c '{success, errors: [.errors[]?.code]}'
+          if [ "$(echo "$response" | jq -r .success)" = "true" ]; then
             echo "Cache purged successfully."
           else
             echo "::warning::Cache purge did not return success — token may lack Cache Purge:Edit on the zone."

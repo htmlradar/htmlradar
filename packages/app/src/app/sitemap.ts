@@ -35,6 +35,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.5,
     },
+    { url: `${baseUrl}/compare/peony`, changeFrequency: 'weekly', priority: 0.5 },
+    { url: `${baseUrl}/compare/stacktree`, changeFrequency: 'weekly', priority: 0.5 },
+    { url: `${baseUrl}/compare/tiiny-host`, changeFrequency: 'weekly', priority: 0.5 },
+    { url: `${baseUrl}/compare/hummingdeck`, changeFrequency: 'weekly', priority: 0.5 },
     {
       url: `${baseUrl}/use-case/pitch-deck-tracking`,
       changeFrequency: 'monthly',

@@ -13,9 +13,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Track a Claude HTML Artifact as a Link | HTMLRadar',
+  title: 'How to Share a Claude Artifact and See Who Opened It | HTMLRadar',
   description:
-    'Export a standalone Claude HTML artifact, share it through a tracked link, and see active read time and section-level attention.',
+    'How to share a Claude artifact and see who opened it: export it as HTML, send a tracked HTMLRadar link, and get section-level attention and active read time.',
   path: '/for/claude-artifacts',
 });
 
@@ -33,7 +33,7 @@ export default function ClaudeArtifactsPage() {
           />
           <SectionMark>HTMLRadar · Works with</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            Track a Claude artifact you can export as HTML.
+            How to share a Claude artifact and see who opened it.
           </h1>
           <DirectAnswer updated="August 2026">
             To see who opened a Claude artifact, export it as HTML, upload it to HTMLRadar, and send
@@ -41,7 +41,46 @@ export default function ClaudeArtifactsPage() {
             read and for how long, plus an optional email gate, password and expiry. Free for two
             tracked links, open source.
           </DirectAnswer>
-          <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+
+          <section className="mt-10">
+            <p className="max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              A published artifact gives you a URL. Here is what an HTMLRadar link adds on top of
+              the same HTML.
+            </p>
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-line bg-paper">
+              <table className="w-full text-[14px]">
+                <thead className="bg-paper-2/40 text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
+                  <tr>
+                    <th className="px-5 py-3">What you want to know</th>
+                    <th className="px-5 py-3">What an HTMLRadar link adds</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {[
+                    [
+                      'Who opened it',
+                      'Each recipient gets their own link, and you get an email alert on the first open',
+                    ],
+                    [
+                      'Which sections were read',
+                      'Headings and slides become labels, with active read time and scroll depth against each',
+                    ],
+                    [
+                      'Email gate, password, expiry',
+                      'All three are optional per link, alongside an allow-list and revocation',
+                    ],
+                  ].map(([question, htmlradar]) => (
+                    <tr key={question}>
+                      <td className="px-5 py-3.5 align-top text-ink">{question}</td>
+                      <td className="px-5 py-3.5 align-top text-ink-soft">{htmlradar}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <p className="mt-10 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Claude artifacts can be documents, code, websites, or interactive apps. HTMLRadar fits
             the website case: a standalone HTML page you can save or a public page you already host.
             Keep the browser version intact, send a tracked link, and see whether the recipient read

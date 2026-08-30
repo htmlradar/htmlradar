@@ -13,9 +13,9 @@ import { Check, X } from 'lucide-react';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Open-Source DocSend Alternative for HTML | HTMLRadar',
+  title: 'DocSend Alternative for HTML Files (2026) | HTMLRadar',
   description:
-    'Looking for a DocSend alternative? HTMLRadar tracks HTML decks and proposals with section-level read analytics. Open-source, self-hostable, free to start.',
+    'HTMLRadar is the open-source DocSend alternative for HTML files: track HTML decks, briefs and proposals with section-level read analytics, self-hostable and free to start.',
   path: '/compare/docsend',
 });
 
@@ -78,7 +78,7 @@ export default function ComparePage() {
           />
           <SectionMark>HTMLRadar · Compare</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            The open-source DocSend alternative built for HTML.
+            The DocSend alternative for HTML files.
           </h1>
           <DirectAnswer updated="August 2026">
             HTMLRadar is an open-source DocSend alternative for HTML files. Upload an HTML deck,
@@ -261,6 +261,22 @@ export default function ComparePage() {
                 className="text-signal-dark hover:underline"
               >
                 DocSend vs Papermark compared
+              </Link>
+              ,{' '}
+              <Link href="/compare/peony" className="text-signal-dark hover:underline">
+                HTMLRadar vs Peony
+              </Link>
+              ,{' '}
+              <Link href="/compare/stacktree" className="text-signal-dark hover:underline">
+                HTMLRadar vs Stacktree
+              </Link>
+              ,{' '}
+              <Link href="/compare/tiiny-host" className="text-signal-dark hover:underline">
+                HTMLRadar vs Tiiny.host
+              </Link>
+              ,{' '}
+              <Link href="/compare/hummingdeck" className="text-signal-dark hover:underline">
+                HTMLRadar vs HummingDeck
               </Link>
               ,{' '}
               <Link href="/self-hosted" className="text-signal-dark hover:underline">

@@ -330,7 +330,7 @@ export class SectionTracker {
       } else if (candidates.strategy === 'prose') {
         title = firstSentence((el.textContent ?? '').trim()) || `Part ${i + 1}`;
       } else {
-        title = cleanWhitespace(el.textContent ?? '').slice(0, 200) || `Section ${i + 1}`;
+        title = titleText(el).slice(0, 200) || `Section ${i + 1}`;
       }
 
       this.sections.push({
@@ -523,7 +523,7 @@ function extractSlideTitle(el: HTMLElement, ord: number): string {
   ].join(', ');
   const classHints = el.querySelectorAll<HTMLElement>(classHintSelector);
   for (const hint of classHints) {
-    const hintText = cleanWhitespace(hint.textContent ?? '');
+    const hintText = titleText(hint);
     if (hintText && hintText.length >= 3 && !isMetaPattern(hintText)) {
       return hintText.slice(0, 200);
     }
@@ -531,7 +531,7 @@ function extractSlideTitle(el: HTMLElement, ord: number): string {
 
   // Layer 3: semantic heading
   const heading = el.querySelector<HTMLElement>('h1, h2, h3, h4, [role="heading"]');
-  const headingText = cleanWhitespace(heading?.textContent ?? '');
+  const headingText = heading ? titleText(heading) : '';
   if (headingText && !isMetaPattern(headingText) && headingText.length >= 3) {
     return headingText.slice(0, 200);
   }
@@ -563,6 +563,26 @@ function isMetaPattern(text: string): boolean {
 
 function cleanWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+// Human-readable text of an element: unlike textContent, child elements are
+// separated by a space ("<span>03</span>Market" → "03 Market"). A leading
+// slide number is dropped only when it is its own child element (never from
+// plain text, so "5 ways to cut churn" keeps its 5) and text remains after it.
+function titleText(el: Node): string {
+  const text = cleanWhitespace(spacedText(el));
+  const first = Array.from(el.childNodes).find((c) => (c.textContent ?? '').trim());
+  const numbered =
+    first?.nodeType === 1 && /^\d{1,3}$/.test(cleanWhitespace(first.textContent ?? ''));
+  return numbered ? text.replace(/^\d{1,3}\s+(?=\S)/, '') : text;
+}
+
+function spacedText(node: Node): string {
+  let out = '';
+  node.childNodes.forEach((c) => {
+    out += c.nodeType === 3 ? (c.textContent ?? '') : ` ${spacedText(c)} `;
+  });
+  return out;
 }
 
 function findLargestVisibleText(root: HTMLElement): string | null {
@@ -605,7 +625,7 @@ function findFirstMeaningfulText(root: HTMLElement): string | null {
   const candidates = root.querySelectorAll<HTMLElement>('p, span, div, li');
   for (const c of candidates) {
     if (c.getAttribute('aria-hidden') === 'true') continue;
-    const text = cleanWhitespace(c.textContent ?? '');
+    const text = titleText(c);
     if (text && text.length >= 4 && !isMetaPattern(text)) {
       return text;
     }

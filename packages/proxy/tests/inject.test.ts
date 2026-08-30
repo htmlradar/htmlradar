@@ -320,6 +320,33 @@ describe('attachments panel — corner pill UI', () => {
   });
 });
 
+describe('document response headers', () => {
+  const opts = {
+    tier: 'pro' as const,
+    trackingEnabled: true,
+    trackerUrl: 'https://htmlradar.com/v1/tracker.js',
+    supabaseUrl: 'https://example.supabase.co',
+    supabaseAnonKey: 'anon-key',
+  };
+
+  // form-action 'none' is the credential-harvesting defence: a convincing
+  // sign-in page uploaded as a document cannot post what a visitor types,
+  // to us or to anyone else. The tracker's own gate is unaffected — it
+  // calls preventDefault and sends the address with fetch, which
+  // form-action does not govern.
+  it('forbids every form submission from a hosted document', async () => {
+    const res = injectTracker(new Response('<html><head></head><body></body></html>'), {
+      share: makeShare({ lock_deck: false }),
+      ...opts,
+    });
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain("form-action 'none'");
+    expect(csp).not.toContain("form-action 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("base-uri 'none'");
+  });
+});
+
 // Regression guard for the 2026-07-08 incident: a customer uploaded an HTML
 // fragment (no <head>/<html>/<body> tags). HTMLRewriter's element handlers
 // never fired, so the tracker script was silently dropped — the doc served

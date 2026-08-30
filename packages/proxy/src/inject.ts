@@ -96,9 +96,17 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
   // Minimal CSP. Customer HTML may contain arbitrary inline scripts/styles,
   // so we can't lock script-src. We do constrain framing, base-uri, and
   // form-action to limit the blast radius of malicious docs.
+  //
+  // form-action 'none': a hosted document's forms cannot submit anywhere.
+  // This is the credential-harvesting defence — a convincing sign-in page
+  // uploaded as a document can no longer post what a visitor types, to us or
+  // to anyone else. Nothing legitimate loses: the tracker's own email gate
+  // calls preventDefault and sends the address with fetch, which form-action
+  // does not govern, and the proxy's gate and opt-out pages are separate
+  // responses that never carry this header.
   headers.set(
     'Content-Security-Policy',
-    `frame-ancestors 'none'; base-uri 'none'; form-action 'self' ${new URL(opts.supabaseUrl).origin};`,
+    `frame-ancestors 'none'; base-uri 'none'; form-action 'none';`,
   );
   return new Response(out.body, { status: out.status, headers });
 }

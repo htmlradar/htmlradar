@@ -6,6 +6,7 @@
 // specific claim about what HTMLRadar does. Third-person editorial.
 
 import Link from 'next/link';
+import { ListedOn } from '@/components/ListedOn';
 import { NavBar } from '@/components/NavBar';
 import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
@@ -152,6 +153,9 @@ export default function WhyPage() {
                 Privacy
               </Link>
             </nav>
+          </div>
+          <div className="mx-auto max-w-6xl px-6 pb-10">
+            <ListedOn />
           </div>
         </footer>
       </main>

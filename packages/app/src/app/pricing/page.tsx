@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { FaqLd } from '@/components/JsonLd';
+import { ListedOn } from '@/components/ListedOn';
 import { PricingTiers } from './PricingTiers';
 import { pageMeta } from '@/lib/seo';
 import '../landing-v2.css';
@@ -353,6 +354,7 @@ export default function PricingPage() {
           </a>
           <Link href="/sign-in">Sign in</Link>
         </div>
+        <ListedOn />
       </footer>
 
       {/* responsive tweaks scoped inline so they ship without polluting CSS */}

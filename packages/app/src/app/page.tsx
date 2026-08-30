@@ -19,6 +19,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
+import { ListedOn } from '@/components/ListedOn';
 import { SoftwareApplicationLd } from '@/components/JsonLd';
 import { pageMeta } from '@/lib/seo';
 import { LandingEffects } from './LandingEffects';
@@ -1250,6 +1251,7 @@ export default function LandingV2() {
           </a>
           <Link href="/sign-in">Sign in</Link>
         </div>
+        <ListedOn />
       </footer>
     </div>
   );

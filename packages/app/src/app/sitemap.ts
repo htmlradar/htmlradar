@@ -60,6 +60,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     { url: `${baseUrl}/for/reveal-js`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${baseUrl}/mcp`, changeFrequency: 'monthly', priority: 0.6 },
+    {
+      url: `${baseUrl}/for/claude-code`,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
     { url: `${baseUrl}/tools/html-to-link`, changeFrequency: 'monthly', priority: 0.7 },
     {
       url: `${baseUrl}/tools/claude-artifact-to-link`,

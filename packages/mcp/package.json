@@ -1,0 +1,52 @@
+{
+  "name": "htmlradar-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for HTMLRadar — publish the HTML your agent just wrote as a tracked link, then ask whether the recipient read it.",
+  "license": "AGPL-3.0-or-later",
+  "author": "HTMLRadar <hello@htmlradar.com>",
+  "homepage": "https://htmlradar.com/mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/htmlradar/htmlradar.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": "https://github.com/htmlradar/htmlradar/issues",
+  "type": "module",
+  "mcpName": "com.htmlradar/share",
+  "bin": {
+    "htmlradar-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "server.json",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "htmlradar",
+    "document-tracking",
+    "html",
+    "docsend"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}

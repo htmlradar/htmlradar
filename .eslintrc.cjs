@@ -7,16 +7,12 @@ module.exports = {
     sourceType: 'module',
   },
   plugins: ['@typescript-eslint'],
-  extends: [
-    'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-    'prettier',
-  ],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
-    'eqeqeq': ['error', 'always', { null: 'ignore' }],
+    eqeqeq: ['error', 'always', { null: 'ignore' }],
   },
   ignorePatterns: [
     'dist/',
@@ -27,5 +23,8 @@ module.exports = {
     '*.config.*',
     // Public assets that ship compiled bundles (tracker IIFE etc.)
     'packages/app/public/',
+    // Bundled MCP server carried inside the Claude Code plugin — build
+    // output of packages/mcp/src, not source.
+    'plugins/htmlradar/server/',
   ],
 };

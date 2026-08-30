@@ -64,7 +64,7 @@ A sender-side analytics tool for one document at a time. **Not** a CMS, deck bui
 
 ## Architecture
 
-Four packages, two storage backends.
+Five packages, two storage backends.
 
 ```
 htmlradar/
@@ -72,7 +72,8 @@ htmlradar/
 │   ├── tracker/      # ~8 KB gzipped browser IIFE — embedded in the recipient's view
 │   ├── proxy/        # Cloudflare Worker at /r/{slug} — gates + HTML fetch + tracker inject + attachment serving
 │   ├── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
-│   └── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
+│   ├── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
+│   └── mcp/          # stdio MCP server — lets an agent publish HTML and read back who opened it
 ├── schema/           # Ordered idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
 ├── examples/         # Demo HTML for trying it locally
 └── docs/             # Architecture, privacy, quickstart, self-hosting
@@ -138,6 +139,33 @@ select vault.create_secret('hello@yourdomain.com',  'resend_from');
 
 Full guide with deployment commands in [`docs/self-hosting.md`](./docs/self-hosting.md).
 
+---
+
+## Use it from your agent
+
+HTMLRadar ships an MCP server, so the agent that wrote the HTML can publish it as a tracked link —
+and ask, the next day, whether anyone read it.
+
+In Claude Code, install the plugin. It adds the tools plus a skill that knows when to offer a
+tracked link and when to stay quiet:
+
+```
+/plugin marketplace add htmlradar/htmlradar
+/plugin install htmlradar@htmlradar
+```
+
+Or add the MCP server on its own:
+
+```
+claude mcp add htmlradar -e HTMLRADAR_API_KEY=hr_live_xxx -- npx -y htmlradar-mcp
+```
+
+Three tools: `share_html`, `get_share_activity`, `whoami`. Create an API key at
+[htmlradar.com/settings](https://htmlradar.com/settings) under **API keys**.
+
+Cursor and Codex CLI install lines — and the from-repo path to use until `htmlradar-mcp` is
+published to npm — are in [`packages/mcp/README.md`](./packages/mcp/README.md).
+
 If you modify the source and run a network service from it, AGPL-3.0 requires you to make your modifications available. See [`LICENSE`](./LICENSE).
 
 ---
@@ -148,7 +176,7 @@ If you modify the source and run a network service from it, AGPL-3.0 requires yo
 pnpm dev                              # runs all 4 packages in parallel
 pnpm typecheck                        # tsc --noEmit across packages
 pnpm lint                             # eslint + prettier
-pnpm test                             # vitest across tracker + proxy
+pnpm test                             # vitest across tracker + proxy + mcp
 ```
 
 Local URLs after `pnpm dev`:

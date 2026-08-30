@@ -40,7 +40,7 @@ section level rather than a single "opened" flag.
 
 ## What this is
 
-Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you already host), send a tracked link `htmlradar.com/r/{slug}`, see who opened it, which sections they dwelled on, and when they bounced. Section-level dwell, not "opened."
+Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you already host), send a tracked link `htmlradar.page/r/{slug}`, see who opened it, which sections they dwelled on, and when they bounced. Section-level dwell, not "opened."
 
 ## What it does
 
@@ -70,7 +70,7 @@ Five packages, two storage backends.
 htmlradar/
 ├── packages/
 │   ├── tracker/      # ~8 KB gzipped browser IIFE — embedded in the recipient's view
-│   ├── proxy/        # Cloudflare Worker at /r/{slug} — gates + HTML fetch + tracker inject + attachment serving
+│   ├── proxy/        # Cloudflare Worker at htmlradar.page/r/{slug} — gates + HTML fetch + tracker inject + attachment serving
 │   ├── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
 │   ├── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
 │   └── mcp/          # stdio MCP server — lets an agent publish HTML and read back who opened it
@@ -80,6 +80,8 @@ htmlradar/
 ```
 
 Document HTML + attachment bytes live in Cloudflare R2. Everything else (sessions, sections, viewers, shares, attachments metadata, version history) lives in Supabase Postgres.
+
+Recipient links live on a second domain, `htmlradar.page`, while the dashboard and the marketing site stay on `htmlradar.com`. A recipient document is HTML somebody else wrote, and serving it on the application's own domain would put a stranger's markup on the same origin as a signed-in session, and would let anyone who uploaded a convincing fake sign-in page have it served under our certificate and our reputation. A separate registrable domain removes both problems at once: the document's origin carries no application cookies, and if the content domain ever ends up on a phishing blocklist, the application domain does not. Links sent before the split still work — the worker answers `htmlradar.com/r/…` with a permanent redirect. Self-hosters choose their own two hosts, or run both roles on one; see [`docs/self-hosting.md`](./docs/self-hosting.md).
 
 The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled PostgREST instead of `@supabase/supabase-js`, why per-session bearer tokens instead of HMAC, the engagement-time methodology, the retroactive allow-list — are in [`docs/architecture.md`](./docs/architecture.md).
 
@@ -105,7 +107,7 @@ Core hosting runs on Cloudflare and Supabase. Resend is optional for notificatio
 4. Send the tracked link.
 5. Watch the dashboard. HTMLRadar requests a first-read email when the recipient creates their first real session.
 
-Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month, or $150/year — two months free): unlimited tracked links, your own link names (`htmlradar.com/r/acme-proposal` rather than a generated one), no "Powered by HTMLRadar" footer on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
+Free tier: 2 tracked links lifetime across unlimited documents, 20 attachments per doc up to 25 MB each and 100 MB total per doc. Pro tier ($15/month, or $150/year — two months free): unlimited tracked links, your own link names (`htmlradar.page/r/acme-proposal` rather than a generated one), no "Powered by HTMLRadar" footer on the recipient view, priority support. Coming soon on Pro: custom domain on share URLs, dynamic per-viewer watermark, repeat-open alerts. What's next is on the [public roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap).
 
 ## Quick start — self-host
 

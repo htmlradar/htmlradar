@@ -78,6 +78,8 @@ A broken build stays in preview; prod keeps serving the last good deploy.
 
 - **App** (`packages/app`, Next.js) → Cloudflare **Pages** (static marketing
   pages are prerendered assets; authed/dynamic routes use `runtime = 'edge'`).
-- **Proxy** (`packages/proxy`) → a separate **Worker** serving `htmlradar.com/r/*`
-  (recipient view + tracker injection). The Deploy workflow ships it too — a
-  proxy change isn't live until that step runs.
+- **Proxy** (`packages/proxy`) → a separate **Worker** serving `htmlradar.page/*`
+  (recipient view + tracker injection) and `htmlradar.com/r/*`, where it only
+  redirects old links to `htmlradar.page`. The Deploy workflow ships it too — a
+  proxy change isn't live until that step runs. Because the deploy syncs both
+  routes, the Cloudflare API token needs Workers Routes: Edit on both zones.

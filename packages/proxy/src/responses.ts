@@ -371,6 +371,39 @@ export const passwordForm = (slug: string, error?: string): Response =>
     'Password required',
   );
 
+// The read-tracking opt-out confirmation. `?optout=1|0` used to change the
+// preference on the spot, which made a plain link — or the shared document's
+// own script navigating its own tab — enough to flip it. So the GET now only
+// asks, and this page's form is what writes: one button, POSTing back to the
+// same address with a short-lived HMAC the GET minted (see auth.ts).
+export const optOutConfirm = (
+  slug: string,
+  optout: '1' | '0',
+  token: string,
+  status = 200,
+): Response =>
+  SHELL(
+    optout === '1' ? 'Turn off read tracking' : 'Turn read tracking back on',
+    `<h1>${
+      optout === '1'
+        ? 'Turn off read tracking for HTMLRadar links in this browser?'
+        : 'Turn read tracking back on?'
+    }</h1>
+     <p class="lede">${
+       optout === '1'
+         ? 'The sender will no longer see that you opened this document, how long you read, or which sections you spent time on. The document itself opens exactly as before. This applies to every HTMLRadar link you open in this browser.'
+         : 'The sender will see that you opened their document, how long you read, and which sections you spent time on — the same as any HTMLRadar link. You can turn it off again at any time.'
+     }</p>
+     ${status === 200 ? '' : '<div class="error" role="alert">That confirmation expired. Press the button to confirm again.</div>'}
+     <form method="POST" action="/r/${escapeHtml(slug)}">
+       <input type="hidden" name="optout" value="${optout}">
+       <input type="hidden" name="token" value="${escapeHtml(token)}">
+       <button type="submit">${optout === '1' ? 'Turn read tracking off' : 'Turn read tracking on'}</button>
+     </form>`,
+    status,
+    'Read tracking',
+  );
+
 export const emailGateForm = (slug: string, error?: string): Response =>
   SHELL(
     error ? 'Email error' : 'Enter your email',

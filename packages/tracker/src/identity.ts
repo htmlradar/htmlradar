@@ -15,6 +15,15 @@ export function isOptedOut(): boolean {
   }
 }
 
+// Clears this browser's stored identity and records the opt-out locally.
+//
+// Local storage is NOT where a proxy-served opt-out lives: those documents
+// are sandboxed into an opaque origin and every call below throws. The
+// durable record is the `hr_optout` cookie the proxy sets once the recipient
+// confirms on its ?optout=1 page (see packages/proxy/src/auth.ts); api.ts
+// navigates there right after calling this. What this still buys us is a directly-embedded tracker on a
+// self-hosted page, where storage works normally, plus wiping the
+// fingerprint and email of anyone who opts out on the proxy.
 export function optOut(): void {
   try {
     localStorage.setItem(OPT_OUT_KEY, '1');

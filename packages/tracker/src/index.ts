@@ -1,5 +1,8 @@
 // Boot order matters here. We:
-//   1. Bail if the recipient has opted out (localStorage flag).
+//   1. Bail if the recipient has opted out. On proxy-served documents the
+//      opt-out never reaches this check — the proxy drops the whole script
+//      tag when its `hr_optout` cookie is present. This flag covers a
+//      directly-embedded tracker, where localStorage works.
 //   2. Resolve config. If required attrs are missing, log + exit — the host
 //      shouldn't fail silently when the tracker is misconfigured.
 //   3. Get an identity (fingerprint + maybe email). Email source priority:

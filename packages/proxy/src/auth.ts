@@ -153,6 +153,65 @@ function cookieAttrs(name: string, value: string): string {
   ].join('; ');
 }
 
+// Recipient opt-out from read tracking. Server-side by necessity: every
+// proxy response carries a `sandbox` CSP without allow-same-origin, so the
+// document runs in an opaque origin where localStorage and document.cookie
+// both throw. A cookie set by the proxy is the only store the recipient's
+// choice can survive in.
+export const OPT_OUT_COOKIE =
+  'hr_optout=1; Path=/r/; Max-Age=31536000; Secure; HttpOnly; SameSite=Lax';
+export const OPT_OUT_CLEAR_COOKIE =
+  'hr_optout=; Path=/r/; Max-Age=0; Secure; HttpOnly; SameSite=Lax';
+
+// The stored cookie is the only thing that decides. A query parameter used to
+// decide it too, which meant a GET changed the preference — and a GET is
+// reachable by a mailed link and by the shared document's own script, which
+// may navigate its browsing context even from an opaque origin. Both could
+// therefore switch tracking off across every sender's shares, or switch it
+// back on after the recipient had turned it off. See issueOptOutToken.
+export function isTrackingOptedOut(cookieHeader: string | null): boolean {
+  if (!cookieHeader) return false;
+  return parseCookies(cookieHeader)['hr_optout'] === '1';
+}
+
+// Confirmation token for the opt-out POST.
+//
+// `GET /r/{slug}?optout=1|0` only asks the question and mints one of these;
+// the POST that carries it back is the only thing that writes the cookie. An
+// attacker can reach the GET but cannot produce the signature, so the write
+// stays behind a deliberate click.
+//
+// Message is `optout|slug|expiry`, so a token minted to turn tracking off
+// cannot be replayed to turn it back on, nor moved to another share.
+// Format: `{expiry}.{hex hmac}` — hex rather than base64url so the value is
+// safe in an HTML attribute and a form field without any encoding thought.
+const OPT_OUT_TOKEN_TTL_SECONDS = 10 * 60;
+
+export async function issueOptOutToken(
+  optout: string,
+  slug: string,
+  secret: string,
+): Promise<string> {
+  const expiresAt = Math.floor(Date.now() / 1000) + OPT_OUT_TOKEN_TTL_SECONDS;
+  return `${expiresAt}.${await hmacHex(`${optout}|${slug}|${expiresAt}`, secret)}`;
+}
+
+export async function verifyOptOutToken(
+  token: string,
+  optout: string,
+  slug: string,
+  secret: string,
+): Promise<boolean> {
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [expiryStr, mac] = parts as [string, string];
+  const expiresAt = Number.parseInt(expiryStr, 10);
+  if (!Number.isFinite(expiresAt)) return false;
+  if (expiresAt < Math.floor(Date.now() / 1000)) return false;
+  const expected = await hmacHex(`${optout}|${slug}|${expiresAt}`, secret);
+  return constantTimeEqual(mac, expected);
+}
+
 function parseCookies(header: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const part of header.split(/;\s*/)) {
@@ -163,7 +222,7 @@ function parseCookies(header: string): Record<string, string> {
   return out;
 }
 
-async function hmac(message: string, secret: string): Promise<string> {
+async function hmacBytes(message: string, secret: string): Promise<Uint8Array> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -172,8 +231,17 @@ async function hmac(message: string, secret: string): Promise<string> {
     false,
     ['sign'],
   );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  return base64url(new Uint8Array(sig));
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
+}
+
+async function hmac(message: string, secret: string): Promise<string> {
+  return base64url(await hmacBytes(message, secret));
+}
+
+async function hmacHex(message: string, secret: string): Promise<string> {
+  return [...(await hmacBytes(message, secret))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function base64url(bytes: Uint8Array): string {

@@ -5,6 +5,9 @@ interface InjectOptions {
   share: Share;
   tier: 'free' | 'pro';
   trackingEnabled: boolean;
+  // Distinct from trackingEnabled: owner previews also disable tracking but
+  // aren't opted out. Drives which of the two badge chips renders below.
+  trackingOptedOut?: boolean;
   trackerUrl: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
@@ -28,7 +31,9 @@ interface InjectOptions {
 
 export function injectTracker(html: Response, opts: InjectOptions): Response {
   const headSnippet = opts.trackingEnabled ? headInjection(opts) : '';
-  const footerSnippet = opts.tier === 'free' ? chromeFooter() : '';
+  // TODO(decision): a recipient-facing tracking notice for ALL tiers (Pro
+  // documents carry no badge, so today they carry no opt-out) goes here.
+  const footerSnippet = opts.tier === 'free' ? chromeFooter(!!opts.trackingOptedOut) : '';
   // Attachments are ALWAYS surfaced to the recipient when present, per
   // the design decision: "if you don't want a file shared,
   // don't attach it." The recipient view shows a corner pill + side
@@ -402,17 +407,29 @@ function extOf(filename: string): string {
 //
 // Removing this badge is the Pro tier's value prop — see
 // injectTracker(opts.tier) and the pricing page's "No footer" bullet.
-function chromeFooter(): string {
-  return [
-    `<a href="https://htmlradar.com/?utm_source=powered-by-badge&utm_medium=shared-doc" target="_blank" rel="noopener" `,
-    `style="position:fixed;bottom:10px;right:12px;z-index:2147483646;`,
-    `display:inline-flex;align-items:center;gap:6px;`,
+function chromeFooter(optedOut: boolean): string {
+  // One chip look, two links: the credit, and the recipient's way out of
+  // being tracked. The opt-out reuses the badge's own styling rather than
+  // introducing a second visual register beside it.
+  const chip = [
     `background:rgba(251,241,232,0.92);color:#3A2818;text-decoration:none;`,
     `font:500 10.5px/1 ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;`,
     `letter-spacing:0.04em;`,
     `padding:5px 9px 5px 7px;border-radius:6px;`,
     `border:1px solid rgba(135,105,89,0.25);`,
-    `box-shadow:0 1px 2px rgba(31,17,8,0.06);backdrop-filter:blur(6px);">`,
+    `box-shadow:0 1px 2px rgba(31,17,8,0.06);backdrop-filter:blur(6px);`,
+  ].join('');
+  // Second chip reflects live opt-out state: a plain-text status plus the
+  // link back, or (default) the opt-out link itself. Same `chip` style on
+  // a <span> instead of an <a> when opted out — no new CSS.
+  const optOutChip = optedOut
+    ? `<span style="${chip}">Read tracking is off &middot; <a href="?optout=0" rel="nofollow" style="color:#7A1F2E;text-decoration:underline;">Turn it back on</a></span>`
+    : `<a href="?optout=1" rel="nofollow" style="${chip}">Opt out of read tracking</a>`;
+  return [
+    `<div style="position:fixed;bottom:10px;right:12px;z-index:2147483646;`,
+    `display:inline-flex;align-items:center;gap:6px;">`,
+    `<a href="https://htmlradar.com/?utm_source=powered-by-badge&utm_medium=shared-doc" target="_blank" rel="noopener" `,
+    `style="display:inline-flex;align-items:center;gap:6px;${chip}">`,
     `<svg aria-hidden viewBox="0 0 24 24" width="11" height="11" style="vertical-align:-1px;flex:0 0 auto;">`,
     `<circle cx="12" cy="12" r="9" fill="none" stroke="#7A1F2E" stroke-width="1.6" opacity="0.55"/>`,
     `<line x1="12" y1="12" x2="12" y2="3" stroke="#7A1F2E" stroke-width="1.8" stroke-linecap="round"/>`,
@@ -420,6 +437,15 @@ function chromeFooter(): string {
     `</svg>`,
     `<span>Powered by <span style="color:#7A1F2E;">HTMLRadar</span></span>`,
     `</a>`,
+    // Same tab, same document address, `optout` added — the proxy answers
+    // with a confirmation page whose button writes the cookie. The link
+    // itself changes nothing, deliberately: a GET that flipped a
+    // browser-wide preference was reachable by any mailed link and by the
+    // shared document's own script. A query-only href resolves against the
+    // current URL, and the CSP's `base-uri 'none'` stops a sender's <base>
+    // tag from redirecting it.
+    optOutChip,
+    `</div>`,
   ].join('');
 }
 

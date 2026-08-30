@@ -1,4 +1,6 @@
 // Public window.HTMLRadar surface. Three methods only: ready, flush, optOut.
+// optOut() stops the live session and then navigates to ?optout=1, where the
+// proxy asks the recipient to confirm — see the note on the method.
 // Programmatic event subscription happens through the hooks config (see
 // boot()), not through a separate listener API. Keeping the public surface
 // this small means we can change tracker internals without breaking
@@ -39,6 +41,17 @@ export function installGlobalApi(opts: InstallOptions): HTMLRadarApi {
     optOut: () => {
       optOut();
       opts.session.stop();
+      // Stopping the session only covers this page view. Persisting the
+      // choice has to happen server-side: documents served through the
+      // HTMLRadar proxy run under a `sandbox` CSP with no allow-same-origin,
+      // so they sit in an opaque origin where localStorage and
+      // document.cookie throw and the local flag above cannot survive a
+      // reload. Navigating with `optout=1` reaches the proxy's confirmation
+      // page; the button there is what records the cookie, because a page a
+      // document can navigate to must not change the setting on its own.
+      const url = new URL(window.location.href);
+      url.searchParams.set('optout', '1');
+      window.location.replace(url.href);
     },
   };
 

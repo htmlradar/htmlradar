@@ -5,6 +5,11 @@
 //   GET  /r/{slug}/m/{att_id} downloads a supporting-material attachment
 //   GET  /r/_doc/{doc_id}     sender-side raw-doc preview (HMAC-gated)
 //
+// The share route also carries the recipient's own switch for read tracking:
+//   GET  /r/{slug}?optout=1|0 asks the question and mints a token
+//   POST /r/{slug}            with `optout` + `token` writes the cookie
+// See handleOptOutSubmit below for why the GET must not write.
+//
 // Gate order: password → allow-list email → content. Each gate issues an
 // HMAC-signed cookie on success (see auth.ts); subsequent requests with the
 // cookie skip the gate. The document body is only ever streamed when all
@@ -29,10 +34,15 @@ import {
 import {
   issueAuthCookie,
   issueEmailCookie,
+  issueOptOutToken,
+  isTrackingOptedOut,
   verifyAuthCookie,
   verifyEmailCookie,
+  verifyOptOutToken,
   verifyOwnerDocPreviewToken,
   verifyOwnerPreviewToken,
+  OPT_OUT_CLEAR_COOKIE,
+  OPT_OUT_COOKIE,
 } from './auth.js';
 import { fetchDocumentHtml } from './fetch-html.js';
 import { geoFromRequest, injectTracker } from './inject.js';
@@ -40,6 +50,7 @@ import {
   emailGateForm,
   expired,
   notFound,
+  optOutConfirm,
   passwordForm,
   revoked,
   sourceUnreachable,
@@ -179,6 +190,22 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   const slug = match[1]!.toLowerCase();
   const subroute = match[2];
 
+  // Read-tracking opt-out. Handled before the share lookup: the preference is
+  // browser-wide, not per-share, so it should not depend on this particular
+  // link still being live — and asking the question must not fire the
+  // disabled-open alert below.
+  if (!subroute) {
+    if (request.method === 'POST') {
+      const written = await handleOptOutSubmit(request, slug, env);
+      if (written) return written;
+    } else {
+      const param = url.searchParams.get('optout');
+      if (param === '1' || param === '0') {
+        return optOutConfirm(slug, param, await issueOptOutToken(param, slug, env.SESSION_SECRET));
+      }
+    }
+  }
+
   const share = await getShareBySlug(env, slug);
   if (!share) return notFound();
 
@@ -282,16 +309,72 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     attachments = await listAttachmentsForDocument(env, doc.id);
   }
 
+  // An opted-out recipient gets the document itself, the free-tier badge and
+  // the same sandbox CSP — just no tracker, and therefore no session.
+  const optedOut = isTrackingOptedOut(request.headers.get('cookie'));
+
   return injectTracker(html, {
     share,
     tier,
-    trackingEnabled: !isOwnerPreview,
+    trackingEnabled: !isOwnerPreview && !optedOut,
+    trackingOptedOut: optedOut,
     trackerUrl: env.TRACKER_URL,
     supabaseUrl: env.SUPABASE_URL,
     supabaseAnonKey: env.SUPABASE_ANON_KEY,
     ...(verifiedEmail ? { email: verifiedEmail } : {}),
     ...(geo && Object.keys(geo).length > 0 ? { geo } : {}),
     ...(attachments.length > 0 ? { attachments } : {}),
+  });
+}
+
+/**
+ * The opt-out write. Returns null when this POST is not one, so anything else
+ * posted to /r/{slug} keeps whatever behaviour it had.
+ *
+ * This is the whole reason the GET stopped writing. `hr_optout` has
+ * `Path=/r/`, so it governs every share on the host, and the old `?optout=`
+ * query parameter set it on a plain navigation. A shared document may
+ * navigate its own browsing context even from the opaque sandbox origin it
+ * runs in, so a sender's script could have switched tracking off for every
+ * other sender's links — or, worse, switched it back ON after the recipient
+ * had opted out. A mailed link did the same thing to anyone who clicked it.
+ *
+ * Routing is by the presence of both fields rather than by a sub-path so the
+ * form can post back to the document's own address, which is the only address
+ * the recipient has.
+ */
+async function handleOptOutSubmit(
+  request: Request,
+  slug: string,
+  env: Env,
+): Promise<Response | null> {
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return null;
+  }
+  const optout = form.get('optout');
+  const token = form.get('token');
+  if ((optout !== '1' && optout !== '0') || typeof token !== 'string') return null;
+
+  if (!(await verifyOptOutToken(token, optout, slug, env.SESSION_SECRET))) {
+    // Ask again with a fresh token rather than dead-ending: the common cause
+    // is a confirmation page left open for more than ten minutes.
+    return optOutConfirm(
+      slug,
+      optout,
+      await issueOptOutToken(optout, slug, env.SESSION_SECRET),
+      400,
+    );
+  }
+
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: `/r/${slug}`,
+      'Set-Cookie': optout === '1' ? OPT_OUT_COOKIE : OPT_OUT_CLEAR_COOKIE,
+    },
   });
 }
 

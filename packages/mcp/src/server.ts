@@ -36,6 +36,13 @@ const shareHtmlShape = {
     .default(true)
     .describe('Ask the recipient for their email before the document opens. Defaults to true.'),
   password: z.string().optional().describe('Extra password gate on top of the email gate.'),
+  lock_deck: z
+    .boolean()
+    .optional()
+    .describe(
+      'Blocks save and print and adds a watermark; default true. Pass false for a document the ' +
+        'recipient is meant to keep a copy of.',
+    ),
   allowed_email_domains: z
     .array(z.string())
     .optional()
@@ -56,6 +63,7 @@ const OPTIONAL_SHARE_FIELDS = [
   'title',
   'recipient_label',
   'password',
+  'lock_deck',
   'allowed_email_domains',
   'expires_in_hours',
   'slug',
@@ -169,7 +177,7 @@ function formatViewer(viewer: ActivityViewer): string {
   const top = [...viewer.sections]
     .sort((a, b) => b.time_seconds - a.time_seconds)
     .slice(0, 5)
-    .map((section) => `${section.title} ${formatDuration(section.time_seconds)}`);
+    .map((section) => `${section.title} ${formatSectionTime(section.time_seconds)}`);
 
   return [
     `${who}`,
@@ -187,12 +195,28 @@ export function formatMe(me: MeResponse): string {
   ].join('\n');
 }
 
+// Rounding rule for every number in the readable summary: FLOOR, applied
+// once, to the value as it stands in the raw JSON below it. Rounding to
+// nearest was applied to each section on its own, so two sections of 2.5 s
+// each inside a five-second visit printed as "3s, 3s" — a summary claiming
+// more reading than the visit contained. Truncating cannot overstate: every
+// printed figure is at or under the recorded one, and they still add up.
 export function formatDuration(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
+  const total = Math.max(0, Math.floor(seconds));
   if (total < 60) return `${total}s`;
   const minutes = Math.floor(total / 60);
   if (minutes < 60) return `${minutes}m ${total % 60}s`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+// Section times arrive fractional — the tracker credits quarter-seconds — and
+// a whole second is the exception rather than the rule. Under a minute the
+// tenth is kept, so the summary line and the raw JSON beside it say the same
+// thing rather than differing by up to a second per section.
+export function formatSectionTime(seconds: number): string {
+  if (seconds >= 60) return formatDuration(seconds);
+  const tenths = Math.max(0, Math.floor(seconds * 10) / 10);
+  return `${Number.isInteger(tenths) ? tenths : tenths.toFixed(1)}s`;
 }
 
 // ponytail: the API contract does not pin max_scroll's unit, so accept both
@@ -216,7 +240,7 @@ function failure(message: string): CallToolResult {
 
 export function createServer(config: Config): McpServer {
   const server = new McpServer(
-    { name: 'htmlradar', version: '0.1.1' },
+    { name: 'htmlradar', version: '0.1.2' },
     {
       instructions:
         'HTMLRadar turns an HTML document into a tracked link. Use share_html once you have ' +

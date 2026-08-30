@@ -309,16 +309,17 @@ Publishes HTML as a tracked link. Pass the markup itself in `html`. The tool doe
 if the document is already on disk, the agent reads it with its own file tools and passes the
 contents, so whatever permissions you set on those tools still apply.
 
-| Input                   | Type     | Default                | Constraint                                                           |
-| ----------------------- | -------- | ---------------------- | -------------------------------------------------------------------- |
-| `html`                  | string   | required               | The full markup. Up to 5 MB; refused before any network call.        |
-| `title`                 | string   | the document `<title>` | Name on your dashboard. Recipients never see it.                     |
-| `recipient_label`       | string   | none                   | Who the link is for, e.g. "Acme". One link per recipient reads best. |
-| `require_email`         | boolean  | `true`                 | Ask for an email before the document opens.                          |
-| `password`              | string   | none                   | Extra gate on top of the email gate. At least 8 characters.          |
-| `allowed_email_domains` | string[] | none                   | Only these domains may open it, e.g. `["acme.com"]`.                 |
-| `expires_in_hours`      | integer  | never                  | Positive whole number. The link stops working after it.              |
-| `slug`                  | string   | generated              | Custom link name, so the URL reads `/r/acme-proposal`. Paid plans.   |
+| Input                   | Type     | Default                | Constraint                                                              |
+| ----------------------- | -------- | ---------------------- | ----------------------------------------------------------------------- |
+| `html`                  | string   | required               | The full markup. Up to 5 MB; refused before any network call.           |
+| `title`                 | string   | the document `<title>` | Name on your dashboard. Recipients never see it.                        |
+| `recipient_label`       | string   | none                   | Who the link is for, e.g. "Acme". One link per recipient reads best.    |
+| `require_email`         | boolean  | `true`                 | Ask for an email before the document opens.                             |
+| `password`              | string   | none                   | Extra gate on top of the email gate. At least 8 characters.             |
+| `lock_deck`             | boolean  | `true`                 | Blocks save and print and adds a watermark. Pass `false` to allow both. |
+| `allowed_email_domains` | string[] | none                   | Only these domains may open it, e.g. `["acme.com"]`.                    |
+| `expires_in_hours`      | integer  | never                  | Positive whole number. The link stops working after it.                 |
+| `slug`                  | string   | generated              | Custom link name, so the URL reads `/r/acme-proposal`. Paid plans.      |
 
 Example output:
 
@@ -336,7 +337,8 @@ The recipient is asked for their email, then sees the document exactly as writte
 
 ### `get_share_activity`
 
-One input, `share_id` (string): the share id or slug, the part after `/r/` in the link. Reports
+One input, `share_id` (string): the share id, its slug (the part after `/r/` in the link), or the
+link itself. Reports
 whether the link was opened, by whom, when they first opened it, how long they were actively
 reading, how far they scrolled, and which sections took the most time. The raw JSON follows the
 summary so the agent can compute on it; sections there are in document order.
@@ -438,9 +440,9 @@ malformed key it prints what is wrong and exits.
 
 ## Versions
 
-Current: `htmlradar-mcp@0.1.1`, Node.js 18 or newer. Every install line above runs
+Current: `htmlradar-mcp@0.1.2`, Node.js 18 or newer. Every install line above runs
 `npx -y htmlradar-mcp`, which fetches the latest version. The Claude Code plugin is different: its
-`.mcp.json` pins `htmlradar-mcp@0.1.1`, and plugin users move to a newer server when the plugin
+`.mcp.json` pins `htmlradar-mcp@0.1.2`, and plugin users move to a newer server when the plugin
 itself is updated (`/plugin marketplace update htmlradar` picks up a new pin; third-party
 marketplaces do not auto-update by default). What changed in each release is in
 [CHANGELOG.md](https://github.com/htmlradar/htmlradar/blob/main/packages/mcp/CHANGELOG.md).

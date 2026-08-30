@@ -305,7 +305,7 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               Versions
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.1.1</span>,
+              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.1.2</span>,
               the current release, and needs Node.js 18 or newer for the{' '}
               <span className="font-mono text-[14px]">npx</span> it runs. A newer server reaches
               plugin users when the plugin is updated; run{' '}

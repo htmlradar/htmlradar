@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.htmlradar/share",
+  "name": "com.htmlradar/share",
   "description": "Publish HTML as a tracked link and see who opened it and which sections they read.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "websiteUrl": "https://htmlradar.com/mcp",
   "repository": {
     "url": "https://github.com/htmlradar/htmlradar",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "htmlradar-mcp",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "transport": {
         "type": "stdio"
       },

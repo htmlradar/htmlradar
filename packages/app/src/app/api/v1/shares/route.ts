@@ -63,6 +63,7 @@ interface CreateShareBody {
   title?: unknown;
   recipient_label?: unknown;
   require_email?: unknown;
+  lock_deck?: unknown;
   password?: unknown;
   allowed_email_domains?: unknown;
   expires_in_hours?: unknown;
@@ -208,6 +209,14 @@ export async function POST(req: NextRequest) {
     return errorResponse(validationError('"require_email" must be a boolean.'));
   }
 
+  // "Lock the deck": blocks save and print and paints the tiled watermark.
+  // True is both the column default (schema/015) and what the browser form
+  // offers, so an absent field keeps the behaviour every existing caller has.
+  if (body.lock_deck !== undefined && typeof body.lock_deck !== 'boolean') {
+    return errorResponse(validationError('"lock_deck" must be a boolean.'));
+  }
+  const lockDeck = body.lock_deck === undefined ? true : body.lock_deck;
+
   const password = typeof body.password === 'string' && body.password ? body.password : null;
 
   let domains: string[] | null = null;
@@ -326,6 +335,34 @@ export async function POST(req: NextRequest) {
     return errorResponse(INTERNAL);
   }
 
+  // Same shape as the browser flow: the link is created with the column
+  // default and the toggle is a surgical follow-up, so create_share_as's
+  // signature stays narrow. The dashboard's set_share_lock_deck RPC is not
+  // available here — it is granted to `authenticated` and reads auth.uid() —
+  // so the service client writes the column directly, scoped to the row this
+  // call just created for this caller.
+  if (!lockDeck) {
+    const { error: lockError } = await supabase
+      .from('document_shares')
+      .update({ lock_deck: false })
+      .eq('id', share.id)
+      .eq('owner_id', caller.userId);
+    if (lockError) {
+      // One API call is one act. A link that quietly ignores a setting the
+      // caller asked for is not the link they asked for, so it goes back with
+      // its document (schema/001 cascades the share from the document).
+      await rollbackDocument(supabase, caller.userId, documentId, bytes !== null);
+      await logServerError({
+        source: 'api.v1.shares',
+        message: lockError.message,
+        userId: caller.userId,
+        route: ROUTE,
+        context: { step: 'set_lock_deck', document_id: documentId },
+      });
+      return errorResponse(INTERNAL);
+    }
+  }
+
   // Both events are emitted only once the whole call has succeeded — a
   // document that gets rolled back above never happened as far as analytics
   // is concerned.
@@ -348,6 +385,7 @@ export async function POST(req: NextRequest) {
       has_domain_allowlist: !!domains,
       has_email_allowlist: false,
       has_expiry: !!expiresAt,
+      lock_deck: lockDeck,
       is_first_share: quota.used === 0,
       custom_slug: !!slug,
       via: 'api',

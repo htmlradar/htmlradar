@@ -80,6 +80,12 @@ const SHARE_INPUTS = [
   ['require_email', 'boolean', 'true', 'Ask for an email before the document opens.'],
   ['password', 'string', 'none', 'Extra gate on top of the email gate. At least 8 characters.'],
   [
+    'lock_deck',
+    'boolean',
+    'true',
+    'Blocks save and print and adds a watermark. Pass false to allow both.',
+  ],
+  [
     'allowed_email_domains',
     'string[]',
     'none',
@@ -615,12 +621,12 @@ did anyone read the proposal I shared yesterday?`}
               Versions
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              Current: <span className="font-mono text-[14px]">htmlradar-mcp@0.1.1</span> on npm,
+              Current: <span className="font-mono text-[14px]">htmlradar-mcp@0.1.2</span> on npm,
               Node.js 18 or newer. Every install line above runs{' '}
               <span className="font-mono text-[14px]">npx -y htmlradar-mcp</span>, which fetches the
               latest version. The Claude Code plugin is different: its{' '}
               <span className="font-mono text-[14px]">.mcp.json</span> pins{' '}
-              <span className="font-mono text-[14px]">htmlradar-mcp@0.1.1</span>, and plugin users
+              <span className="font-mono text-[14px]">htmlradar-mcp@0.1.2</span>, and plugin users
               move to a newer server when the plugin itself is updated. Third-party marketplaces do
               not auto-update by default, so run{' '}
               <span className="font-mono text-[14px]">/plugin marketplace update htmlradar</span> to

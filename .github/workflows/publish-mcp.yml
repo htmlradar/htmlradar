@@ -2,9 +2,12 @@ name: Publish MCP Server
 
 # Publishes htmlradar-mcp to npm (with provenance) and to the MCP registry
 # (https://registry.modelcontextprotocol.io) when an `mcp-v*` tag is pushed,
-# e.g. mcp-v0.1.0. The registry namespace is io.github.htmlradar/* via GitHub
-# OIDC, so no registry secret is needed. npm needs the NPM_TOKEN repository
-# secret (an npm Automation token with publish access to htmlradar-mcp).
+# e.g. mcp-v0.1.0. The registry namespace is com.htmlradar/* via DNS domain
+# verification (htmlradar.com), authenticated with the MCP_REGISTRY_PRIVATE_KEY
+# repository secret (Ed25519 private key, 64 hex chars; the matching
+# `v=MCPv1; k=ed25519; p=...` DNS TXT record is published on htmlradar.com).
+# npm needs the NPM_TOKEN repository secret (an npm Automation token with
+# publish access to htmlradar-mcp).
 
 on:
   push:
@@ -20,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # npm --provenance and mcp-publisher login github-oidc
+      id-token: write # npm publish --provenance
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -62,9 +65,11 @@ jobs:
           echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
           tar -xzf mcp-publisher.tar.gz mcp-publisher
 
-      - name: Authenticate to MCP Registry (GitHub OIDC)
+      - name: Authenticate to MCP Registry (DNS)
         working-directory: packages/mcp
-        run: ./mcp-publisher login github-oidc
+        env:
+          MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+        run: ./mcp-publisher login dns --domain htmlradar.com --private-key "$MCP_REGISTRY_PRIVATE_KEY"
 
       - name: Publish server to MCP Registry
         working-directory: packages/mcp

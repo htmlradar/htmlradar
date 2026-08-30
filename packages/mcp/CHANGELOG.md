@@ -3,6 +3,31 @@
 All notable changes to `htmlradar-mcp`. The plugin at `plugins/htmlradar` pins one of these versions
 in its `.mcp.json`; direct installs (`npx -y htmlradar-mcp`) always run the latest.
 
+## 0.1.2 — 2026-08-30
+
+### Added
+
+- `share_html` takes `lock_deck`, an optional boolean that defaults to true. Locking a deck blocks
+  save and print and adds a watermark; it has always been on for every link made through the API,
+  and the setting could only be changed afterwards from the dashboard. Pass `false` for a document
+  the recipient is meant to keep a copy of.
+
+### Fixed
+
+- The readable summary no longer disagrees with the raw JSON printed beneath it. Section times were
+  rounded to the nearest second, each on its own, so two sections of 2.5 seconds inside a
+  five-second visit read as "3s, 3s" — a summary claiming more reading than the visit contained.
+  Every figure now rounds down, once, and a section time under a minute keeps its tenth.
+
+### Changed
+
+- The MCP registry name is now `com.htmlradar/share`, a domain-verified namespace, replacing the
+  placeholder `io.github.htmlradar/share`.
+- `get_share_activity`'s `share_id` parameter and the README now document that a share's slug (the
+  part after `/r/` in its link) or the link itself work as well as the plain id — the server has
+  accepted all three since the 0.1.1 follow-up fix (`636a76d`).
+- The Claude Code plugin pins `htmlradar-mcp@0.1.2`.
+
 ## 0.1.1 — 2026-08-30
 
 ### Fixed

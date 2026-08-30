@@ -267,23 +267,10 @@ describe('recipient opt-out', () => {
     );
   });
 
-  it('offers the opt-out from the free-tier badge', async () => {
+  it('free-tier badge carries no opt-out link or state', async () => {
     const html = await (await get('/r/acme-proposal')).text();
     expect(html).toContain('Powered by');
-    expect(html).toContain('Opt out of read tracking');
-    expect(html).toContain('href="?optout=1"');
-    expect(html).toContain('rel="nofollow"');
-  });
-
-  it('badge reflects the opted-out state for a request carrying hr_optout=1', async () => {
-    const html = await (await get('/r/acme-proposal', { Cookie: 'hr_optout=1' })).text();
-    expect(html).toContain('Read tracking is off');
-    expect(html).toContain('href="?optout=0"');
-  });
-
-  it('badge shows the opt-out link (not the off state) for a normal request', async () => {
-    const html = await (await get('/r/acme-proposal')).text();
-    expect(html).toContain('Opt out of read tracking');
+    expect(html).not.toContain('Opt out');
     expect(html).not.toContain('Read tracking is off');
   });
 

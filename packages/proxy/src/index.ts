@@ -317,7 +317,6 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     share,
     tier,
     trackingEnabled: !isOwnerPreview && !optedOut,
-    trackingOptedOut: optedOut,
     trackerUrl: env.TRACKER_URL,
     supabaseUrl: env.SUPABASE_URL,
     supabaseAnonKey: env.SUPABASE_ANON_KEY,

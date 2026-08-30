@@ -32,9 +32,21 @@ zone_name = "htmlradar.com"
 TRACKER_URL = "https://htmlradar.com/v1/tracker.js"
 # Host that serves recipient documents; everything else on it is a 404.
 SHARE_HOST = "htmlradar.page"
-# Comma-separated hosts that only redirect to SHARE_HOST. Self-hosters who
-# never moved leave this empty.
-LEGACY_HOSTS = "htmlradar.com"
+# Comma-separated hosts that only redirect to SHARE_HOST. Empty means no host
+# redirects: every host this worker is routed on serves documents where the
+# request arrived. Self-hosters who never moved leave it empty.
+#
+# It ships empty on purpose. The first deploy of the content domain then
+# changes nothing a recipient sees — htmlradar.com/r/ keeps serving the
+# document it always served, htmlradar.page starts serving it too, and the
+# same link works on either host.
+#
+# GATE 2 (docs/workstreams/content-domain/SWITCH-PLAN-2026-08-31.md) turns the
+# permanent redirect on: set this to "htmlradar.com" and deploy. From then on
+# every htmlradar.com/r/ link answers 301 to the same path and query on
+# SHARE_HOST. Setting it back to "" and deploying is the whole rollback; no
+# data is touched either way.
+LEGACY_HOSTS = ""
 
 # Secrets — set via `wrangler secret put`:
 #   SUPABASE_URL

@@ -264,3 +264,34 @@ describe('a self-hoster sets their own hosts', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('an empty legacy list turns the redirect off', () => {
+  // How the content domain ships on its first deploy, and where a rollback
+  // puts it afterwards: both hosts serve documents, neither one redirects, so
+  // a single link opens on either. Gate 2 of the switch plan sets
+  // LEGACY_HOSTS = "htmlradar.com" to turn the permanent redirect on.
+  const noRedirect = { ...baseEnv, LEGACY_HOSTS: '' } as import('../src/env.js').Env;
+
+  it('serves the old host in place instead of redirecting it', async () => {
+    const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, noRedirect);
+    expect(res.status).toBe(200);
+    expect(getShareBySlug).toHaveBeenCalledWith(noRedirect, 'acme-proposal');
+  });
+
+  it('serves the share host at the same time, so one link opens on either', async () => {
+    const res = await fetchAs('https://htmlradar.page/r/acme-proposal', {}, noRedirect);
+    expect(res.status).toBe(200);
+  });
+
+  it('sends no Location at all, query string included', async () => {
+    const res = await fetchAs('https://htmlradar.com/r/acme-proposal?x=1', {}, noRedirect);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Location')).toBeNull();
+  });
+
+  it('still upgrades plain HTTP, which is a separate rule from the host', async () => {
+    const res = await fetchAs('http://htmlradar.com/r/acme-proposal', {}, noRedirect);
+    expect(res.status).toBe(301);
+    expect(res.headers.get('Location')).toBe('https://htmlradar.com/r/acme-proposal');
+  });
+});

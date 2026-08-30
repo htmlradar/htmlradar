@@ -23,7 +23,9 @@
   ],
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
+    "modelcontextprotocol",
     "htmlradar",
     "html",
     "tracked-link",
@@ -40,7 +42,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "build:mcpb": "node esbuild.config.mjs && node scripts/build-mcpb.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

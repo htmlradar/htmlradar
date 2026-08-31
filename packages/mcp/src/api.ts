@@ -181,6 +181,13 @@ function errorMessage(status: number, payload: unknown): string {
       ]
         .filter(Boolean)
         .join('\n');
+    case 'conflict':
+      // Nothing was written, and a blind retry would race the same way again.
+      return [
+        body.message ?? 'That document changed while the replacement was being uploaded.',
+        'Nothing was replaced. Check what the document says now — somebody, or another ' +
+          'session, replaced or deleted it — and ask the user before trying again.',
+      ].join('\n');
     case 'read_only_key':
       // Also relayed rather than retried: the key is fine, it simply does not
       // have this power, and only the user can decide to hand over one that

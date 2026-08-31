@@ -22,9 +22,13 @@ const db = vi.hoisted(() => ({
   }[],
   inserts: [] as { table: string; values: Record<string, unknown> }[],
   uploads: [] as { key: string; bytes: number }[],
+  deletes: [] as string[],
   flags: [] as { documentId: string; score: number }[],
   events: [] as { event: string; properties: Record<string, unknown> }[],
   uploadFails: false,
+  // Runs at the moment the bytes reach R2, which is the window between the
+  // read at the top of the call and the swap at the end of it.
+  onUpload: null as null | (() => void),
 }));
 
 vi.mock('@/lib/error-log', () => ({ logServerError: vi.fn() }));
@@ -38,7 +42,14 @@ vi.mock('@/lib/r2', () => ({
     `docs/${userId}/${docId}/v${version}.html`,
   uploadHtml: async (key: string, bytes: Uint8Array) => {
     if (db.uploadFails) throw new Error('R2 is down');
+    // A tick, so two replacements racing in one test interleave the way two
+    // requests do: both read, then both try to claim.
+    await Promise.resolve();
     db.uploads.push({ key, bytes: bytes.byteLength });
+    db.onUpload?.();
+  },
+  deleteR2Object: async (key: string) => {
+    db.deletes.push(key);
   },
 }));
 // The screen itself has its own tests (lib/screen-html.test.ts). What this
@@ -59,6 +70,10 @@ vi.mock('@/lib/api-auth', async (importOriginal) => ({
       const filters: Record<string, unknown> = {};
       let values: Record<string, unknown> | null = null;
       let op: 'update' | 'insert' | '' = '';
+      const matching = () =>
+        db.documents.filter((doc) =>
+          Object.entries(filters).every(([column, value]) => doc[column] === value),
+        );
       const chain = {
         select: () => chain,
         update: (v: Record<string, unknown>) => {
@@ -82,16 +97,19 @@ vi.mock('@/lib/api-auth', async (importOriginal) => ({
         },
         maybeSingle: async () => {
           db.lookupFilters = { ...filters };
-          const row = db.documents.find((doc) =>
-            Object.entries(filters).every(([column, value]) => doc[column] === value),
-          );
-          return { data: table === 'documents' ? (row ?? null) : null, error: null };
+          return { data: table === 'documents' ? (matching()[0] ?? null) : null, error: null };
         },
-        then: (resolve: (value: { error: null }) => void) => {
-          if (op === 'update' && values) {
-            db.writes.push({ table, values, filters: { ...filters } });
+        // The write lands on the stored rows, so a compare-and-swap that no
+        // longer matches returns no rows here exactly as PostgREST would.
+        then: (resolve: (value: { data: unknown; error: null }) => void) => {
+          if (op !== 'update' || !values) {
+            resolve({ data: null, error: null });
+            return;
           }
-          resolve({ error: null });
+          db.writes.push({ table, values, filters: { ...filters } });
+          const rows = table === 'documents' ? matching() : [];
+          for (const row of rows) Object.assign(row, values);
+          resolve({ data: rows.map((row) => ({ id: row['id'] })), error: null });
         },
       };
       return chain;
@@ -112,9 +130,11 @@ beforeEach(() => {
   db.writes = [];
   db.inserts = [];
   db.uploads = [];
+  db.deletes = [];
   db.flags = [];
   db.events = [];
   db.uploadFails = false;
+  db.onUpload = null;
 });
 
 async function replace(id: string, body: Record<string, unknown>) {
@@ -136,11 +156,15 @@ describe('POST /api/v1/documents/{id}/replace', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ document_id: DOC_ID, version: 4, links_unchanged: true });
-    expect(db.uploads).toEqual([{ key: `docs/user-1/${DOC_ID}/v4.html`, bytes: 21 }]);
+    // The key names the version and then something no other request can guess,
+    // so two replacements racing for version 4 never share an object.
+    expect(db.uploads).toHaveLength(1);
+    expect(db.uploads[0]?.bytes).toBe(21);
+    expect(db.uploads[0]?.key).toMatch(new RegExp(`^docs/user-1/${DOC_ID}/v4-[0-9a-f]{8}\\.html$`));
     expect(db.writes[0]).toMatchObject({
       table: 'documents',
       filters: { id: DOC_ID, owner_id: 'user-1' },
-      values: { current_version: 4, r2_key: `docs/user-1/${DOC_ID}/v4.html` },
+      values: { current_version: 4, r2_key: db.uploads[0]?.key },
     });
     expect(db.inserts[0]).toMatchObject({
       table: 'document_versions',
@@ -204,6 +228,68 @@ describe('POST /api/v1/documents/{id}/replace', () => {
   it('is a 404 for a document id that is not an id, before anything is read', async () => {
     expect((await replace('not-a-uuid', { html: '<h1>Four</h1>' })).status).toBe(404);
     expect(db.lookupFilters).toEqual({});
+  });
+
+  // The swap is conditional on the version this call read, so of two
+  // replacements that both saw version 3 exactly one can land. Without that
+  // condition both would write v4, one would silently overwrite the other, and
+  // the stored screening score would describe bytes nobody is being served.
+  it('lets exactly one of two racing replacements win, and cleans up after the other', async () => {
+    const [first, second] = await Promise.all([
+      replace(DOC_ID, { html: '<h1>Four from A</h1>' }),
+      replace(DOC_ID, { html: '<h1>Four from B</h1>' }),
+    ]);
+
+    const statuses = [first?.status, second?.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    // Both uploaded, to different keys, and the loser's object is deleted at
+    // the moment it is known to belong to nothing.
+    expect(db.uploads).toHaveLength(2);
+    expect(db.uploads[0]?.key).not.toBe(db.uploads[1]?.key);
+    expect(db.deletes).toHaveLength(1);
+
+    // The document moved exactly one version, and it points at the object that
+    // was not deleted.
+    const document = db.documents[0];
+    expect(document?.['current_version']).toBe(4);
+    expect(db.deletes).not.toContain(document?.['r2_key']);
+    expect(db.uploads.map((upload) => upload.key)).toContain(document?.['r2_key']);
+
+    // One winner, one history row.
+    expect(db.inserts.filter((insert) => insert.table === 'document_versions')).toHaveLength(1);
+    expect(db.events.map((event) => event.event)).toEqual(['document.replaced']);
+  });
+
+  it('answers the loser with a 409 that says nothing was replaced', async () => {
+    const [first, second] = await Promise.all([
+      replace(DOC_ID, { html: '<h1>Four from A</h1>' }),
+      replace(DOC_ID, { html: '<h1>Four from B</h1>' }),
+    ]);
+    const loser = first?.status === 409 ? first : second;
+    expect(loser?.body).toEqual({
+      error: 'conflict',
+      message:
+        'This document changed while the replacement was being uploaded, so nothing was ' +
+        'replaced. Read the current version before trying again.',
+    });
+  });
+
+  // The same condition covers a delete that lands while the bytes are on their
+  // way up: the row the swap is looking for is no longer there.
+  it('refuses to replace a document that was deleted mid-upload', async () => {
+    const document = db.documents[0];
+    // The delete lands after the read at the top of the call and before the
+    // swap at the end of it.
+    db.onUpload = () => {
+      if (document) document['deleted_at'] = '2026-08-31T10:00:00Z';
+    };
+
+    const res = await replace(DOC_ID, { html: '<h1>Four</h1>' });
+    expect(res.status).toBe(409);
+    expect(document?.['current_version']).toBe(3);
+    expect(db.deletes).toHaveLength(1);
+    expect(db.inserts).toEqual([]);
   });
 
   // Upload first: a failed upload leaves every recipient reading the version

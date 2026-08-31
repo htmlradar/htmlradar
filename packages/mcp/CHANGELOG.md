@@ -25,7 +25,9 @@ This release is those four.
 - `replace_document` puts new contents behind every existing link. Same addresses, same settings,
   same reading history, and the recipient sees the new version the next time they open the link
   they already have. The new HTML goes through the same phishing screen every upload does, and the
-  previous version is kept in the document's history.
+  previous version is kept in the document's history. Two replacements racing for the same version
+  do not overwrite each other: the second one is told that nothing was replaced and that the
+  document changed underneath it.
 - `get_share_activity` takes `include_detail`, which adds each reader's country, city, device and
   referrer. Off by default on purpose: that is a named person's location and device, and the
   ordinary question — was it read, and which parts — is answered without it.

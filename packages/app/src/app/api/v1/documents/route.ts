@@ -18,9 +18,11 @@
 import type { NextRequest } from 'next/server';
 import {
   authenticateApiKey,
+  beforeFilter,
   CHEAP_MAX,
   errorResponse,
   INTERNAL,
+  cursorOf,
   jsonResponse,
   PAGE_SIZE,
   readBefore,
@@ -47,8 +49,8 @@ export async function GET(req: NextRequest) {
   if ('error' in auth) return errorResponse(auth.error);
   const { caller } = auth;
 
-  const cursor = readBefore(req);
-  if ('error' in cursor) return errorResponse(cursor.error);
+  const page = readBefore(req);
+  if ('error' in page) return errorResponse(page.error);
 
   const supabase = serviceClient();
   let query = supabase
@@ -56,9 +58,12 @@ export async function GET(req: NextRequest) {
     .select('id, title, created_at')
     .eq('owner_id', caller.userId)
     .is('deleted_at', null)
+    // Both columns, in both places: the sort and the cursor have to agree, or
+    // rows sharing a timestamp fall between two pages.
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(PAGE_SIZE);
-  if (cursor.before) query = query.lt('created_at', cursor.before);
+  if (page.cursor) query = query.or(beforeFilter(page.cursor));
 
   const { data, error } = await query;
   if (error) {
@@ -101,6 +106,6 @@ export async function GET(req: NextRequest) {
       created_at: row.created_at,
       share_count: shareCount.get(row.id) ?? 0,
     })),
-    next_before: rows.length === PAGE_SIZE ? (rows[rows.length - 1]?.created_at ?? null) : null,
+    next_before: rows.length === PAGE_SIZE ? cursorOf(rows[rows.length - 1]!) : null,
   });
 }

@@ -46,10 +46,9 @@
 --
 -- ORDERING: run this AFTER 034 (api_keys).
 --
--- UNTIL IT IS APPLIED: the API reads the key row without this column and
--- treats every key as `full`, which is what every key is today. See findKeyRow
--- in api-auth.ts and createApiKeyAction in settings/page.tsx — both carry a
--- fallback marked for deletion once this has run.
+-- APPLIED: 31 August 2026. The two pre-apply fallbacks that let the API and the
+-- settings page work without this column are gone with it, so a key row is now
+-- read one way only and a key that cannot be written as asked is not written.
 -- ------------------------------------------------------------
 
 alter table public.api_keys

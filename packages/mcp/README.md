@@ -416,7 +416,9 @@ reading reports stay separate. It uploads nothing and creates no second copy of 
 Lists the account's tracked links, newest first: the slug, the recipient label, the document title,
 whether it has been opened and when, and the share and document ids the other tools take. Returns
 at most 50. One optional input, `before` (string): the `next_before` cursor printed at the end of a
-previous result, for the page of older links.
+previous result, for the page of older links. A cursor is `<created_at>|<share id>` — both halves,
+because fifty links created in the same second would otherwise fall across a page boundary and the
+ones sharing it would be skipped. Pass it back exactly as printed.
 
 Example output:
 

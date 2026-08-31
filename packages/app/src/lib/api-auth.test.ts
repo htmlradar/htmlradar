@@ -15,8 +15,10 @@ import {
   API_KEY_PREFIX,
   authenticateApiKey,
   BODY_TIMED_OUT,
+  beforeFilter,
   CHEAP_MAX,
   creationMax,
+  cursorOf,
   READ_ONLY_KEY,
   readBefore,
   FREE_LIMIT_REACHED,
@@ -371,7 +373,8 @@ interface Chain {
 /** The two calls authenticateApiKey makes, with the limiter RPC handed over. */
 function stubSupabase(rpc: (bucket: string) => Promise<{ data: unknown; error: unknown }>) {
   const rows: Record<string, unknown> = {
-    api_keys: { id: 'key-1', user_id: 'user-1' },
+    // As the column has stood since schema/040: every key row carries a scope.
+    api_keys: { id: 'key-1', user_id: 'user-1', scope: 'full' },
     profiles: { tier: 'free' },
   };
   const query = (table: string): Chain => {
@@ -448,47 +451,29 @@ describe('URL mode', () => {
 
 /**
  * A Supabase stub that answers with the key row and plan it is given, and
- * records the ceiling every rate-limit call was made with. `scopeColumn: false`
- * is the database that has not had schema/040 applied: a select naming `scope`
- * comes back as an error, exactly as PostgREST answers for a missing column.
+ * records the ceiling every rate-limit call was made with.
  */
 function stubAccount({
-  scope,
+  scope = 'full',
   tier,
-  scopeColumn = true,
+  omitScope = false,
 }: {
   scope?: string | null;
   tier?: 'free' | 'pro';
-  scopeColumn?: boolean;
+  omitScope?: boolean;
 }) {
   const maxima: { bucket: string; max: number }[] = [];
   const client = {
     from: (table: string) => {
-      let columns = '';
       const chain: Record<string, unknown> = {
         update: () => chain,
-        select: (c: string) => {
-          columns = c;
-          return chain;
-        },
+        select: () => chain,
         eq: () => chain,
         is: () => chain,
         maybeSingle: () => {
           if (table === 'profiles') return Promise.resolve({ data: { tier: tier ?? 'free' } });
-          if (!scopeColumn && columns.includes('scope')) {
-            return Promise.resolve({
-              data: null,
-              error: { message: 'column api_keys.scope does not exist' },
-            });
-          }
           return Promise.resolve({
-            // `scope` absent entirely is the pre-040 row; scope: null is a row
-            // that has the column and nothing useful in it.
-            data: {
-              id: 'key-1',
-              user_id: 'user-1',
-              ...(scope === undefined ? {} : { scope }),
-            },
+            data: { id: 'key-1', user_id: 'user-1', ...(omitScope ? {} : { scope }) },
           });
         },
       };
@@ -613,6 +598,17 @@ describe('a key whose stored scope is not one of the two words', () => {
 
   // A null cannot happen while the column is NOT NULL, which is exactly why
   // it must not be the one value that quietly means full access.
+  // Nothing writes a row without the column any more — 040 is applied — but if
+  // one ever appears, the answer is the same as for every other value we do
+  // not recognise.
+  it('treats a row with no scope at all as read-only', async () => {
+    const { client } = stubAccount({ omitScope: true });
+    supabase.current = client;
+    await expect(authenticateApiKey(apiRequest(), writeLimit)).resolves.toEqual({
+      error: READ_ONLY_KEY,
+    });
+  });
+
   it('treats a null the same way', async () => {
     const { client } = stubAccount({ scope: null });
     supabase.current = client;
@@ -630,22 +626,6 @@ describe('a key whose stored scope is not one of the two words', () => {
   });
 });
 
-// ponytail: delete this test with the fallback it covers, once 040 is applied.
-describe('a database that has not had schema/040 applied', () => {
-  it('authenticates the key as full access rather than failing the request', async () => {
-    const { client } = stubAccount({ scopeColumn: false });
-    supabase.current = client;
-    await expect(
-      authenticateApiKey(apiRequest(), {
-        name: 'shares',
-        per: 'account',
-        max: creationMax,
-        write: true,
-      }),
-    ).resolves.toEqual({ caller: { userId: 'user-1', tier: 'free', scope: 'full' } });
-  });
-});
-
 describe('the listing cursor', () => {
   const listRequest = (query: string) =>
     new Request(`https://htmlradar.com/api/v1/shares${query}`, {
@@ -653,27 +633,54 @@ describe('the listing cursor', () => {
     });
 
   it('is absent when the caller did not ask for a page', () => {
-    expect(readBefore(listRequest(''))).toEqual({ before: null });
+    expect(readBefore(listRequest(''))).toEqual({ cursor: null });
   });
 
-  it('normalises a timestamp the caller passed back', () => {
-    expect(readBefore(listRequest('?before=2026-08-30T10:00:00Z'))).toEqual({
-      before: '2026-08-30T10:00:00.000Z',
+  it('carries both halves of where the last page stopped', () => {
+    expect(readBefore(listRequest('?before=2026-08-30T10:00:00Z|share-50'))).toEqual({
+      cursor: { createdAt: '2026-08-30T10:00:00.000Z', id: 'share-50' },
+    });
+  });
+
+  // A cursor is handed out, sent back, and compared as an instant, so the
+  // round trip must survive however Postgres printed the timestamp.
+  it('hands out a cursor with no plus sign in it, and reads its own back', () => {
+    const handed = cursorOf({ created_at: '2026-08-30T10:00:00+00:00', id: 'share-50' });
+    expect(handed).toBe('2026-08-30T10:00:00.000Z|share-50');
+    expect(readBefore(listRequest(`?before=${handed}`))).toEqual({
+      cursor: { createdAt: '2026-08-30T10:00:00.000Z', id: 'share-50' },
     });
   });
 
   // Silently returning page one to a caller that asked for page four is how a
-  // paging loop becomes an infinite one.
-  it('refuses a cursor that is not a timestamp rather than ignoring it', () => {
-    const result = readBefore(listRequest('?before=yesterday'));
-    expect(result).toEqual({
-      error: {
-        status: 422,
-        body: {
-          error: 'validation',
-          message: '"before" must be an ISO 8601 timestamp, as returned in next_before.',
-        },
-      },
-    });
+  // paging loop becomes an endless one.
+  it('refuses a cursor that is not one this API handed out', () => {
+    for (const bad of ['yesterday', '2026-08-30T10:00:00Z', 'nope|id', '|share-1']) {
+      const result = readBefore(listRequest(`?before=${bad}`));
+      expect('error' in result, bad).toBe(true);
+      expect((result as { error: { status: number } }).error.status).toBe(422);
+    }
+  });
+
+  // The identifier goes into a PostgREST filter string, so the characters that
+  // would end the filter early are the ones that cannot be in it.
+  it('refuses an identifier carrying filter punctuation', () => {
+    for (const bad of [
+      '2026-08-30T10:00:00Z|a"b',
+      "2026-08-30T10:00:00Z|a'b",
+      '2026-08-30T10:00:00Z|a,b',
+    ]) {
+      expect('error' in readBefore(listRequest(`?before=${bad}`)), bad).toBe(true);
+    }
+  });
+
+  // Older by timestamp, or the same timestamp and lower by id. Both halves,
+  // because fifty rows can share a millisecond and the page boundary can fall
+  // inside them.
+  it('asks for everything strictly before the cursor, on both columns', () => {
+    expect(beforeFilter({ createdAt: '2026-08-30T10:00:00.000Z', id: 'share-50' })).toBe(
+      'created_at.lt."2026-08-30T10:00:00.000Z",' +
+        'and(created_at.eq."2026-08-30T10:00:00.000Z",id.lt."share-50")',
+    );
   });
 });

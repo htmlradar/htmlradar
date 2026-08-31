@@ -29,8 +29,11 @@ vi.mock('@/lib/api-auth', async (importOriginal) => ({
         select: () => chain,
         eq: record('eq'),
         is: record('is'),
-        lt: record('lt'),
         in: record('in'),
+        or: (expression: string) => {
+          db.filters.push({ table, op: 'or', column: 'created_at,id', value: expression });
+          return chain;
+        },
         order: () => chain,
         limit: (n: number) => {
           db.limits.push(n);
@@ -124,18 +127,33 @@ describe('GET /api/v1/documents', () => {
     ]);
   });
 
-  it('pages back with the cursor it was given, and refuses one that is not a timestamp', async () => {
-    await list('?before=2026-08-01T00:00:00Z');
+  // The same two-column cursor the share list uses, and for the same reason:
+  // documents created in one bulk run share a timestamp, and paging on the
+  // timestamp alone would drop the ones sharing the page boundary.
+  it('pages back on both columns, and refuses a cursor it did not hand out', async () => {
+    await list('?before=2026-08-01T00:00:00Z|doc-9');
     expect(db.filters).toContainEqual({
       table: 'documents',
-      op: 'lt',
-      column: 'created_at',
-      value: '2026-08-01T00:00:00.000Z',
+      op: 'or',
+      column: 'created_at,id',
+      value:
+        'created_at.lt."2026-08-01T00:00:00.000Z",' +
+        'and(created_at.eq."2026-08-01T00:00:00.000Z",id.lt."doc-9")',
     });
 
     db.filters = [];
     expect((await list('?before=nonsense')).status).toBe(422);
+    expect((await list('?before=2026-08-01T00:00:00Z')).status).toBe(422);
     expect(db.filters).toEqual([]);
+  });
+
+  it('hands back a cursor naming the timestamp and the id of its last row', async () => {
+    db.rows['documents'] = Array.from({ length: 50 }, (_, i) => ({
+      id: `doc-${String(i).padStart(3, '0')}`,
+      title: `Deck ${i}`,
+      created_at: '2026-08-30T10:00:00Z',
+    }));
+    expect((await list()).body['next_before']).toBe('2026-08-30T10:00:00.000Z|doc-049');
   });
 
   it('is an empty list, not an error, on a new account', async () => {

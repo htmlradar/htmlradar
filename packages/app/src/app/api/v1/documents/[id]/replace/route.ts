@@ -34,6 +34,7 @@ import {
   jsonResponse,
   NOT_FOUND,
   readBodyCapped,
+  REPLACE_CONFLICT,
   REQUEST_TIMEOUT,
   serviceClient,
   STORAGE_FAILED,
@@ -43,7 +44,7 @@ import {
 import { flagIfHighScore, screenUpload } from '@/lib/create-document';
 import { captureServerEvent } from '@/lib/events';
 import { logServerError } from '@/lib/error-log';
-import { r2Key, uploadHtml } from '@/lib/r2';
+import { deleteR2Object, r2Key, uploadHtml } from '@/lib/r2';
 
 export const runtime = 'edge';
 
@@ -111,8 +112,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const screen = screenUpload(bytes);
-  const nextVersion = (document.current_version ?? 0) + 1;
-  const newKey = r2Key(caller.userId, document.id as string, nextVersion);
+  const readVersion = (document.current_version as number | null) ?? 0;
+  const nextVersion = readVersion + 1;
+
+  // The object goes to a key nobody else can be writing at the same moment.
+  // Two replacements that both read version 3 both call the next one 4, and if
+  // they shared v4.html the loser's tidy-up would delete the winner's bytes
+  // and every recipient would get a 404 from a link that was working. The row
+  // is the only thing that says where a document lives (documents.r2_key is
+  // what the proxy reads; nothing anywhere rebuilds a key from the version),
+  // so the suffix costs nothing.
+  const newKey = r2Key(caller.userId, document.id as string, nextVersion).replace(
+    /\.html$/,
+    `-${crypto.randomUUID().slice(0, 8)}.html`,
+  );
 
   try {
     await uploadHtml(newKey, bytes);
@@ -128,10 +141,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return errorResponse(STORAGE_FAILED);
   }
 
+  // Compare and swap, because there is no transaction to be had here: an edge
+  // route talks to PostgREST, one statement at a time. The update only lands
+  // on a row that is still at the version this call read and is still not
+  // deleted, so of two replacements racing for version 4 exactly one wins, and
+  // a delete that landed while the bytes were uploading takes the swap with
+  // it. Returning the row is what makes the loss visible — an update that
+  // matches nothing is a success with no rows, not an error.
+  //
   // The score describes the document being served now, so it is rewritten on
   // every replace rather than kept at its highest — the same line the browser
   // path takes.
-  const { error: updateError } = await supabase
+  const { data: claimed, error: updateError } = await supabase
     .from('documents')
     .update({
       current_version: nextVersion,
@@ -141,7 +162,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       screen_signals: screen.signals,
     })
     .eq('id', document.id)
-    .eq('owner_id', caller.userId);
+    .eq('owner_id', caller.userId)
+    .eq('current_version', readVersion)
+    .is('deleted_at', null)
+    .select('id');
   if (updateError) {
     // The uploaded object is now an orphan: the row still points at the
     // previous version and every recipient still reads it. Same trade the
@@ -155,6 +179,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       context: { step: 'update_document', document_id: document.id, version: nextVersion },
     });
     return errorResponse(INTERNAL);
+  }
+
+  // Nothing matched: somebody else replaced this document, or deleted it,
+  // between the read at the top of this call and here. The bytes just uploaded
+  // belong to nothing, and this is the one moment anybody knows that, so they
+  // go now rather than waiting for a sweep.
+  if (!claimed || claimed.length === 0) {
+    try {
+      await deleteR2Object(newKey);
+    } catch {
+      // An orphaned object is the acceptable half of this failure; a 500 in
+      // place of an honest 409 is not.
+    }
+    return errorResponse(REPLACE_CONFLICT);
   }
 
   await flagIfHighScore(document.id as string, caller.userId, screen);

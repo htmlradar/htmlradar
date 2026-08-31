@@ -20,8 +20,10 @@
 import type { NextRequest } from 'next/server';
 import {
   authenticateApiKey,
+  beforeFilter,
   CHEAP_MAX,
   creationMax,
+  cursorOf,
   errorResponse,
   FREE_LIMIT_REACHED,
   INTERNAL,
@@ -474,17 +476,20 @@ export async function GET(req: NextRequest) {
   if ('error' in auth) return errorResponse(auth.error);
   const { caller } = auth;
 
-  const cursor = readBefore(req);
-  if ('error' in cursor) return errorResponse(cursor.error);
+  const page = readBefore(req);
+  if ('error' in page) return errorResponse(page.error);
 
   const supabase = serviceClient();
   let query = supabase
     .from('document_shares')
     .select('id, slug, document_id, recipient_label, created_at, revoked_at, expires_at')
     .eq('owner_id', caller.userId)
+    // Both columns, in both places: the sort and the cursor have to agree, or
+    // rows sharing a timestamp fall between two pages.
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(PAGE_SIZE);
-  if (cursor.before) query = query.lt('created_at', cursor.before);
+  if (page.cursor) query = query.or(beforeFilter(page.cursor));
 
   const { data, error } = await query;
   if (error) {
@@ -552,7 +557,7 @@ export async function GET(req: NextRequest) {
     })),
     // Only when the page was full. A short page is the end of the list, and
     // a cursor there would send the caller round one more empty request.
-    next_before: rows.length === PAGE_SIZE ? (rows[rows.length - 1]?.created_at ?? null) : null,
+    next_before: rows.length === PAGE_SIZE ? cursorOf(rows[rows.length - 1]!) : null,
   });
 }
 

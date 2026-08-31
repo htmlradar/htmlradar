@@ -24,6 +24,9 @@
 //   obfuscated-script        30  eval(atob( or unescape(%u
 //   cross-domain-form-action 25  a form posting to a registrable domain the
 //                                document names nowhere else
+//   exfiltration-script      25  one script that reads what somebody typed and
+//                                sends it to a domain the document names
+//                                nowhere else
 //   hidden-external-iframe   20  an off-screen or zero-sized iframe to another
 //                                origin
 //   meta-refresh-external    20  a meta refresh to another site
@@ -46,6 +49,7 @@ const WEIGHTS = {
   'brand-login-wording': 30,
   'obfuscated-script': 30,
   'cross-domain-form-action': 25,
+  'exfiltration-script': 25,
   'hidden-external-iframe': 20,
   'meta-refresh-external': 20,
   'single-line-script-blob': 10,
@@ -64,6 +68,13 @@ const WEIGHTS = {
  * them together stop having one.
  */
 export const SCREEN_FLAG_THRESHOLD = 50;
+
+// An image's alternative text counts as text. A kit's brand is usually a logo
+// rather than a word — <img alt="Microsoft"> above a password box — and
+// stripping every tag before looking for a brand name threw exactly that away.
+// The alt text is put where its image stood, so the proximity rule below still
+// measures the distance a reader would see.
+const IMG_ALT = /<img\b[^>]*\balt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>/gi;
 
 // The brands whose sign-in pages are actually copied, plus retail banking in
 // general. Short on purpose: every name here is one a customer's own deck may
@@ -121,18 +132,60 @@ function brandNearLoginWording(text: string): boolean {
   );
 }
 
-function postsToAnotherDomain(html: string): boolean {
+/**
+ * Every registrable domain the document links to or loads from.
+ *
+ * A document that already names a domain in a link or a script tag is not
+ * hiding its relationship with it, which is what both of the "somewhere else"
+ * signals below are actually looking for.
+ */
+function namedDomains(html: string): Set<string> {
   const named = new Set<string>();
   for (const [, url] of html.matchAll(LINKED_URL)) {
     const domain = registrableDomain(url ?? '');
     if (domain) named.add(domain);
   }
+  return named;
+}
+
+function postsToAnotherDomain(html: string, named: Set<string>): boolean {
   for (const [, action] of html.matchAll(FORM_ACTION)) {
     // A relative action posts back to the document's own origin, which on a
     // hosted document is our sandbox and goes nowhere.
     if (!/^https?:\/\//i.test(action ?? '')) continue;
     const domain = registrableDomain(action!);
     if (domain && !named.has(domain)) return true;
+  }
+  return false;
+}
+
+// A credential collector does not need a <form action>. It reads the box with
+// JavaScript and posts the value itself, which is why the form signal above
+// misses it entirely.
+const SENDS =
+  /(fetch\s*\(|navigator\.sendbeacon\s*\(|new\s+xmlhttprequest\b|new\s+websocket\s*\()/i;
+const READS_TYPED_INPUT =
+  /(\.value\b|new\s+formdata\s*\(|document\.forms\b|\.elements\s*\[|getelementbyid\s*\([^)]*(pass|pwd|email|user))/i;
+const URL_IN_SCRIPT = /https?:\/\/[^"'`\s)]+/gi;
+
+/**
+ * One script that reads what somebody typed and sends it to a stranger.
+ *
+ * All three parts have to be in the same script: the read, the send, and an
+ * absolute address whose domain the document does not name anywhere else. Any
+ * two of them are ordinary — a form that posts to its own backend, an
+ * analytics call, a bundled library holding a documentation URL — and it is
+ * the three together, in one script, that stop having an innocent reading.
+ * Even then it is 25, which flags nothing on its own.
+ */
+function exfiltrationScript(html: string, named: Set<string>): boolean {
+  for (const [, body] of html.matchAll(SCRIPT_BODY)) {
+    const script = (body ?? '').toLowerCase();
+    if (!SENDS.test(script) || !READS_TYPED_INPUT.test(script)) continue;
+    for (const [url] of script.matchAll(URL_IN_SCRIPT)) {
+      const domain = registrableDomain(url);
+      if (domain && !named.has(domain)) return true;
+    }
   }
   return false;
 }
@@ -171,12 +224,17 @@ function longestScriptLine(html: string): number {
  * in a stable order so two uploads of the same file store the same array.
  */
 export function screenHtml(html: string): ScreenResult {
-  const text = html.toLowerCase().replace(TAG_SOUP, ' ');
+  const text = html
+    .toLowerCase()
+    .replace(IMG_ALT, (_tag, quoted, single, bare) => ` ${quoted ?? single ?? bare ?? ''} `)
+    .replace(TAG_SOUP, ' ');
+  const named = namedDomains(html);
   const found: Record<keyof typeof WEIGHTS, boolean> = {
     'password-input': /<input\b[^>]*\btype\s*=\s*["']?password/i.test(html),
     'brand-login-wording': brandNearLoginWording(text),
     'obfuscated-script': /eval\s*\(\s*atob\s*\(|unescape\s*\(\s*["']?%u/i.test(html),
-    'cross-domain-form-action': postsToAnotherDomain(html),
+    'cross-domain-form-action': postsToAnotherDomain(html, named),
+    'exfiltration-script': exfiltrationScript(html, named),
     'hidden-external-iframe': hiddenExternalIframe(html),
     'meta-refresh-external': metaRefreshOffsite(html),
     'single-line-script-blob': longestScriptLine(html) > 10_000,

@@ -74,10 +74,9 @@ export interface ApiCaller {
    * What the key itself may do (schema/040). A read-only key authenticates
    * exactly like a full one and is refused at the routes that write, so a
    * watching assistant can hold a credential that cannot publish, revoke or
-   * replace anything. The column holds exactly 'full' or 'read_only'; the read
-   * fails closed, so anything else is treated as 'read_only' (see scopeOf). A
-   * key created before 040 has no column to read and stays 'full', which is
-   * what it has always been.
+   * replace anything. The column holds exactly 'full' or 'read_only', and the
+   * read fails closed: anything else at all is treated as 'read_only' (see
+   * scopeOf).
    */
   scope: ApiKeyScope;
 }
@@ -109,24 +108,78 @@ export const CHEAP_MAX = 120;
 export const PAGE_SIZE = 50;
 
 /**
+ * Where the last page of a listing stopped: a timestamp and the identifier of
+ * the row that carried it.
+ *
+ * Both halves, because a timestamp alone loses rows. Fifty is a page and
+ * `created_at` is not unique — a loop creating links, or a backfill, writes
+ * many rows in the same millisecond — so "everything older than the last
+ * timestamp I saw" silently skips every other row that shares it. The pair is
+ * unique, and comparing on the pair is the whole fix.
+ */
+export interface PageCursor {
+  createdAt: string;
+  id: string;
+}
+
+/** The cursor a client sends back: the timestamp, a bar, the identifier. */
+export const CURSOR_FORMAT = '<created_at>|<id>';
+
+/**
+ * What a page hands back as `next_before`, for the caller to send again.
+ *
+ * The timestamp is normalised to UTC with a trailing Z rather than passed
+ * through as Postgres printed it, because Postgres prints `+00:00` and a plus
+ * sign in a query string decodes as a space. A cursor that stops working the
+ * moment somebody forgets to escape it is a cursor that will stop working.
+ */
+export function cursorOf(row: { created_at: string; id: string }): string {
+  return `${new Date(row.created_at).toISOString()}|${row.id}`;
+}
+
+/**
+ * The PostgREST filter for "strictly older than this cursor", in the order the
+ * two lists sort by (created_at descending, then id descending).
+ *
+ * Written out rather than expressed as two `.lt()` calls, because a row is
+ * before the cursor when its timestamp is older OR its timestamp is equal and
+ * its identifier is lower — which is one OR and cannot be two filters. Both
+ * values are quoted: a timestamp carries a `+` and a `:`, and an unquoted
+ * value would be parsed as part of the filter.
+ */
+export function beforeFilter(cursor: PageCursor): string {
+  return `created_at.lt."${cursor.createdAt}",and(created_at.eq."${cursor.createdAt}",id.lt."${cursor.id}")`;
+}
+
+/**
  * The `before` cursor of a listing request, or the response to send instead.
  *
- * The cursor is the `created_at` of the last row of the previous page, handed
- * back as `next_before`, so paging is a timestamp comparison and needs no
- * server-side state. Anything that is not a timestamp is refused rather than
+ * Anything that is not a cursor this API handed out is refused rather than
  * quietly ignored: silently returning page one to a caller that asked for
- * page four is how a loop becomes infinite.
+ * page four is how a paging loop becomes an endless one.
  */
-export function readBefore(req: Request): { before: string | null } | { error: ApiErrorResponse } {
+export function readBefore(
+  req: Request,
+): { cursor: PageCursor | null } | { error: ApiErrorResponse } {
   const raw = new URL(req.url).searchParams.get('before');
-  if (!raw) return { before: null };
-  const when = new Date(raw);
-  if (Number.isNaN(when.getTime())) {
+  if (!raw) return { cursor: null };
+
+  const bar = raw.lastIndexOf('|');
+  const createdAt = bar === -1 ? '' : raw.slice(0, bar);
+  const id = bar === -1 ? '' : raw.slice(bar + 1);
+  const when = new Date(createdAt);
+  // The identifier is checked for shape, not for existence: a cursor naming a
+  // row that has since been deleted still says exactly where the last page
+  // stopped, and that is all it is for.
+  if (!id || Number.isNaN(when.getTime()) || /["',()]/.test(id)) {
     return {
-      error: validationError('"before" must be an ISO 8601 timestamp, as returned in next_before.'),
+      error: validationError(
+        `"before" must be the next_before value from the previous page, of the form ${CURSOR_FORMAT}.`,
+      ),
     };
   }
-  return { before: when.toISOString() };
+  // Normalised, so a cursor is compared as an instant however it was printed.
+  return { cursor: { createdAt: when.toISOString(), id } };
 }
 
 // Every public API limit is per hour. One window keeps the buckets, the
@@ -328,51 +381,37 @@ export async function authenticateApiKey(req: Request, limit: ApiLimit): Promise
 /**
  * The stored scope, read so that only the exact word grants full access.
  *
- * Fails closed. `full` and `read_only` are the only two values the column may
- * hold (schema/040 has the CHECK), so anything else is a row nobody meant to
- * write — a hand-edited value, a typo, a value from a later migration this
- * build has never heard of — and the safe reading of a value we do not
- * understand is the weakest one, not the strongest. Reversed, a single typo in
- * a scope column would hand an agent every power the account has.
- *
- * `undefined` is the one value that means full, and it is not a value: it is
- * the column not existing yet, which is every key today (see findKeyRow).
+ * Fails closed, with no exceptions left. `full` and `read_only` are the only
+ * two values the column may hold (schema/040 has the CHECK and is applied), so
+ * anything else is a row nobody meant to write — a hand-edited value, a typo,
+ * a missing column, a value from a later migration this build has never heard
+ * of — and the safe reading of a value we do not understand is the weakest
+ * one, not the strongest. Reversed, a single wrong character would hand an
+ * agent every power the account has.
  */
 function scopeOf(stored: string | null | undefined): ApiKeyScope {
-  if (stored === undefined) return 'full';
   return stored === 'full' ? 'full' : 'read_only';
 }
 
 /**
  * The key row, with `last_used_at` stamped in the same statement.
  *
- * ponytail: schema/040 adds `scope`, and migrations here are a human pasting
- * SQL into an editor after the deploy has already landed. Between those two
- * moments a select naming the column fails, and every API request with it, so
- * the read falls back to the columns that have always existed and the key
- * behaves as the full-access key it is today. Delete the fallback once 040 is
- * applied.
+ * One statement, one shape: schema/040 is applied, so `scope` is a column like
+ * any other. A failed read is a failed request — there is no second attempt
+ * that drops a column and no path on which a key authenticates with less than
+ * the whole row behind it.
  */
 async function findKeyRow(
   supabase: ReturnType<typeof serviceClient>,
   keyHash: string,
 ): Promise<{ id: string; user_id: string; scope?: string | null } | null> {
-  const stamp = { last_used_at: new Date().toISOString() };
-  const lookup = (columns: string) =>
-    supabase
-      .from('api_keys')
-      .update(stamp)
-      .eq('key_hash', keyHash)
-      .is('revoked_at', null)
-      .select(columns)
-      .maybeSingle();
-
-  const { data, error } = await lookup('id, user_id, scope');
-  if (error && /scope/.test(error.message)) {
-    console.warn('[api] api_keys has no scope column yet — schema/040 is not applied');
-    const fallback = await lookup('id, user_id');
-    return (fallback.data as { id: string; user_id: string } | null) ?? null;
-  }
+  const { data } = await supabase
+    .from('api_keys')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('key_hash', keyHash)
+    .is('revoked_at', null)
+    .select('id, user_id, scope')
+    .maybeSingle();
   return (data as { id: string; user_id: string; scope?: string | null } | null) ?? null;
 }
 
@@ -488,6 +527,24 @@ export const READ_ONLY_KEY: ApiErrorResponse = {
  * A key must not be usable to probe for the ids of other accounts.
  */
 export const NOT_FOUND: ApiErrorResponse = { status: 404, body: { error: 'not_found' } };
+
+/**
+ * Somebody else changed the document while this replacement was in flight.
+ *
+ * 409 rather than 500: nothing is broken and nothing was written. The caller's
+ * bytes were uploaded against a version that is no longer the current one, so
+ * the right move is to look at what the document says now and decide again —
+ * which is a decision for the person, not a retry for the agent.
+ */
+export const REPLACE_CONFLICT: ApiErrorResponse = {
+  status: 409,
+  body: {
+    error: 'conflict',
+    message:
+      'This document changed while the replacement was being uploaded, so nothing was replaced. ' +
+      'Read the current version before trying again.',
+  },
+};
 
 export const FREE_LIMIT_REACHED: ApiErrorResponse = {
   status: 402,

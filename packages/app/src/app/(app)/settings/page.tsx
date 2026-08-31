@@ -346,25 +346,19 @@ async function createApiKeyAction(
   const cleanScope = scope === 'full' ? 'full' : 'read_only';
   const key = generateApiKey();
 
-  const row = {
-    user_id: user.id,
-    key_hash: await hashApiKey(key),
-    key_prefix: apiKeyPrefix(key),
-    label: cleanLabel,
-  };
-
-  const insert = (values: Record<string, unknown>) =>
-    serverClient().from('api_keys').insert(values);
-
-  let { error } = await insert({ ...row, scope: cleanScope });
-  // ponytail: schema/040 is applied by hand after the deploy that needs it, so
-  // between the two a key naming `scope` cannot be written at all. A key made
-  // in that window is a full-access key, which is what every key was before
-  // this. Delete this fallback once 040 has been applied.
-  if (error && /scope/.test(error.message)) {
-    console.warn('[api] api_keys has no scope column yet — schema/040 is not applied');
-    ({ error } = await insert(row));
-  }
+  // One insert, and it always names the scope. A retry that dropped the column
+  // would answer "created" to somebody who asked for a read-only key and hand
+  // them a full-access one, which is the failure worth being loud about: if
+  // this write cannot be made as asked, it is not made at all.
+  const { error } = await serverClient()
+    .from('api_keys')
+    .insert({
+      user_id: user.id,
+      key_hash: await hashApiKey(key),
+      key_prefix: apiKeyPrefix(key),
+      label: cleanLabel,
+      scope: cleanScope,
+    });
   if (error) {
     // The ten-live-keys cap is a trigger on api_keys (schema/034), because the
     // insert policy lets a signed-in session write key rows straight through

@@ -483,7 +483,8 @@ export function createServer(config: Config): McpServer {
         'wants to know whether it was read. Pass the markup itself in `html`; this tool does ' +
         'not read files, so if the document is already on disk, read it with your own file ' +
         'tools first — that way the permissions the user set on those tools still apply. ' +
-        'Ask the user before publishing anything you did not just write for them.',
+        'Never call this tool unless the user explicitly asked you to publish or create a ' +
+        'tracked link.',
       inputSchema: shareHtmlShape,
       annotations: {
         title: 'Share HTML as a tracked link',
@@ -505,7 +506,9 @@ export function createServer(config: Config): McpServer {
         'its own recipient label, gate, password, expiry and address. Use it whenever the same ' +
         'document goes to more than one person: one link per recipient is what separates their ' +
         'reading reports. It uploads nothing and creates no second copy — pass the document id ' +
-        'from list_shares, or the one share_html returned. To publish new HTML, use share_html.',
+        'from list_shares, or the one share_html returned. To publish new HTML, use share_html. ' +
+        'Never call this tool unless the user explicitly asked you to publish or create a ' +
+        'tracked link.',
       inputSchema: createShareShape,
       annotations: {
         title: 'Make another tracked link for an existing document',
@@ -533,8 +536,9 @@ export function createServer(config: Config): McpServer {
           .string()
           .optional()
           .describe(
-            'Cursor for the next page: the `next_before` timestamp printed at the end of a ' +
-              'previous list_shares result. Omit for the most recent links.',
+            'Cursor for the next page: the `next_before` value printed at the end of a previous ' +
+              'list_shares result, of the form <created_at>|<share id>. Pass it back exactly as ' +
+              'printed. Omit for the most recent links.',
           ),
       },
       annotations: {

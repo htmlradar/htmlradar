@@ -679,6 +679,19 @@ describe('the tools the server publishes', () => {
     expect(tool?.description).toMatch(/never deletes anything/i);
   });
 
+  // No "unless you just wrote it" exception: the assistant having produced the
+  // document is not the user having asked for it to be published.
+  it('forbids publishing that the user did not ask for, in both publishing tools', async () => {
+    const sentence =
+      'Never call this tool unless the user explicitly asked you to publish or create a tracked link.';
+    const tools = await listTools();
+    for (const name of ['share_html', 'create_share']) {
+      const tool = tools.find((t) => t.name === name);
+      expect(tool?.description, name).toContain(sentence);
+      expect(tool?.description, name).not.toMatch(/did not just write/);
+    }
+  });
+
   it('says that replacing keeps the links and screens the new contents', async () => {
     const tool = (await listTools()).find((t) => t.name === 'replace_document');
     expect(tool?.description).toMatch(/Every existing link stays exactly as it is/);

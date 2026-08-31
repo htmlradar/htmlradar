@@ -7,7 +7,10 @@ import { mcpInstallCommands } from './mcp-install-commands';
 // a file name and this file is not changed with it, these cases fail — which
 // is the whole point of pinning them.
 
-const KEY = 'hr_live_0123456789abcdef0123456789abcdef01234567';
+// Deliberately a repeating pattern rather than random-looking hex. A real key
+// is 40 hexadecimal characters, and a realistic fixture has enough entropy that
+// the gitleaks step in CI reports it as a leaked credential. Keep the repeat.
+const KEY = 'hr_live_deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
 
 const EXPECTED: Record<string, string> = {
   'claude-code-plugin': `export HTMLRADAR_API_KEY=${KEY}

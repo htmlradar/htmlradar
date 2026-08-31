@@ -4,12 +4,17 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { loadConfig, type Config } from '../src/api.js';
 import {
   createServer,
+  createShare,
   formatDuration,
   formatScroll,
   formatSectionTime,
   getShareActivity,
+  listShares,
   MAX_HTML_BYTES,
+  replaceDocument,
+  revokeShare,
   shareHtml,
+  UNTRUSTED_NOTICE,
   whoami,
 } from '../src/server.js';
 
@@ -405,5 +410,285 @@ describe('formatters', () => {
     expect(formatScroll(0.87)).toBe('87%');
     expect(formatScroll(87)).toBe('87%');
     expect(formatScroll(1)).toBe('100%');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0.2.0: another link on an existing document, listing, revoking, replacing,
+// and the reading detail that is off unless asked for.
+// ---------------------------------------------------------------------------
+
+describe('create_share', () => {
+  it('posts the document id and the link options, and nothing else', async () => {
+    const fetchMock = mockFetch(201, {
+      share_id: 'shr_2',
+      document_id: 'doc_1',
+      url: 'https://htmlradar.page/r/acme-two',
+      dashboard_url: 'https://htmlradar.com/docs/doc_1',
+    });
+
+    await createShare(config, {
+      document_id: ' doc_1 ',
+      require_email: true,
+      recipient_label: 'Beta Corp',
+      expires_in_hours: 72,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://htmlradar.com/api/v1/shares');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      document_id: 'doc_1',
+      require_email: true,
+      recipient_label: 'Beta Corp',
+      expires_in_hours: 72,
+    });
+  });
+
+  // Publishing new markup is share_html's job. A tool that quietly accepted
+  // html here would be a second upload path with none of share_html's checks.
+  it('takes no html, and says which tool does', async () => {
+    const fetchMock = mockFetch(201, {});
+    const result = await createShare(config, { document_id: '  ', require_email: true });
+    expect(result.isError).toBe(true);
+    expect(body(result)).toMatch(/`document_id` is required/);
+    expect(body(result)).toMatch(/use share_html instead/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the new link the same way share_html does', async () => {
+    mockFetch(201, {
+      share_id: 'shr_2',
+      document_id: 'doc_1',
+      url: 'https://htmlradar.page/r/acme-two',
+      dashboard_url: 'https://htmlradar.com/docs/doc_1',
+    });
+    const text = body(await createShare(config, { document_id: 'doc_1', require_email: true }));
+    expect(text).toContain('https://htmlradar.page/r/acme-two');
+    expect(text).toContain('shr_2');
+  });
+});
+
+const LISTED = {
+  shares: [
+    {
+      share_id: 'shr_1',
+      slug: 'acme-deck',
+      url: 'https://htmlradar.page/r/acme-deck',
+      recipient_label: 'Acme',
+      document_id: 'doc_1',
+      document_title: 'Q3 proposal',
+      created_at: '2026-08-30T10:00:00Z',
+      revoked: false,
+      expired: false,
+      opened: true,
+      last_open: '2026-08-31T09:00:00Z',
+    },
+  ],
+  next_before: null,
+};
+
+describe('list_shares', () => {
+  it('prints the identifiers the other tools take', async () => {
+    mockFetch(200, LISTED);
+    const text = body(await listShares(config, {}));
+    expect(text).toContain('acme-deck');
+    expect(text).toContain('Q3 proposal');
+    expect(text).toContain('share shr_1 · document doc_1');
+    expect(text).toContain('opened, last 2026-08-31T09:00:00Z');
+    expect(text).toContain('live');
+  });
+
+  // Recipient labels and document titles are text somebody else wrote, and
+  // this result is read by a model.
+  it('marks the customer-written text as data', async () => {
+    mockFetch(200, LISTED);
+    expect(body(await listShares(config, {}))).toContain(UNTRUSTED_NOTICE);
+  });
+
+  it('says a link is switched off or expired rather than live', async () => {
+    mockFetch(200, {
+      shares: [
+        { ...LISTED.shares[0], revoked: true },
+        { ...LISTED.shares[0], share_id: 'shr_2', slug: 'old', expired: true, opened: false },
+      ],
+      next_before: null,
+    });
+    const text = body(await listShares(config, {}));
+    expect(text).toContain('switched off');
+    expect(text).toContain('expired');
+    expect(text).toContain('not opened');
+  });
+
+  it('passes the cursor through and tells the agent how to ask for the next page', async () => {
+    const fetchMock = mockFetch(200, { ...LISTED, next_before: '2026-08-01T00:00:00Z' });
+    const text = body(await listShares(config, { before: '2026-08-15T00:00:00Z' }));
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://htmlradar.com/api/v1/shares?before=2026-08-15T00%3A00%3A00Z',
+    );
+    expect(text).toContain('before: "2026-08-01T00:00:00Z"');
+  });
+
+  it('says plainly when there is nothing to list', async () => {
+    mockFetch(200, { shares: [], next_before: null });
+    expect(body(await listShares(config, {}))).toMatch(/No tracked links on this account yet/);
+  });
+});
+
+describe('revoke_share', () => {
+  it('switches a link off by default and explains what a recipient now sees', async () => {
+    const fetchMock = mockFetch(200, {
+      share_id: 'shr_1',
+      url: 'https://htmlradar.page/r/acme-deck',
+      revoked: true,
+      revoked_at: '2026-08-31T10:00:00Z',
+    });
+    const text = body(await revokeShare(config, { share_id: 'acme-deck' }));
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://htmlradar.com/api/v1/shares/acme-deck/revoke');
+    expect(JSON.parse(init.body as string)).toEqual({ revoked: true });
+    expect(text).toMatch(/no longer available/);
+    expect(text).toMatch(/revoked: false to put it back/);
+  });
+
+  it('puts a link back when asked', async () => {
+    const fetchMock = mockFetch(200, {
+      share_id: 'shr_1',
+      url: 'https://htmlradar.page/r/acme-deck',
+      revoked: false,
+      revoked_at: null,
+    });
+    const text = body(await revokeShare(config, { share_id: 'shr_1', revoked: false }));
+    expect(JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string)).toEqual({
+      revoked: false,
+    });
+    expect(text).toMatch(/switched back on/);
+  });
+
+  it('needs an identifier, and never reaches the network without one', async () => {
+    const fetchMock = mockFetch(200, {});
+    const result = await revokeShare(config, { share_id: '  ' });
+    expect(result.isError).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('replace_document', () => {
+  it('sends the new markup and reports that the links did not change', async () => {
+    const fetchMock = mockFetch(200, {
+      document_id: 'doc_1',
+      version: 4,
+      links_unchanged: true,
+    });
+    const text = body(
+      await replaceDocument(config, { document_id: 'doc_1', html: '<h1>Version four</h1>' }),
+    );
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://htmlradar.com/api/v1/documents/doc_1/replace');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ html: '<h1>Version four</h1>' });
+    expect(text).toContain('version 4');
+    expect(text).toMatch(/Every existing link is unchanged/);
+  });
+
+  it('refuses an oversized or missing document before the network', async () => {
+    const fetchMock = mockFetch(200, {});
+    expect((await replaceDocument(config, { document_id: '', html: '<p/>' })).isError).toBe(true);
+    expect((await replaceDocument(config, { document_id: 'doc_1', html: '  ' })).isError).toBe(
+      true,
+    );
+    const big = await replaceDocument(config, {
+      document_id: 'doc_1',
+      html: 'x'.repeat(MAX_HTML_BYTES + 1),
+    });
+    expect(big.isError).toBe(true);
+    expect(body(big)).toMatch(/the limit is 5\.0 MB/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reading detail on the activity report', () => {
+  it('asks for it only when the caller does', async () => {
+    const fetchMock = mockFetch(200, { share_id: 'shr_1', url: 'u', opened: false, viewers: [] });
+    await getShareActivity(config, { share_id: 'shr_1' });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://htmlradar.com/api/v1/shares/shr_1/activity');
+
+    await getShareActivity(config, { share_id: 'shr_1', include_detail: true });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://htmlradar.com/api/v1/shares/shr_1/activity?include_detail=true',
+    );
+  });
+
+  it('prints where and on what, when the report carries it', async () => {
+    mockFetch(200, {
+      share_id: 'shr_1',
+      url: 'https://htmlradar.page/r/acme-deck',
+      opened: true,
+      viewers: [
+        {
+          label: 'Acme',
+          email: 'jane@acme.com',
+          first_open: '2026-08-30T18:00:00Z',
+          last_seen: '2026-08-30T18:04:00Z',
+          active_seconds: 120,
+          max_scroll: 0.9,
+          sections: [],
+          detail: {
+            country: 'FR',
+            city: 'Paris',
+            device: 'mobile',
+            referrer: 'https://mail.google.com/',
+          },
+        },
+      ],
+    });
+    const text = body(await getShareActivity(config, { share_id: 'shr_1', include_detail: true }));
+    expect(text).toContain('Paris, FR · on mobile · from https://mail.google.com/');
+  });
+});
+
+describe('the tools the server publishes', () => {
+  async function listTools() {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await createServer(config).connect(serverSide);
+    const client = new Client({ name: 'test', version: '0.0.0' });
+    await client.connect(clientSide);
+    return (await client.listTools()).tools;
+  }
+
+  it('publishes all seven, and no delete', async () => {
+    const names = (await listTools()).map((tool) => tool.name).sort();
+    expect(names).toEqual([
+      'create_share',
+      'get_share_activity',
+      'list_shares',
+      'replace_document',
+      'revoke_share',
+      'share_html',
+      'whoami',
+    ]);
+    expect(names.some((name) => name.includes('delete'))).toBe(false);
+  });
+
+  // The description is the only place an assistant learns that this changes
+  // what a recipient can see, so it has to ask for confirmation there.
+  it('tells the assistant to confirm before switching a link off', async () => {
+    const tool = (await listTools()).find((t) => t.name === 'revoke_share');
+    expect(tool?.description).toMatch(/confirm with the user/i);
+    expect(tool?.description).toMatch(/reversible/i);
+    expect(tool?.description).toMatch(/never deletes anything/i);
+  });
+
+  it('says that replacing keeps the links and screens the new contents', async () => {
+    const tool = (await listTools()).find((t) => t.name === 'replace_document');
+    expect(tool?.description).toMatch(/Every existing link stays exactly as it is/);
+    expect(tool?.description).toMatch(/screened for phishing signals/);
+  });
+
+  it('makes the reading detail optional and says why', async () => {
+    const tool = (await listTools()).find((t) => t.name === 'get_share_activity');
+    const detail = tool?.inputSchema.properties?.['include_detail'] as { description?: string };
+    expect(detail.description).toMatch(/Off by default/);
+    expect(tool?.inputSchema.required ?? []).not.toContain('include_detail');
   });
 });

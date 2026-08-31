@@ -27,6 +27,14 @@ export interface ActivitySection {
   time_seconds: number;
 }
 
+/** Only present when the call asked for it — see get_share_activity's include_detail. */
+export interface ActivityDetail {
+  country: string | null;
+  city: string | null;
+  device: string | null;
+  referrer: string | null;
+}
+
 export interface ActivityViewer {
   label: string | null;
   email: string | null;
@@ -35,6 +43,40 @@ export interface ActivityViewer {
   active_seconds: number;
   max_scroll: number;
   sections: ActivitySection[];
+  detail?: ActivityDetail;
+}
+
+export interface ShareListItem {
+  share_id: string;
+  slug: string;
+  url: string;
+  recipient_label: string | null;
+  document_id: string;
+  document_title: string | null;
+  created_at: string;
+  revoked: boolean;
+  expired: boolean;
+  opened: boolean;
+  last_open: string | null;
+}
+
+export interface ShareListResponse {
+  shares: ShareListItem[];
+  /** The cursor for the next page, or null when this was the last one. */
+  next_before: string | null;
+}
+
+export interface RevokeResponse {
+  share_id: string;
+  url: string;
+  revoked: boolean;
+  revoked_at: string | null;
+}
+
+export interface ReplaceResponse {
+  document_id: string;
+  version: number;
+  links_unchanged: boolean;
 }
 
 export interface ActivityResponse {
@@ -139,6 +181,16 @@ function errorMessage(status: number, payload: unknown): string {
       ]
         .filter(Boolean)
         .join('\n');
+    case 'read_only_key':
+      // Also relayed rather than retried: the key is fine, it simply does not
+      // have this power, and only the user can decide to hand over one that
+      // does.
+      return [
+        body.message ??
+          'This HTMLRadar API key is read-only and cannot create, revoke or replace anything.',
+        'Do not retry this call — tell the user, who can create a full-access key at ' +
+          'https://htmlradar.com/settings.',
+      ].join('\n');
     case 'too_large':
       return `That HTML is too large for HTMLRadar. Maximum accepted size is ${
         body.max_bytes ?? 'unknown'

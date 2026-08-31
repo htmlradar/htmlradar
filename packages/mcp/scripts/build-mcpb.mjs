@@ -14,7 +14,15 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const stage = 'dist/mcpb';
 const out = 'dist/htmlradar.mcpb';
-const TOOL_NAMES = ['share_html', 'get_share_activity', 'whoami'];
+const TOOL_NAMES = [
+  'share_html',
+  'create_share',
+  'list_shares',
+  'get_share_activity',
+  'revoke_share',
+  'replace_document',
+  'whoami',
+];
 
 // Smithery's release API rejects a manifest whose tools have no inputSchema.
 // Rather than re-deriving JSON Schema from the zod shapes in src/server.ts
@@ -54,7 +62,9 @@ const manifest = {
     'opened it, how long they read, how far they scrolled and which sections held their ' +
     'attention. Needs an HTMLRadar API key from https://htmlradar.com/settings. Free for two ' +
     'tracked links.',
-  author: { name: 'HTMLRadar', email: 'hello@htmlradar.com', url: 'https://htmlradar.com' },
+  // The directories that read this expect the author URL to be the place the
+  // source lives, not the product's marketing page.
+  author: { name: 'HTMLRadar', email: 'hello@htmlradar.com', url: 'https://github.com/htmlradar' },
   repository: { type: 'git', url: 'https://github.com/htmlradar/htmlradar' },
   homepage: 'https://htmlradar.com/mcp',
   documentation: 'https://htmlradar.com/mcp',
@@ -75,9 +85,29 @@ const manifest = {
       inputSchema: toolSchemas.share_html,
     },
     {
+      name: 'create_share',
+      description: 'Make another tracked link for a document that already exists.',
+      inputSchema: toolSchemas.create_share,
+    },
+    {
+      name: 'list_shares',
+      description: "List the account's tracked links, newest first.",
+      inputSchema: toolSchemas.list_shares,
+    },
+    {
       name: 'get_share_activity',
       description: 'Report who opened a tracked link, for how long, and which sections they read.',
       inputSchema: toolSchemas.get_share_activity,
+    },
+    {
+      name: 'revoke_share',
+      description: 'Switch a tracked link off, or back on. Never deletes anything.',
+      inputSchema: toolSchemas.revoke_share,
+    },
+    {
+      name: 'replace_document',
+      description: 'Replace a document, keeping every existing link working.',
+      inputSchema: toolSchemas.replace_document,
     },
     {
       name: 'whoami',

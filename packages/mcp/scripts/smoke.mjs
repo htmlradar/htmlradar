@@ -59,7 +59,7 @@ for (const tool of list.result.tools) {
     `    input: ${Object.keys(tool.inputSchema?.properties ?? {}).join(', ') || '(none)'}`,
   );
 }
-if (list.result.tools.length !== 3) {
-  console.error(`expected 3 tools, got ${list.result.tools.length}`);
+if (list.result.tools.length !== 7) {
+  console.error(`expected 7 tools, got ${list.result.tools.length}`);
   process.exit(1);
 }

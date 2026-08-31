@@ -3,6 +3,44 @@
 All notable changes to `htmlradar-mcp`. The plugin at `plugins/htmlradar` pins one of these versions
 in its `.mcp.json`; direct installs (`npx -y htmlradar-mcp`) always run the latest.
 
+## 0.2.0 — 2026-08-31
+
+The server could publish and it could report. It could not find anything it had not just made, make
+a second link for a document, put new contents behind links already sent, or take a link down.
+This release is those four.
+
+### Added
+
+- `create_share` makes another tracked link for a document that already exists, with its own
+  recipient label, gate, password, expiry and address. Sending one deck to twenty people is now one
+  stored document and twenty links rather than twenty copies, which is also how the dashboard was
+  designed to read. It uploads nothing.
+- `list_shares` lists the account's links, newest first, fifty at a time with a cursor for older
+  ones: the slug, the recipient label, the document title, whether it has been opened and when, and
+  the share and document ids the other tools take. Without it, `get_share_activity` only worked in
+  the conversation that created the link.
+- `revoke_share` switches a link off, and back on again with `revoked: false`. It is the undo a
+  tool that can publish needed. There is no delete tool and there will not be one: revoking is
+  reversible, deleting is not, and deleting stays on the website.
+- `replace_document` puts new contents behind every existing link. Same addresses, same settings,
+  same reading history, and the recipient sees the new version the next time they open the link
+  they already have. The new HTML goes through the same phishing screen every upload does, and the
+  previous version is kept in the document's history.
+- `get_share_activity` takes `include_detail`, which adds each reader's country, city, device and
+  referrer. Off by default on purpose: that is a named person's location and device, and the
+  ordinary question — was it read, and which parts — is answered without it.
+- API keys can be read-only. A key created as read-only on
+  [htmlradar.com/settings](https://htmlradar.com/settings) can list and read activity and is
+  refused, with an explanation, on creating, revoking and replacing. Give a watching or reporting
+  assistant one of those.
+
+### Changed
+
+- The hourly creation limit is 75 links an hour on Pro, up from 30. Free stays at 30. A hundred
+  personalised links now fit inside ninety minutes.
+- The Claude Code plugin pins `htmlradar-mcp@0.2.0`.
+- The bundle manifest's author URL is now `https://github.com/htmlradar`.
+
 ## 0.1.2 — 2026-08-30
 
 ### Added

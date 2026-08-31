@@ -1,4 +1,4 @@
-// The three HTMLRadar tools, and the MCP server that exposes them.
+// The seven HTMLRadar tools, and the MCP server that exposes them.
 //
 // Handlers are exported separately from `createServer` so the tests can call
 // them with a mocked `fetch` and no transport.
@@ -12,6 +12,9 @@ import {
   type ActivityViewer,
   type Config,
   type MeResponse,
+  type ReplaceResponse,
+  type RevokeResponse,
+  type ShareListResponse,
   type ShareResponse,
 } from './api.js';
 
@@ -19,14 +22,11 @@ import {
 // be accepted does not travel the network first.
 export const MAX_HTML_BYTES = 5 * 1024 * 1024;
 
-const shareHtmlShape = {
-  html: z
-    .string()
-    .describe(
-      'The HTML markup to publish, in full. If the document is a file on disk, read it with ' +
-        'your own file tools and pass the contents here.',
-    ),
-  title: z.string().optional().describe('Name shown on your dashboard. Recipients do not see it.'),
+// The settings every link carries, whatever it was made from. share_html
+// takes these with the markup; create_share takes them with the id of a
+// document that already exists. One shape, so the two tools cannot come to
+// offer different options for the same thing.
+const linkOptionsShape = {
   recipient_label: z
     .string()
     .optional()
@@ -59,8 +59,39 @@ const shareHtmlShape = {
     .describe('Custom link name, so the URL reads /r/acme-proposal. Paid plans only.'),
 };
 
-const OPTIONAL_SHARE_FIELDS = [
-  'title',
+const shareHtmlShape = {
+  html: z
+    .string()
+    .describe(
+      'The HTML markup to publish, in full. If the document is a file on disk, read it with ' +
+        'your own file tools and pass the contents here.',
+    ),
+  title: z.string().optional().describe('Name shown on your dashboard. Recipients do not see it.'),
+  ...linkOptionsShape,
+};
+
+const createShareShape = {
+  document_id: z
+    .string()
+    .describe(
+      'The document to make another link for — the document id from list_shares, or the one ' +
+        'share_html returned when the document was first published.',
+    ),
+  ...linkOptionsShape,
+};
+
+const replaceDocumentShape = {
+  document_id: z
+    .string()
+    .describe('The document whose contents are being replaced. Every link to it keeps working.'),
+  html: z
+    .string()
+    .describe(
+      'The new HTML markup, in full. It replaces the document; there is no partial update.',
+    ),
+};
+
+const OPTIONAL_LINK_FIELDS = [
   'recipient_label',
   'password',
   'lock_deck',
@@ -69,7 +100,10 @@ const OPTIONAL_SHARE_FIELDS = [
   'slug',
 ] as const;
 
+const OPTIONAL_SHARE_FIELDS = ['title', ...OPTIONAL_LINK_FIELDS] as const;
+
 export type ShareHtmlArgs = z.infer<z.ZodObject<typeof shareHtmlShape>>;
+export type CreateShareArgs = z.infer<z.ZodObject<typeof createShareShape>>;
 
 export async function shareHtml(config: Config, args: ShareHtmlArgs): Promise<CallToolResult> {
   const html = args.html;
@@ -98,9 +132,135 @@ export async function shareHtml(config: Config, args: ShareHtmlArgs): Promise<Ca
   return text(formatShare(result.data, args.require_email));
 }
 
+/**
+ * Another link on a document that already exists.
+ *
+ * The difference from share_html is the whole point: no second copy of the
+ * file, one dashboard entry, and a separate reading report per recipient.
+ * Nothing is uploaded, so nothing is screened — the document went through the
+ * upload screen when it was first published.
+ */
+export async function createShare(config: Config, args: CreateShareArgs): Promise<CallToolResult> {
+  const documentId = args.document_id?.trim();
+  if (!documentId) {
+    return failure(
+      '`document_id` is required — pass the document id from list_shares, or the one share_html ' +
+        'returned. To publish new HTML, use share_html instead.',
+    );
+  }
+
+  const body: Record<string, unknown> = {
+    document_id: documentId,
+    require_email: args.require_email,
+  };
+  for (const key of OPTIONAL_LINK_FIELDS) {
+    const value = args[key];
+    if (value !== undefined) body[key] = value;
+  }
+
+  const result = await apiFetch<ShareResponse>(config, '/api/v1/shares', { method: 'POST', body });
+  if (!result.ok) return failure(result.message);
+  return text(formatShare(result.data, args.require_email));
+}
+
+/**
+ * The account's recent links.
+ *
+ * Without this, get_share_activity only works in the conversation that made
+ * the link: the next morning, in a new session, the assistant has no
+ * identifier and has to send the user to the website to fetch one.
+ */
+export async function listShares(
+  config: Config,
+  args: { before?: string | undefined },
+): Promise<CallToolResult> {
+  const before = args.before?.trim();
+  const path = before ? `/api/v1/shares?before=${encodeURIComponent(before)}` : '/api/v1/shares';
+
+  const result = await apiFetch<ShareListResponse>(config, path);
+  if (!result.ok) return failure(result.message);
+  return text(formatShareList(result.data));
+}
+
+/**
+ * Switch a link off, or back on.
+ *
+ * There is no delete here and there will not be one: revoking is reversible
+ * and deleting is not, and the destructive half stays on the website where a
+ * person types the confirmation themselves.
+ */
+export async function revokeShare(
+  config: Config,
+  args: { share_id: string; revoked?: boolean | undefined },
+): Promise<CallToolResult> {
+  const shareId = args.share_id?.trim();
+  if (!shareId) {
+    return failure(
+      "`share_id` is required — pass the share id, the share's slug, or its link. list_shares " +
+        'returns all three.',
+    );
+  }
+
+  const revoked = args.revoked !== false;
+  const result = await apiFetch<RevokeResponse>(
+    config,
+    `/api/v1/shares/${encodeURIComponent(shareId)}/revoke`,
+    { method: 'POST', body: { revoked } },
+  );
+  if (!result.ok) return failure(result.message);
+
+  return text(
+    revoked
+      ? `Link switched off: ${result.data.url}\nAnyone opening it now sees that it is no longer available. Call revoke_share again with revoked: false to put it back.`
+      : `Link switched back on: ${result.data.url}\nIt works again for anyone who already has it.`,
+  );
+}
+
+/**
+ * New contents behind the links that have already been sent.
+ *
+ * The loop the product exists for: read where people stopped, rewrite that
+ * part, and the link in their inbox serves the new version. Nobody is sent a
+ * second link.
+ */
+export async function replaceDocument(
+  config: Config,
+  args: { document_id: string; html: string },
+): Promise<CallToolResult> {
+  const documentId = args.document_id?.trim();
+  if (!documentId) {
+    return failure('`document_id` is required — pass the document id from list_shares.');
+  }
+  const html = args.html;
+  if (typeof html !== 'string' || html.trim() === '') {
+    return failure('`html` is required — pass the full replacement markup.');
+  }
+
+  const bytes = Buffer.byteLength(html, 'utf8');
+  if (bytes > MAX_HTML_BYTES) {
+    return failure(
+      `That document is ${formatBytes(bytes)}; the limit is ${formatBytes(MAX_HTML_BYTES)}.`,
+    );
+  }
+
+  const result = await apiFetch<ReplaceResponse>(
+    config,
+    `/api/v1/documents/${encodeURIComponent(documentId)}/replace`,
+    { method: 'POST', body: { html } },
+  );
+  if (!result.ok) return failure(result.message);
+
+  return text(
+    [
+      `Replaced. Document ${result.data.document_id} is now at version ${result.data.version}.`,
+      'Every existing link is unchanged and serves the new contents from the next time it is opened.',
+    ].join('\n'),
+  );
+}
+
 export async function getShareActivity(
   config: Config,
-  args: { share_id: string },
+  args: { share_id: string; include_detail?: boolean | undefined },
 ): Promise<CallToolResult> {
   const shareId = args.share_id?.trim();
   if (!shareId) {
@@ -109,9 +269,13 @@ export async function getShareActivity(
     );
   }
 
+  // Off by default and asked for per call: location and device are about a
+  // named person's behaviour, and the ordinary question — was it read, and
+  // which parts — is answered without them.
+  const query = args.include_detail === true ? '?include_detail=true' : '';
   const result = await apiFetch<ActivityResponse>(
     config,
-    `/api/v1/shares/${encodeURIComponent(shareId)}/activity`,
+    `/api/v1/shares/${encodeURIComponent(shareId)}/activity${query}`,
   );
   if (!result.ok) return failure(result.message);
   return text(
@@ -179,11 +343,64 @@ function formatViewer(viewer: ActivityViewer): string {
     .slice(0, 5)
     .map((section) => `${section.title} ${formatSectionTime(section.time_seconds)}`);
 
-  return [
+  const lines = [
     `${who}`,
     `  ${facts}`,
     `  ${top.length ? `read most: ${top.join(', ')}` : 'no section reading recorded'}`,
-  ].join('\n');
+  ];
+
+  // Only when the caller asked for it. An absent block means it was not
+  // requested, not that the reader had no country.
+  if (viewer.detail) {
+    const where = [
+      [viewer.detail.city, viewer.detail.country].filter(Boolean).join(', ') || 'location unknown',
+      viewer.detail.device ? `on ${viewer.detail.device}` : 'device unknown',
+      viewer.detail.referrer ? `from ${viewer.detail.referrer}` : 'no referrer',
+    ].join(' · ');
+    lines.push(`  ${where}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * The account's links, one block each.
+ *
+ * Compact on purpose: this lands in an assistant's context every time it
+ * needs an identifier, so it carries what the other tools take as arguments
+ * — the slug, the share id and the document id — and nothing decorative.
+ */
+export function formatShareList(list: ShareListResponse): string {
+  if (!list.shares || list.shares.length === 0) {
+    return 'No tracked links on this account yet. share_html publishes one.';
+  }
+
+  const lines = [
+    `${list.shares.length} ${list.shares.length === 1 ? 'link' : 'links'}, newest first:`,
+    '',
+    UNTRUSTED_NOTICE,
+  ];
+
+  for (const share of list.shares) {
+    const state = share.revoked ? 'switched off' : share.expired ? 'expired' : 'live';
+    const read = share.opened ? `opened, last ${share.last_open ?? 'unknown'}` : 'not opened';
+    lines.push(
+      '',
+      `${share.slug} · ${share.recipient_label ?? 'no recipient label'} · ${
+        share.document_title ?? 'untitled document'
+      }`,
+      `  ${state} · ${read} · created ${share.created_at}`,
+      `  ${share.url}`,
+      `  share ${share.share_id} · document ${share.document_id}`,
+    );
+  }
+
+  if (list.next_before) {
+    lines.push(
+      '',
+      `More links exist. Call list_shares again with before: "${list.next_before}" for the next page.`,
+    );
+  }
+  return lines.join('\n');
 }
 
 export function formatMe(me: MeResponse): string {
@@ -240,12 +457,18 @@ function failure(message: string): CallToolResult {
 
 export function createServer(config: Config): McpServer {
   const server = new McpServer(
-    { name: 'htmlradar', version: '0.1.2' },
+    { name: 'htmlradar', version: '0.2.0' },
     {
       instructions:
         'HTMLRadar turns an HTML document into a tracked link. Use share_html once you have ' +
         'produced an HTML deck, proposal or report that the user intends to send to someone ' +
-        'else, and get_share_activity when they ask whether it was read.',
+        'else, and get_share_activity when they ask whether it was read. When the user refers ' +
+        'to something they sent earlier, call list_shares first to find its identifiers rather ' +
+        'than asking them to look one up. create_share makes another link for a document that ' +
+        'already exists, which is what "send this to these five people" needs; ' +
+        'replace_document puts new contents behind links that have already been sent; and ' +
+        'revoke_share switches a link off. Ask the user before publishing, replacing or ' +
+        'revoking anything.',
     },
   );
 
@@ -274,19 +497,78 @@ export function createServer(config: Config): McpServer {
   );
 
   server.registerTool(
+    'create_share',
+    {
+      title: 'Make another tracked link for an existing document',
+      description:
+        'Create an additional tracked link for a document that is already on HTMLRadar, with ' +
+        'its own recipient label, gate, password, expiry and address. Use it whenever the same ' +
+        'document goes to more than one person: one link per recipient is what separates their ' +
+        'reading reports. It uploads nothing and creates no second copy — pass the document id ' +
+        'from list_shares, or the one share_html returned. To publish new HTML, use share_html.',
+      inputSchema: createShareShape,
+      annotations: {
+        title: 'Make another tracked link for an existing document',
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    (args) => createShare(config, args),
+  );
+
+  server.registerTool(
+    'list_shares',
+    {
+      title: 'List tracked links on this account',
+      description:
+        "List the account's tracked links, newest first: the slug, the recipient label, the " +
+        'document title, whether it has been opened and when, and the share and document ids ' +
+        'the other tools take. Use it whenever the user refers to something they sent earlier ' +
+        'and you do not already have its id — that is nearly always cheaper than asking them ' +
+        'to find one. Returns at most 50; pass `before` to page back through older links.',
+      inputSchema: {
+        before: z
+          .string()
+          .optional()
+          .describe(
+            'Cursor for the next page: the `next_before` timestamp printed at the end of a ' +
+              'previous list_shares result. Omit for the most recent links.',
+          ),
+      },
+      annotations: {
+        title: 'List tracked links on this account',
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
+    },
+    (args) => listShares(config, args),
+  );
+
+  server.registerTool(
     'get_share_activity',
     {
       title: 'Check who read a tracked link',
       description:
         'Report whether a tracked HTMLRadar link has been opened, by whom, for how long, how ' +
         'far they scrolled, and which sections held their attention. Use it when the user asks ' +
-        'whether something they sent has been read.',
+        'whether something they sent has been read. If you do not have the share id, call ' +
+        'list_shares first.',
       inputSchema: {
         share_id: z
           .string()
           .describe(
             "The share id returned by share_html, or the share's slug (the part after /r/ in " +
               'its link), or the link itself.',
+          ),
+        include_detail: z
+          .boolean()
+          .optional()
+          .describe(
+            "Also return each reader's country, city, device and referrer. Off by default: " +
+              "that is a named person's location and device, so ask for it only when the user " +
+              'has asked where or on what somebody read.',
           ),
       },
       annotations: {
@@ -296,6 +578,66 @@ export function createServer(config: Config): McpServer {
       },
     },
     (args) => getShareActivity(config, args),
+  );
+
+  server.registerTool(
+    'revoke_share',
+    {
+      title: 'Switch a tracked link off',
+      description:
+        'Switch off a tracked link that has already been sent. Anyone who opens it afterwards ' +
+        'sees that it is no longer available, and the sender is emailed that somebody tried. ' +
+        'This changes what a recipient can see, so confirm with the user which link you are ' +
+        'about to switch off before calling it, and name the recipient and the document in the ' +
+        'confirmation. It is reversible: call it again with revoked set to false. It never ' +
+        'deletes anything — deleting a link is deliberately only possible on the website.',
+      inputSchema: {
+        share_id: z
+          .string()
+          .describe(
+            "The share id, the share's slug (the part after /r/ in its link), or the link " +
+              'itself. list_shares returns all three.',
+          ),
+        revoked: z
+          .boolean()
+          .optional()
+          .describe('True (the default) switches the link off. False switches it back on.'),
+      },
+      annotations: {
+        title: 'Switch a tracked link off',
+        readOnlyHint: false,
+        // Reversible, and it destroys nothing: the link, its settings and
+        // every reading record survive a revoke and come back on un-revoke.
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    (args) => revokeShare(config, args),
+  );
+
+  server.registerTool(
+    'replace_document',
+    {
+      title: 'Replace a document, keeping every link',
+      description:
+        'Replace the contents of a document that is already on HTMLRadar. Every existing link ' +
+        'stays exactly as it is — same address, same settings, same reading history — and ' +
+        'serves the new contents from the next time it is opened, so nobody has to be sent a ' +
+        'second link. Use it after reading where people stopped and rewriting that part. The ' +
+        'new HTML is screened for phishing signals as every upload is, and the previous ' +
+        "version is kept in the document's history. Recipients may already have read the old " +
+        'contents, so confirm with the user before replacing.',
+      inputSchema: replaceDocumentShape,
+      annotations: {
+        title: 'Replace a document, keeping every link',
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    (args) => replaceDocument(config, args),
   );
 
   server.registerTool(

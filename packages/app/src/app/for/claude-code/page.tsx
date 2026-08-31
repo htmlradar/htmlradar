@@ -100,10 +100,11 @@ export default function ForClaudeCodePage() {
             Claude Code wrote the deck. Find out if they read it.
           </h1>
           <DirectAnswer updated="August 2026">
-            HTMLRadar adds two abilities to Claude Code: publish an HTML deck, proposal or report as
-            a tracked link, and ask afterwards who opened it and which sections they read. Install
-            the plugin, generate as usual, and the whole loop stays in the terminal. Free for two
-            links, then $15 a month.
+            HTMLRadar lets Claude Code publish an HTML deck, proposal or report as a tracked link,
+            ask afterwards who opened it and which sections they read, send the same document to
+            more people one link at a time, switch a link off, and rewrite the document behind links
+            that have already gone out. Install the plugin, generate as usual, and the whole loop
+            stays in the terminal. Free for two links, then $15 a month.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Claude Code is very good at producing a finished HTML document — a board update, a
@@ -305,7 +306,7 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               Versions
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.1.2</span>,
+              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.2.0</span>,
               the current release, and needs Node.js 18 or newer for the{' '}
               <span className="font-mono text-[14px]">npx</span> it runs. A newer server reaches
               plugin users when the plugin is updated; run{' '}

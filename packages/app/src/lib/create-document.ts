@@ -190,15 +190,21 @@ export async function createDocumentForUser(
   // write or delete.
   const screen = screenHtml(new TextDecoder().decode(source.bytes.subarray(0, SCREEN_MAX_BYTES)));
 
-  const { error: insertError } = await supabase.from('documents').insert({
-    id: docId,
-    title,
-    owner_id: userId,
-    source_type: 'upload',
-    r2_key: key,
-    screen_score: screen.score,
-    screen_signals: screen.signals,
-  });
+  const row = { id: docId, title, owner_id: userId, source_type: 'upload', r2_key: key };
+
+  // ponytail: written on the INSERT, and retried without them if the database
+  // does not have the columns yet. Deploys land before migrations do here — a
+  // push runs CI and deploys itself, while schema/039 is a human pasting SQL
+  // into an editor afterwards — and in that window every upload on every path
+  // would fail on an unknown column. Eight lines of tolerance are cheaper than
+  // that outage. Delete this fallback once 039 has been applied.
+  let { error: insertError } = await supabase
+    .from('documents')
+    .insert({ ...row, screen_score: screen.score, screen_signals: screen.signals });
+  if (insertError && /screen_score|screen_signals/.test(insertError.message)) {
+    console.warn('[screen] documents has no screen columns yet — schema/039 is not applied');
+    ({ error: insertError } = await supabase.from('documents').insert(row));
+  }
   if (insertError) throw new Error(insertError.message);
 
   try {

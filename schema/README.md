@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `041`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `043`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -44,12 +44,12 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - **Session bearer tokens** stored on the `sessions.token` column (replaces the HMAC-with-shared-secret scheme entirely — no app secret needed).
 - **Vault** for Resend secrets (decrypted at trigger execution time).
 
-## Tables (18)
+## Tables (20)
 
-- `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`).
+- `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`). `handle` (043) is the account's subdomain label — links are served from `{handle}.htmlradar.page`. Nullable and null on every row until a later lane allocates one; immutable once set; three to twenty-four lowercase letters, digits and hyphens with no two hyphens in a row, which is also what bans a Punycode `xn--` prefix. It is a routing and reputation boundary, **not** an identity claim about the sender.
 - `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, `last_viewed_by_owner_at`, and the upload-time phishing screen's `screen_score` / `screen_signals` (039; null on every URL-source document and on everything predating the migration).
 - `document_versions` (018) — one row per upload or replace, capturing original local filename + bytes + R2 key.
-- `document_shares` — per-recipient tracked links; password / expiry / revoke / `allowed_email_domains` / `allowed_emails` / `lock_deck` per share.
+- `document_shares` — per-recipient tracked links; password / expiry / revoke / `allowed_email_domains` / `allowed_emails` / `lock_deck` per share. `host_handle` (043) is the hostname this link was created for: null means it is served on the apex forever, a value means `{host_handle}.htmlradar.page`. Immutable, and a trigger requires it to equal the owner's own handle when set — without that a customer could have their document served on `microsoft.htmlradar.page`. Routing follows this column, never `profiles.handle`, so an already-sent link never moves.
 - `document_attachments` (009) — file metadata per share (PDF / Office / image / ZIP), bytes in R2.
 - `attachment_downloads` (016) — per-viewer download log keyed on viewer_id + session_id + filename + size_bytes.
 - `viewers` — recipient identities (email or anonymous fingerprint), scoped per share; `is_internal` flag (012) hides owner-self test reads — narrowed in `036_internal_viewers_owner_only.sql` to the owner's own address, so colleagues on the sender's own email domain are ordinary, visible recipients.
@@ -64,6 +64,15 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `waitlist` — legacy pre-launch capture surface, retained but not actively used post-launch.
 - `abuse_reports` (037) — one row per abuse report. A recipient's report names a share; an automated upload-screen flag names a document instead (039), which is why `share_id` is nullable and `document_id` exists. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.
 - `telegram_outbox` (038) — every Telegram message the monitor worker sends, and every thread-scan run whether it sent anything or not. Exists because a Telegram bot cannot read back its own sent history. `kind` also allows `heartbeat` (a maintenance session stamping the register) and `sentinel` (the daily report on the register's machine-checkable duties) as of 041. RLS on with no policies; the worker writes with the service role.
+- `radar_items` (042) — every item the listening radar sees on Hacker News, Reddit and Google Alerts, upserted on `source_url` so re-seeing a thread refreshes it rather than duplicating it. RLS on with no policies; the monitor worker reads and writes with the service role.
+- `handle_registry` (043) — every subdomain label that is spoken for: 193 reserved names seeded with `claimed_by` null, plus one row per allocated handle. Rows are never deleted, only stamped `released_at` when the holding profile goes, so a retired handle can never be inherited by a new account along with the old one's hostname reputation. `claimed_by` is deliberately **not** a foreign key — a key would cascade the row away on account deletion, which is the failure the table exists to prevent. Its primary key is also what resolves two simultaneous allocations of the same name. RLS on with no policies.
+
+## Views (2)
+
+Both follow the same private-view pattern: `security_invoker` set explicitly, then every grant revoked and re-granted narrowly. Supabase's default privileges hand new objects in `public` to `anon` and `authenticated`, and PostgREST publishes every view in `public`, so the REVOKE is a control rather than tidiness.
+
+- `recent_events` (006) — the last seven days of `app_events` joined to the user's email. `security_invoker = on`; granted to `authenticated` and `service_role`.
+- `share_lookup` (043) — everything the proxy needs to answer one recipient request in a single read: the share, its stored `host_handle`, the owner's handle and tier, and the document's R2 key, version and soft-delete state. `security_invoker = off`; **service role only**, because it carries every customer's handle and every document's storage key. The password hash is deliberately absent — password checks go through the rate-limited `verify_share_password` RPC.
 
 ## RPCs (10)
 

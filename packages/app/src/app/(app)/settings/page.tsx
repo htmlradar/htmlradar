@@ -339,7 +339,11 @@ async function createApiKeyAction(
   'use server';
   const user = await requireUser();
   const cleanLabel = label.trim().slice(0, 60) || 'API key';
-  const cleanScope = scope === 'read_only' ? 'read_only' : 'full';
+  // 'full' and 'read_only' are the only two values the column may hold, and
+  // this fails closed the same way authenticateApiKey does: anything that is
+  // not exactly 'full' makes the weaker key. A typo must never quietly hand
+  // out a key stronger than the one that was asked for.
+  const cleanScope = scope === 'full' ? 'full' : 'read_only';
   const key = generateApiKey();
 
   const row = {

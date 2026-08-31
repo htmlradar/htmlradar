@@ -19,6 +19,12 @@
 --              403 on creating a link, revoking one, and replacing a
 --              document.
 --
+-- Those two words are the whole vocabulary. The CHECK below is one guard and
+-- the application's read is the other: it grants full access only for the
+-- exact string 'full' and treats every other value, including one a later
+-- migration might add, as 'read_only'. A scope column that fails open would
+-- turn a single typo into an agent holding every power the account has.
+--
 -- WHERE IT IS ENFORCED
 --
 -- In the application, at authenticateApiKey (packages/app/src/lib/api-auth.ts),

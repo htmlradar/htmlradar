@@ -74,8 +74,10 @@ export interface ApiCaller {
    * What the key itself may do (schema/040). A read-only key authenticates
    * exactly like a full one and is refused at the routes that write, so a
    * watching assistant can hold a credential that cannot publish, revoke or
-   * replace anything. A key created before 040 reads as 'full', which is what
-   * it has always been.
+   * replace anything. The column holds exactly 'full' or 'read_only'; the read
+   * fails closed, so anything else is treated as 'read_only' (see scopeOf). A
+   * key created before 040 has no column to read and stays 'full', which is
+   * what it has always been.
    */
   scope: ApiKeyScope;
 }
@@ -317,10 +319,28 @@ export async function authenticateApiKey(req: Request, limit: ApiLimit): Promise
 
   // After the budgets, not before: a script looping on a route its key cannot
   // use still runs into a 429, so the 403 is not a free retry.
-  const scope: ApiKeyScope = row.scope === 'read_only' ? 'read_only' : 'full';
+  const scope = scopeOf(row.scope);
   if (limit.write && scope === 'read_only') return { error: READ_ONLY_KEY };
 
   return { caller: { userId: row.user_id, tier, scope } };
+}
+
+/**
+ * The stored scope, read so that only the exact word grants full access.
+ *
+ * Fails closed. `full` and `read_only` are the only two values the column may
+ * hold (schema/040 has the CHECK), so anything else is a row nobody meant to
+ * write — a hand-edited value, a typo, a value from a later migration this
+ * build has never heard of — and the safe reading of a value we do not
+ * understand is the weakest one, not the strongest. Reversed, a single typo in
+ * a scope column would hand an agent every power the account has.
+ *
+ * `undefined` is the one value that means full, and it is not a value: it is
+ * the column not existing yet, which is every key today (see findKeyRow).
+ */
+function scopeOf(stored: string | null | undefined): ApiKeyScope {
+  if (stored === undefined) return 'full';
+  return stored === 'full' ? 'full' : 'read_only';
 }
 
 /**

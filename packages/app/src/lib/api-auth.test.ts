@@ -15,6 +15,7 @@ import {
   API_KEY_PREFIX,
   authenticateApiKey,
   BODY_TIMED_OUT,
+  CHEAP_MAX,
   creationMax,
   READ_ONLY_KEY,
   readBefore,
@@ -456,7 +457,7 @@ function stubAccount({
   tier,
   scopeColumn = true,
 }: {
-  scope?: string;
+  scope?: string | null;
   tier?: 'free' | 'pro';
   scopeColumn?: boolean;
 }) {
@@ -481,7 +482,13 @@ function stubAccount({
             });
           }
           return Promise.resolve({
-            data: { id: 'key-1', user_id: 'user-1', ...(scope ? { scope } : {}) },
+            // `scope` absent entirely is the pre-040 row; scope: null is a row
+            // that has the column and nothing useful in it.
+            data: {
+              id: 'key-1',
+              user_id: 'user-1',
+              ...(scope === undefined ? {} : { scope }),
+            },
           });
         },
       };
@@ -560,6 +567,66 @@ describe('a read-only key', () => {
       write: true,
     });
     expect(maxima).toEqual([{ bucket: 'api:shares:user-1', max: 30 }]);
+  });
+});
+
+// The row is written straight onto api_keys here, which is what a hand-edited
+// row, a botched backfill or a later migration this build has never heard of
+// looks like from the API's side. Every one of them must read as the weakest
+// scope: a scope column that fails open turns one typo into an agent holding
+// every power the account has.
+describe('a key whose stored scope is not one of the two words', () => {
+  const writeLimit = {
+    name: 'shares',
+    per: 'account',
+    max: creationMax,
+    write: true,
+  } as const;
+
+  it('is refused on create, revoke and replace, whatever the value says', async () => {
+    for (const stored of ['read', 'READ_ONLY', 'Full', 'admin', 'write', '', 'true']) {
+      const { client } = stubAccount({ scope: stored });
+      supabase.current = client;
+      // The three write routes spend one bucket between them (creation) and
+      // revoke spends its own; both are refused at the same check.
+      await expect(authenticateApiKey(apiRequest(), writeLimit)).resolves.toEqual({
+        error: READ_ONLY_KEY,
+      });
+      await expect(
+        authenticateApiKey(apiRequest(), {
+          name: 'share-revoke',
+          per: 'account',
+          max: CHEAP_MAX,
+          write: true,
+        }),
+      ).resolves.toEqual({ error: READ_ONLY_KEY });
+    }
+  });
+
+  it('reads as read-only on the routes that only read, rather than as full', async () => {
+    const { client } = stubAccount({ scope: 'read' });
+    supabase.current = client;
+    await expect(
+      authenticateApiKey(apiRequest(), { name: 'activity', per: 'key', max: 300 }),
+    ).resolves.toEqual({ caller: { userId: 'user-1', tier: 'free', scope: 'read_only' } });
+  });
+
+  // A null cannot happen while the column is NOT NULL, which is exactly why
+  // it must not be the one value that quietly means full access.
+  it('treats a null the same way', async () => {
+    const { client } = stubAccount({ scope: null });
+    supabase.current = client;
+    await expect(authenticateApiKey(apiRequest(), writeLimit)).resolves.toEqual({
+      error: READ_ONLY_KEY,
+    });
+  });
+
+  it('still lets the exact word through', async () => {
+    const { client } = stubAccount({ scope: 'full' });
+    supabase.current = client;
+    await expect(authenticateApiKey(apiRequest(), writeLimit)).resolves.toEqual({
+      caller: { userId: 'user-1', tier: 'free', scope: 'full' },
+    });
   });
 });
 

@@ -59,7 +59,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `app_events` (006) — PostHog-shaped product events (`distinct_id`, `event`, `properties`, `user_id`).
 - `error_log` (006) — client/server/worker JS error sink.
 - `feedback` (006) — user-submitted feedback from `/feedback`.
-- `api_keys` (034) — public-API credentials, one row per key; the key itself is stored only as a SHA-256 hash. `scope` (040) is `full` or `read_only`; a read-only key is refused at the routes that create, revoke or replace, and the check lives in the application because those routes run as the service role.
+- `api_keys` (034) — public-API credentials, one row per key; the key itself is stored only as a SHA-256 hash. `scope` (040) is exactly `full` or `read_only`; a read-only key is refused at the routes that create, revoke or replace, and the check lives in the application because those routes run as the service role. The application's read fails closed: only the exact string `full` grants full access, so an unexpected value is treated as read-only.
 - `rate_limits` — identity-keyed rate-limit counters for RPCs.
 - `waitlist` — legacy pre-launch capture surface, retained but not actively used post-launch.
 - `abuse_reports` (037) — one row per abuse report. A recipient's report names a share; an automated upload-screen flag names a document instead (039), which is why `share_id` is nullable and `document_id` exists. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.

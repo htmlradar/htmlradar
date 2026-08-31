@@ -14,9 +14,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'HummingDeck Alternative for Tracked HTML Links (2026) | HTMLRadar',
+  title: 'HummingDeck Alternative for Tracked HTML Links | HTMLRadar',
   description:
-    'HummingDeck shares documents and branded rooms with per-page engagement analytics. HTMLRadar is a HummingDeck alternative for tracked HTML links with section-level read tracking, open source and free for two links.',
+    'HTMLRadar is a HummingDeck alternative for tracked HTML links: section-level read tracking, open source, and free for two links.',
   path: '/compare/hummingdeck',
 });
 

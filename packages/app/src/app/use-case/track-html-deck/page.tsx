@@ -15,7 +15,7 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Track an HTML Deck — Read Analytics for Web Decks | HTMLRadar',
+  title: 'Track an HTML Deck — Read Analytics | HTMLRadar',
   description:
     'Upload an HTML deck or paste a URL, then see which sections people read. Built for Claude artifacts, reveal.js decks, and hand-written HTML.',
   path: '/use-case/track-html-deck',

@@ -1,11 +1,20 @@
 // JSON-LD structured data, server-rendered. Values must stay
-// consistent with the real entity: GitHub is the only profile that
-// exists (no X/LinkedIn/Bluesky — links that 404 weaken entity
-// resolution), and aggregateRating stays out until there are real
-// public reviews; fabricated schema is a policy risk.
+// consistent with the real entity: sameAs below lists only profiles
+// that are actually live and public (no X/LinkedIn/Bluesky — links
+// that 404 weaken entity resolution), and aggregateRating stays out
+// until there are real public reviews; fabricated schema is a policy
+// risk.
 
 const SITE_URL = 'https://htmlradar.com';
 const GITHUB_URL = 'https://github.com/htmlradar/htmlradar';
+const SAME_AS = [
+  GITHUB_URL,
+  'https://www.npmjs.com/package/htmlradar-mcp',
+  'https://glama.ai/mcp/servers/htmlradar/htmlradar',
+  'https://www.crunchbase.com/organization/htmlradar',
+  'https://www.trustpilot.com/review/htmlradar.com',
+  'https://stackshare.io/htmlradar',
+];
 
 function JsonLd({ data }: { data: Record<string, unknown> }) {
   return (
@@ -25,7 +34,7 @@ export function OrganizationLd() {
         logo: `${SITE_URL}/icon.svg`,
         description: 'Open-source read tracking for HTML decks, briefs, and proposals.',
         foundingDate: '2026',
-        sameAs: [GITHUB_URL],
+        sameAs: SAME_AS,
       }}
     />
   );

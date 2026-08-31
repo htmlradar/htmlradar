@@ -10,7 +10,7 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'HTMLRadar MCP Server — Share HTML as a Tracked Link | HTMLRadar',
+  title: 'MCP Server — Share HTML as a Tracked Link | HTMLRadar',
   description:
     'An MCP server that publishes the HTML your agent just wrote as a tracked link, and reports back who opened it and which sections they read. Claude Code, Cursor, Codex and any MCP client.',
   path: '/mcp',

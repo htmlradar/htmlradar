@@ -9,10 +9,15 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Alternatywa dla DocSend do plików HTML (open source) | HTMLRadar',
+  title: 'Alternatywa dla DocSend do plików HTML | HTMLRadar',
   description:
     'Szukasz alternatywy dla DocSend? HTMLRadar to otwartoźródłowe śledzenie prezentacji HTML: wiesz, kto otworzył Twój dokument, które sekcje przeczytał i jak długo je czytał.',
   path: '/pl/alternatywa-dla-docsend',
+  languages: {
+    en: '/compare/docsend',
+    pl: '/pl/alternatywa-dla-docsend',
+    'x-default': '/compare/docsend',
+  },
 });
 
 const FAQ = [
@@ -34,7 +39,7 @@ export default function AlternatywaDlaDocsendPage() {
   return (
     <>
       <NavBar />
-      <main className="relative">
+      <main lang="pl" className="relative">
         <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
           <BreadcrumbLd
             items={[

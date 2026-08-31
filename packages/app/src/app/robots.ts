@@ -24,6 +24,7 @@ export default function robots(): MetadataRoute.Robots {
           '/new',
           '/settings',
           '/upgrade',
+          '/admin', // founder-only, auth-gated — defense in depth
         ],
       },
     ],

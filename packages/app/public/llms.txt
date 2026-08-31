@@ -1,0 +1,23 @@
+# HTMLRadar
+
+HTMLRadar is read tracking for HTML documents. Upload an HTML file or paste
+a public URL, send the tracked link instead of the original file, and see
+who opened it, which sections they read, and how long they spent on each
+one. Built for decks, briefs, and proposals shared as HTML rather than PDF.
+
+Open source (AGPL-3.0), self-hostable on your own Cloudflare and Supabase
+accounts. Free for two tracked links; paid plans start at $15/month.
+
+## Key pages
+
+- https://htmlradar.com/ — product overview and how it works
+- https://htmlradar.com/why — why HTMLRadar exists
+- https://htmlradar.com/pricing — plans and pricing
+- https://htmlradar.com/mcp — MCP server for Claude Code, Cursor, and Codex
+- https://htmlradar.com/tools/html-to-link — free tool: share an HTML file as a tracked link
+- https://htmlradar.com/compare/docsend — HTMLRadar vs DocSend
+- https://htmlradar.com/blog — engineering and product writing
+
+## Contact
+
+hello@htmlradar.com

@@ -94,7 +94,7 @@ export default function Post() {
 
               <figure className="mt-8">
                 <img
-                  src="/brand/dashboard-demo.gif"
+                  src="/brand/dashboard-demo.webp"
                   width={960}
                   height={540}
                   loading="eager"

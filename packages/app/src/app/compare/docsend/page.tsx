@@ -17,6 +17,11 @@ export const metadata = pageMeta({
   description:
     'HTMLRadar is the open-source DocSend alternative for HTML files: track HTML decks, briefs and proposals with section-level read analytics, self-hostable and free to start.',
   path: '/compare/docsend',
+  languages: {
+    en: '/compare/docsend',
+    pl: '/pl/alternatywa-dla-docsend',
+    'x-default': '/compare/docsend',
+  },
 });
 
 interface Row {

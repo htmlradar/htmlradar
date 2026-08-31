@@ -13,7 +13,7 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'How to Share a Claude Artifact and See Who Opened It | HTMLRadar',
+  title: 'Share a Claude Artifact, See Who Opened It | HTMLRadar',
   description:
     'How to share a Claude artifact and see who opened it: export it as an HTML file, send a tracked HTMLRadar link, and get section-level attention and active read time.',
   path: '/for/claude-artifacts',

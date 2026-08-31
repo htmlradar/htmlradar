@@ -9,6 +9,11 @@ import { SectionMark } from '@/components/SectionMark';
 
 export const runtime = 'edge';
 
+export const metadata = {
+  title: 'Admin',
+  robots: { index: false, follow: false },
+};
+
 const SUPABASE_URL = process.env['SUPABASE_URL']!;
 const SERVICE_ROLE = process.env['SUPABASE_SERVICE_ROLE_KEY']!;
 

@@ -14,7 +14,7 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Client Proposal Tracking — Know the Moment It’s Read | HTMLRadar',
+  title: 'Client Proposal Tracking — Know When It’s Read | HTMLRadar',
   description:
     'Send proposals as tracked links. See when each client opens it, which sections they read — scope, timeline, pricing — and when to follow up. Free to start.',
   path: '/use-case/proposal-tracking',

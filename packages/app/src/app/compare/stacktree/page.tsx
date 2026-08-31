@@ -13,9 +13,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Stacktree Alternative for Tracked HTML Links (2026) | HTMLRadar',
+  title: 'Stacktree Alternative for Tracked HTML Links | HTMLRadar',
   description:
-    'Stacktree and HTMLRadar both track how an HTML page is read. HTMLRadar is open source, self-hostable, $15 a month, and free for two links that do not expire; Stacktree is $19 a month on Solo with client portals and custom domains.',
+    'HTMLRadar is a Stacktree alternative for tracked HTML links: open source, self-hostable, $15/mo, and free for two links that never expire.',
   path: '/compare/stacktree',
 });
 

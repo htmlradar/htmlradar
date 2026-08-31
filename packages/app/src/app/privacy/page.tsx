@@ -11,7 +11,7 @@ import { pageMeta } from '@/lib/seo';
 export const dynamic = 'force-static';
 
 export const metadata = pageMeta({
-  title: 'Privacy',
+  title: 'Privacy Policy | HTMLRadar',
   description:
     'How HTMLRadar handles the data it collects. The policy that applies to the hosted version at htmlradar.com.',
   path: '/privacy',

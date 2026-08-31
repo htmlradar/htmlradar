@@ -10,7 +10,7 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'HTMLRadar for Claude Code — Track What You Generate | HTMLRadar',
+  title: 'Claude Code — Track What You Generate | HTMLRadar',
   description:
     'Share an HTML file from Claude Code as a tracked link: generate the deck or report in the terminal, publish it without leaving Claude Code, and ask the next day whether the recipient read it.',
   path: '/for/claude-code',

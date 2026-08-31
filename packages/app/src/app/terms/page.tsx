@@ -12,7 +12,7 @@ import { pageMeta } from '@/lib/seo';
 export const dynamic = 'force-static';
 
 export const metadata = pageMeta({
-  title: 'Terms',
+  title: 'Terms of Service | HTMLRadar',
   description:
     'The terms that apply to the hosted version of HTMLRadar at htmlradar.com — subscriptions, cancelling, your documents, and what happens if the service ends.',
   path: '/terms',

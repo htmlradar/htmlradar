@@ -15,15 +15,28 @@ const OG_IMAGE = {
   alt: 'HTMLRadar — track who reads your HTML decks',
 };
 
-export function pageMeta(opts: { title: string; description: string; path: string }): Metadata {
-  const { title, description, path } = opts;
+export function pageMeta(opts: {
+  title: string;
+  description: string;
+  path: string;
+  // Reciprocal hreflang — e.g. { en: '/compare/docsend', pl: '/pl/...', 'x-default': '/compare/docsend' }.
+  languages?: Record<string, string>;
+}): Metadata {
+  const { title, description, path, languages } = opts;
   return {
     title: { absolute: title },
     description,
     // Canonical pins every page to the apex host — www.htmlradar.com
     // serves the same content and Search Console indexes both, splitting
     // ranking signal between two hosts without this.
-    alternates: { canonical: `${SITE_URL}${path}` },
+    alternates: {
+      canonical: `${SITE_URL}${path}`,
+      ...(languages && {
+        languages: Object.fromEntries(
+          Object.entries(languages).map(([lang, p]) => [lang, `${SITE_URL}${p}`]),
+        ),
+      }),
+    },
     openGraph: {
       type: 'website',
       locale: 'en_US',

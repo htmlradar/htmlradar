@@ -13,9 +13,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Tiiny.host Alternative for Tracked HTML Links (2026) | HTMLRadar',
+  title: 'Tiiny.host Alternative for Tracked HTML Links | HTMLRadar',
   description:
-    'Tiiny.host publishes an uploaded HTML file to its own link. HTMLRadar is a Tiiny.host alternative for tracked HTML links with section-level read tracking, open source and free for two links.',
+    'HTMLRadar is a Tiiny.host alternative for tracked HTML links: section-level read tracking, open source, and free for two links.',
   path: '/compare/tiiny-host',
 });
 

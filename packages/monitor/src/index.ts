@@ -798,7 +798,7 @@ export async function scanThreads(env: Env, gapMs: number = SCAN_QUERY_GAP_MS): 
 // out as ONE message: six findings are one glance, six messages are noise.
 //
 // Every check runs inside its own try/catch, so a failure in one cannot hide
-// the other five, and a check that could not run at all is reported as
+// the other three, and a check that could not run at all is reported as
 // "check unavailable" rather than silently counting as clean. An unreadable
 // table is not an empty table.
 

@@ -1167,34 +1167,86 @@ interface RadarRow {
 // holds the guarantee. This is the guardrail Sol reviews before drafts go live.
 export const DISCLOSURE = 'Full disclosure: I built HTMLRadar.';
 
-/** A founder-voice reply DRAFT for one item. A scaffold he edits, not a
- *  finished post: plain first-person, the mandatory disclosure, and — where it
- *  genuinely fits — Papermark named as the honest pick for PDFs. Pure. */
-export function draftReply(item: { category: RadarCategory; title: string }): string {
+// Evidence the item itself is about sharing or tracking a document — the
+// actual audience for what HTMLRadar does — rather than a question the
+// classifier's shape rules alone caught. Required before a buyer_question or
+// product_feedback item earns a drafted reply; competitor_mention and
+// reputation already carry their own evidence from classifyItem (a named
+// competitor, or our own name), so they are not gated again here.
+const SHARE_EVIDENCE_TERMS = [
+  'share',
+  'shared',
+  'sharing',
+  'send',
+  'sent',
+  'sending',
+  'track',
+  'tracked',
+  'tracking',
+  'read receipt',
+  'open rate',
+  'who opened',
+  'who read',
+  'document',
+  'deck',
+  'proposal',
+  'html',
+  'artifact',
+];
+
+// Pricing-specific pain — the one context where naming a cheaper open-source
+// rival (Papermark) is an honest answer rather than a pitch bolted onto a
+// complaint the item never actually made.
+const PRICING_PAIN_TERMS = ['pricing', 'too expensive', 'expensive', 'cheaper', 'cost'];
+
+/** A founder-voice reply DRAFT for one item, or null when no honest reply
+ *  exists — noise, an unexpected category, or a buyer_question/product_feedback
+ *  item that never mentions sharing or tracking a document. Where it does
+ *  draft, it is plain first-person, carries the mandatory disclosure, keeps
+ *  product claims conditional, and names Papermark only where the item's own
+ *  pricing complaint makes that the honest answer. Takes no web content into
+ *  the body — title and snippet are read only to check for evidence, never
+ *  interpolated. Pure. */
+export function draftReply(item: {
+  category: RadarCategory;
+  title: string;
+  snippet?: string | null;
+}): string | null {
+  const t = `${item.title} ${item.snippet ?? ''}`.toLowerCase();
+  const hasShareEvidence = containsAny(t, SHARE_EVIDENCE_TERMS);
+  const hasPricingPain = containsAny(t, PRICING_PAIN_TERMS);
+
   let body: string;
   switch (item.category) {
     case 'competitor_mention':
-      body =
-        'For an open-source route, Papermark is the usual answer for PDFs — its own repo calls itself the open-source DocSend alternative. ' +
-        'If what you send is HTML rather than an uploaded file, that is the gap I built for: a link that stays a live page and shows who opened it and which sections they read. ' +
-        `${DISCLOSURE} It is AGPL, self-hostable, free for two tracked links. Either way, send one real document to yourself and read the per-section numbers — that is the feature.`;
+      body = hasPricingPain
+        ? 'On price specifically, Papermark is a usual free/open-source pick if what you are sending is a PDF. ' +
+          'If it is HTML instead, that is the gap I built HTMLRadar for — a link that stays a live page and shows who opened it and which sections they read. ' +
+          `${DISCLOSURE} It is AGPL, self-hostable, free for two tracked links.`
+        : 'If what you are sharing is HTML rather than a file you upload, that is the gap I built HTMLRadar for — a link that stays a live page and shows who opened it and which sections they read. ' +
+          `${DISCLOSURE} It is AGPL, self-hostable, free for two tracked links.`;
       break;
     case 'product_feedback':
+      if (!hasShareEvidence) return null;
       body =
-        'This exists. You paste or upload the HTML and get a link that stays a live page and reports who opened it, when, and which sections they actually read — not just a count of opens. ' +
-        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links. If your document is a PDF rather than HTML, Papermark is the honest pick.`;
+        'That exists: paste or upload the HTML and you get a link that stays a live page, and if you also want to know it was read, it reports who opened it and which sections they read. ' +
+        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links.`;
       break;
     case 'reputation':
       body =
-        'Happy to answer anything here. ' +
-        `${DISCLOSURE} Treat this as the maker talking, not a neutral review. For PDFs specifically, Papermark is often the better fit than what I built.`;
+        'Happy to answer anything here — ask away. ' +
+        `${DISCLOSURE} Take this as the maker talking, not a neutral review.`;
       break;
     case 'buyer_question':
-    default:
+      if (!hasShareEvidence) return null;
       body =
-        'You can do this without emailing the file: paste or upload the HTML and share a link that stays a live page and shows who opened it and which sections they read. ' +
-        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links. If what you are sending is a PDF instead, Papermark is the honest pick.`;
+        'You can send it as a link instead of an attachment, and if you also want to know it was opened and which sections were read, that is what I built HTMLRadar for. ' +
+        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links.`;
       break;
+    default:
+      // noise, and any category this switch does not otherwise know about:
+      // no honest reply exists, so no draft.
+      return null;
   }
   // Belt to the braces above: no draft ever ships without the disclosure.
   if (!body.includes(DISCLOSURE)) body = `${DISCLOSURE} ${body}`;
@@ -1298,7 +1350,8 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
       `\n\n[${SOURCE_LABEL[it.source] ?? it.source}] ${it.title}` +
       `\n${it.source_url}` +
       `\ncategory: ${it.category} · intent ${it.intent_score}`;
-    const draft = withDrafts && it.intent_score >= REPLY_THRESHOLD ? `\n${draftReply(it)}` : '';
+    const raw = withDrafts && it.intent_score >= REPLY_THRESHOLD ? draftReply(it) : null;
+    const draft = raw ? `\n${raw}` : '';
     if (lines.join('').length + block.length + draft.length > budget) break;
     lines.push(block);
     if (draft) {

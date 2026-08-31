@@ -238,6 +238,40 @@ export async function notifyDisabledAttempt(
   }).catch(() => undefined);
 }
 
+// A recipient's abuse report. The RPC (schema/037) validates the reason,
+// enforces five reports an hour per address hash, resolves the slug to a
+// share, writes the row, and emails abuse@htmlradar.com at most once per share
+// per six hours. It never raises, so anything thrown here is transport.
+//
+// Service role, like every other write on this path: the rate-limit identity
+// is an argument, so a role a stranger's script can hold must not be able to
+// call it with an identity of that script's choosing. See 037's header.
+export async function reportAbuse(
+  env: Env,
+  payload: { slug: string; reason: string; note: string | null; ipHash: string },
+): Promise<'ok' | 'rate_limited' | 'invalid' | 'error'> {
+  const res = await call(env, new URL(`${env.SUPABASE_URL}/rest/v1/rpc/report_abuse`), {
+    method: 'POST',
+    body: JSON.stringify({
+      p_slug: payload.slug,
+      p_reason: payload.reason,
+      p_note: payload.note,
+      p_ip_hash: payload.ipHash,
+    }),
+  }).catch(() => null);
+  if (!res || !res.ok) return 'error';
+  const body = (await res.json().catch(() => null)) as {
+    ok?: boolean;
+    error?: string;
+  } | null;
+  if (body?.ok) return 'ok';
+  if (body?.error === 'rate_limited') return 'rate_limited';
+  // 'bad_reason' and 'no_share' both mean the request was not one we can act
+  // on; the caller has already checked the reason and the share exists, so
+  // reaching either is a bug rather than something to explain to a reporter.
+  return body?.error ? 'invalid' : 'error';
+}
+
 function call(env: Env, url: URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('apikey', env.SUPABASE_SERVICE_ROLE_KEY);

@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `036`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `037`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -44,7 +44,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - **Session bearer tokens** stored on the `sessions.token` column (replaces the HMAC-with-shared-secret scheme entirely — no app secret needed).
 - **Vault** for Resend secrets (decrypted at trigger execution time).
 
-## Tables (15)
+## Tables (17)
 
 - `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`).
 - `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, and `last_viewed_by_owner_at`.
@@ -59,10 +59,12 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `app_events` (006) — PostHog-shaped product events (`distinct_id`, `event`, `properties`, `user_id`).
 - `error_log` (006) — client/server/worker JS error sink.
 - `feedback` (006) — user-submitted feedback from `/feedback`.
+- `api_keys` (034) — public-API credentials, one row per key; the key itself is stored only as a SHA-256 hash.
 - `rate_limits` — identity-keyed rate-limit counters for RPCs.
 - `waitlist` — legacy pre-launch capture surface, retained but not actively used post-launch.
+- `abuse_reports` (037) — one row per recipient abuse report on a share. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.
 
-## RPCs (8)
+## RPCs (10)
 
 Recipient-side (anon, SECURITY DEFINER):
 
@@ -71,6 +73,10 @@ Recipient-side (anon, SECURITY DEFINER):
 Owner-side (authenticated, SECURITY DEFINER, invoked from server actions):
 
 - `create_share`, `update_share` (007), `set_share_lock_deck` (015), `toggle_viewer_internal` (012)
+
+Server-side only (service role, SECURITY DEFINER, invoked by the proxy worker and the public API):
+
+- `create_share_as` (034), `notify_disabled_attempt` (028), `report_abuse` (037)
 
 ## RLS posture
 

@@ -168,7 +168,7 @@ p.lede {
   color: var(--ink-soft);
 }
 form { margin: 0; }
-input[type="email"], input[type="password"] {
+input[type="email"], input[type="password"], select, textarea {
   width: 100%;
   font: inherit;
   /* 16px is the iOS Safari zoom-on-focus threshold. Anything smaller
@@ -183,11 +183,31 @@ input[type="email"], input[type="password"] {
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-input::placeholder { color: rgba(135, 105, 89, 0.7); }
-input:focus {
+input::placeholder, textarea::placeholder { color: rgba(135, 105, 89, 0.7); }
+input:focus, select:focus, textarea:focus {
   border-color: var(--signal);
   box-shadow: 0 0 0 3px rgba(122, 31, 46, 0.10);
 }
+textarea { min-height: 96px; resize: vertical; margin-top: 12px; }
+label {
+  display: block;
+  margin: 0 2px 8px;
+  font: 500 11px/1 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--graphite);
+}
+/* The report affordance under each gate. Quiet on purpose: a recipient
+   looking for it finds it, and nobody else is nudged into suspecting the
+   document they were sent. */
+.report {
+  margin-top: 26px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--graphite);
+}
+.report a { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(135, 105, 89, 0.6); }
+.report a:hover { color: var(--signal); border-bottom-color: var(--signal); }
 input.invalid {
   border-color: var(--signal-dark);
   box-shadow: 0 0 0 3px rgba(90, 21, 33, 0.12);
@@ -349,6 +369,20 @@ export const sourceUnreachable = (): Response =>
     'Source error',
   );
 
+// The recipient's route to us, on both gates.
+//
+// A phishing page pushed through HTMLRadar is opened by somebody who can tell
+// it is one — the person it was aimed at. Nothing else in the pipeline can:
+// the document is the customer's own HTML, and we do not read it. So the gate
+// carries the one control the sender cannot remove, because the sender's HTML
+// never renders on this page.
+//
+// Not on the document itself. That decision stands: a badge inside somebody's
+// deck is chrome on a stranger's work, and the gates are where an unexpected
+// document is met anyway.
+const reportLink = (slug: string): string =>
+  `<p class="report"><a href="/r/${escapeHtml(slug)}/report">Report this document</a></p>`;
+
 export const passwordForm = (slug: string, error?: string): Response =>
   SHELL(
     error ? 'Incorrect password' : 'Enter password',
@@ -366,7 +400,8 @@ export const passwordForm = (slug: string, error?: string): Response =>
        />
        <div class="error" role="alert" aria-live="polite">${error ? escapeHtml(error) : ''}</div>
        <button type="submit">Continue</button>
-     </form>`,
+     </form>
+     ${reportLink(slug)}`,
     error ? 401 : 200,
     'Password required',
   );
@@ -422,7 +457,67 @@ export const emailGateForm = (slug: string, error?: string): Response =>
        <div class="error" role="alert" aria-live="polite">${error ? escapeHtml(error) : ''}</div>
        <p class="lede">Reading activity on this document is shared with the sender. <a href="https://htmlradar.com/privacy">How HTMLRadar handles this</a></p>
        <button type="submit">Continue</button>
-     </form>`,
+     </form>
+     ${reportLink(slug)}`,
     error ? 401 : 200,
     'Email required',
+  );
+
+// The four reasons, in the order they appear in the menu. Exported because
+// index.ts checks a submission against this same list — one place to change
+// if a fifth is ever worth having, and the database's CHECK constraint
+// (schema/037) is the third copy that stops a mismatch from being written.
+export const REPORT_REASONS = [
+  ['phishing', 'Phishing or impersonation'],
+  ['malware', 'Malware'],
+  ['personal_data', 'Sensitive personal data'],
+  ['other', 'Something else'],
+] as const;
+
+export const NOTE_MAX_LENGTH = 500;
+
+// The report form. No sign-in, no email field, no name: asking a person to
+// identify themselves before they can tell us a page is a fake login is
+// asking the one thing that stops most people reporting.
+//
+// The menu opens on an empty choice rather than on the first reason. A
+// pre-selected "phishing" would be the answer given by everyone who did not
+// read the menu, and a reason nobody chose is a reason nobody can triage on.
+export const reportForm = (slug: string, error?: string): Response =>
+  SHELL(
+    'Report this document',
+    `<h1>Report this document.</h1>
+     <p class="lede">This goes to HTMLRadar, not to whoever sent you the link. We look at every report. You do not need an account, and we do not ask who you are.</p>
+     <form method="POST" action="/r/${escapeHtml(slug)}/report">
+       <label for="reason">What is wrong with it</label>
+       <select id="reason" name="reason" required autofocus>
+         <option value="" disabled selected>Choose one</option>
+         ${REPORT_REASONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join('\n         ')}
+       </select>
+       <label for="note">Anything else we should know (optional)</label>
+       <textarea
+         id="note"
+         name="note"
+         maxlength="${NOTE_MAX_LENGTH}"
+         placeholder="Up to ${NOTE_MAX_LENGTH} characters"
+       ></textarea>
+       <div class="error" role="alert" aria-live="polite">${error ? escapeHtml(error) : ''}</div>
+       <button type="submit">Send report</button>
+     </form>`,
+    error ? 400 : 200,
+    'Report abuse',
+  );
+
+// The confirmation. It promises nothing we cannot do: there is no reply,
+// because we deliberately did not ask for an address to reply to.
+export const reportSent = (): Response =>
+  SHELL(
+    'Report received',
+    `<h1>Report received.</h1>
+     <p class="lede">Thank you. Somebody at HTMLRadar reads these. We cannot write back — the report is anonymous and we did not ask for your address — so if the document is a fake sign-in page, treat anything you typed into it as compromised.</p>
+     <div style="margin-top:32px;padding-top:24px;border-top:1px dashed var(--line);">
+       <a href="https://htmlradar.com/?utm_source=share-report-page&utm_medium=shared-doc" style="display:inline-block;color:#7A1F2E;text-decoration:none;border-bottom:1px dotted currentColor;font-size:13.5px;padding:4px 0;">What is HTMLRadar? &rarr;</a>
+     </div>`,
+    200,
+    'Report received',
   );

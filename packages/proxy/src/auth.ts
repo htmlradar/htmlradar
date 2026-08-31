@@ -212,6 +212,24 @@ export async function verifyOptOutToken(
   return constantTimeEqual(mac, expected);
 }
 
+// The rate-limit identity for an abuse report, and the only thing about the
+// reporter that leaves this worker.
+//
+// The report itself is anonymous — no sign-in, no address field — but "five an
+// hour" has to count something. This is that something: an HMAC of the
+// connecting address under SESSION_SECRET, so the database stores an opaque
+// string and never the address, and a reader of that table cannot walk the
+// hash back by trying every address in the world, because the key is not in
+// the database.
+//
+// An empty address (no CF-Connecting-IP, which is every local run and no
+// production request) hashes to one stable value, so those reporters share a
+// single budget. That fails toward more limiting, which is the right way for
+// a limit to fail.
+export async function hashReporterAddress(address: string, secret: string): Promise<string> {
+  return hmacHex(`abuse-reporter:${address}`, secret);
+}
+
 function parseCookies(header: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const part of header.split(/;\s*/)) {

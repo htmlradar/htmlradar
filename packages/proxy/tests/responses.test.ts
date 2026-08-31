@@ -6,6 +6,8 @@ import {
   sourceUnreachable,
   emailGateForm,
   passwordForm,
+  reportForm,
+  reportSent,
 } from '../src/responses.js';
 
 // Recipient-facing shells get rewritten relatively often (copy, colors,
@@ -109,6 +111,45 @@ describe('recipient error shells (Batch D)', () => {
     });
     it('passwordForm includes the POST target', async () => {
       expect(await bodyOf(passwordForm('xyz-789'))).toContain('action="/r/xyz-789/auth"');
+    });
+  });
+
+  // The abuse report link. It lives on the gates and nowhere else: those are
+  // the two pages a recipient meets before the sender's own HTML renders, so
+  // they are the only place in the pipeline where the control cannot be
+  // removed by the person being reported. The document itself stays clean —
+  // that decision stands.
+  describe('the report link on both gates', () => {
+    const LINK = 'Report this document';
+
+    it.each([
+      ['emailGateForm', () => emailGateForm('abc-123')],
+      ['passwordForm', () => passwordForm('abc-123')],
+    ])('%s carries the link, pointing at this share', async (_name, fn) => {
+      const body = await bodyOf(fn());
+      expect(body).toContain(LINK);
+      expect(body).toContain('href="/r/abc-123/report"');
+    });
+
+    it.each([
+      ['notFound', notFound],
+      ['revoked', revoked],
+      ['expired', expired],
+      ['sourceUnreachable', sourceUnreachable],
+    ])('%s does not, because there is no document there to report', async (_name, fn) => {
+      expect(await bodyOf(fn())).not.toContain(LINK);
+    });
+
+    it('the report page itself does not link to itself', async () => {
+      expect(await bodyOf(reportForm('abc-123'))).not.toContain(LINK + '</a>');
+    });
+
+    it('the confirmation promises no reply, because the report is anonymous', async () => {
+      expect(await bodyOf(reportSent())).toContain('cannot write back');
+    });
+
+    it('the report page is not cached, like every other shell', () => {
+      expect(reportForm('abc-123').headers.get('Cache-Control') ?? '').toMatch(/no-store/);
     });
   });
 

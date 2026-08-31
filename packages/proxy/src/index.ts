@@ -14,6 +14,8 @@
 //   GET  /r/{slug}            serves the document, gates as needed
 //   POST /r/{slug}/auth       password submission
 //   POST /r/{slug}/email      email submission for allow-list shares
+//   GET  /r/{slug}/report     the recipient's abuse report form
+//   POST /r/{slug}/report     the report itself
 //   GET  /r/{slug}/m/{att_id} downloads a supporting-material attachment
 //   GET  /r/_doc/{doc_id}     sender-side raw-doc preview (HMAC-gated)
 //   GET  /v1/tracker.js       the tracker, first-party to the document
@@ -36,6 +38,7 @@ import type { Env } from './env.js';
 import {
   getShareBySlug,
   getDocument,
+  reportAbuse,
   getProfileTier,
   getAttachment,
   listAttachmentsForDocument,
@@ -49,6 +52,7 @@ import {
   type Share,
 } from './supabase.js';
 import {
+  hashReporterAddress,
   issueAuthCookie,
   issueEmailCookie,
   issueOptOutToken,
@@ -69,8 +73,12 @@ import {
   notFound,
   optOutConfirm,
   passwordForm,
+  reportForm,
+  reportSent,
   revoked,
   sourceUnreachable,
+  NOTE_MAX_LENGTH,
+  REPORT_REASONS,
 } from './responses.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -270,7 +278,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     return handleAttachmentDownload(request, slug, attachmentId, env);
   }
 
-  const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email))?\/?$/i.exec(url.pathname);
+  const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email|report))?\/?$/i.exec(url.pathname);
   if (!match) return new Response('Not Found', { status: 404 });
   // Lowercased rather than redirected to the canonical form. Every stored
   // slug is lowercase (the format is enforced by the validate_share_slug
@@ -306,6 +314,20 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 
   const share = await getShareBySlug(env, slug);
   if (!share) return notFound();
+
+  // The abuse report, answered before the revoked/expired branch below.
+  //
+  // A link that was turned off after it was sent is exactly the kind somebody
+  // comes back to report, and a reporter who met the "sender turned this link
+  // off" page instead of the form would have no way through. Answering here
+  // also keeps a report from firing the owner's disabled-open alert — telling
+  // a phishing sender that somebody just came back to their dead link is the
+  // one thing this path must never do.
+  if (subroute === 'report') {
+    if (request.method === 'POST') return handleReportSubmit(request, share, env);
+    if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
+    return reportForm(slug);
+  }
 
   // Owner-preview short-circuit. When the doc owner clicks "Preview
   // as you" in /docs/[id], the app mints a 10-minute HMAC token bound
@@ -504,6 +526,62 @@ async function handlePasswordSubmit(request: Request, share: Share, env: Env): P
       'Set-Cookie': await issueAuthCookie(slug, env.SESSION_SECRET),
     },
   });
+}
+
+/**
+ * The report write.
+ *
+ * The reason is checked here as well as in the RPC so a mistyped menu value
+ * comes back as a sentence on the form rather than as a silent nothing, and
+ * the note is cut to the length the form advertises rather than refused —
+ * somebody who typed six hundred characters about a fake login page should
+ * not lose them to a validation message.
+ *
+ * The connecting address is hashed before it goes anywhere. It is the
+ * rate-limit identity and nothing else; the raw address never leaves this
+ * worker, and no part of the report identifies the reporter.
+ *
+ * NO CONFIRMATION TOKEN, unlike the opt-out POST a few functions down. That
+ * one needs a token because the thing it writes is the recipient's own
+ * setting across every sender's links, so a forged submission changes
+ * something the recipient owns. A forged report changes nothing anybody
+ * owns: it writes a row we read by hand, five an hour per address, and the
+ * worst it can do is make us look at a document. A token would buy a page of
+ * machinery for that.
+ */
+async function handleReportSubmit(request: Request, share: Share, env: Env): Promise<Response> {
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return reportForm(share.slug, 'Something went wrong sending that. Please try again.');
+  }
+
+  const reason = form.get('reason');
+  if (typeof reason !== 'string' || !REPORT_REASONS.some(([value]) => value === reason)) {
+    return reportForm(share.slug, 'Please choose a reason.');
+  }
+
+  const rawNote = form.get('note');
+  const note =
+    typeof rawNote === 'string' ? rawNote.trim().slice(0, NOTE_MAX_LENGTH) || null : null;
+
+  const ipHash = await hashReporterAddress(
+    request.headers.get('CF-Connecting-IP') ?? '',
+    env.SESSION_SECRET,
+  );
+
+  const verdict = await reportAbuse(env, { slug: share.slug, reason, note, ipHash });
+  if (verdict === 'rate_limited') {
+    return reportForm(
+      share.slug,
+      'That is several reports from here in the last hour. Try again a little later.',
+    );
+  }
+  if (verdict !== 'ok') {
+    return reportForm(share.slug, "That didn't send. Try again in a moment.");
+  }
+  return reportSent();
 }
 
 async function handleEmailSubmit(request: Request, share: Share, env: Env): Promise<Response> {

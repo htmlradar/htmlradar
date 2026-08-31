@@ -189,6 +189,30 @@ describe('the form is reachable from the link the recipient was sent', () => {
   });
 });
 
+describe('a gate is never in the way of a report', () => {
+  // The report block sits above the password and email gates on purpose. A
+  // recipient who cannot get past the gate — because the document is a fake
+  // sign-in page and they have no password for it — is exactly the person
+  // most likely to want to report it. Moving the block below the gates would
+  // make a gated phishing page the one kind nobody can report.
+  it('renders behind a password gate without the password', async () => {
+    getShareBySlug.mockResolvedValue({ ...share, require_password: true });
+    const res = await fetchAs('https://htmlradar.page/r/acme-proposal/report');
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('action="/r/acme-proposal/report"');
+  });
+
+  it('accepts a report behind an email gate without the email', async () => {
+    getShareBySlug.mockResolvedValue({ ...share, require_email: true });
+    const res = await fetchAs(
+      'https://htmlradar.page/r/acme-proposal/report',
+      reportPost({ reason: 'phishing' }),
+    );
+    expect(res.status).toBe(200);
+    expect(reportAbuse).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('a link the sender has turned off can still be reported', () => {
   // A revoked or expired link is exactly the kind somebody comes back to
   // report, and the report must not tell its owner that they did.

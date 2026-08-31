@@ -17,6 +17,10 @@ export type AppEvent =
   | 'document.deleted'
   | 'document.replaced'
   | 'version.v1_seed_failed'
+  // The upload-time phishing screen scored a document at or above the
+  // threshold (schema/039). Carries the score and the named signals, never a
+  // byte of the document itself.
+  | 'document.screen_flagged'
   | 'share.created'
   // Fired alongside share.created when the owner chose the link address
   // rather than taking a generated one (Pro).

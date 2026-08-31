@@ -26,6 +26,7 @@ const db = vi.hoisted(() => ({
   rpcArgs: null as Record<string, unknown> | null,
   calls: [] as TableCall[],
   updateError: null as { message: string } | null,
+  documentSource: null as { type: string; bytes?: Uint8Array } | null,
 }));
 
 // These three reach the network or Next's server-only runtime; the route's
@@ -33,7 +34,21 @@ const db = vi.hoisted(() => ({
 vi.mock('@/lib/error-log', () => ({ logServerError: vi.fn() }));
 vi.mock('@/lib/events', () => ({ captureServerEvent: vi.fn() }));
 vi.mock('@/lib/r2', () => ({ deleteR2Object: vi.fn(), r2Key: () => 'key' }));
-vi.mock('@/lib/create-document', () => ({ createDocumentForUser: async () => 'doc-1' }));
+// Records the source so the screening chain can be asserted: the phishing
+// screen runs inside createDocumentForUser (lib/create-document.test.ts covers
+// what it does with what it is given), so what this route owes it is the
+// caller's own bytes, unmodified.
+vi.mock('@/lib/create-document', () => ({
+  createDocumentForUser: async (
+    _client: unknown,
+    _userId: string,
+    _title: string,
+    source: { type: string; bytes?: Uint8Array },
+  ) => {
+    db.documentSource = source;
+    return 'doc-1';
+  },
+}));
 vi.mock('@/lib/quota', () => ({ readQuota: async () => ({ atCap: false, used: 0 }) }));
 
 vi.mock('@/lib/api-auth', async (importOriginal) => ({
@@ -77,6 +92,7 @@ beforeEach(() => {
   db.rpcArgs = null;
   db.calls = [];
   db.updateError = null;
+  db.documentSource = null;
 });
 
 async function post(body: Record<string, unknown>) {
@@ -134,6 +150,14 @@ describe('POST /api/v1/shares — lock_deck', () => {
     }
     expect(db.rpcArgs).toBeNull();
     expect(db.calls).toEqual([]);
+  });
+
+  it('hands the HTML the caller sent, unmodified, to the screened create path', async () => {
+    expect((await post({ html: '<h1>Deck</h1><p>Nothing to see.</p>' })).status).toBe(201);
+    expect(db.documentSource?.type).toBe('upload');
+    expect(new TextDecoder().decode(db.documentSource?.bytes)).toBe(
+      '<h1>Deck</h1><p>Nothing to see.</p>',
+    );
   });
 
   it('takes the whole link back when the setting cannot be written', async () => {

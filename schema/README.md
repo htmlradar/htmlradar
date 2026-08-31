@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `038`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `039`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -47,7 +47,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 ## Tables (18)
 
 - `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`).
-- `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, and `last_viewed_by_owner_at`.
+- `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, `last_viewed_by_owner_at`, and the upload-time phishing screen's `screen_score` / `screen_signals` (039; null on every URL-source document and on everything predating the migration).
 - `document_versions` (018) — one row per upload or replace, capturing original local filename + bytes + R2 key.
 - `document_shares` — per-recipient tracked links; password / expiry / revoke / `allowed_email_domains` / `allowed_emails` / `lock_deck` per share.
 - `document_attachments` (009) — file metadata per share (PDF / Office / image / ZIP), bytes in R2.
@@ -62,7 +62,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `api_keys` (034) — public-API credentials, one row per key; the key itself is stored only as a SHA-256 hash.
 - `rate_limits` — identity-keyed rate-limit counters for RPCs.
 - `waitlist` — legacy pre-launch capture surface, retained but not actively used post-launch.
-- `abuse_reports` (037) — one row per recipient abuse report on a share. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.
+- `abuse_reports` (037) — one row per abuse report. A recipient's report names a share; an automated upload-screen flag names a document instead (039), which is why `share_id` is nullable and `document_id` exists. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.
 - `telegram_outbox` (038) — every Telegram message the monitor worker sends, and every thread-scan run whether it sent anything or not. Exists because a Telegram bot cannot read back its own sent history. RLS on with no policies; the worker writes with the service role.
 
 ## RPCs (10)

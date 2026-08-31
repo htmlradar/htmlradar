@@ -15,7 +15,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Stacktree Alternative for Tracked HTML Links | HTMLRadar',
   description:
-    'HTMLRadar is a Stacktree alternative for tracked HTML links: open source, self-hostable, $15/mo, and free for two links that never expire.',
+    'HTMLRadar is a Stacktree alternative for tracked HTML links: open source, self-hostable, $15/mo, and free for two links that remain live unless you set an expiry or revoke them.',
   path: '/compare/stacktree',
 });
 
@@ -86,9 +86,10 @@ export default function CompareStacktreePage() {
           <DirectAnswer updated="August 2026">
             Both track reading: Stacktree&apos;s site says it shows which sections held a reader,
             and HTMLRadar reports the same. HTMLRadar is open source, self-hostable, and free for
-            two links that do not expire; Stacktree&apos;s free plan caps at 3 pages that come down
-            after 7 days. Want client portals on your own domain? Stacktree. Want open source and
-            two free links that do not expire? HTMLRadar.
+            two links that remain live unless you set an expiry or revoke them; Stacktree&apos;s
+            free plan caps at 3 pages that come down after 7 days. Want client portals on your own
+            domain? Stacktree. Want open source and two free links that remain live unless you set
+            an expiry or revoke them? HTMLRadar.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Stacktree&apos;s site describes one address per client where everything collects, a
@@ -156,8 +157,9 @@ export default function CompareStacktreePage() {
                 <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
                   You are sending one HTML file, whether uploaded or a URL you already host, to
                   named people and want section-level reading reported back per recipient. The free
-                  tier is two tracked links that do not expire, then $15 a month or $150 a year, and
-                  the source is open under AGPL-3.0 so you can self-host it.
+                  tier is two tracked links that remain live unless you set an expiry or revoke
+                  them, then $15 a month or $150 a year, and the source is open under AGPL-3.0 so
+                  you can self-host it.
                 </p>
               </div>
             </div>

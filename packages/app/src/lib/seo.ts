@@ -21,8 +21,11 @@ export function pageMeta(opts: {
   path: string;
   // Reciprocal hreflang — e.g. { en: '/compare/docsend', pl: '/pl/...', 'x-default': '/compare/docsend' }.
   languages?: Record<string, string>;
+  // og:locale for the social-sharing card. Defaults to en_US; pass e.g.
+  // 'pl_PL' on a translated page so the share card matches its content.
+  locale?: string;
 }): Metadata {
-  const { title, description, path, languages } = opts;
+  const { title, description, path, languages, locale = 'en_US' } = opts;
   return {
     title: { absolute: title },
     description,
@@ -39,7 +42,7 @@ export function pageMeta(opts: {
     },
     openGraph: {
       type: 'website',
-      locale: 'en_US',
+      locale,
       siteName: 'HTMLRadar',
       url: `${SITE_URL}${path}`,
       title,

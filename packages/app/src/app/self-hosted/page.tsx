@@ -15,7 +15,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Self-Hosted DocSend Alternative, Open Source | HTMLRadar',
   description:
-    'HTMLRadar is a self-hosted, open-source (AGPL-3.0) DocSend alternative for HTML documents, run in your own Cloudflare and Supabase accounts.',
+    'HTMLRadar is a self-hosted, open-source (AGPL-3.0) DocSend alternative for HTML documents. It runs in your own Cloudflare and Supabase accounts.',
   path: '/self-hosted',
 });
 

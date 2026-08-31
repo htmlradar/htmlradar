@@ -563,8 +563,10 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
               <Link href="/settings" className="text-signal-dark hover:underline">
                 htmlradar.com/settings
               </Link>
-              ; revocation is immediate. Every route is rate-limited per key, per account and per
-              address, for example 75 new links an hour per account on Pro, 30 on free.
+              ; revocation is immediate. Every route is rate-limited: creating and replacing share
+              one account budget of 75 calls an hour on Pro and 30 on free, plus 120 calls an hour
+              from one address, while listing and revoking are each capped at 120 calls an hour per
+              account.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               The only data that leaves your machine is the HTML the agent passes in and the

@@ -13,6 +13,7 @@ export const metadata = pageMeta({
   description:
     'Szukasz alternatywy dla DocSend? HTMLRadar to otwartoźródłowe śledzenie prezentacji HTML: wiesz, kto otworzył Twój dokument, które sekcje przeczytał i jak długo je czytał.',
   path: '/pl/alternatywa-dla-docsend',
+  locale: 'pl_PL',
   languages: {
     en: '/compare/docsend',
     pl: '/pl/alternatywa-dla-docsend',

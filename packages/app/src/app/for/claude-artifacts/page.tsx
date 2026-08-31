@@ -1,5 +1,9 @@
-// /for/claude-artifacts addresses the portable-HTML workflow specifically.
-// Claude artifacts can be several formats, so this page must not imply every
+// /for/claude-artifacts is the workflow guide: how a Claude user fits
+// tracked sharing into ongoing work with artifacts, from export through
+// updating the same link later. /tools/claude-artifact-to-link owns the
+// transactional "I have the file, give me a link now" intent, so this
+// opening stays on the workflow rather than repeating that promise. Claude
+// artifacts can be several formats, so this page must not imply every
 // artifact can be uploaded as a standalone document.
 
 import Link from 'next/link';
@@ -13,9 +17,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Share a Claude Artifact, See Who Opened It | HTMLRadar',
+  title: 'Working With Claude Artifacts: A Tracking Workflow | HTMLRadar',
   description:
-    'How to share a Claude artifact and see who opened it: export it as an HTML file, send a tracked HTMLRadar link, and get section-level attention and active read time.',
+    'How Claude users fit tracked sharing into their work: export an artifact once, keep the same link current as it changes, and know which sections recipients actually read.',
   path: '/for/claude-artifacts',
 });
 
@@ -33,13 +37,14 @@ export default function ClaudeArtifactsPage() {
           />
           <SectionMark>HTMLRadar · Works with</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
-            How to share a Claude artifact and see who opened it.
+            The workflow for tracking a Claude artifact you keep revising.
           </h1>
           <DirectAnswer updated="August 2026">
-            To see who opened a Claude artifact, export it as an HTML file, upload it to HTMLRadar,
-            and send the tracked link instead of the artifact URL. You get who opened it, which
-            sections they read and for how long, plus an optional email gate, password and expiry.
-            Free for two tracked links, open source.
+            Export a Claude artifact once, upload it to HTMLRadar, and send the tracked link instead
+            of the artifact URL. When the artifact changes, replace the uploaded file and the same
+            link serves the new version, so recipients never get a stale copy. Each recipient&apos;s
+            open, section-level read time, and optional email gate, password, or expiry come from
+            that one link. Free for two tracked links, open source.
           </DirectAnswer>
 
           <section className="mt-10">

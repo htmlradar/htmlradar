@@ -1,8 +1,10 @@
 // Free tool page: the same staging tool as /tools/html-to-link, framed for
-// people searching "how to share html file from claude" and "share claude
-// artifacts with others". Deliberately says nothing about Claude's interface
-// beyond saving or exporting the artifact as an HTML file — the same wording
-// /for/claude-artifacts uses.
+// people who already have the exported HTML file and want the link right
+// now — a transactional intent. /for/claude-artifacts owns the "how do I
+// work with Claude artifacts" guide intent, so this opening stays short and
+// verb-first rather than duplicating that framing. Deliberately says nothing
+// about Claude's interface beyond saving or exporting the artifact as an
+// HTML file.
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
@@ -18,9 +20,9 @@ import { HtmlToolPanel } from '../HtmlToolPanel';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Share a Claude Artifact as a Link | HTMLRadar',
+  title: 'Turn a Claude Artifact Into a Link (Free) | HTMLRadar',
   description:
-    'How to share an HTML file from Claude: save or export the artifact as an HTML file, drop it here, and get a tracked link that shows who opened it, which sections they read, and for how long.',
+    'Already have the artifact exported? Drop the HTML file here and get a tracked link in the time it takes to sign in — no build step, no hosting to set up.',
   path: '/tools/claude-artifact-to-link',
 });
 
@@ -69,13 +71,13 @@ export default async function ClaudeArtifactToLinkToolPage({
           />
           <SectionMark>HTMLRadar · Free tool</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[52px]">
-            Share a Claude artifact as a link, and know who opened it.
+            Drop your Claude artifact here. Get a tracked link back.
           </h1>
           <DirectAnswer updated="August 2026">
-            Save or export the artifact as an HTML file, drop that file on this page, and sign in to
-            get your tracked link. Send the link instead of the artifact. You see who opened it,
-            which sections they read, and how long they stayed. Free for two tracked links, then $15
-            a month.
+            Drop the exported HTML file below and sign in: that&apos;s the whole tool. You get a
+            tracked link to send instead of the artifact, and it reports who opened it, which
+            sections they read, and how long they stayed. Free for two tracked links, then $15 a
+            month.
           </DirectAnswer>
 
           <div className="mt-8">

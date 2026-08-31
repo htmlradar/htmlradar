@@ -137,15 +137,18 @@ export default async function HtmlToLinkToolPage({ searchParams }: { searchParam
           <div className="mt-16 border-t border-line pt-10">
             <p className="text-[14px] leading-relaxed text-ink-soft">
               Related:{' '}
-              <Link href="/how-to/share-an-html-file" className="text-signal-dark hover:underline">
-                how to share an HTML file
-              </Link>
-              ,{' '}
               <Link
                 href="/tools/claude-artifact-to-link"
                 className="text-signal-dark hover:underline"
               >
                 share a Claude artifact as a link
+              </Link>
+              ,{' '}
+              <Link
+                href="/tools/claude-artifact-to-pdf"
+                className="text-signal-dark hover:underline"
+              >
+                Claude artifact to PDF
               </Link>
               , and{' '}
               <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">

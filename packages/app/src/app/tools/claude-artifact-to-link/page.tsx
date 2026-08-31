@@ -30,10 +30,6 @@ const FAQ = [
     a: 'Save or export the artifact as an HTML file, drop that file on this page, and sign in. HTMLRadar gives you a link anyone can open in a browser, with no account on their side.',
   },
   {
-    q: 'How do I share an HTML file from Claude?',
-    a: 'Copy or download the artifact as one self-contained HTML file — Claude lets you view the code and save it — then drop that file on this page and sign in. You get a tracked link anyone can open in a browser, and it tells you who opened it and which sections they read.',
-  },
-  {
     q: 'Which artifacts work here?',
     a: 'Self-contained HTML pages. If the artifact depends on a build step, on assets it loads from elsewhere, or on Claude-hosted AI behaviour, prepare it as a single portable HTML file first or keep it where it is.',
   },

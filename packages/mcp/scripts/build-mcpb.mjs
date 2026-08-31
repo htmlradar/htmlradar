@@ -137,4 +137,5 @@ if (zipResult.status !== 0) {
   process.stderr.write(zipResult.stderr ?? '');
   process.exit(zipResult.status ?? 1);
 }
+// eslint-disable-next-line no-console -- replaces the pack summary `mcpb pack` used to print
 console.log(`Packed ${out}`);

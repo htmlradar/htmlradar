@@ -46,7 +46,7 @@ interface ViewerInsightsProps {
   // (rare, e.g. forwarded link), we render "N shares" instead.
   shareSlugs?: Record<string, string>;
   // Map of share_id → recipient_label. Surfaces the sender's chosen
-  // label under the slug ("Investor list", "Marc at Example Ventures"), so the
+  // label under the slug ("Investor list", "Marc at Halbrook Capital"), so the
   // viewer row ties back to the same share-identity the rail uses.
   shareLabels?: Record<string, string | null>;
   toggleInternal: (formData: FormData) => void | Promise<void>;

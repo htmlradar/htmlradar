@@ -94,7 +94,7 @@ export function DashboardMock() {
             <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
               Recipient
             </div>
-            <div className="mt-0.5 text-[14px] font-medium text-ink">Marc · Example Ventures</div>
+            <div className="mt-0.5 text-[14px] font-medium text-ink">Marc · Halbrook Capital</div>
           </div>
         </div>
         <div className="flex items-baseline gap-6">

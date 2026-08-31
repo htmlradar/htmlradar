@@ -9,7 +9,7 @@
 // opened it.
 //
 // Why this is the right hierarchy:
-//   - A label like "Investor list" or "Marc at Example Ventures" is a
+//   - A label like "Investor list" or "Marc at Halbrook Capital" is a
 //     deliberate group/person identifier. Demoting it under
 //     "first-viewer-email +N" reads as the dashboard ignoring the
 //     sender's own taxonomy, especially when the share went to a

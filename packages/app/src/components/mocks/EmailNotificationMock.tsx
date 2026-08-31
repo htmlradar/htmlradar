@@ -32,7 +32,7 @@ export function EmailNotificationMock({ variant = 'inbox' }: EmailNotificationMo
           Marc just opened Seed Deck, Q2.
         </p>
         <p className="mt-1 text-[12.5px] leading-snug text-ink-soft sm:truncate">
-          Example Ventures · 2m 41s on §03 The Ask · still active
+          Halbrook Capital · 2m 41s on §03 The Ask · still active
         </p>
         {isCard && (
           <div className="mt-3 flex items-center justify-between border-t border-line pt-3">

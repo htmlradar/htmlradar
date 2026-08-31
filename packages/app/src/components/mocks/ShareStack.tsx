@@ -20,7 +20,7 @@ const SHARES: ShareCard[] = [
   {
     initial: 'M',
     name: 'Marc',
-    org: 'Example Ventures',
+    org: 'Halbrook Capital',
     slug: 'swift-falcon-a3f2',
     status: 'opened',
   },

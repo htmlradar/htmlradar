@@ -18,10 +18,10 @@ describe('resolveRecipientIdentity', () => {
 
     it('shows label primary + single viewer email secondary', () => {
       const r = resolveRecipientIdentity(
-        { recipient_label: 'Marc at Example Ventures', require_email: true },
+        { recipient_label: 'Marc at Halbrook Capital', require_email: true },
         [{ email: 'marc@example.com', first_seen: '2026-01-01T12:00:00Z' }],
       );
-      expect(r.primary).toBe('Marc at Example Ventures');
+      expect(r.primary).toBe('Marc at Halbrook Capital');
       expect(r.secondary).toBe('marc@example.com');
     });
 

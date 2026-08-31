@@ -75,19 +75,6 @@ export function screenUpload(bytes: Uint8Array): ScreenResult {
 }
 
 /**
- * Whether a Postgres error is "this database has not had schema/039 applied".
- *
- * ponytail: deploys land before migrations do here — a push runs CI and
- * deploys itself, while 039 is a human pasting SQL into an editor afterwards —
- * and in that window every write naming a screen column would fail. Both write
- * paths retry without the columns rather than fail a customer's upload. Delete
- * this and its two call sites once 039 has been applied.
- */
-export function screenColumnsMissing(message: string): boolean {
-  return /screen_score|screen_signals/.test(message);
-}
-
-/**
  * Put a high-scoring upload into the abuse queue for a human to look at.
  * A no-op below the threshold, so callers do not repeat the comparison.
  *
@@ -214,15 +201,15 @@ export async function createDocumentForUser(
   // write or delete.
   const screen = screenUpload(source.bytes);
 
-  const row = { id: docId, title, owner_id: userId, source_type: 'upload', r2_key: key };
-
-  let { error: insertError } = await supabase
-    .from('documents')
-    .insert({ ...row, screen_score: screen.score, screen_signals: screen.signals });
-  if (insertError && screenColumnsMissing(insertError.message)) {
-    console.warn('[screen] documents has no screen columns yet — schema/039 is not applied');
-    ({ error: insertError } = await supabase.from('documents').insert(row));
-  }
+  const { error: insertError } = await supabase.from('documents').insert({
+    id: docId,
+    title,
+    owner_id: userId,
+    source_type: 'upload',
+    r2_key: key,
+    screen_score: screen.score,
+    screen_signals: screen.signals,
+  });
   if (insertError) throw new Error(insertError.message);
 
   try {

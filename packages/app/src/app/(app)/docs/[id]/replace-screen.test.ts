@@ -13,7 +13,6 @@ const DOC = '11111111-1111-4111-8111-111111111111';
 
 const state = vi.hoisted(() => ({
   updates: [] as Record<string, unknown>[],
-  rejectScreenColumns: false,
   redirectedTo: null as string | null,
 }));
 
@@ -59,14 +58,6 @@ vi.mock('@/lib/supabase-server', () => ({
       update: (values: Record<string, unknown>) => ({
         eq: () => ({
           eq: async () => {
-            if (state.rejectScreenColumns && 'screen_score' in values) {
-              return {
-                error: {
-                  message:
-                    "Could not find the 'screen_score' column of 'documents' in the schema cache",
-                },
-              };
-            }
             state.updates.push({ table, ...values });
             return { error: null };
           },
@@ -103,7 +94,6 @@ let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   state.updates = [];
-  state.rejectScreenColumns = false;
   state.redirectedTo = null;
   process.env['SUPABASE_URL'] = 'https://project.supabase.co';
   process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'service-role-key';
@@ -135,13 +125,5 @@ describe('replaceDocumentAction — the upload screen', () => {
     >;
     expect(body['document_id']).toBe(DOC);
     expect(body['reason']).toBe('phishing');
-  });
-
-  it('still replaces the document when schema/039 is not applied', async () => {
-    state.rejectScreenColumns = true;
-    await replace(BENIGN);
-    expect(state.redirectedTo).toBe(`/docs/${DOC}?replaced=1`);
-    expect(state.updates[0]).not.toHaveProperty('screen_score');
-    expect(state.updates[0]).toMatchObject({ current_version: 2 });
   });
 });

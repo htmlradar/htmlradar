@@ -11,7 +11,7 @@ import { captureServerEvent } from '@/lib/events';
 import { readQuota } from '@/lib/quota';
 import { issueOwnerDocPreviewToken, issueOwnerPreviewToken } from '@/lib/preview-token';
 import { deleteR2Object, r2Key, uploadAttachment, uploadHtml } from '@/lib/r2';
-import { flagIfHighScore, screenColumnsMissing, screenUpload } from '@/lib/create-document';
+import { flagIfHighScore, screenUpload } from '@/lib/create-document';
 import {
   MAX_ATTACHMENTS_PER_DOC,
   MAX_TOTAL_BYTES_PER_DOC,
@@ -860,23 +860,18 @@ export async function replaceDocumentAction(formData: FormData) {
     // is rewritten on every replace rather than kept at its highest, because
     // the score describes the document being served now.
     const screen = screenUpload(bytes);
-    const patch = {
-      current_version: nextVersion,
-      r2_key: newKey,
-      updated_at: new Date().toISOString(),
-    };
-    const write = (values: Record<string, unknown>) =>
-      supabase.from('documents').update(values).eq('id', doc.id).eq('owner_id', user.id);
 
-    let { error: updateErr } = await write({
-      ...patch,
-      screen_score: screen.score,
-      screen_signals: screen.signals,
-    });
-    if (updateErr && screenColumnsMissing(updateErr.message)) {
-      console.warn('[screen] documents has no screen columns yet — schema/039 is not applied');
-      ({ error: updateErr } = await write(patch));
-    }
+    const { error: updateErr } = await supabase
+      .from('documents')
+      .update({
+        current_version: nextVersion,
+        r2_key: newKey,
+        updated_at: new Date().toISOString(),
+        screen_score: screen.score,
+        screen_signals: screen.signals,
+      })
+      .eq('id', doc.id)
+      .eq('owner_id', user.id);
     if (updateErr) throw new Error(updateErr.message);
 
     await flagIfHighScore(doc.id, user.id, screen);

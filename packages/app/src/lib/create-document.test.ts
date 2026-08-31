@@ -41,21 +41,11 @@ interface Insert {
   row: Record<string, unknown>;
 }
 
-// `rejectScreenColumns` reproduces a database that has not had schema/039
-// applied: PostgREST refuses an insert naming a column it cannot find.
-function fakeSupabase(inserts: Insert[], rejectScreenColumns = false) {
+function fakeSupabase(inserts: Insert[]) {
   return {
     from(table: string) {
       return {
         insert: async (row: Record<string, unknown>) => {
-          if (rejectScreenColumns && 'screen_score' in row) {
-            return {
-              error: {
-                message:
-                  "Could not find the 'screen_score' column of 'documents' in the schema cache",
-              },
-            };
-          }
           inserts.push({ table, row });
           return { error: null };
         },
@@ -121,20 +111,6 @@ describe('createDocumentForUser — the score on the document row', () => {
     expect(row['screen_score']).toBeGreaterThanOrEqual(SCREEN_FLAG_THRESHOLD);
     expect(row['screen_signals']).toContain('password-input');
     expect(row['screen_signals']).toContain('brand-login-wording');
-  });
-
-  it('still stores the document when the database has not had schema/039 applied', async () => {
-    // A push deploys itself; the migration is a human pasting SQL afterwards.
-    // In that window the upload must go through without the score, not fail.
-    const docId = await createDocumentForUser(fakeSupabase(inserts, true), USER, 'Q3 update', {
-      type: 'upload',
-      bytes: bytes(BENIGN),
-      filename: 'q3.html',
-    });
-    expect(docId).toMatch(/^[0-9a-f-]{36}$/);
-    const row = documentRow();
-    expect(row).not.toHaveProperty('screen_score');
-    expect(row['r2_key']).toBe(`docs/${USER}/${docId}/v1.html`);
   });
 
   it('leaves a URL-source document unscreened rather than scoring it clean', async () => {

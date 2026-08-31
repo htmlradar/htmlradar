@@ -67,7 +67,29 @@ async function seedFirstVersion(
 }
 
 /**
+ * Score the bytes of an upload. The cap is the whole of this function's
+ * cleverness — see SCREEN_MAX_BYTES.
+ */
+export function screenUpload(bytes: Uint8Array): ScreenResult {
+  return screenHtml(new TextDecoder().decode(bytes.subarray(0, SCREEN_MAX_BYTES)));
+}
+
+/**
+ * Whether a Postgres error is "this database has not had schema/039 applied".
+ *
+ * ponytail: deploys land before migrations do here — a push runs CI and
+ * deploys itself, while 039 is a human pasting SQL into an editor afterwards —
+ * and in that window every write naming a screen column would fail. Both write
+ * paths retry without the columns rather than fail a customer's upload. Delete
+ * this and its two call sites once 039 has been applied.
+ */
+export function screenColumnsMissing(message: string): boolean {
+  return /screen_score|screen_signals/.test(message);
+}
+
+/**
  * Put a high-scoring upload into the abuse queue for a human to look at.
+ * A no-op below the threshold, so callers do not repeat the comparison.
  *
  * Written straight to the table with the service role rather than through
  * `report_abuse` (schema/037). That RPC is the trust border for a stranger on
@@ -83,11 +105,13 @@ async function seedFirstVersion(
  * product. The console line and the captured event are what make a lost write
  * findable afterwards.
  */
-async function flagForReview(
+export async function flagIfHighScore(
   documentId: string,
   userId: string,
   screen: ScreenResult,
 ): Promise<void> {
+  if (screen.score < SCREEN_FLAG_THRESHOLD) return;
+
   await captureServerEvent({
     event: 'document.screen_flagged',
     distinctId: userId,
@@ -188,20 +212,14 @@ export async function createDocumentForUser(
   // worth defending: the score is advisory, and the thing an operator acts on
   // is the abuse_reports row below, which no customer-facing role can read,
   // write or delete.
-  const screen = screenHtml(new TextDecoder().decode(source.bytes.subarray(0, SCREEN_MAX_BYTES)));
+  const screen = screenUpload(source.bytes);
 
   const row = { id: docId, title, owner_id: userId, source_type: 'upload', r2_key: key };
 
-  // ponytail: written on the INSERT, and retried without them if the database
-  // does not have the columns yet. Deploys land before migrations do here — a
-  // push runs CI and deploys itself, while schema/039 is a human pasting SQL
-  // into an editor afterwards — and in that window every upload on every path
-  // would fail on an unknown column. Eight lines of tolerance are cheaper than
-  // that outage. Delete this fallback once 039 has been applied.
   let { error: insertError } = await supabase
     .from('documents')
     .insert({ ...row, screen_score: screen.score, screen_signals: screen.signals });
-  if (insertError && /screen_score|screen_signals/.test(insertError.message)) {
+  if (insertError && screenColumnsMissing(insertError.message)) {
     console.warn('[screen] documents has no screen columns yet — schema/039 is not applied');
     ({ error: insertError } = await supabase.from('documents').insert(row));
   }
@@ -230,8 +248,6 @@ export async function createDocumentForUser(
   // foreign key cascade, which is correct: there is no longer a document for
   // an operator to look at. The captured event above has no foreign key and
   // survives, so the attempt is still visible on /admin/events.
-  if (screen.score >= SCREEN_FLAG_THRESHOLD) {
-    await flagForReview(docId, userId, screen);
-  }
+  await flagIfHighScore(docId, userId, screen);
   return docId;
 }

@@ -11,6 +11,7 @@ import { captureServerEvent } from '@/lib/events';
 import { readQuota } from '@/lib/quota';
 import { issueOwnerDocPreviewToken, issueOwnerPreviewToken } from '@/lib/preview-token';
 import { deleteR2Object, r2Key, uploadAttachment, uploadHtml } from '@/lib/r2';
+import { flagIfHighScore, screenColumnsMissing, screenUpload } from '@/lib/create-document';
 import {
   MAX_ATTACHMENTS_PER_DOC,
   MAX_TOTAL_BYTES_PER_DOC,
@@ -850,18 +851,35 @@ export async function replaceDocumentAction(formData: FormData) {
     // version's blob — recipients are unaffected. If the DB update fails
     // after a successful upload, we have an orphan R2 object (acceptable;
     // periodic sweep cleans these up).
-    await uploadHtml(newKey, new Uint8Array(await file.arrayBuffer()));
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await uploadHtml(newKey, bytes);
 
-    const { error: updateErr } = await supabase
-      .from('documents')
-      .update({
-        current_version: nextVersion,
-        r2_key: newKey,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', doc.id)
-      .eq('owner_id', user.id);
+    // Replace is the fourth path that stores customer HTML, and screening the
+    // other three without this one would be a control with a documented way
+    // round it: upload an empty page, then replace it with the kit. The score
+    // is rewritten on every replace rather than kept at its highest, because
+    // the score describes the document being served now.
+    const screen = screenUpload(bytes);
+    const patch = {
+      current_version: nextVersion,
+      r2_key: newKey,
+      updated_at: new Date().toISOString(),
+    };
+    const write = (values: Record<string, unknown>) =>
+      supabase.from('documents').update(values).eq('id', doc.id).eq('owner_id', user.id);
+
+    let { error: updateErr } = await write({
+      ...patch,
+      screen_score: screen.score,
+      screen_signals: screen.signals,
+    });
+    if (updateErr && screenColumnsMissing(updateErr.message)) {
+      console.warn('[screen] documents has no screen columns yet — schema/039 is not applied');
+      ({ error: updateErr } = await write(patch));
+    }
     if (updateErr) throw new Error(updateErr.message);
+
+    await flagIfHighScore(doc.id, user.id, screen);
 
     // Append to the version history (schema 018). Awaited because the
     // Edge runtime can terminate after redirect, dropping unawaited

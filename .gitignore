@@ -69,3 +69,7 @@ ops/
 .claude/
 .playwright-mcp/
 graphify-out/
+
+# Tokens and keys never reach the index
+.npmrc
+*.pem

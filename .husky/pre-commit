@@ -1,6 +1,13 @@
 #!/usr/bin/env sh
 
-# Run gitleaks if installed locally; otherwise skip with a warning.
+# Identity assertion (docs/control/GIT-RULES.md rule 1: one identity, always).
+if [ "$(git config user.email)" != "hello@htmlradar.com" ]; then
+  echo "❌ Wrong git identity: commits must be authored hello@htmlradar.com (docs/control/GIT-RULES.md rule 1)."
+  echo "   Fix it: git config user.email hello@htmlradar.com"
+  exit 1
+fi
+
+# Run gitleaks if installed locally; the local scan is the first net and may not silently degrade.
 if command -v gitleaks >/dev/null 2>&1; then
   gitleaks protect --staged --redact -v --config=.gitleaks.toml || {
     echo ""
@@ -9,7 +16,9 @@ if command -v gitleaks >/dev/null 2>&1; then
     exit 1
   }
 else
-  echo "⚠️  gitleaks not installed locally — relying on CI. Install via 'brew install gitleaks' for local protection."
+  echo "❌ gitleaks not installed locally — the first-net secret scan cannot run. Commit blocked."
+  echo "   Install it: brew install gitleaks"
+  exit 1
 fi
 
 # Run lint-staged

@@ -1,17 +1,19 @@
-// Blog post #4 — the MCP developer tutorial. Body is the approved draft
-// (docs/launch/MCP-TUTORIAL-DRAFT-2026-08-31.md) word for word; this URL is
-// canonical and the dev.to / Hashnode cross-posts point back at it.
+// Blog post #4 — the MCP developer tutorial. This URL is canonical and the
+// dev.to / Hashnode cross-posts point back at it.
 //
 // Two block treatments, and the split is the whole visual idea of the page:
-// a light CodeBlock is what YOU type, a dark Transcript is the session and
-// what it prints back. Both clip their own overflow, so a long command
-// scrolls inside its block rather than pushing the page sideways on a phone.
+// a light Cmd is what YOU type, a dark Transcript is the session and what it
+// prints back. Neither one scrolls sideways — see Lines below.
+//
+// The page reads in one short pass. Every careful caveat that used to sit in
+// the main column now lives in a FinePrint disclosure: the words are all still
+// here, in the DOM, for the reader who wants them and for search. The default
+// reading is the spine.
 
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
-import { CodeBlock } from '@/components/CodeBlock';
 import { ArticleLd, BreadcrumbLd } from '@/components/JsonLd';
 import { pageMeta } from '@/lib/seo';
 
@@ -36,6 +38,68 @@ function C({ children }: { children: ReactNode }) {
     <code className="font-mono text-[13.5px] text-signal-dark [overflow-wrap:anywhere]">
       {children}
     </code>
+  );
+}
+
+// Every block of code or output on this page renders through here, and nothing
+// on this page relies on horizontal scroll. On macOS that scrollbar is
+// invisible, so a command that overflows simply reads as cut — which is
+// exactly what it did. Each line is its own block with a hanging indent, so a
+// long command that wraps still reads as one command rather than two. It stays
+// a <pre>, so copying it still yields the real line breaks.
+function Lines({ code, className }: { code: string; className: string }) {
+  return (
+    <pre className={className}>
+      {code.split('\n').map((line, i) => (
+        <span
+          key={i}
+          className="block whitespace-pre-wrap [overflow-wrap:anywhere]"
+          style={{ textIndent: '-2ch', paddingLeft: '2ch' }}
+        >
+          {line || ' '}
+        </span>
+      ))}
+    </pre>
+  );
+}
+
+// What you type. Page-local rather than the shared CodeBlock, because the
+// wrapping above is the fix and this page must not wait on a shared component.
+function Cmd({ label, code }: { label?: string; code: string }) {
+  return (
+    <div className="my-5 overflow-hidden rounded-xl border border-line bg-paper-2/40">
+      {label ? (
+        <div className="border-b border-line bg-paper-2/60 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+          {label}
+        </div>
+      ) : null}
+      <Lines code={code} className="px-4 py-4 font-mono text-[12.5px] leading-[1.55] text-ink" />
+    </div>
+  );
+}
+
+// Fine print. A native <details>, so it costs no JavaScript, opens to a
+// keyboard, and keeps its text in the DOM for anyone reading closely.
+function FinePrint({ summary, children }: { summary: string; children: ReactNode }) {
+  return (
+    <details className="group mt-6 rounded-xl border border-line bg-paper-2/30 px-4 py-3 open:bg-paper-2/50">
+      <summary className="flex cursor-pointer list-none items-start gap-2.5 font-mono text-[11px] uppercase leading-[1.6] tracking-[0.16em] text-graphite transition-colors hover:text-signal-dark [&::-webkit-details-marker]:hidden">
+        <svg
+          viewBox="0 0 10 10"
+          width={9}
+          height={9}
+          aria-hidden
+          role="presentation"
+          className="mt-[4px] shrink-0 text-signal-dark transition-transform duration-200 group-open:rotate-90"
+        >
+          <path d="M 2 1 L 8 5 L 2 9 Z" fill="currentColor" />
+        </svg>
+        <span className="min-w-0">{summary}</span>
+      </summary>
+      <div className="mt-3 border-t border-line pt-3 text-[15px] leading-[1.65] text-ink-soft [&>*+*]:mt-3">
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -94,12 +158,13 @@ function M({ children }: { children: ReactNode }) {
   );
 }
 
-// What the tool printed. Scrolls inside the block; never widens the page.
+// What the tool printed.
 function Out({ code }: { code: string }) {
   return (
-    <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[12.5px] leading-[1.65] text-paper/85 [&:not(:first-child)]:mt-4 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-paper/10 [&:not(:first-child)]:pt-4">
-      {code}
-    </pre>
+    <Lines
+      code={code}
+      className="font-mono text-[12.5px] leading-[1.65] text-paper/85 [&:not(:first-child)]:mt-4 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-paper/10 [&:not(:first-child)]:pt-4"
+    />
   );
 }
 
@@ -126,18 +191,15 @@ const WHOAMI = `HTMLRadar account 3333…
 Plan: free
 Free tracked links used: 1 of 2`;
 
-const STARTUP_ERROR = `htmlradar-mcp: HTMLRADAR_API_KEY is the unresolved placeholder "\${HTMLRADAR_API_KEY}",
-which means the variable was not set in the environment the client started from. Export it
-in your shell (export HTMLRADAR_API_KEY=hr_live_...) before starting Claude Code or the
-client that launches this server. Create a key at https://htmlradar.com/settings (under
-"API keys") and pass it to this server as the HTMLRADAR_API_KEY environment variable.`;
+// The complete message the server prints, as one flowing line so it wraps to
+// the reader's width instead of being hard-wrapped to somebody else's.
+const STARTUP_ERROR = `htmlradar-mcp: HTMLRADAR_API_KEY is the unresolved placeholder "\${HTMLRADAR_API_KEY}", which means the variable was not set in the environment the client started from. Export it in your shell (export HTMLRADAR_API_KEY=hr_live_...) before starting Claude Code or the client that launches this server. Create a key at https://htmlradar.com/settings (under "API keys") and pass it to this server as the HTMLRADAR_API_KEY environment variable.`;
 
 const SHARE_OUT = `Tracked link: https://htmlradar.page/r/q3-board-update
 Dashboard:    https://htmlradar.com/docs/2222…
 Share id:     1111…
 
-The recipient is asked for their email, then sees the document exactly as written — never the
-tracking, the dashboard, or anyone else who opened it.`;
+The recipient is asked for their email, then sees the document exactly as written — never the tracking, the dashboard, or anyone else who opened it.`;
 
 const ACTIVITY_OUT = `Share 1111… — https://htmlradar.page/r/q3-board-update
 Opened: yes — 1 viewer
@@ -162,6 +224,7 @@ const CURSOR_JSON = `{
 }`;
 
 const H2 = 'font-serif text-[26px] leading-snug text-ink md:text-[30px]';
+const LIST = 'mt-6 ml-5 list-disc space-y-3 marker:text-signal-dark';
 
 export default function Post() {
   return (
@@ -182,7 +245,7 @@ export default function Post() {
             Share an HTML page from Claude Code, then ask who read it
           </h1>
           <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-            {PUBLISHED} &nbsp;·&nbsp; 8 min read &nbsp;·&nbsp; Tutorial
+            {PUBLISHED} &nbsp;·&nbsp; 4 min read &nbsp;·&nbsp; Tutorial
           </p>
 
           <div className="mt-12 space-y-10 text-[16.5px] leading-[1.7] text-ink-soft">
@@ -193,10 +256,8 @@ export default function Post() {
             </p>
 
             <p>
-              Here is the ten minute version of closing that gap without leaving the terminal. You
-              add one MCP server to Claude Code, ask it to publish the HTML your agent just wrote,
-              and the next morning ask the same agent whether anyone read it. I built HTMLRadar, so
-              weigh the enthusiasm accordingly.
+              Closing that gap takes one MCP server and about two minutes, without leaving the
+              terminal. I built HTMLRadar, so weigh the enthusiasm accordingly.
             </p>
 
             {/* The whole post in one glance. */}
@@ -224,82 +285,88 @@ export default function Post() {
 
             <section className="!mt-14">
               <h2 className={H2}>Before you start</h2>
-              <p className="mt-6">
-                Four things. Node.js 18 or newer, an HTMLRadar account, an API key, and an HTML file
-                to send. Any self-contained page will do, and if you have none lying around, ask
-                your agent to write one. Every command below names <C>./q3-board-update.html</C>, so
-                substitute your own path.
-              </p>
-              <p className="mt-6">
-                Sign in at{' '}
-                <Link href="/sign-in" className="text-signal-dark hover:underline">
-                  htmlradar.com
-                </Link>{' '}
-                and create a key in Settings, under API keys. It is <C>hr_live_</C> plus 40
-                hexadecimal characters, and you are shown it exactly once, so put it somewhere
-                before you close the tab. The free tier covers 2 tracked links, enough to follow
-                this post and keep one spare.
-              </p>
-              <p className="mt-6">Put the key in your shell before anything else:</p>
-              <CodeBlock
+              <ul className={LIST}>
+                <li>Node.js 18 or newer.</li>
+                <li>
+                  An HTMLRadar account. Sign in at{' '}
+                  <Link href="/sign-in" className="text-signal-dark hover:underline">
+                    htmlradar.com
+                  </Link>
+                  .
+                </li>
+                <li>
+                  An API key, from Settings under API keys — <C>hr_live_</C> plus 40 hexadecimal
+                  characters, shown once. The free tier covers 2 tracked links.
+                </li>
+                <li>
+                  An HTML file to send; any self-contained page, and your agent will write one.
+                  Every command below names <C>./q3-board-update.html</C>, so substitute your own
+                  path.
+                </li>
+              </ul>
+              <p className="mt-6">Put the key in your shell first:</p>
+              <Cmd
                 label="terminal"
-                code={`export HTMLRADAR_API_KEY=hr_live_…      # or read it out of your password manager`}
+                code={`# or read it out of your password manager
+export HTMLRADAR_API_KEY=hr_live_…`}
               />
-              <p className="mt-6">
-                The export buys less than it looks, so be clear about what it does. It keeps the
-                literal key out of the config file the client writes, which is the copy that
-                survives and the one you might commit. It does not hide the key from <C>ps</C>: your
-                shell expands <C>$HTMLRADAR_API_KEY</C> into the arguments of <C>claude mcp add</C>{' '}
-                before that command runs, and for the second it lives, anyone else on the machine
-                can read it there.
-              </p>
+              <FinePrint summary="What the export really buys">
+                <p>
+                  It keeps the literal key out of the config file the client writes, which is the
+                  copy that survives and the one you might commit. It does not hide the key from{' '}
+                  <C>ps</C>: your shell expands <C>$HTMLRADAR_API_KEY</C> into the arguments of{' '}
+                  <C>claude mcp add</C> before that command runs, and for the second it lives,
+                  anyone else on the machine can read it there.
+                </p>
+              </FinePrint>
             </section>
 
             <section className="!mt-14">
               <h2 className={H2}>Add the server: one line</h2>
-              <CodeBlock
+              <Cmd
                 label="terminal"
                 code={`claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlradar-mcp`}
               />
               <p className="mt-6">
-                Check it with <C>claude mcp list</C>, or <C>/mcp</C> inside a session. There is also
-                a plugin (<C>/plugin marketplace add htmlradar/htmlradar</C>, then{' '}
-                <C>/plugin install htmlradar@htmlradar</C>) which adds the same server plus a skill
-                that teaches Claude when to offer a link, pinned to 0.2.0 rather than always
-                fetching the latest.
-              </p>
-              <p className="mt-6">
-                Cursor and Codex CLI run the identical server, because it is plain stdio with one
-                environment variable. Codex takes{' '}
-                <C>
-                  codex mcp add htmlradar --env HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y
-                  htmlradar-mcp
-                </C>
-                . Cursor takes a block in <C>.cursor/mcp.json</C>:
-              </p>
-              <CodeBlock label=".cursor/mcp.json" code={CURSOR_JSON} />
-              <p className="mt-6">
-                Either route installs one bundled file with no runtime npm dependencies, so{' '}
-                <C>npx</C> is not quietly pulling 95 packages behind it. The fastest health check is
-                to ask for something harmless: &quot;how many free HTMLRadar links do I have
-                left?&quot; That calls <C>whoami</C>, which needs the key and the network and
-                nothing else.
+                Check it with <C>claude mcp list</C>, or <C>/mcp</C> in a session. Then ask
+                something harmless — how many free links are left — which calls <C>whoami</C>.
               </p>
               <Transcript title="claude · htmlradar">
                 <Out code={WHOAMI} />
               </Transcript>
-              <p className="mt-6">
-                If a tool call fails instead, run <C>npx -y htmlradar-mcp</C> by hand. Some clients
-                report a server as connected even when it exited at startup, and the server prints
-                its actual reason before going:
-              </p>
-              <Transcript title="npx -y htmlradar-mcp">
-                <Out code={STARTUP_ERROR} />
-              </Transcript>
-              <p className="mt-6">
-                An unexported variable in the shell that launched the client is the most common
-                failure by a distance.
-              </p>
+              <FinePrint summary="Cursor, Codex CLI, and the plugin">
+                <p>
+                  The server is plain stdio with one environment variable, so every client runs the
+                  identical thing. Codex takes{' '}
+                  <C>
+                    codex mcp add htmlradar --env HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y
+                    htmlradar-mcp
+                  </C>
+                  . Cursor takes a block in <C>.cursor/mcp.json</C>:
+                </p>
+                <Cmd label=".cursor/mcp.json" code={CURSOR_JSON} />
+                <p>
+                  There is also a plugin — <C>/plugin marketplace add htmlradar/htmlradar</C>, then{' '}
+                  <C>/plugin install htmlradar@htmlradar</C> — which adds the same server plus a
+                  skill that teaches Claude when to offer a link, pinned to 0.2.0 rather than always
+                  fetching the latest. Either route installs one bundled file with no runtime npm
+                  dependencies, so <C>npx</C> is not quietly pulling 95 packages behind it.
+                </p>
+              </FinePrint>
+              <FinePrint summary="If that first tool call fails">
+                <p>
+                  Run <C>npx -y htmlradar-mcp</C> by hand. Some clients report a server as connected
+                  even when it exited at startup, and the server prints its actual reason before
+                  going:
+                </p>
+                <Transcript title="npx -y htmlradar-mcp">
+                  <Out code={STARTUP_ERROR} />
+                </Transcript>
+                <p>
+                  An unexported variable in the shell that launched the client is the most common
+                  failure by a distance.
+                </p>
+              </FinePrint>
             </section>
 
             <section className="!mt-14">
@@ -318,60 +385,53 @@ export default function Post() {
                 <Out code={SHARE_OUT} />
               </Transcript>
 
-              <p className="mt-6">You send the first line. The second is yours.</p>
               <p className="mt-6">
-                The part I actually use is the next morning, in a fresh session with no memory of
-                any of this:
+                You send the first line. The second is yours. The part I actually use is the next
+                morning, in a fresh session with no memory of any of this:
               </p>
 
               <Transcript title="claude · htmlradar · the next morning">
                 <You>did anyone read the board update? which sections did they spend time on?</You>
                 <Turn>
-                  Claude calls <M>list_shares</M> first, because a new session has no share id and
-                  looking one up beats sending you to go and find it. Then <M>get_share_activity</M>
-                  :
+                  Claude calls <M>list_shares</M> first, because a new session has no share id. Then{' '}
+                  <M>get_share_activity</M>:
                 </Turn>
                 <Out code={ACTIVITY_OUT} />
               </Transcript>
 
-              <p className="mt-6">
-                The JSON I trimmed above is the same values again, so the agent computes on them
-                rather than parsing prose back out. Notice the line above the viewer block:
-                recipient labels, gate emails and section titles are all text other people wrote,
-                and any of them can be phrased as an instruction to a model. So it is marked as
-                data, every time.
-              </p>
-              <p className="mt-6">
-                Four minutes twelve on a board update, with two minutes forty of it on The Ask, is a
-                different follow-up from &quot;just checking in&quot;. The whole product is that
-                difference, honestly.
-              </p>
-
               <figure className="mt-10">
                 <img
-                  src="/brand/mcp-transcript.png"
-                  width={880}
-                  height={1143}
+                  src="/brand/dashboard-demo.webp"
+                  width={960}
+                  height={540}
                   loading="lazy"
-                  alt="Claude Code answering which sections of a shared deck each viewer read, from get_share_activity, with a whoami account check underneath"
+                  alt="The HTMLRadar dashboard cycling through one row per viewer, time spent per section, scroll depth and first-open email"
                   className="w-full max-w-full rounded-xl border border-line"
                   style={{ maxWidth: '100%', height: 'auto' }}
                 />
                 <figcaption className="mt-3 text-[13px] leading-relaxed text-graphite">
-                  A real Claude Code session with the HTMLRadar plugin
+                  The same reading on the dashboard, if you would rather look than ask. Demo data.
                 </figcaption>
               </figure>
+
+              <p className="mt-8">
+                Four minutes twelve on a board update, with two minutes forty of it on The Ask, is a
+                different follow-up from &quot;just checking in&quot;. The whole product is that
+                difference, honestly.
+              </p>
+              <p className="mt-6">
+                Note the line above the viewer block. Recipient labels, gate emails and section
+                titles are all text other people wrote, so they are marked as data, every time — and
+                the same values repeat as JSON, so the agent computes rather than parses prose.
+              </p>
             </section>
 
             <section className="!mt-14">
               <h2 className={H2}>The recipient&apos;s side</h2>
               <p className="mt-6">
-                The document, at <C>htmlradar.page/r/&lt;slug&gt;</C>, exactly as written. They
-                never see the tracking, the dashboard, or anyone else who opened the link.
-              </p>
-              <p className="mt-6">
-                By default they are asked for an email address first, and that gate page carries
-                this line, under the field:
+                They get the document at <C>htmlradar.page/r/&lt;slug&gt;</C>, exactly as written —
+                never the tracking, the dashboard, or anyone else who opened it. By default they are
+                asked for an email first, and that gate carries this line under the field:
               </p>
               <blockquote className="mt-6 border-l-2 border-signal-dark/40 bg-paper-2/40 py-4 pl-5 pr-4 text-[15.5px] leading-relaxed">
                 Reading activity on this document is shared with the sender.
@@ -381,110 +441,121 @@ export default function Post() {
                 <Link href="/privacy" className="text-signal-dark hover:underline">
                   privacy page
                 </Link>{' '}
-                beside it. That line is a design position rather than an accident: reading is
-                measured, and the person being measured is told so before the document opens. On top
-                of the gate you can set a password of 8 characters or more, an expiry in hours, or
-                an allow-list of email domains. One default worth knowing: <C>lock_deck</C> is on,
-                which blocks save and print and adds a faint per-viewer watermark. Pass{' '}
-                <C>lock_deck: false</C> for anything the recipient is meant to keep.
+                beside it. Reading is measured, and the person being measured is told so before the
+                document opens. Never recorded: no raw IP address, no keystrokes, no mouse
+                positions, no session replay.
               </p>
               <p className="mt-6">
-                Never recorded: no raw IP address, no keystrokes, no mouse positions, no session
-                replay. A recipient switches tracking off for every HTMLRadar link in their browser
-                with <C>window.HTMLRadar.optOut()</C>, which opens a confirmation page rather than
-                acting on the spot.
-              </p>
-              <p className="mt-6">
-                The honest edge on all of this: if you pass <C>require_email: false</C> there is no
-                gate, and therefore no notice on the document itself. Turning the gate off turns the
+                The honest edge: pass <C>require_email: false</C> and there is no gate, and
+                therefore no notice on the document itself. Turning the gate off turns the
                 disclosure off with it.
               </p>
+              <FinePrint summary="Gate options and the print lock">
+                <p>
+                  On top of the gate you can set a password of 8 characters or more, an expiry in
+                  hours, or an allow-list of email domains. One default worth knowing:{' '}
+                  <C>lock_deck</C> is on, which blocks save and print and adds a faint per-viewer
+                  watermark. Pass <C>lock_deck: false</C> for anything the recipient is meant to
+                  keep.
+                </p>
+                <p>
+                  A recipient switches tracking off for every HTMLRadar link in their browser with{' '}
+                  <C>window.HTMLRadar.optOut()</C>, which opens a confirmation page rather than
+                  acting on the spot.
+                </p>
+              </FinePrint>
             </section>
 
             <section className="!mt-14">
-              <h2 className={H2}>Five things version 0.2.0 added</h2>
+              <h2 className={H2}>What 0.2.0 added</h2>
               <p className="mt-6">
                 Version 0.1 could publish and it could report. It could not find anything it had not
-                just made. Five additions closed that gap, and they are the difference between a
-                demo and something still in use in week three.
+                just made. Five additions closed that gap:
               </p>
+              <ul className={LIST}>
+                <li>
+                  <C>list_shares</C> — your links, newest first, with the ids the other tools take.
+                  This is what makes every session after the first one work.
+                </li>
+                <li>
+                  <C>create_share</C> — another link for a document that already exists, so one deck
+                  sent to 20 people is one document and 20 reading reports.
+                </li>
+                <li>
+                  <C>revoke_share</C> — switches a link off, and back on with <C>revoked: false</C>.
+                </li>
+                <li>
+                  <C>replace_document</C> — new contents behind every link you have already sent:
+                  same addresses, same settings, same reading history.
+                </li>
+                <li>Read-only keys — they cannot publish, revoke or replace.</li>
+              </ul>
               <p className="mt-6">
-                <C>list_shares</C> returns your links newest first, 50 at a time with a cursor for
-                older ones, carrying the ids the other tools take. That is what makes every session
-                after the first one work. <C>create_share</C> makes another link for a document that
-                already exists, so one deck sent to 20 people is one stored document and 20 links,
-                each with its own recipient label and its own reading report. <C>revoke_share</C>{' '}
-                switches a link off, and back on with <C>revoked: false</C>. <C>replace_document</C>{' '}
-                puts new contents behind every link you have already sent: same addresses, same
-                settings, same reading history, and the recipient sees the new version the next time
-                they open the link they already have.
+                Read-only bounds what a key can change, not what it can see: it still reads your
+                links and the full activity on them. Seven tools in total, one environment variable,
+                no telemetry, every route rate limited.
               </p>
-              <p className="mt-6">
-                And keys can be read-only now, with a boundary worth stating exactly. A read-only
-                key cannot publish, revoke or replace, and is refused with an explanation at every
-                route that writes. It can still list your links and read the full activity on them:
-                the email addresses recipients typed at the gate and, when a call asks for it, their
-                country, city, device and referrer. Read-only bounds what a key can change, not what
-                it can see.
-              </p>
-              <p className="mt-6">
-                Seven tools in total, one required environment variable, no telemetry. Every route
-                is rate limited, and the whole set is short enough to give you here: 30 new links an
-                hour on free and 75 on Pro, 120 an hour for listing and revoking, 300 activity reads
-                an hour per key, and 60 <C>whoami</C> calls an hour per key. The current numbers are
-                on{' '}
-                <Link href="/mcp" className="text-signal-dark hover:underline">
-                  htmlradar.com/mcp
-                </Link>
-                .
-              </p>
+              <FinePrint summary="Read-only scope, rate limits and paging">
+                <p>
+                  A read-only key is refused with an explanation at every route that writes. It can
+                  still list your links and read the full activity on them: the email addresses
+                  recipients typed at the gate and, when a call asks for it, their country, city,
+                  device and referrer.
+                </p>
+                <p>
+                  30 new links an hour on free and 75 on Pro, 120 an hour for listing and revoking,
+                  300 activity reads an hour per key, and 60 <C>whoami</C> calls an hour per key.{' '}
+                  <C>list_shares</C> returns 50 at a time with a cursor for older ones. The current
+                  numbers are on{' '}
+                  <Link href="/mcp" className="text-signal-dark hover:underline">
+                    htmlradar.com/mcp
+                  </Link>
+                  .
+                </p>
+              </FinePrint>
             </section>
 
             <section className="!mt-14">
               <h2 className={H2}>What it does not do</h2>
-              <ul className="mt-6 ml-5 list-disc space-y-4 marker:text-signal-dark">
+              <ul className={LIST}>
                 <li>
                   <strong className="font-semibold text-ink">It does not read files.</strong> The
-                  agent reads the file with its own tools and passes the markup, so whatever
-                  permissions you set on those tools still apply. There is no file path argument
-                  anywhere in the server.
+                  agent reads the file with its own tools and passes the markup, so your permissions
+                  still apply. There is no file path argument in the server.
                 </li>
                 <li>
-                  <strong className="font-semibold text-ink">One self-contained file.</strong> Only
-                  the markup goes up. A relative <C>./style.css</C> or <C>./logo.png</C> will not
-                  resolve on the other end, so inline it or use absolute URLs. Documents over 5 MB
-                  are refused before any network call.
+                  <strong className="font-semibold text-ink">One self-contained file.</strong> A
+                  relative <C>./style.css</C> will not resolve on the other end, so inline it or use
+                  absolute URLs. Over 5 MB is refused before any network call.
                 </li>
                 <li>
                   <strong className="font-semibold text-ink">
                     Section detection is heuristic.
                   </strong>{' '}
-                  Headings first, then slide or page containers, then paragraph buckets for plain
-                  prose. The paragraph-bucket case is the one I trust least.
+                  Headings, then slide or page containers, then paragraph buckets — and the bucket
+                  case is the one I trust least.
                 </li>
                 <li>
                   <strong className="font-semibold text-ink">
                     A gate email is whatever somebody typed.
                   </strong>{' '}
-                  An allow-list narrows which addresses may be typed; neither one proves who is
-                  holding the keyboard.
+                  An allow-list narrows which addresses may be typed; neither proves who is at the
+                  keyboard.
                 </li>
                 <li>
-                  <strong className="font-semibold text-ink">
-                    Free links are scarce and they do not come back.
-                  </strong>{' '}
-                  Two on the free tier, and a revoked or expired link still counts against them.
+                  <strong className="font-semibold text-ink">Free links do not come back.</strong>{' '}
+                  Two on the free tier, and a revoked or expired link still counts.
                 </li>
                 <li>
                   <strong className="font-semibold text-ink">Nothing here deletes.</strong> Revoking
-                  is reversible and deleting is not, so deleting a link stays on the website where a
-                  person types the confirmation. Deliberate, and there will not be a delete tool.
+                  is reversible and deleting is not, so deleting stays on the website behind a typed
+                  confirmation. There will not be a delete tool.
                 </li>
                 <li>
                   <strong className="font-semibold text-ink">
                     It tells you what was read, never what they thought.
                   </strong>{' '}
-                  Four minutes on the pricing section is a signal to go and ask a question, not an
+                  Four minutes on the pricing section is a reason to go and ask a question, not an
                   answer to one.
                 </li>
               </ul>
@@ -493,14 +564,18 @@ export default function Post() {
             <section className="!mt-14">
               <h2 className={H2}>If you would rather run your own</h2>
               <p className="mt-6">
-                HTMLRadar is AGPL-3.0 end to end, the MCP server included. The stack self-hosts on
-                Cloudflare and Supabase, and <C>HTMLRADAR_API_URL</C> points the server at your own
-                deployment instead of mine. The software costs nothing; you pay Cloudflare,
-                Supabase, your domain registrar and any email provider directly. Their free tiers
-                can cover light personal use, and I would check each one&apos;s current limits
-                before leaning on that. Hosted is free for two tracked links, then $15 a month or
-                $150 a year, which is how the open version gets paid for.
+                HTMLRadar is AGPL-3.0 end to end, the MCP server included. It self-hosts on
+                Cloudflare and Supabase, and <C>HTMLRADAR_API_URL</C> points the server at your
+                deployment instead of mine. Hosted is free for two tracked links, then $15 a month
+                or $150 a year, which is how the open version gets paid for.
               </p>
+              <FinePrint summary="What self-hosting actually costs">
+                <p>
+                  The software costs nothing; you pay Cloudflare, Supabase, your domain registrar
+                  and any email provider directly. Their free tiers can cover light personal use,
+                  and I would check each one&apos;s current limits before leaning on that.
+                </p>
+              </FinePrint>
               <p className="mt-6">
                 Source, issues and the changelog:{' '}
                 <a

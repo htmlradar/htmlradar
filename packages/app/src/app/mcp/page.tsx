@@ -227,6 +227,49 @@ export default function McpPage() {
             </p>
           </section>
 
+          <section className="mt-14">
+            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+              What people use it for
+            </h2>
+            <div className="mt-6 space-y-7">
+              <div>
+                <p className="text-[15px] leading-relaxed text-ink-soft">
+                  Claude just finished the board update, and you want a link for the email plus to
+                  know tomorrow who opened it.{' '}
+                  <Link href="/for/claude-code" className="text-signal-dark hover:underline">
+                    Full walkthrough.
+                  </Link>
+                </p>
+                <CodeBlock
+                  code={`share q3-board-update.html with the board as a tracked link, email gate on`}
+                />
+              </div>
+              <div>
+                <p className="text-[15px] leading-relaxed text-ink-soft">
+                  A client proposal that should not float around for weeks, gated by email and dead
+                  in three days.{' '}
+                  <Link href="/for/claude-code" className="text-signal-dark hover:underline">
+                    Full walkthrough.
+                  </Link>
+                </p>
+                <CodeBlock
+                  code={`read ./proposal.html and turn it into a tracked link for hello@acme.com, expiring in 72 hours`}
+                />
+              </div>
+              <div>
+                <p className="text-[15px] leading-relaxed text-ink-soft">
+                  The next morning, checking whether it was read and which sections held them.{' '}
+                  <Link href="/for/claude-code" className="text-signal-dark hover:underline">
+                    Full walkthrough.
+                  </Link>
+                </p>
+                <CodeBlock
+                  code={`did anyone read the Acme proposal? which sections did they spend time on?`}
+                />
+              </div>
+            </div>
+          </section>
+
           <section className="mt-14" id="install">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">Install</h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">

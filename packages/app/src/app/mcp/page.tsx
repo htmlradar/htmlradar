@@ -551,10 +551,12 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
               What the key can do
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              You are about to hand a key to an agent, so here is exactly what it opens. The key can
-              create tracked links, read the activity of the account&rsquo;s own links, and read the
-              plan. It cannot delete or revoke a link, change any setting, or see another account: a
-              share id that belongs to someone else comes back as not found.
+              You are about to hand a key to an agent, so here is exactly what it opens. A
+              full-access key can create tracked links, switch one off and back on, replace a
+              document, and read activity and the plan. A read-only key can only list and read: it
+              gets a 403 back for creating, revoking, or replacing anything. Neither key can delete
+              a link or a document, change an account setting, or see another account: a share id
+              that belongs to someone else comes back as not found.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               A key is shown once, and only a hash of it is stored. Revoke it at{' '}
@@ -562,7 +564,7 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
                 htmlradar.com/settings
               </Link>
               ; revocation is immediate. Every route is rate-limited per key, per account and per
-              address, for example 30 new links an hour per account.
+              address, for example 75 new links an hour per account on Pro, 30 on free.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               The only data that leaves your machine is the HTML the agent passes in and the

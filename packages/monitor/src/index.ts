@@ -38,6 +38,11 @@
 // because this worker already has a cron, a fetch, and nothing else to do at
 // 04:00 UTC — a second worker for five HTTP calls a day would be silly.
 //
+// Everything this worker says on Telegram is written to telegram_outbox
+// (schema/038) as it is said, because a Telegram bot cannot read back its own
+// sent history and the record was otherwise only on the founder's phone. See
+// sendTelegram below.
+//
 // Not in scope (deliberately): tracker bundle version, R2 health,
 // section_events capture rate. Those are real signals but the bar
 // here is "the simplest thing that would have caught the email
@@ -494,18 +499,30 @@ function matchesQuery(query: string, haystack: string): boolean {
   );
 }
 
-async function scanHN(query: string, sinceSec: number): Promise<{ title: string; url: string }[]> {
+// Both source functions report the HTTP status alongside their items rather
+// than throwing on a refusal, so the scan_run row can say WHY a query
+// contributed nothing. "Reddit answered 429" and "Reddit answered 200 with no
+// matching threads" are the same empty list and very different facts, and
+// until this row existed neither of them was written down anywhere.
+interface ScanResult {
+  status: number;
+  items: { title: string; url: string }[];
+  /** Why a successful response still yielded nothing, when that isn't obvious. */
+  error?: string;
+}
+
+async function scanHN(query: string, sinceSec: number): Promise<ScanResult> {
   const res = await fetch(
     'https://hn.algolia.com/api/v1/search_by_date' +
       `?query=${encodeURIComponent(query)}&tags=(story,comment)` +
       `&numericFilters=created_at_i>${sinceSec}&hitsPerPage=10`,
     { signal: AbortSignal.timeout(SCAN_TIMEOUT_MS) },
   );
-  if (!res.ok) throw new Error(`algolia HTTP ${res.status}`);
+  if (!res.ok) return { status: res.status, items: [] };
   const body = (await res.json()) as { hits?: HNHit[] };
   // story_title carries the thread a comment lives under, which is where the
   // query words usually sit when the hit is a reply rather than a story.
-  return (body.hits ?? [])
+  const items = (body.hits ?? [])
     .filter((hit) =>
       matchesQuery(query, `${hit.title ?? ''} ${hit.story_title ?? ''} ${hit.comment_text ?? ''}`),
     )
@@ -514,15 +531,13 @@ async function scanHN(query: string, sinceSec: number): Promise<{ title: string;
       title: clean(hit.title ?? hit.comment_text ?? ''),
       url: `https://news.ycombinator.com/item?id=${hit.objectID}`,
     }));
+  return { status: res.status, items };
 }
 
 // Reddit blocks datacentre IPs often enough that treating a refusal as an
 // error would take the HN half of the scan down with it. Anything that isn't
 // a 200 of XML is a silent skip for that query.
-async function scanReddit(
-  query: string,
-  sinceMs: number,
-): Promise<{ title: string; url: string }[]> {
+async function scanReddit(query: string, sinceMs: number): Promise<ScanResult> {
   const res = await fetch(
     `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`,
     {
@@ -534,9 +549,18 @@ async function scanReddit(
       signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
     },
   );
-  if (!res.ok || !(res.headers.get('content-type') ?? '').includes('xml')) return [];
+  if (!res.ok) return { status: res.status, items: [] };
+  // A 200 whose body is not XML is Reddit's block page, which used to be
+  // indistinguishable from a 200 with no matching threads. Say which it was.
+  if (!(res.headers.get('content-type') ?? '').includes('xml')) {
+    return {
+      status: res.status,
+      items: [],
+      error: 'non-XML body — Reddit refused this address',
+    };
+  }
   const xml = await res.text();
-  const out: { title: string; url: string }[] = [];
+  const items: { title: string; url: string }[] = [];
   for (const match of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
     const entry = match[1] ?? '';
     // t=week, not t=day: Reddit's own filter keys off post time rather than
@@ -550,12 +574,119 @@ async function scanReddit(
     if (!url || !title) continue;
     const content = /<content[^>]*>([\s\S]*?)<\/content>/.exec(entry)?.[1] ?? '';
     if (!matchesQuery(query, clean(`${title} ${content}`))) continue;
-    out.push({ title: clean(title), url: clean(url) });
+    items.push({ title: clean(title), url: clean(url) });
   }
-  return out;
+  return { status: res.status, items };
 }
 
-async function scanThreads(env: Env): Promise<void> {
+// ---------------------------------------------------------------------------
+// Telegram, with a receipt.
+//
+// A Telegram bot cannot read back what it sent: the Bot API exposes incoming
+// updates and nothing else. So every message this worker sent went into a
+// channel neither the worker nor any later agent could re-read, and the only
+// copy was on the founder's phone. sendTelegram is now the single door — it
+// sends, then writes down what it sent and how Telegram answered, into
+// telegram_outbox (schema/038).
+//
+// It fails open in one direction only. A failed outbox WRITE is logged and
+// swallowed, because a bookkeeping problem must never be the reason the
+// founder doesn't hear about a live thread. The reverse is not true: a failed
+// SEND still writes its row, since "we tried and Telegram refused" is exactly
+// the fact that used to go missing.
+//
+// The bot token never enters a row — it is in the request URL, not the body.
+// The chat id does, because it is not a secret (it is the founder's own chat)
+// and without it a row can't be attributed to a destination.
+
+type OutboxKind = 'alert' | 'scan' | 'scan_run' | 'test';
+
+interface OutboxRow {
+  kind: OutboxKind;
+  source: string;
+  message: string;
+  /** Null when nothing was sent — neither true nor false would be honest. */
+  telegram_ok: boolean | null;
+  telegram_error?: string | null;
+  meta?: Record<string, unknown>;
+}
+
+/** Writes one row. Never throws: the caller's real work outranks the receipt. */
+export async function recordOutbox(env: Env, row: OutboxRow): Promise<void> {
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/telegram_outbox`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[outbox] write failed:', (err as Error).message);
+  }
+}
+
+/** Sends one Telegram message and records it. Returns whether Telegram took it. */
+export async function sendTelegram(
+  env: Env,
+  kind: OutboxKind,
+  source: string,
+  text: string,
+  meta: Record<string, unknown> = {},
+): Promise<boolean> {
+  let ok = false;
+  let error: string | null = null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: env.TELEGRAM_CHAT_ID,
+        text,
+        disable_web_page_preview: true,
+      }),
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    });
+    // Read the body as text, not res.json(): a 502 from Telegram's edge is
+    // HTML, and json() would throw away the status and body that explain it.
+    const body = await res.text();
+    try {
+      ok = res.ok && (JSON.parse(body) as { ok?: boolean }).ok === true;
+    } catch {
+      ok = false;
+    }
+    if (!ok) error = `HTTP ${res.status}: ${body.slice(0, 500)}`;
+  } catch (err) {
+    error = `fetch threw: ${(err as Error).message}`;
+  }
+  await recordOutbox(env, {
+    kind,
+    source,
+    message: text,
+    telegram_ok: ok,
+    telegram_error: error,
+    meta: { ...meta, chat_id: env.TELEGRAM_CHAT_ID },
+  });
+  return ok;
+}
+
+/** One entry per fetch in a scan run, for the scan_run row's meta. */
+interface ScanFetch {
+  source: string;
+  query: string;
+  /** Null when the fetch threw before there was a response. */
+  status: number | null;
+  items: number;
+  error?: string;
+}
+
+// gapMs is a parameter for the same reason probe's retryMs is: so a test does
+// not sit through three minutes of real rate-limit spacing.
+export async function scanThreads(env: Env, gapMs: number = SCAN_QUERY_GAP_MS): Promise<void> {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
     // eslint-disable-next-line no-console
     console.log('[scan] no Telegram credentials set — skipping');
@@ -567,57 +698,74 @@ async function scanThreads(env: Env): Promise<void> {
   // Keyed by URL: the same thread surfaces under several queries, and the
   // first query to find it owns the angle.
   const hits = new Map<string, ThreadHit>();
+  // Ten entries, one per fetch, whatever happens to each. This is the whole
+  // reason a scan run stops being a black box.
+  const fetches: ScanFetch[] = [];
 
   for (const [i, { query, angle }] of SCAN_QUERIES.entries()) {
     for (const source of ['HN', 'Reddit'] as const) {
       try {
         const found =
           source === 'HN' ? await scanHN(query, sinceSec) : await scanReddit(query, sinceMs);
-        for (const { title, url } of found) {
+        fetches.push({
+          source,
+          query,
+          status: found.status,
+          items: found.items.length,
+          ...(found.error ? { error: found.error } : {}),
+        });
+        for (const { title, url } of found.items) {
           if (title && !hits.has(url)) hits.set(url, { source, title, url, angle });
         }
       } catch (err) {
-        // One dead source or one bad query must not cost the whole scan.
-        // eslint-disable-next-line no-console
-        console.error(`[scan] ${source} "${query}" failed:`, (err as Error).message);
+        // One dead source or one bad query must not cost the whole scan — but
+        // it does go in the run row, which is the only place anyone will look.
+        fetches.push({ source, query, status: null, items: 0, error: (err as Error).message });
       }
     }
     if (i < SCAN_QUERIES.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, SCAN_QUERY_GAP_MS));
+      await new Promise((resolve) => setTimeout(resolve, gapMs));
     }
   }
-  if (hits.size === 0) return;
 
-  // Plain text on purpose — no parse_mode, so a stray underscore in a thread
-  // title can't 400 the whole message.
-  let text = `HTMLRadar thread scan — ${new Date().toISOString().slice(0, 10)}`;
+  // Still no message when there is nothing to say — a daily "found nothing" is
+  // how a channel gets muted. What changed is that the run itself is now
+  // recorded either way, a few lines down.
   let sent = 0;
-  for (const hit of hits.values()) {
-    if (sent >= SCAN_MAX_ITEMS) break;
-    const block =
-      `\n\n${hit.source} — ${hit.title.slice(0, SCAN_TITLE_CHARS)}` +
-      `\n${hit.url}\nAngle: ${hit.angle}`;
-    if (text.length + block.length > SCAN_MAX_CHARS) break;
-    text += block;
-    sent++;
+  let ok: boolean | null = null;
+  if (hits.size > 0) {
+    // Plain text on purpose — no parse_mode, so a stray underscore in a thread
+    // title can't 400 the whole message.
+    let text = `HTMLRadar thread scan — ${new Date().toISOString().slice(0, 10)}`;
+    for (const hit of hits.values()) {
+      if (sent >= SCAN_MAX_ITEMS) break;
+      const block =
+        `\n\n${hit.source} — ${hit.title.slice(0, SCAN_TITLE_CHARS)}` +
+        `\n${hit.url}\nAngle: ${hit.angle}`;
+      if (text.length + block.length > SCAN_MAX_CHARS) break;
+      text += block;
+      sent++;
+    }
+    ok = await sendTelegram(env, 'scan', 'scanThreads', text, {
+      items_sent: sent,
+      items_found: hits.size,
+    });
   }
 
-  const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: env.TELEGRAM_CHAT_ID,
-      text,
-      disable_web_page_preview: true,
-    }),
-    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+  // Always, sent or not. The run that finds nothing used to leave no trace at
+  // all, which looked exactly like a cron that never fired.
+  await recordOutbox(env, {
+    kind: 'scan_run',
+    source: 'scanThreads',
+    message:
+      `${hits.size} item(s) across ${fetches.length} fetch(es); ` +
+      (hits.size > 0 ? `${sent} sent, telegram ok:${ok}` : 'nothing sent'),
+    telegram_ok: ok,
+    meta: { fetches, total_items: hits.size, items_sent: sent, message_sent: hits.size > 0 },
   });
-  const tg = (await res.json()) as { ok?: boolean; description?: string };
+
   // eslint-disable-next-line no-console
-  console.log(
-    `[scan] ${sent} of ${hits.size} item(s) sent — telegram ok:${tg.ok === true}`,
-    tg.description ?? '',
-  );
+  console.log(`[scan] ${sent} of ${hits.size} item(s) sent — telegram ok:${ok}`);
 }
 
 export default {
@@ -740,6 +888,14 @@ export default {
 
     if (alerts.length === 0) return;
 
+    // Deliberately NOT written to telegram_outbox: this alert goes out by
+    // email, and an inbox is already a readable record — the outbox exists
+    // for the one channel that isn't. A healthy run writes nothing here
+    // either; a row every five minutes would bury the scan runs the table was
+    // built to surface. ponytail: if health alerts ever move to Telegram they
+    // go through sendTelegram with kind='alert', which the schema already
+    // allows.
+    //
     // Single consolidated alert. Plain text — no template to break.
     const body = [
       'HTMLRadar prod looks unhealthy.',

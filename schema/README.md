@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `037`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `038`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -44,7 +44,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - **Session bearer tokens** stored on the `sessions.token` column (replaces the HMAC-with-shared-secret scheme entirely — no app secret needed).
 - **Vault** for Resend secrets (decrypted at trigger execution time).
 
-## Tables (17)
+## Tables (18)
 
 - `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`).
 - `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, and `last_viewed_by_owner_at`.
@@ -63,6 +63,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `rate_limits` — identity-keyed rate-limit counters for RPCs.
 - `waitlist` — legacy pre-launch capture surface, retained but not actively used post-launch.
 - `abuse_reports` (037) — one row per recipient abuse report on a share. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.
+- `telegram_outbox` (038) — every Telegram message the monitor worker sends, and every thread-scan run whether it sent anything or not. Exists because a Telegram bot cannot read back its own sent history. RLS on with no policies; the worker writes with the service role.
 
 ## RPCs (10)
 

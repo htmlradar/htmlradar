@@ -308,7 +308,8 @@ export default function Post() {
                     Settings under API keys
                   </a>{' '}
                   — <C>hr_live_</C> plus 40 hexadecimal characters, shown once. The free tier covers
-                  2 tracked links.
+                  2 tracked links. Creating it there also pre-fills the export and add commands
+                  below with the key, so those two steps are copy-paste, not splicing.
                 </li>
                 <li>
                   An HTML file to send; any self-contained page, and your agent will write one.

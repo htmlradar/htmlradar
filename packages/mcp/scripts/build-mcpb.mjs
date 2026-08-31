@@ -7,10 +7,41 @@
 
 import { spawnSync } from 'node:child_process';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const stage = 'dist/mcpb';
 const out = 'dist/htmlradar.mcpb';
+const TOOL_NAMES = ['share_html', 'get_share_activity', 'whoami'];
+
+// Smithery's release API rejects a manifest whose tools have no inputSchema.
+// Rather than re-deriving JSON Schema from the zod shapes in src/server.ts
+// (a second copy that could drift), ask the built server itself: tools/list
+// runs the exact same zod-to-JSON-schema conversion a real MCP client sees,
+// so this cannot go stale.
+async function readToolSchemas() {
+  const transport = new StdioClientTransport({
+    command: 'node',
+    args: ['dist/index.js'],
+    env: { HTMLRADAR_API_KEY: `hr_live_${'0'.repeat(40)}` },
+  });
+  const client = new Client({ name: 'build-mcpb', version: '0.0.0' });
+  await client.connect(transport);
+  try {
+    const { tools } = await client.listTools();
+    const schemas = Object.fromEntries(tools.map((tool) => [tool.name, tool.inputSchema]));
+    for (const name of TOOL_NAMES) {
+      if (!schemas[name]) throw new Error(`tools/list did not return a schema for "${name}"`);
+    }
+    return schemas;
+  } finally {
+    await client.close();
+  }
+}
+
+const toolSchemas = await readToolSchemas();
 
 const manifest = {
   manifest_version: '0.3',
@@ -38,12 +69,21 @@ const manifest = {
     },
   },
   tools: [
-    { name: 'share_html', description: 'Publish an HTML document as a tracked link.' },
+    {
+      name: 'share_html',
+      description: 'Publish an HTML document as a tracked link.',
+      inputSchema: toolSchemas.share_html,
+    },
     {
       name: 'get_share_activity',
       description: 'Report who opened a tracked link, for how long, and which sections they read.',
+      inputSchema: toolSchemas.get_share_activity,
     },
-    { name: 'whoami', description: 'Show the HTMLRadar account, plan and free links used.' },
+    {
+      name: 'whoami',
+      description: 'Show the HTMLRadar account, plan and free links used.',
+      inputSchema: toolSchemas.whoami,
+    },
   ],
   keywords: ['html', 'tracked-link', 'read-tracking', 'docsend', 'deck', 'proposal'],
   license: pkg.license,
@@ -72,5 +112,29 @@ const mcpb = (...args) => {
   });
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
-mcpb('validate', `${stage}/manifest.json`);
-mcpb('pack', stage, out);
+
+// @anthropic-ai/mcpb's own manifest schema (unchanged through 2.1.2, the
+// current latest) has no tools[].inputSchema field and rejects the key
+// outright, so `mcpb pack` refuses to build this bundle as-is -- even though
+// Smithery's publish step reads tools[].inputSchema straight out of
+// manifest.json and rejects a tool that lacks it. Validate a copy with just
+// that field stripped, so every other manifest mistake still gets caught,
+// then zip the staged directory ourselves: a .mcpb file is nothing more
+// than a zip of manifest.json plus the server, per the MANIFEST.md spec
+// linked above.
+const strippedManifest = {
+  ...manifest,
+  tools: manifest.tools.map(({ inputSchema: _inputSchema, ...tool }) => tool),
+};
+const checkPath = `${stage}/manifest.check.json`;
+await writeFile(checkPath, JSON.stringify(strippedManifest, null, 2));
+mcpb('validate', checkPath);
+await rm(checkPath);
+
+await rm(out, { force: true });
+const zipResult = spawnSync('zip', ['-rqX', resolve(out), '.'], { cwd: stage });
+if (zipResult.status !== 0) {
+  process.stderr.write(zipResult.stderr ?? '');
+  process.exit(zipResult.status ?? 1);
+}
+console.log(`Packed ${out}`);

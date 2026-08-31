@@ -205,13 +205,13 @@ export default function Post() {
               <p className="mt-8">
                 HTMLRadar ships an MCP server. The agent that wrote the HTML publishes it as a
                 tracked link, and the next morning you ask the same agent whether anyone opened it.
-                Three tools over stdio (
+                Three tools over stdio the day I shipped it (
                 <code className="font-mono text-[14px] text-signal-dark">share_html</code>,{' '}
                 <code className="font-mono text-[14px] text-signal-dark">get_share_activity</code>,{' '}
-                <code className="font-mono text-[14px] text-signal-dark">whoami</code>), working in
-                Claude Code, Cursor and Codex CLI; in Claude Code a plugin adds a skill so the agent
-                knows when to offer a link. I built it as a side path. It is now the part I use
-                most.
+                <code className="font-mono text-[14px] text-signal-dark">whoami</code>; seven now),
+                working in Claude Code, Cursor and Codex CLI; in Claude Code a plugin adds a skill
+                so the agent knows when to offer a link. I built it as a side path. It is now the
+                part I use most.
               </p>
             </section>
 

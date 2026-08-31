@@ -63,10 +63,8 @@ export default function WhyPage() {
 
             <Reveal delay={0.24}>
               <p>
-                PDFs were built to be printed. HTML was built to render. That difference, ignored
-                for years because PDFs were "the document format," compounded into something obvious
-                in retrospect. Anything you would send to someone you care about reads better as
-                HTML on every modern surface.
+                PDFs were built to be printed. HTML was built to render. That difference was ignored
+                for years, because PDFs were "the document format."
               </p>
             </Reveal>
 
@@ -90,9 +88,9 @@ export default function WhyPage() {
 
             <Reveal delay={0.48}>
               <p className="border-t border-line pt-7 text-ink">
-                HTMLRadar tracks who reads HTML at the section level. It sends an email the moment
-                the document is first opened, and tells you which sections kept them past three
-                seconds.
+                HTMLRadar tracks who reads HTML at the section level. It emails you on the first
+                real read — five seconds on the page, not a bounce — and tells you which sections
+                kept them past three seconds.
               </p>
             </Reveal>
           </div>

@@ -1,4 +1,10 @@
-// Free tool page: HTML in, PDF out. No sign-in, and the file itself is never
+// Free tool page: HTML in, PDF out. Sol's messaging review, 31 Aug 2026: the
+// tool direction is fine as a funnel, but the copy must not read as though PDF
+// is where a deck ends up. The framing is that the PDF is the frozen copy you
+// hand over when someone insists, and the HTML you already have is the version
+// that can be read back — so every closing block routes to the tracked link.
+//
+// HTML in, PDF out. No sign-in, and the file itself is never
 // uploaded to HTMLRadar — the page renders it in a sandboxed iframe and hands
 // that iframe to the browser's own print dialog. The sandbox blocks scripts,
 // forms and navigation; it does not stop the browser fetching images, fonts or
@@ -58,7 +64,8 @@ export default function ClaudeArtifactToPdfToolPage() {
             Save or export the artifact as an HTML file, drop it here, and press Save as PDF. Your
             browser&rsquo;s own print dialog writes the PDF, and the file itself is never uploaded
             to HTMLRadar. Scripts, forms and navigation are blocked in the preview, so interactive
-            artifacts print as their static layout.
+            artifacts print as their static layout. The PDF is a frozen copy; the HTML stays the
+            version you can send as a tracked link.
           </DirectAnswer>
 
           <div className="mt-8">
@@ -110,16 +117,17 @@ export default function ClaudeArtifactToPdfToolPage() {
 
           <section className="mt-14 rounded-2xl border border-line bg-paper-2/40 p-6">
             <p className="text-[16px] leading-relaxed text-ink-soft">
-              A PDF freezes the page. If you would rather send a live page and find out whether the
-              person actually read it, use{' '}
+              A PDF answers nothing after you send it. On Thursday you still cannot tell whether the
+              client read the pricing section or stopped on page two. The same HTML file, sent as a
+              tracked link, does answer that: opened at 4pm, four minutes on scope, the pricing
+              section read twice. Keep the PDF for whoever asked for one, and{' '}
               <Link
                 href="/tools/claude-artifact-to-link"
                 className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
               >
-                share a Claude artifact as a link
+                send the artifact as a tracked link
               </Link>{' '}
-              instead. Same file, but you get a tracked link that reports who opened it, which
-              sections they read, and for how long.
+              to the person whose answer you actually need.
             </p>
           </section>
 

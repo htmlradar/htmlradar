@@ -60,7 +60,6 @@ export function PricingTiers({ proHref }: { proHref: string }) {
           name="Hosted · Free"
           price="$0"
           cadence="forever"
-          description="Enough to try it on a deck or two."
           features={FREE_FEATURES}
           ctaLabel="Start free"
           ctaHref="/sign-in"
@@ -213,7 +212,7 @@ interface TierProps {
   name: string;
   price: string;
   cadence: string;
-  description: string;
+  description?: string;
   features: string[];
   ctaLabel: string;
   ctaHref: string;
@@ -290,20 +289,21 @@ function Tier({
         </span>
       </div>
       {/* Reserved whether or not a note is showing, so switching between
-          monthly and annual doesn't make the two cards jump height and so the
-          free card's description stays on the same baseline as Pro's. */}
+          monthly and annual doesn't make the two cards jump height. */}
       <div style={{ minHeight: 38 }}>{priceNote}</div>
-      <p
-        style={{
-          margin: '10px 0 0',
-          maxWidth: '32ch',
-          fontSize: 14,
-          lineHeight: 1.55,
-          color: accent ? 'rgba(255,255,255,0.7)' : 'var(--ink-2)',
-        }}
-      >
-        {description}
-      </p>
+      {description && (
+        <p
+          style={{
+            margin: '10px 0 0',
+            maxWidth: '32ch',
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: accent ? 'rgba(255,255,255,0.7)' : 'var(--ink-2)',
+          }}
+        >
+          {description}
+        </p>
+      )}
       <ul
         style={{
           listStyle: 'none',

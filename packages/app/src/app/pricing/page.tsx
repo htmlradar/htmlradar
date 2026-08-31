@@ -198,22 +198,12 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* ─────────────────────── ROADMAP ─────────────────────── */}
+      {/* Sol's messaging review, 31 Aug 2026: a pricing page states what you
+          can buy today. The "what we're building next" cards promised custom
+          domains, per-viewer watermarks and repeat-open alerts to people
+          reading a buy page, so they are gone; the roadmap stays where it is
+          actually tracked. */}
       <section style={{ padding: '0 56px 110px', maxWidth: 1180, margin: '0 auto' }}>
-        <div className="v2-kicker">Roadmap</div>
-        <h2
-          style={{
-            fontFamily: 'var(--serif)',
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-            fontSize: 'clamp(24px, 3vw, 40px)',
-            lineHeight: 1.15,
-            margin: '12px 0 18px',
-            maxWidth: '30ch',
-          }}
-        >
-          What we&apos;re building next.
-        </h2>
         <p
           style={{
             margin: 0,
@@ -223,42 +213,18 @@ export default function PricingPage() {
             color: 'var(--ink-2)',
           }}
         >
-          Public-visible and trackable on GitHub. Nothing here is promised inside the Pro tier above
-          — it moves into Pro the moment it&apos;s shipped, not before.
+          The two cards above are what you get today, and nothing on this page is a promise about a
+          feature that has not shipped. What gets built next is argued out in the open:
         </p>
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: '36px 0 0',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 14,
-          }}
-          className="v2-pricing-roadmap"
-        >
-          <RoadmapItem
-            kicker="Custom domain"
-            body="share.yourdomain.com on every link, no HTMLRadar in the URL."
-          />
-          <RoadmapItem
-            kicker="Per-viewer watermark"
-            body="Recipient&rsquo;s email overlaid on the page so a leaked screenshot is traceable."
-          />
-          <RoadmapItem
-            kicker="Repeat-open alerts"
-            body="Notify when someone re-opens a deck after their first read."
-          />
-        </ul>
         <Link
-          href="https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap"
+          href="https://github.com/htmlradar/htmlradar/issues"
           target="_blank"
           rel="noopener noreferrer"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            marginTop: 28,
+            marginTop: 20,
             fontFamily: 'var(--mono)',
             fontSize: 11,
             letterSpacing: '0.16em',
@@ -268,7 +234,7 @@ export default function PricingPage() {
             fontWeight: 600,
           }}
         >
-          Track + vote on GitHub
+          Open an issue on GitHub
           <ArrowUpRight style={{ width: 14, height: 14 }} />
         </Link>
       </section>
@@ -342,50 +308,8 @@ export default function PricingPage() {
       <style>{`
         @media (max-width: 900px) {
           .v2-pricing-grid { grid-template-columns: 1fr !important; }
-          .v2-pricing-roadmap { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>
-  );
-}
-
-/* ───────── Roadmap item ───────── */
-
-function RoadmapItem({ kicker, body }: { kicker: string; body: string }) {
-  return (
-    <li
-      style={{
-        background: 'var(--card)',
-        border: '1px solid var(--line)',
-        borderRadius: 12,
-        padding: '16px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-      }}
-    >
-      <span
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 10.5,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          fontWeight: 700,
-          color: 'var(--ink-3)',
-        }}
-      >
-        {kicker}
-      </span>
-      <span
-        style={{
-          fontFamily: 'var(--serif)',
-          fontSize: 16,
-          lineHeight: 1.4,
-          letterSpacing: '-0.01em',
-          color: 'var(--ink)',
-        }}
-        dangerouslySetInnerHTML={{ __html: body }}
-      />
-    </li>
   );
 }

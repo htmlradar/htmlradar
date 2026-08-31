@@ -53,8 +53,10 @@ export default function PitchDeckTrackingPage() {
               How do you know when an investor opens your deck?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              HTMLRadar waits five seconds after the document loads before creating a session. The
-              first session requests an email notification; a fast backgrounded bounce does not.
+              HTMLRadar waits five seconds after the document loads before it creates a session, so
+              a link preview or a two-second mis-click never counts as a read. That first real read
+              is what emails you — one email per document per recipient, so a partner who re-opens
+              the deck on Sunday does not ping you again.
             </p>
           </section>
 

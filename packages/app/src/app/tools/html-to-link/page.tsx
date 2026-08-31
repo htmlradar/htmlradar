@@ -3,6 +3,13 @@
 // "html file to link converter online free" is to do the thing, not read
 // about it. The copy below exists for the same reason every other marketing
 // page has copy: so the page can rank and be cited.
+//
+// Sol's messaging review, 31 Aug 2026: four pages describe this same upload
+// workflow, so each opening has to claim a different job. This one owns the
+// transactional intent — the file is already on disk, the link is wanted now,
+// and the browser-side preview is what only the tool pages offer.
+// /use-case/track-html-deck owns the buyer story for a deck you already
+// built, and /for/claude-artifacts owns the keep-revising workflow.
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
@@ -64,10 +71,10 @@ export default async function HtmlToLinkToolPage({ searchParams }: { searchParam
             Share an HTML file as a link, and see who reads it.
           </h1>
           <DirectAnswer updated="August 2026">
-            To share an HTML file as a link, drop it on this page. It previews in your browser, then
-            you sign in and HTMLRadar gives you a link you can send anyone. The link shows who
-            opened it, which sections they read, and for how long. Free for two tracked links, then
-            $15 a month. Open source.
+            To share an HTML file as a link, drop it on this page. Nothing is uploaded while you
+            look: your own browser renders the preview, and the file reaches HTMLRadar only once you
+            sign in. The link you get back reports who opened it, which sections they read, and for
+            how long. Free for two tracked links, then $15 a month. Open source.
           </DirectAnswer>
 
           <div className="mt-8">

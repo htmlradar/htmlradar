@@ -31,7 +31,7 @@ const FAQ = [
   },
   {
     q: 'What does the recipient see?',
-    a: 'The document, exactly as written, behind an email prompt unless you turn the gate off. They never see the tracking, the dashboard, or anyone else who opened the link. HTMLRadar stores no raw IP address, no keystrokes, no mouse positions and no session replay.',
+    a: 'The HTML you supplied, behind an email prompt unless you turn the gate off. Your source file stays unchanged; the page HTMLRadar serves adds the tracker script, and on a free link a small Powered by HTMLRadar badge. They never see the tracking data, the dashboard, or anyone else who opened the link. HTMLRadar stores no raw IP address, no keystrokes, no mouse positions and no session replay.',
   },
   {
     q: 'What happens when the free links run out?',

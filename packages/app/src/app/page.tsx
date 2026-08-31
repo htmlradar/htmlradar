@@ -231,71 +231,6 @@ function ProposalMock() {
   );
 }
 
-function BoardPrepMock() {
-  return (
-    <CaseChrome filename="board-prep-mar-14.html · confidential">
-      <div className="flex items-center justify-between font-mono text-[7.5px] font-bold uppercase tracking-[0.16em] text-graphite">
-        <span className="inline-flex items-center gap-1 text-signal">
-          <span className="size-1 rounded-full bg-signal" />
-          Friday · Mar 14
-        </span>
-        <span>Pre-read · 9 pages</span>
-      </div>
-      <div className="mt-1.5 font-serif text-[16px] font-bold leading-[1.05] tracking-tight text-ink">
-        The five things we&apos;ll
-        <br />
-        cover <em className="not-italic text-signal">Friday</em>.
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-1.5">
-        {[
-          ['On agenda', '5', '90-min call'],
-          ['Decisions', '2', 'Vote required'],
-          ['Open risks', '1', 'Flagged red'],
-        ].map(([k, v, sub]) => (
-          <div key={k as string} className="rounded-md border border-line bg-paper-2/40 p-1.5">
-            <div className="font-mono text-[6.5px] font-bold uppercase tracking-[0.14em] text-graphite">
-              {k}
-            </div>
-            <div className="font-serif text-[14px] font-semibold leading-none text-ink">{v}</div>
-            <div className="mt-0.5 font-mono text-[6.5px] font-semibold text-signal">{sub}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 space-y-1">
-        {[
-          ['#1F7A3A', 'CEO opening · Q1 narrative', '15 min'],
-          ['#D9A04A', '2026 hiring plan', '25 min'],
-          ['#7A1F2E', 'Enterprise GTM · debate', '20 min'],
-        ].map(([color, label, tag]) => (
-          <div
-            key={label as string}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-1.5 rounded-md border border-line bg-paper-2/40 px-2 py-1"
-          >
-            <span
-              aria-hidden
-              className="size-1.5 rounded-full"
-              style={{ backgroundColor: color as string }}
-            />
-            <span className="text-[9px] font-medium text-ink">{label}</span>
-            <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-graphite">
-              {tag}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex items-center justify-between border-t border-line/60 pt-1.5 font-mono text-[7px] uppercase tracking-[0.14em] text-graphite">
-        <span className="inline-flex items-center gap-1.5 text-ink">
-          <span className="grid size-3.5 place-items-center rounded-full bg-signal text-signal-soft font-serif text-[8px] font-semibold tracking-tight normal-case">
-            J
-          </span>
-          Jules Kim · CEO
-        </span>
-        <span>Sent Tue 6:02 PM</span>
-      </div>
-    </CaseChrome>
-  );
-}
-
 const USE_CASES: Array<{
   n: string;
   title: string;
@@ -316,13 +251,6 @@ const USE_CASES: Array<{
     body: 'Agencies and consultants send proposals, monthly reports, and concepts as tracked links. Follow up with the exact section the client re-read — not "just checking in".',
     mock: <ProposalMock />,
     caseKey: 'b2b-proposal',
-  },
-  {
-    n: '03',
-    title: 'Meeting Prep & Weekly Updates',
-    body: 'Know who walked in cold. Pre-reads as HTML — see who actually read it, who skimmed, who needs the recap.',
-    mock: <BoardPrepMock />,
-    caseKey: 'meeting-prep',
   },
 ];
 
@@ -427,8 +355,6 @@ export default function LandingV2() {
                 <span>Diligence packets</span>
                 <span className="dot-sep">·</span>
                 <span>Sales reports</span>
-                <span className="dot-sep">·</span>
-                <span>Design specs</span>
                 <span className="dot-sep">·</span>
                 <span>Proposals</span>
               </div>
@@ -812,7 +738,7 @@ export default function LandingV2() {
               Track the HTML documents you send most, from investor decks to client proposals.
             </p>
           </div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mt-12 grid gap-5 md:grid-cols-2">
             {USE_CASES.map((c) => (
               <AuthLink
                 key={c.caseKey}
@@ -959,8 +885,8 @@ export default function LandingV2() {
                 The radar <em>lights up</em>.
               </h3>
               <p>
-                Sub-second. Active time, scroll depth, time-per-section, device, browser. A live
-                dashboard, not an email digest.
+                An email on the first real read. Then the dashboard — active time, scroll depth,
+                time-per-section, device, browser — refreshed every 30 seconds while it is open.
               </p>
             </div>
           </div>

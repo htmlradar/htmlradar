@@ -111,8 +111,10 @@ export default function TermsPage() {
                 makes the analytics work. Nothing beyond that.
               </p>
               <p className="mt-4">
-                You can delete a document or revoke a link at any time. When you do, we stop serving
-                it.
+                You can revoke a link or delete a document at any time, and we stop serving it. Be
+                clear on what Delete does: it archives the document, so the uploaded HTML and its
+                records stay with us and can be recovered. For permanent erasure, email
+                privacy@htmlradar.com.
               </p>
             </Section>
 

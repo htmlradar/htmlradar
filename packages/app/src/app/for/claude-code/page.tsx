@@ -156,11 +156,6 @@ export default function ForClaudeCodePage() {
               </Link>{' '}
               are one command each.
             </p>
-            <CodeBlock
-              label="terminal"
-              code={`export HTMLRADAR_API_KEY=hr_live_…
-claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlradar-mcp`}
-            />
           </section>
 
           <section className="mt-14">
@@ -215,8 +210,9 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
                 </p>
                 <CodeBlock label="returned to claude" code={PROPOSAL_OUTPUT} />
                 <p className="text-[15px] leading-relaxed text-ink-soft">
-                  Acme enters an email, then reads the proposal exactly as written. They see nothing
-                  about the tracking, the dashboard, or anyone else who opened it.
+                  Acme enters an email, then reads the proposal you wrote — your file unchanged,
+                  with HTMLRadar&rsquo;s tracker added to the page it serves. They see nothing about
+                  the reading data, the dashboard, or anyone else who opened it.
                 </p>
               </li>
 
@@ -261,14 +257,16 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               What the key can do
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              Create tracked links, read the activity of this account&rsquo;s own links, read the
-              plan. It cannot delete or revoke a link, change a setting, or see another account. The
-              key is shown once and stored hashed; revoke it at{' '}
+              A full-access key can create tracked links, switch one off and back on, replace the
+              document behind a link that has already gone out, and read activity and the plan. A
+              read-only key can only list and read. Neither key can delete a link or a document,
+              change an account setting, or see another account. The key is shown once and stored
+              hashed; revoke it at{' '}
               <Link href="/settings" className="text-signal-dark hover:underline">
                 htmlradar.com/settings
               </Link>
               . The only data that leaves your machine is the HTML Claude passes in and the call
-              parameters, to htmlradar.com or your own instance. The full list is on the{' '}
+              parameters, to htmlradar.com or your own instance. The per-tool detail is on the{' '}
               <Link href="/mcp#key" className="text-signal-dark hover:underline">
                 MCP page
               </Link>
@@ -281,44 +279,32 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               If it does not connect
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              Run <span className="font-mono text-[14px]">claude mcp list</span> in the terminal, or{' '}
-              <span className="font-mono text-[14px]">/mcp</span> in the session; a connected server
-              shows a tick. Or just ask &ldquo;how many free HTMLRadar links do I have left?&rdquo;,
-              which calls <span className="font-mono text-[14px]">whoami</span> and works as a
-              health check.
-            </p>
-            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The one Claude Code-specific failure: the plugin passes{' '}
+              One failure is specific to Claude Code: the plugin passes{' '}
               <span className="font-mono text-[14px]">{'${HTMLRADAR_API_KEY}'}</span> through
               literally when the variable was not exported in the shell that started Claude Code.
               Since 0.1.1 the server refuses to start and names that placeholder in its message.
-              Export the key, restart Claude Code, and it connects. Everything else — Node.js 18 or
-              newer, a rejected key, the free limit, the MCP Inspector — is in the{' '}
-              <Link href="/mcp#troubleshooting" className="text-signal-dark hover:underline">
-                troubleshooting list
-              </Link>
-              .
+              Export the key, restart Claude Code, and it connects.
             </p>
-          </section>
-
-          <section className="mt-14">
-            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              Versions
-            </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.2.0</span>,
-              the current release, and needs Node.js 18 or newer for the{' '}
-              <span className="font-mono text-[14px]">npx</span> it runs. A newer server reaches
-              plugin users when the plugin is updated; run{' '}
-              <span className="font-mono text-[14px]">/plugin marketplace update htmlradar</span> to
-              pick it up. The direct <span className="font-mono text-[14px]">claude mcp add</span>{' '}
-              line runs the latest version every time. Changes per release are in the{' '}
-              <a
-                href="https://github.com/htmlradar/htmlradar/blob/main/packages/mcp/CHANGELOG.md"
-                className="text-signal-dark hover:underline"
-              >
-                package changelog
-              </a>
+              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.2.0</span> and
+              needs Node.js 18 or newer. Everything else you only need once — the seven tools and
+              their arguments, install lines for the other clients, rate limits, release history,
+              and every other startup failure — is on the MCP page:{' '}
+              <Link href="/mcp#tools" className="text-signal-dark hover:underline">
+                tools
+              </Link>
+              ,{' '}
+              <Link href="/mcp#install" className="text-signal-dark hover:underline">
+                install
+              </Link>
+              ,{' '}
+              <Link href="/mcp#troubleshooting" className="text-signal-dark hover:underline">
+                troubleshooting
+              </Link>
+              , and{' '}
+              <Link href="/mcp#versions" className="text-signal-dark hover:underline">
+                versions
+              </Link>
               .
             </p>
           </section>

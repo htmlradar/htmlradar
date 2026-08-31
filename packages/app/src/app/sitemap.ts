@@ -95,6 +95,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    // Published 2026-08-31.
+    {
+      url: `${baseUrl}/blog/share-html-from-claude-code`,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
   ];
 
   return routes;

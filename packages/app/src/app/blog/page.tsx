@@ -9,8 +9,9 @@ import { pageMeta } from '@/lib/seo';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'Blog',
-  description: 'Engineering, design, and product writing from the HTMLRadar team.',
+  title: 'HTML Document Tracking: Audits and Build Notes | HTMLRadar',
+  description:
+    "What HTMLRadar's blog covers: recipient-side audits of seven deck-sharing tools, how the read tracking is built, and what the reading data actually shows.",
   path: '/blog',
 });
 
@@ -23,6 +24,14 @@ interface Post {
 }
 
 const POSTS: Post[] = [
+  {
+    slug: 'share-html-from-claude-code',
+    title: 'Share an HTML page from Claude Code, then ask who read it',
+    description:
+      'Add the HTMLRadar MCP server to Claude Code in one line, publish the HTML your agent wrote as a tracked link, then ask which sections the reader stayed on.',
+    date: '2026-08-31',
+    readingTime: '8 min',
+  },
   {
     slug: 'why-i-built-read-tracking-for-html',
     title: 'Decks moved to HTML. I built the read tracking for it.',
@@ -52,7 +61,8 @@ export default function BlogIndex() {
             Notes from the build.
           </h1>
           <p className="mt-6 max-w-lg text-[15.5px] leading-relaxed text-ink-soft">
-            Architecture choices, product reasoning, lessons from running a small open-source SaaS.
+            Recipient-side audits of the tools we compete with, the 8 KB tracker explained, and what
+            the reading data on real sends actually came back as.
           </p>
 
           <ul className="mt-16 divide-y divide-line">

@@ -11,6 +11,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Copy, KeyRound } from 'lucide-react';
 import { formatTimestamp } from '@/lib/format-timestamp';
+import { mcpInstallCommands } from '@/lib/mcp-install-commands';
 
 export interface ApiKeyRow {
   id: string;
@@ -27,6 +28,82 @@ type RevokeResult = { ok: boolean; error?: string };
 /** What a key may do (schema/040). Full is the default and what every key made before it is. */
 export type ApiKeyScope = 'full' | 'read_only';
 
+/** Copies its own text and says so for a moment. One per row, so each says it separately. */
+function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          // clipboard is unavailable outside a secure context; the text is on
+          // screen and selectable, so this is not worth a fallback hack.
+          return;
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      }}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite transition hover:border-signal hover:text-signal-dark"
+    >
+      {copied ? (
+        <>
+          <Check aria-hidden className="size-3 text-signal" />
+          Copied
+        </>
+      ) : (
+        <>
+          <Copy aria-hidden className="size-3" />
+          {label}
+        </>
+      )}
+    </button>
+  );
+}
+
+// The commands are assembled in the browser from a key that is already in this
+// tab. Nothing here is sent anywhere, and nothing is written to a log.
+function InstallCommands({ apiKey }: { apiKey: string }) {
+  return (
+    <div className="mt-6 border-t border-signal/25 pt-5">
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+        Use it right now
+      </p>
+      <p className="mt-1 max-w-2xl text-[13.5px] leading-relaxed text-ink">
+        Each block below already has this key written into it, so what you copy is the secret
+        itself. Paste it into your own terminal or your own config file, and nowhere else — not a
+        chat, not a ticket, not a shared document.
+      </p>
+      <div className="mt-4 space-y-3">
+        {mcpInstallCommands(apiKey).map((row) => (
+          <div key={row.id} className="overflow-hidden rounded-xl border border-line bg-paper">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3.5 py-2">
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
+                {row.client} · {row.where}
+              </span>
+              <CopyButton text={row.code} label="Copy command" />
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3.5 py-3 font-mono text-[12px] leading-[1.55] text-ink">
+              {row.code}
+            </pre>
+            <p className="border-t border-line px-3.5 py-2 text-[12.5px] leading-relaxed text-graphite">
+              {row.note}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-[12.5px] leading-relaxed text-graphite">
+        VS Code, Windsurf, Zed, Gemini CLI, Goose, Cline and any other MCP client are covered at{' '}
+        <a href="/mcp" className="text-signal-dark underline underline-offset-4 hover:no-underline">
+          htmlradar.com/mcp
+        </a>
+        .
+      </p>
+    </div>
+  );
+}
+
 export function ApiKeys({
   keys,
   createAction,
@@ -40,22 +117,8 @@ export function ApiKeys({
   const [scope, setScope] = useState<ApiKeyScope>('full');
   const [freshKey, setFreshKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
-
-  const copy = async () => {
-    if (!freshKey) return;
-    try {
-      await navigator.clipboard.writeText(freshKey);
-    } catch {
-      // clipboard is unavailable outside a secure context; the key is on
-      // screen and selectable, so this is not worth a fallback hack.
-      return;
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
 
   return (
     <section className="mt-12 border-t border-line pt-8">
@@ -144,24 +207,9 @@ export function ApiKeys({
             <code className="min-w-0 flex-1 break-all rounded-md border border-line bg-paper px-3 py-2 font-mono text-[12.5px] text-ink">
               {freshKey}
             </code>
-            <button
-              type="button"
-              onClick={copy}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite transition hover:border-signal hover:text-signal-dark"
-            >
-              {copied ? (
-                <>
-                  <Check aria-hidden className="size-3 text-signal" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy aria-hidden className="size-3" />
-                  Copy key
-                </>
-              )}
-            </button>
+            <CopyButton text={freshKey} label="Copy key" />
           </div>
+          <InstallCommands apiKey={freshKey} />
         </div>
       ) : null}
 

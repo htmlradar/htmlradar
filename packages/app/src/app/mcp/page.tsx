@@ -293,11 +293,27 @@ export default function McpPage() {
                 htmlradar.com/settings
               </Link>{' '}
               under <span className="font-mono text-[14px]">API keys</span>. Keys start with{' '}
-              <span className="font-mono text-[14px]">hr_live_</span> and are shown once. Every
-              client below runs the same command,{' '}
-              <span className="font-mono text-[14px]">npx -y htmlradar-mcp</span>, and needs Node.js
-              18 or newer, except Claude Desktop, which brings its own.
+              <span className="font-mono text-[14px]">hr_live_</span> and are shown once — and at
+              that moment the settings page hands you the commands below with your own key already
+              filled in, so there is nothing to substitute by hand. Every client below runs the same
+              command, <span className="font-mono text-[14px]">npx -y htmlradar-mcp</span>, and
+              needs Node.js 18 or newer, except Claude Desktop, which brings its own.
             </p>
+
+            <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+              Claude Code plugin
+            </h3>
+            <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
+              The plugin adds the same server plus a skill that teaches Claude when to offer a
+              tracked link. It reads{' '}
+              <span className="font-mono text-[13px]">HTMLRADAR_API_KEY</span> from the shell that
+              started Claude Code, so export it before you start:
+            </p>
+            <CodeBlock
+              label="claude code"
+              code={`/plugin marketplace add htmlradar/htmlradar
+/plugin install htmlradar@htmlradar`}
+            />
 
             <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
               Claude Code
@@ -317,21 +333,6 @@ claude mcp add htmlradar -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlr
               <span className="font-mono text-[13px]">-e HTMLRADAR_API_KEY=hr_live_xxx</span> — and
               is fine for a throwaway key you are about to revoke.
             </p>
-
-            <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
-              Claude Code plugin
-            </h3>
-            <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
-              The plugin adds the same server plus a skill that teaches Claude when to offer a
-              tracked link. It reads{' '}
-              <span className="font-mono text-[13px]">HTMLRADAR_API_KEY</span> from the shell that
-              started Claude Code, so export it before you start:
-            </p>
-            <CodeBlock
-              label="claude code"
-              code={`/plugin marketplace add htmlradar/htmlradar
-/plugin install htmlradar@htmlradar`}
-            />
 
             <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
               Cursor

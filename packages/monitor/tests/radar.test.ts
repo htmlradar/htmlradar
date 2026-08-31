@@ -340,7 +340,8 @@ function stubDigestWorld(world: DigestWorld) {
         outbox.push(body as OutboxWrite);
         return new Response('', { status: 201 });
       }
-      // readRecentRadarItems asks for non-noise; weeklyInsight asks for limit=500.
+      // readRecentRadarItems asks for non-noise, score >= REPLY_THRESHOLD;
+      // weeklyInsight asks for limit=500.
       if (url.startsWith(RADAR_URL) && url.includes('limit=500')) return json(world.weekly ?? []);
       if (url.startsWith(RADAR_URL)) return json(world.recent ?? []);
       throw new Error(`unexpected fetch: ${url}`);
@@ -349,31 +350,34 @@ function stubDigestWorld(world: DigestWorld) {
   return { outbox, telegram };
 }
 
-const recentItems = [
-  {
-    source: 'HN',
-    source_url: 'https://news.ycombinator.com/item?id=1',
-    title: 'How do I share an html file and see who read it?',
-    snippet: null,
-    category: 'buyer_question',
-    intent_score: 90,
-    published_at: null,
-  },
-  {
-    source: 'GoogleAlerts',
-    source_url: 'https://blog.test/roundup',
-    title: '11 best DocSend alternatives, a roundup',
-    snippet: null,
-    category: 'competitor_mention',
-    intent_score: 42,
-    published_at: null,
-  },
-];
+// One item comfortably above REPLY_THRESHOLD (a fresh direct question) and one
+// comfortably below it (a listicle — see scoreIntent's own test for why these
+// land where they do). The strict filter's whole job is to show the first and
+// never the second.
+const highScoreItem = {
+  source: 'HN',
+  source_url: 'https://news.ycombinator.com/item?id=1',
+  title: 'How do I share an html file and see who read it?',
+  snippet: null,
+  category: 'buyer_question',
+  intent_score: 90,
+  published_at: null,
+};
 
-describe('dailyDigest sends one batch, drafts only the worthwhile, silent when quiet', () => {
-  it('lists every non-noise item with its link and category', async () => {
+const lowScoreItem = {
+  source: 'GoogleAlerts',
+  source_url: 'https://blog.test/roundup',
+  title: '11 best DocSend alternatives, a roundup',
+  snippet: null,
+  category: 'competitor_mention',
+  intent_score: 42,
+  published_at: null,
+};
+
+describe('dailyDigest is a strict opportunity filter: <=3 items, only above REPLY_THRESHOLD', () => {
+  it('surfaces a high-score item and drops anything below the threshold', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { telegram, outbox } = stubDigestWorld({ recent: recentItems });
+    const { telegram, outbox } = stubDigestWorld({ recent: [highScoreItem, lowScoreItem] });
 
     await dailyDigest(env, TUESDAY);
 
@@ -382,27 +386,66 @@ describe('dailyDigest sends one batch, drafts only the worthwhile, silent when q
     expect(text).toContain('How do I share an html file');
     expect(text).toContain('https://news.ycombinator.com/item?id=1');
     expect(text).toContain('category: buyer_question');
-    expect(text).toContain('category: competitor_mention');
+    // The listicle is below REPLY_THRESHOLD and must never appear.
+    expect(text).not.toContain('11 best DocSend alternatives');
     // Drafts are OFF by default (RADAR_DRAFTS unset) — log-and-mine only.
     expect(text).not.toContain('DRAFT');
     expect(outbox[0]).toMatchObject({ kind: 'radar' });
+    expect(outbox[0]!.meta).toMatchObject({ items_shown: 1, items_available: 1 });
   });
 
-  it('attaches a disclosed draft to items over the threshold when drafts are enabled', async () => {
+  it('never shows more than 3 items, even when more clear the bar', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { telegram } = stubDigestWorld({ recent: recentItems });
+    const fiveQualifying = Array.from({ length: 5 }, (_, i) => ({
+      source: 'HN',
+      source_url: `https://news.ycombinator.com/item?id=${i}`,
+      title: `Buyer question number ${i}, how do I do this?`,
+      snippet: null,
+      category: 'buyer_question' as const,
+      intent_score: 90 - i, // all comfortably above REPLY_THRESHOLD (60)
+      published_at: null,
+    }));
+    const { telegram, outbox } = stubDigestWorld({ recent: fiveQualifying });
+
+    await dailyDigest(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    const shownCount = (telegram[0]!.text.match(/category: buyer_question/g) ?? []).length;
+    expect(shownCount).toBe(3);
+    expect(outbox[0]!.meta).toMatchObject({ items_shown: 3, items_available: 3 });
+  });
+
+  it('drafts every item shown when drafts are enabled, since everything shown already cleared the bar', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const secondHighScoreItem = {
+      source: 'Reddit',
+      source_url: 'https://reddit.com/r/test/2',
+      title: 'Any good DocSend alternative that is actually open source?',
+      snippet: null,
+      category: 'competitor_mention',
+      intent_score: 65,
+      published_at: null,
+    };
+    const { telegram } = stubDigestWorld({ recent: [highScoreItem, secondHighScoreItem] });
 
     await dailyDigest({ ...env, RADAR_DRAFTS: '1' }, TUESDAY);
 
     const text = telegram[0]!.text;
-    // The 90-score buyer question gets a draft; the 42-score listicle does not.
-    expect(text).toContain('DRAFT (personal account, edit before posting)');
     expect(text).toContain(DISCLOSURE);
-    // Exactly one draft: the item below REPLY_THRESHOLD stays undrafted.
-    expect(text.match(/DRAFT \(personal account/g)).toHaveLength(1);
+    expect(text.match(/DRAFT \(personal account/g)).toHaveLength(2);
   });
 
-  it('says nothing on a quiet weekday', async () => {
+  it('sends nothing on a day where every item is below the threshold', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram, outbox } = stubDigestWorld({ recent: [lowScoreItem] });
+
+    await dailyDigest(env, TUESDAY);
+
+    expect(telegram).toHaveLength(0);
+    expect(outbox).toHaveLength(0);
+  });
+
+  it('says nothing on a quiet weekday with no items at all', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { telegram, outbox } = stubDigestWorld({ recent: [] });
 
@@ -412,7 +455,7 @@ describe('dailyDigest sends one batch, drafts only the worthwhile, silent when q
     expect(outbox).toHaveLength(0);
   });
 
-  it('still sends the weekly insight on a quiet Monday', async () => {
+  it('still sends the weekly insight on a quiet Monday, unaffected by the daily filter', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { telegram } = stubDigestWorld({ recent: [], weekly: [] });
 
@@ -420,6 +463,17 @@ describe('dailyDigest sends one batch, drafts only the worthwhile, silent when q
 
     expect(telegram).toHaveLength(1);
     expect(telegram[0]!.text).toContain('Weekly insight: nothing logged in the last 7 days');
+  });
+
+  it('still sends the weekly insight on a Monday when only below-threshold items exist', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram } = stubDigestWorld({ recent: [lowScoreItem], weekly: [] });
+
+    await dailyDigest(env, MONDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).toContain('Weekly insight: nothing logged in the last 7 days');
+    expect(telegram[0]!.text).not.toContain('11 best DocSend alternatives');
   });
 });
 

@@ -832,11 +832,16 @@ export function scoreIntent(
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-// A drafted reply is attached to a digest item only at or above this score.
-// A recent, direct buyer question lands 45 + 20 (question) + 12 (phrasing) + 20
-// (fresh) = 97; a recent competitor-pain thread ~72; a listicle ~40; a passing
-// mention below that. 60 is the clean gap between "a person asking, today" and
-// "an article or a stale mention" — worth a personal reply versus worth logging.
+// The digest's inclusion floor, and the score at or above which a drafted
+// reply is attached. A recent, direct buyer question lands 45 + 20 (question)
+// + 12 (phrasing) + 20 (fresh) = 97; a recent competitor-pain thread ~72; a
+// listicle ~40; a passing mention below that. 60 is the clean gap between "a
+// person asking, today" and "an article or a stale mention" — worth surfacing
+// to the founder at all, not only worth a personal reply. Per
+// docs/workstreams/seo-and-indexing/SEO-PLAN-DECISION-2026-08-31.md, the
+// digest is a strict opportunity filter rather than a daily top-ten, so this
+// number now gates both: whether an item appears at all, and whether it gets
+// a draft.
 export const REPLY_THRESHOLD = 60;
 
 // ---------------------------------------------------------------------------
@@ -1119,17 +1124,24 @@ export async function scanThreads(
 // The daily digest and the weekly insight.
 //
 // The digest is the founder-facing half, on its own 05:00 cron an hour after
-// the mining scan. It reads what was first seen in the last 24 hours, drops
-// noise, ranks by intent, shows the top ten, and for the worthwhile few (score
-// at or above REPLY_THRESHOLD) attaches a drafted reply he can approve in a tap
-// and post himself. It marks nothing acted — acted defaults false and stays
-// false until he tells us he replied; there is no auto-post. On a quiet day it
-// stays silent, except Monday, when the weekly insight rides along so that
-// unanswered items still become intelligence.
+// the mining scan. It is a strict opportunity filter, not a daily top-ten: it
+// reads what was first seen in the last 24 hours, drops noise, keeps only
+// items at or above REPLY_THRESHOLD (a listicle or a passing mention never
+// clears it — see that constant's comment), and shows at most
+// DIGEST_MAX_ITEMS of those, highest intent first. Because everything shown
+// already cleared REPLY_THRESHOLD, every shown item also gets a drafted reply
+// when RADAR_DRAFTS is on. It marks nothing acted — acted defaults false and
+// stays false until he tells us he replied; there is no auto-post. On a day
+// nothing clears the bar it stays silent, except Monday, when the weekly
+// insight (unchanged) rides along so unanswered items still become
+// intelligence.
 
 const DIGEST_WINDOW_MS = 24 * 60 * 60_000;
 const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60_000;
-const DIGEST_MAX_ITEMS = 10;
+// Strict filter, not a top-ten: at most 3 items a day (see
+// readRecentRadarItems for the score floor that keeps this a real cap, not
+// just "all we happened to find").
+const DIGEST_MAX_ITEMS = 3;
 // Telegram hard-caps at 4096; stop well short so the appended weekly section
 // and a draft can't push the last item past the cliff.
 const DIGEST_MAX_CHARS = 3_800;
@@ -1199,17 +1211,22 @@ const radarHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
 });
 
+/** The digest's candidate list: non-noise items from the last 24h, at or above
+ *  REPLY_THRESHOLD, highest intent first, capped at DIGEST_MAX_ITEMS. The
+ *  score floor and the cap are also applied here in code (not left to the
+ *  query alone), so the guarantee holds even if the query changes underneath. */
 async function readRecentRadarItems(env: Env, nowMs: number): Promise<RadarRow[]> {
   const since = encodeURIComponent(new Date(nowMs - DIGEST_WINDOW_MS).toISOString());
   const res = await fetch(
     `${env.SUPABASE_URL}/rest/v1/radar_items` +
-      `?first_seen_at=gte.${since}&category=neq.noise` +
+      `?first_seen_at=gte.${since}&category=neq.noise&intent_score=gte.${REPLY_THRESHOLD}` +
       `&order=intent_score.desc,first_seen_at.desc&limit=${DIGEST_MAX_ITEMS}` +
       `&select=source,source_url,title,snippet,category,intent_score,published_at`,
     { headers: radarHeaders(env) },
   );
   if (!res.ok) throw new Error(`radar_items read HTTP ${res.status}`);
-  return (await res.json()) as RadarRow[];
+  const rows = (await res.json()) as RadarRow[];
+  return rows.filter((r) => r.intent_score >= REPLY_THRESHOLD).slice(0, DIGEST_MAX_ITEMS);
 }
 
 /** The weekly pattern summary: what recurred, not a raw dump. Monday only. */

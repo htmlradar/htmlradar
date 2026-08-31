@@ -36,4 +36,9 @@ regexes = [
   # for search engines to verify ownership). The file under packages/app/public is
   # that proof.
   '''aa73fbe8e79ef39105fe22e99a64e50c''',
+  # Fake API key that lived for one commit (3e1f0fc) as the fixture in
+  # mcp-install-commands.test.ts — never issued, never valid, and replaced there by
+  # a repeating pattern with too little entropy to look like a credential. This scan
+  # reads the whole history, so the dead commit still has to be excused by name.
+  '''hr_live_0123456789abcdef0123456789abcdef01234567''',
 ]

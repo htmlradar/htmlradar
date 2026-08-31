@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `043`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in order, `001` through `044`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -55,7 +55,7 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - `viewers` — recipient identities (email or anonymous fingerprint), scoped per share; `is_internal` flag (012) hides owner-self test reads — narrowed in `036_internal_viewers_owner_only.sql` to the owner's own address, so colleagues on the sender's own email domain are ordinary, visible recipients.
 - `sessions` — one row per page-open; `token` is the per-session bearer credential returned to the tracker. `document_version` records which version this session saw.
 - `section_events` — section-level dwell records, deduped via `unique (session_id, section_id)`.
-- `notifications_log` (003) — observability for the `notify_on_first_open` trigger; status enum `queued / delivered / failed / skipped`.
+- `notifications_log` (003) — observability for the `notify_on_first_open` trigger; status enum `queued / delivered / failed / skipped / sent / unverified` (the last two added in 044). Nothing used to move a row off `queued` — 044's `reconcile_notification_sends()` closes that: joined against `net._http_response` by `request_id`, a 2xx becomes `sent`, anything else becomes `failed` with the code in `error_message`, and a `queued` row older than 30 minutes with no response row left at all (pg_net's own retention already dropped it) becomes `unverified` rather than a guess either way.
 - `app_events` (006) — PostHog-shaped product events (`distinct_id`, `event`, `properties`, `user_id`).
 - `error_log` (006) — client/server/worker JS error sink.
 - `feedback` (006) — user-submitted feedback from `/feedback`.
@@ -74,7 +74,7 @@ Both follow the same private-view pattern: `security_invoker` set explicitly, th
 - `recent_events` (006) — the last seven days of `app_events` joined to the user's email. `security_invoker = on`; granted to `authenticated` and `service_role`.
 - `share_lookup` (043) — everything the proxy needs to answer one recipient request in a single read: the share, its stored `host_handle`, the owner's handle and tier, and the document's R2 key, version and soft-delete state. `security_invoker = off`; **service role only**, because it carries every customer's handle and every document's storage key. The password hash is deliberately absent — password checks go through the rate-limited `verify_share_password` RPC.
 
-## RPCs (10)
+## RPCs (11)
 
 Recipient-side (anon, SECURITY DEFINER):
 
@@ -86,7 +86,7 @@ Owner-side (authenticated, SECURITY DEFINER, invoked from server actions):
 
 Server-side only (service role, SECURITY DEFINER, invoked by the proxy worker and the public API):
 
-- `create_share_as` (034), `notify_disabled_attempt` (028), `report_abuse` (037)
+- `create_share_as` (034), `notify_disabled_attempt` (028), `report_abuse` (037), `reconcile_notification_sends` (044) — scheduled every 10 minutes via `pg_cron` (`select cron.schedule('reconcile_notification_sends', '*/10 * * * *', ...)`); on a Postgres without `pg_cron` (a self-hosted install, a scratch test database) the migration logs a notice and skips scheduling instead of failing, so the function still exists and can be called by hand or by an external scheduler.
 
 ## RLS posture
 

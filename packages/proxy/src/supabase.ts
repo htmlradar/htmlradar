@@ -36,6 +36,18 @@ export interface Share {
   lock_deck: boolean;
   expires_at: string | null;
   revoked_at: string | null;
+  // The hostname THIS LINK was created for: null means it is served on the
+  // apex forever, a value means {host_handle}.{SHARE_HOST}. Immutable in the
+  // database (schema/043). Routing follows this column and never the owner's
+  // current handle, which is what keeps an already-sent link from ever moving
+  // when an owner is given a handle later or renames an account.
+  host_handle: string | null;
+  // The owner's current handle. Not the routing key — that is host_handle
+  // above — and read only for diagnostics and the app's link building.
+  owner_handle: string | null;
+  // Free or Pro, from the same read. Null when the profile row is missing,
+  // which a left join makes possible; every caller treats that as free.
+  owner_tier: 'free' | 'pro' | null;
 }
 
 export interface Document {
@@ -60,14 +72,53 @@ export interface Attachment {
   created_at: string;
 }
 
+// Columns named explicitly rather than `select=*`. The view carries the
+// document's storage key and every customer's handle; a wildcard would put all
+// of that in a response body on every recipient request for no reason.
+const SHARE_LOOKUP_COLUMNS = [
+  'id',
+  'slug',
+  'document_id',
+  'owner_id',
+  'recipient_label',
+  'require_email',
+  'require_password',
+  'allowed_email_domains',
+  'allowed_emails',
+  'lock_deck',
+  'expires_at',
+  'revoked_at',
+  'host_handle',
+  'owner_handle',
+  'owner_tier',
+].join(',');
+
+/**
+ * The one read a recipient request makes.
+ *
+ * Reads `share_lookup` (schema/043), not `document_shares`. Two reasons, both
+ * from the trust layer's design:
+ *
+ * The stored hostname has to be known BEFORE the gate cookies are checked,
+ * because "a handle host that does not match this share's stored hostname is
+ * not found" must answer before anything else does. A second call for it would
+ * be a second round trip on the recipient's critical path.
+ *
+ * And the owner's tier comes back in the same row, which is why getProfileTier
+ * is gone: this is now one database call where the document route made two.
+ *
+ * `share_lookup` is a private view — `security_invoker = off`, every grant
+ * revoked from public, anon and authenticated, granted to the service role
+ * alone, which is the key this worker holds. It exposes no password hash.
+ */
 export async function getShareBySlug(env: Env, slug: string): Promise<Share | null> {
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/document_shares`);
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/share_lookup`);
   url.searchParams.set('slug', `eq.${slug}`);
-  url.searchParams.set('select', '*');
+  url.searchParams.set('select', SHARE_LOOKUP_COLUMNS);
   url.searchParams.set('limit', '1');
 
   const res = await call(env, url);
-  if (!res.ok) throw new UpstreamError(`document_shares lookup failed: ${res.status}`);
+  if (!res.ok) throw new UpstreamError(`share_lookup failed: ${res.status}`);
   const rows = (await res.json()) as Share[];
   return rows[0] ?? null;
 }
@@ -164,17 +215,11 @@ export async function getDocument(env: Env, id: string): Promise<Document | null
   return rows[0] ?? null;
 }
 
-export async function getProfileTier(env: Env, ownerId: string): Promise<'free' | 'pro'> {
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/profiles`);
-  url.searchParams.set('id', `eq.${ownerId}`);
-  url.searchParams.set('select', 'tier');
-  url.searchParams.set('limit', '1');
-
-  const res = await call(env, url);
-  if (!res.ok) return 'free';
-  const rows = (await res.json()) as Array<{ tier: 'free' | 'pro' }>;
-  return rows[0]?.tier ?? 'free';
-}
+// getProfileTier used to live here. It is gone: share_lookup returns
+// owner_tier in the same row as the share, so the document route makes one
+// call where it made two. The direction of failure is unchanged — a missing
+// profile row, or a null tier, still reads as 'free' at the call site, which
+// is the safe way for the badge decision to fail.
 
 // 'ok' = correct password; 'bad' = wrong; 'rate_limited' = the RPC's per-slug
 // rate limiter tripped (5/min) — kept distinct so the recipient sees a "wait a

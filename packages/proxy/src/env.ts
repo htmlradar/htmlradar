@@ -22,6 +22,16 @@ export interface Env {
   // Comma-separated hosts that used to serve /r/ and now only redirect there.
   // Defaults to htmlradar.com. Empty for a self-hoster who never moved.
   LEGACY_HOSTS?: string;
+  // The trust layer's one gate setting
+  // (docs/workstreams/content-domain/TRUST-LAYER-DESIGN-2026-08-31.md).
+  // Three states:
+  //   ""   off. /r/{slug} serves the document exactly as it does today, and
+  //        the wrapper's frame and print routes are not-found.
+  //   list a comma-separated list of slugs, for QA shares only.
+  //   "*"  every share.
+  // Rolling back is this setting and one deploy; no database change either
+  // way, and no already-sent link changes its address in any state.
+  TRUST_WRAPPER?: string;
   // Git commit bound at deploy time (`wrangler deploy --var GIT_SHA:...` from
   // .github/workflows/deploy.yml); absent under `wrangler dev` and in tests.
   GIT_SHA?: string;

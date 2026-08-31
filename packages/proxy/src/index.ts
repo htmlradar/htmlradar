@@ -16,10 +16,25 @@
 //   POST /r/{slug}/email      email submission for allow-list shares
 //   GET  /r/{slug}/report     the recipient's abuse report form
 //   POST /r/{slug}/report     the report itself
+//   GET  /r/{slug}/frame      the document, inside the trust wrapper's frame
+//   GET  /r/{slug}/print      the document unframed, behind a signed grant
 //   GET  /r/{slug}/m/{att_id} downloads a supporting-material attachment
 //   GET  /r/_doc/{doc_id}     sender-side raw-doc preview (HMAC-gated)
 //   GET  /v1/tracker.js       the tracker, first-party to the document
 //   GET  /robots.txt          Disallow: / — SHARE_HOST is not a website
+//
+// THE TRUST WRAPPER. With TRUST_WRAPPER off — its shipped state — /r/{slug}
+// answers exactly as it always has and /frame and /print are not-found. Turned
+// on for a slug, /r/{slug} instead returns HTMLRadar's own thin page (see
+// wrapper.ts) with the document in a frame above a strip the sender cannot
+// remove, cover or intercept. The design is
+// docs/workstreams/content-domain/TRUST-LAYER-DESIGN-2026-08-31.md.
+//
+// WHICH HOST SERVES WHAT. Every share carries a stored hostname, `host_handle`
+// (schema/043), and routing follows THAT value rather than the owner's current
+// handle, so no link that has already been sent ever moves. See resolveHost
+// and enforceStoredHost below for the design's five rules; the check runs on
+// every route carrying a share identifier, not only the document route.
 //
 // Anything else on SHARE_HOST is a 404, and every response carries
 // X-Robots-Tag: noindex (see withNoIndex).
@@ -39,7 +54,6 @@ import {
   getShareBySlug,
   getDocument,
   reportAbuse,
-  getProfileTier,
   getAttachment,
   listAttachmentsForDocument,
   logAttachmentDownload,
@@ -56,17 +70,23 @@ import {
   issueAuthCookie,
   issueEmailCookie,
   issueOptOutToken,
+  issuePrintGrant,
   isTrackingOptedOut,
+  newPrintSecret,
+  printCookie,
+  readPrintCookie,
   verifyAuthCookie,
   verifyEmailCookie,
   verifyOptOutToken,
   verifyOwnerDocPreviewToken,
   verifyOwnerPreviewToken,
+  verifyPrintGrant,
   OPT_OUT_CLEAR_COOKIE,
   OPT_OUT_COOKIE,
 } from './auth.js';
 import { fetchDocumentHtml } from './fetch-html.js';
 import { geoFromRequest, injectTracker } from './inject.js';
+import { wrapperPage, FRAME_SANDBOX, OWN_PAGE_HEADER } from './wrapper.js';
 import {
   emailGateForm,
   expired,
@@ -164,11 +184,124 @@ function withNoIndex(res: Response, env: Env): Response {
   //
   // Interim hardening. Recipient documents should move to an origin that
   // holds no application cookies.
-  out.headers.append(
-    'Content-Security-Policy',
-    'sandbox allow-scripts allow-forms allow-popups allow-downloads',
-  );
+  //
+  // THE ONE EXEMPTION is the trust wrapper, HTMLRadar's own page, which holds
+  // no customer HTML and must keep a real origin: an opaque origin has no
+  // registrable domain, and the browser decides a request's "same-site"
+  // question from the top-level document's site, so a sandboxed wrapper would
+  // make its own frame request cross-site and the gate cookies would not be
+  // sent with it. wrapper.ts sets the marker; it never reaches the reader.
+  // Everything else on this worker — every response carrying customer HTML,
+  // frame and print alike, and the error path — is sandboxed here, once, so no
+  // future response shape can be added without it.
+  if (out.headers.has(OWN_PAGE_HEADER)) {
+    out.headers.delete(OWN_PAGE_HEADER);
+  } else {
+    out.headers.append('Content-Security-Policy', `sandbox ${FRAME_SANDBOX}`);
+  }
   return out;
+}
+
+/**
+ * Which hostname this request arrived on, in the only three shapes that mean
+ * anything: the apex, exactly one handle label under it, or a shape we refuse.
+ *
+ * Rule 4 of the design's routing: hostnames are accepted only as the apex or
+ * exactly one handle label. Extra levels and malformed labels get the same
+ * not-found response as an unknown handle and a mismatched owner, so probing
+ * the wildcard reveals nothing about who exists.
+ *
+ * Anything that is not the apex and not under it — a legacy host being served
+ * in place, a self-hoster's own host, localhost under `wrangler dev` — is
+ * treated as the apex, which is what those hosts have always been. This
+ * function only classifies hosts BELOW the share host, because those are the
+ * only ones the wildcard record can create.
+ */
+type HostKind = { kind: 'apex' } | { kind: 'handle'; handle: string } | { kind: 'refused' };
+
+const APEX: HostKind = { kind: 'apex' };
+
+// The handle format, matching the check constraint in schema/043 exactly:
+// three to twenty-four characters, no leading or trailing hyphen, no
+// consecutive hyphens, ASCII only. A hostname with an extra level fails it on
+// the dot, which is what makes rule 4 fall out of the same test.
+const HANDLE_LABEL = /^[a-z0-9](?:[a-z0-9-]{1,22})[a-z0-9]$/;
+
+function resolveHost(hostname: string, env: Env): HostKind {
+  const apex = shareHostOf(env).toLowerCase();
+  const host = hostname.toLowerCase();
+  if (host === apex) return APEX;
+  if (!host.endsWith(`.${apex}`)) return APEX;
+  const label = host.slice(0, -(apex.length + 1));
+  if (!HANDLE_LABEL.test(label) || label.includes('--')) return { kind: 'refused' };
+  return { kind: 'handle', handle: label };
+}
+
+/**
+ * The stored-hostname check, run on every route carrying a share identifier —
+ * the gates, the report form, the frame, print and attachment downloads — and
+ * not only on the document route, which would leave the others as ways to
+ * reach a share from the wrong host.
+ *
+ * Returns a response when the request must be answered here, and null when it
+ * may continue. The three rules it enforces:
+ *
+ *   1. Apex request, share stores no hostname: served in place. These are the
+ *      links already sent, and they work forever — no redirect, no repeated
+ *      gate. Every share that exists today is one of these.
+ *   2. Apex request, share stores a hostname: permanent redirect to it. Those
+ *      links were only ever printed in handle form, so no session is
+ *      disturbed. A method that carries a body redirects with 308, never 301,
+ *      which would turn a gate submission into a GET and drop what was typed.
+ *   3. A handle host that does not match the share's stored hostname: not
+ *      found, and identically so. Without this an abuser could have their own
+ *      document served on a rival's host, or on microsoft.htmlradar.page, and
+ *      poison a name they do not own.
+ */
+function enforceStoredHost(
+  host: HostKind,
+  share: Share,
+  url: URL,
+  method: string,
+  env: Env,
+): Response | null {
+  if (host.kind === 'refused') return notFound();
+  if (host.kind === 'handle') {
+    return share.host_handle === host.handle ? null : notFound();
+  }
+  if (!share.host_handle) return null;
+  const target = new URL(url.toString());
+  target.hostname = `${share.host_handle}.${shareHostOf(env)}`;
+  target.protocol = 'https:';
+  const status = method === 'GET' || method === 'HEAD' ? 301 : 308;
+  return new Response(null, { status, headers: { Location: target.toString() } });
+}
+
+// Back to the badge. Every refusal on the frame and print routes lands here
+// rather than dead-ending, because the wrapper is where a live grant is minted
+// and where the strip is. 302, not 301: the frame address is not permanently
+// the wrapper, it is only not one right now.
+const toWrapper = (slug: string): Response =>
+  new Response(null, { status: 302, headers: { Location: `/r/${slug}` } });
+
+/**
+ * The trust layer's gate, and the whole of its rollback.
+ *
+ * Empty or unset is off, and off means the deployed behaviour is what it was
+ * before any of this existed: /r/{slug} serves the document, /frame and
+ * /print are not-found. A comma-separated list turns it on for those slugs
+ * alone, which is how it reaches QA shares first; "*" turns it on for
+ * everybody.
+ */
+function wrapperEnabled(slug: string, env: Env): boolean {
+  const setting = (env.TRUST_WRAPPER ?? '').trim();
+  if (!setting) return false;
+  if (setting === '*') return true;
+  return setting
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(slug);
 }
 
 export default {
@@ -205,6 +338,13 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   if (wrongHost || wrongScheme) {
     return new Response(null, { status: 301, headers: { Location: url.toString() } });
   }
+
+  // Rule 4, before anything else looks at the path: a hostname that is neither
+  // the apex nor exactly one well-formed handle label under it answers the
+  // standard not-found, whatever was asked for. Applied here so an extra
+  // hostname level cannot reach a single route, share-bearing or not.
+  const host = resolveHost(url.hostname, env);
+  if (host.kind === 'refused') return notFound();
 
   if (url.pathname === TRACKER_PATH) {
     return fetch(env.TRACKER_URL);
@@ -275,10 +415,10 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     const slug = downloadMatch[1]!.toLowerCase();
     const attachmentId = downloadMatch[2]!;
     if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
-    return handleAttachmentDownload(request, slug, attachmentId, env);
+    return handleAttachmentDownload(request, slug, attachmentId, host, env);
   }
 
-  const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email|report))?\/?$/i.exec(url.pathname);
+  const match = /^\/r\/([a-z0-9-]+)(?:\/(auth|email|report|frame|print))?\/?$/i.exec(url.pathname);
   if (!match) return new Response('Not Found', { status: 404 });
   // Lowercased rather than redirected to the canonical form. Every stored
   // slug is lowercase (the format is enforced by the validate_share_slug
@@ -294,7 +434,17 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   // targets. Duplicate-URL indexing is not a concern because every response
   // carries X-Robots-Tag: noindex.
   const slug = match[1]!.toLowerCase();
-  const subroute = match[2];
+  const subroute = match[2]?.toLowerCase();
+  // The two routes the trust wrapper adds. Both serve customer HTML and both
+  // are gated exactly as the document route is; `framed` also chooses the
+  // quieter answer at each gate, because a frame is not a page a person reads
+  // an explanation on.
+  const framed = subroute === 'frame' || subroute === 'print';
+
+  // GATE. Off is how this ships, and off means these two routes do not exist:
+  // the standard not-found, before any lookup, so nothing about the share
+  // leaks and no disabled-open alert fires.
+  if (framed && !wrapperEnabled(slug, env)) return notFound();
 
   // Read-tracking opt-out. Handled before the share lookup: the preference is
   // browser-wide, not per-share, so it should not depend on this particular
@@ -314,6 +464,41 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 
   const share = await getShareBySlug(env, slug);
   if (!share) return notFound();
+
+  // Which host may serve THIS share, before any gate answers. Covers the
+  // document, both gate submissions, the report form, the frame and print;
+  // the attachment route runs the same check against its own lookup.
+  const wrongStoredHost = enforceStoredHost(host, share, url, request.method, env);
+  if (wrongStoredHost) return wrongStoredHost;
+
+  // The frame route refuses to be a top-level page.
+  //
+  // If a sender emails the frame address to skip the badge, the browser sends
+  // Sec-Fetch-Dest: document — a header browsers write and page scripts cannot
+  // forge. Anything other than `iframe`, its absence included, is sent to the
+  // wrapper, which is where the badge is.
+  //
+  // After the stored-hostname check, not before it, so that a request on a
+  // host this share was never created for gets the same not-found as every
+  // other route rather than a redirect that says the route exists.
+  if (subroute === 'frame' && request.headers.get('Sec-Fetch-Dest') !== 'iframe') {
+    return toWrapper(slug);
+  }
+
+  // The print grant. Missing, expired, wrong-slug, wrong-hostname or
+  // wrong-browser all land on the wrapper, where a live one is minted, so a
+  // genuine reader whose grant simply aged out is never dead-ended — they are
+  // put back in front of the badge, which is the point.
+  if (subroute === 'print') {
+    const granted = await verifyPrintGrant(
+      url.searchParams.get('g'),
+      slug,
+      url.hostname,
+      request.headers.get('cookie'),
+      env.SESSION_SECRET,
+    );
+    if (!granted) return toWrapper(slug);
+  }
 
   // The abuse report, answered before the revoked/expired branch below.
   //
@@ -341,6 +526,17 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     ? await verifyOwnerPreviewToken(previewToken, slug, env.SESSION_SECRET)
     : false;
 
+  const isDisabled =
+    !!share.revoked_at || !!(share.expires_at && new Date(share.expires_at).getTime() < Date.now());
+
+  // A revoked or expired share is answered on the wrapper's own address, where
+  // the reader gets the explanation and the owner gets the one alert. The
+  // frame and print routes are reachable only by someone who went round that,
+  // so they answer not-found and fire nothing: a second alert per open would
+  // be noise, and telling a phishing sender that somebody came back to their
+  // dead link is the one thing this path must never do.
+  if (framed && isDisabled) return notFound();
+
   if (!isOwnerPreview) {
     // A disabled open serves an error shell and loads no tracker, so this
     // is the only place we learn the recipient tried. Fire-and-forget an
@@ -366,9 +562,15 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   }
 
   // Gate sequence: password (if required) → email (if allow-listed) → content.
+  //
+  // The frame and print routes repeat every check the document route makes,
+  // and answer not-found rather than a gate form: a gate rendered inside the
+  // frame would ask for a password under a badge that says the document is
+  // already open, and print is not a page anybody types into. Both are reached
+  // only through the wrapper, which shows the gate at its own address.
   if (share.require_password && !isOwnerPreview) {
     const cookie = await verifyAuthCookie(request.headers.get('cookie'), slug, env.SESSION_SECRET);
-    if (!cookie) return passwordForm(slug);
+    if (!cookie) return framed ? notFound() : passwordForm(slug);
   }
 
   // Hard-gate the document on a verified email whenever require_email
@@ -394,7 +596,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   let verifiedEmail: string | undefined;
   if (share.require_email && !isOwnerPreview) {
     const cookie = await verifyEmailCookie(request.headers.get('cookie'), slug, env.SESSION_SECRET);
-    if (!cookie) return emailGateForm(slug);
+    if (!cookie) return framed ? notFound() : emailGateForm(slug);
     // Re-check the cookie's email against
     // the share's CURRENT allowlist on every request — not just at
     // gate-submission time. If the sender tightened the allowlist
@@ -405,9 +607,41 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     // (so vanilla require_email shares keep working), and for the
     // owner-preview path which already short-circuits above.
     if (!isEmailAllowed(share, cookie.email)) {
-      return emailGateForm(slug, 'This document is no longer shared with your address.');
+      return framed
+        ? notFound()
+        : emailGateForm(slug, 'This document is no longer shared with your address.');
     }
     verifiedEmail = cookie.email;
+  }
+
+  // Every gate has passed, so the wrapper may be served. It is HTMLRadar's own
+  // page and needs nothing from the document: the frame route below fetches
+  // that, one extra request on the same connection to the same worker.
+  //
+  // The owner's own preview is deliberately NOT wrapped. The badge is a
+  // recipient-facing control, the preview token already bypasses every other
+  // recipient gate, and a sender checking their own rendering should see their
+  // own document.
+  //
+  // ponytail: no document check here, so a share whose document was deleted
+  // shows the wrapper with a not-found inside the frame rather than a clean
+  // not-found page. Buying the tidier answer costs a second database call on
+  // every open, which is the call this design just removed.
+  if (!subroute && !isOwnerPreview && wrapperEnabled(slug, env)) {
+    // Printing is already blocked on a locked deck, so its strip carries no
+    // Print link and no print cookie is minted for it.
+    const existingSecret = readPrintCookie(request.headers.get('cookie'));
+    const printSecret = share.lock_deck ? null : (existingSecret ?? newPrintSecret());
+    const grant = printSecret
+      ? await issuePrintGrant(slug, url.hostname, printSecret, env.SESSION_SECRET)
+      : null;
+    return wrapperPage({
+      slug,
+      printHref: grant ? `/r/${slug}/print?g=${grant}` : null,
+      // Only when it is new. Re-minting on every load would kill the grant a
+      // second tab on the same share is holding.
+      setCookie: printSecret && printSecret !== existingSecret ? printCookie(printSecret) : null,
+    });
   }
 
   const doc = await getDocument(env, share.document_id);
@@ -416,7 +650,10 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   const html = await fetchDocumentHtml(doc, env);
   if (!html) return sourceUnreachable();
 
-  const tier = await getProfileTier(env, doc.owner_id);
+  // Came back with the share, from share_lookup. A missing profile row leaves
+  // it null, which reads as free — the safe direction for the badge decision
+  // to fail, since the other way silently gives the paid feature away.
+  const tier = share.owner_tier ?? 'free';
   const geo = geoFromRequest(request);
 
   // Attachments are ALWAYS surfaced to the recipient when they exist
@@ -436,7 +673,13 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   return injectTracker(html, {
     share,
     tier,
-    trackingEnabled: !isOwnerPreview && !optedOut,
+    // frame-ancestors 'self' and no X-Frame-Options, on that route alone.
+    framed: subroute === 'frame',
+    // Print is a second view of a document the reader already opened, so it
+    // does not start a session of its own. Today's Cmd+P on the unwrapped page
+    // does not either, and a print address that carried a viewer's identity
+    // would be a worse thing to leave in a browser's history.
+    trackingEnabled: subroute !== 'print' && !isOwnerPreview && !optedOut,
     trackerUrl: TRACKER_PATH,
     supabaseUrl: env.SUPABASE_URL,
     supabaseAnonKey: env.SUPABASE_ANON_KEY,
@@ -652,10 +895,17 @@ async function handleAttachmentDownload(
   request: Request,
   slug: string,
   attachmentId: string,
+  host: HostKind,
   env: Env,
 ): Promise<Response> {
   const share = await getShareBySlug(env, slug);
   if (!share) return notFound();
+  // The same stored-hostname check the document route makes. Without it this
+  // route would be a way to reach a share from a host it was never created
+  // for — which is exactly the gap the design says leaving the check on the
+  // document route alone would leave.
+  const wrongStoredHost = enforceStoredHost(host, share, new URL(request.url), request.method, env);
+  if (wrongStoredHost) return wrongStoredHost;
   if (share.revoked_at) return notFound();
   if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
     return notFound();

@@ -48,6 +48,34 @@ SHARE_HOST = "htmlradar.page"
 # data is touched either way.
 LEGACY_HOSTS = "htmlradar.com"
 
+# The trust layer's one gate setting, and the whole of its rollback.
+# Design: docs/workstreams/content-domain/TRUST-LAYER-DESIGN-2026-08-31.md.
+#
+# Three states:
+#   ""   OFF — how it ships. /r/{slug} serves the document exactly as it did
+#        before any of this existed, and /r/{slug}/frame and /r/{slug}/print
+#        answer the standard not-found. Nothing a recipient sees changes.
+#   "a,b" a comma-separated slug list. Gate 1: the QA shares only.
+#   "*"  every share. Gate 3, and only after the real-device comparison in the
+#        design's "What wrapping does to the tracker" has passed.
+#
+# Rolling back is this value and one deploy. No database change either way, and
+# no already-sent link changes its address in any state.
+TRUST_WRAPPER = ""
+
+# WILDCARD ROUTE, NOT YET INSTALLED. Per-customer hostnames need one wildcard
+# DNS record (*.htmlradar.page, proxied) and one more route here:
+#
+#   [[routes]]
+#   pattern = "*.htmlradar.page/*"
+#   zone_name = "htmlradar.page"
+#
+# The stored-hostname check ships FIRST, in this commit, deliberately: a
+# wildcard route live before that check would briefly let any handle host serve
+# any customer's document. Installing the record and the route is the
+# operations half of Gate 0, and until it happens no handle host resolves, so
+# every rule in resolveHost/enforceStoredHost is inert in production.
+
 # Secrets — set via `wrangler secret put`:
 #   SUPABASE_URL
 #   SUPABASE_SERVICE_ROLE_KEY

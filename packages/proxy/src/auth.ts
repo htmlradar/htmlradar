@@ -212,6 +212,97 @@ export async function verifyOptOutToken(
   return constantTimeEqual(mac, expected);
 }
 
+// The print grant, and why printing needs one.
+//
+// A browser printing a page that contains a frame prints only the part on
+// screen, so Cmd+P breaks inside the wrapper and the strip has to offer Print
+// itself. The first draft answered with a public /r/{slug}?print=1 address,
+// and that was a way ROUND the badge: a sender could email it directly or hide
+// it behind a fake strip, and the only HTMLRadar mark on it is the free-tier
+// footer injected into the sender's own document, which the sender's own code
+// can remove.
+//
+// So the print address is not public. Serving the wrapper sets a random,
+// script-inaccessible cookie — HttpOnly, so the framed document cannot read
+// it, and no Domain attribute, so it belongs to that exact hostname — and the
+// strip's Print link carries a grant signed over the slug, that hostname and
+// the cookie's value, with ten minutes' life.
+//
+// Four properties follow, and they are what print-grant.test.ts pins:
+//   - copied into another browser, the grant has no matching cookie: dead.
+//   - copied to another share, the slug does not match: dead.
+//   - copied to another hostname, the hostname does not match: dead.
+//   - kept for a quarter of an hour: expired.
+// Every one of those redirects to the wrapper, where a live grant is minted,
+// so a genuine reader is never dead-ended — they are put back in front of the
+// badge, which is the whole point.
+//
+// Format `{expiry}.{hex hmac}`, hex so the value needs no encoding thought in
+// an href. Message is prefixed `print:`, so no other token in this file can be
+// replayed as one of these, or one of these as another.
+const PRINT_COOKIE_NAME = 'hr_print';
+const PRINT_GRANT_TTL_SECONDS = 10 * 60;
+// A day, so a reader who leaves the tab open overnight and prints in the
+// morning re-uses the same binding rather than losing it. The GRANT is the
+// short-lived half; this is only the thing it is bound to.
+const PRINT_COOKIE_MAX_AGE = 24 * 60 * 60;
+
+// Path=/r/ like the opt-out cookie: sent with the print route, sent with
+// nothing outside the recipient namespace.
+export function printCookie(secret: string): string {
+  return `${PRINT_COOKIE_NAME}=${secret}; Path=/r/; Max-Age=${PRINT_COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export function readPrintCookie(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null;
+  const raw = parseCookies(cookieHeader)[PRINT_COOKIE_NAME];
+  return raw && /^[0-9a-f]{32}$/.test(raw) ? raw : null;
+}
+
+export function newPrintSecret(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function issuePrintGrant(
+  slug: string,
+  hostname: string,
+  cookieSecret: string,
+  secret: string,
+): Promise<string> {
+  const expiresAt = Math.floor(Date.now() / 1000) + PRINT_GRANT_TTL_SECONDS;
+  const mac = await hmacHex(printMessage(slug, hostname, cookieSecret, expiresAt), secret);
+  return `${expiresAt}.${mac}`;
+}
+
+export async function verifyPrintGrant(
+  grant: string | null,
+  slug: string,
+  hostname: string,
+  cookieHeader: string | null,
+  secret: string,
+): Promise<boolean> {
+  if (!grant) return false;
+  const cookieSecret = readPrintCookie(cookieHeader);
+  if (!cookieSecret) return false;
+  const parts = grant.split('.');
+  if (parts.length !== 2) return false;
+  const [expiryStr, mac] = parts as [string, string];
+  const expiresAt = Number.parseInt(expiryStr, 10);
+  if (!Number.isFinite(expiresAt)) return false;
+  if (expiresAt < Math.floor(Date.now() / 1000)) return false;
+  const expected = await hmacHex(printMessage(slug, hostname, cookieSecret, expiresAt), secret);
+  return constantTimeEqual(mac, expected);
+}
+
+const printMessage = (
+  slug: string,
+  hostname: string,
+  cookieSecret: string,
+  expiresAt: number,
+): string => `print:${slug}|${hostname.toLowerCase()}|${cookieSecret}|${expiresAt}`;
+
 // The rate-limit identity for an abuse report, and the only thing about the
 // reporter that leaves this worker.
 //

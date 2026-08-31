@@ -1,9 +1,13 @@
 import type { Attachment, Share } from './supabase.js';
 import { escapeHtml } from './escape.js';
+import { FRAME_PERMISSIONS_POLICY } from './wrapper.js';
 
 interface InjectOptions {
   share: Share;
   tier: 'free' | 'pro';
+  // True only on /r/{slug}/frame, the response the trust wrapper puts in its
+  // frame. It is the one response allowed to be framed, and only by us.
+  framed?: boolean;
   trackingEnabled: boolean;
   trackerUrl: string;
   supabaseUrl: string;
@@ -90,7 +94,21 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
   const out = rewriter.transform(html);
   const headers = new Headers(out.headers);
   headers.set('Cache-Control', 'private, max-age=0, must-revalidate');
-  headers.set('X-Frame-Options', 'DENY');
+  if (opts.framed) {
+    // X-Frame-Options is deliberately ABSENT on this one route. It is the
+    // older instruction and it would override the newer frame-ancestors
+    // below, so leaving it here would stop the wrapper framing the document
+    // it exists to frame. Every other response still carries DENY.
+    //
+    // The two features that can paint outside a frame's rectangle are denied
+    // here as well as on the wrapper and on the frame element — three places,
+    // because a strip that can be covered is not a control.
+    headers.set('Permissions-Policy', FRAME_PERMISSIONS_POLICY);
+  } else {
+    headers.set('X-Frame-Options', 'DENY');
+  }
+  // NOT no-referrer, on either path. The first draft of the trust layer set it
+  // and would have blanked the referral source the tracker records today.
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   headers.set('X-Content-Type-Options', 'nosniff');
   // Minimal CSP. Customer HTML may contain arbitrary inline scripts/styles,
@@ -104,9 +122,13 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
   // calls preventDefault and sends the address with fetch, which form-action
   // does not govern, and the proxy's gate and opt-out pages are separate
   // responses that never carry this header.
+  //
+  // frame-ancestors: 'none' everywhere except the framed route, where it
+  // becomes 'self' — the single relaxation the trust layer makes. The wrapper
+  // and the frame share a host, so 'self' names exactly one framer: us.
   headers.set(
     'Content-Security-Policy',
-    `frame-ancestors 'none'; base-uri 'none'; form-action 'none';`,
+    `frame-ancestors ${opts.framed ? "'self'" : "'none'"}; base-uri 'none'; form-action 'none';`,
   );
   return new Response(out.body, { status: out.status, headers });
 }

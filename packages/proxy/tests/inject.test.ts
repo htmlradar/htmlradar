@@ -345,6 +345,65 @@ describe('document response headers', () => {
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("base-uri 'none'");
   });
+
+  // The trust wrapper's frame route, and the exact headers the design gives it
+  // (TRUST-LAYER-DESIGN-2026-08-31.md, "The exact frame arrangement"). The
+  // route's own behaviour — the gate, Sec-Fetch-Dest, the gates repeated — is
+  // frame-route.test.ts; what a served frame response CARRIES is here, where
+  // the real injectTracker can run.
+  describe('the framed response', () => {
+    const framed = () =>
+      injectTracker(new Response('<html><head></head><body></body></html>'), {
+        share: makeShare({ lock_deck: false }),
+        ...opts,
+        framed: true,
+      });
+
+    it('allows exactly one framer, which is the wrapper on the same host', async () => {
+      // The only relaxation the trust layer makes to today's document policy.
+      const csp = framed().headers.get('Content-Security-Policy') ?? '';
+      expect(csp).toContain("frame-ancestors 'self'");
+      expect(csp).not.toContain("frame-ancestors 'none'");
+    });
+
+    it('drops X-Frame-Options on that route alone', async () => {
+      // It is the older instruction and it would override the newer
+      // frame-ancestors, so leaving it would stop the wrapper framing the
+      // document it exists to frame.
+      expect(framed().headers.get('X-Frame-Options')).toBeNull();
+      const unframed = injectTracker(new Response('<html><head></head><body></body></html>'), {
+        share: makeShare({ lock_deck: false }),
+        ...opts,
+      });
+      expect(unframed.headers.get('X-Frame-Options')).toBe('DENY');
+    });
+
+    it('denies the two features that can paint outside a frame', async () => {
+      // Fullscreen, and video Picture-in-Picture, which floats a window over
+      // everything and is allowed by default unless turned off. Denied here,
+      // on the wrapper's own header, and on the frame element — three places,
+      // because a strip that can be covered is not a control.
+      const pp = framed().headers.get('Permissions-Policy') ?? '';
+      expect(pp).toBe('fullscreen=(), picture-in-picture=()');
+    });
+
+    it('keeps everything else about the document policy as it is today', async () => {
+      const csp = framed().headers.get('Content-Security-Policy') ?? '';
+      expect(csp).toContain("base-uri 'none'");
+      expect(csp).toContain("form-action 'none'");
+      expect(framed().headers.get('X-Content-Type-Options')).toBe('nosniff');
+      expect(framed().headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
+    });
+
+    it('does not blank the referrer, which the tracker records as the referral source', async () => {
+      // The first draft set no-referrer on wrapper and frame and would have
+      // destroyed a field we store. What must not leak to the sender is the
+      // recipient's identity, and that is kept out of the frame address
+      // instead.
+      expect(framed().headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+      expect(framed().headers.get('Referrer-Policy')).not.toBe('no-referrer');
+    });
+  });
 });
 
 // Regression guard for the 2026-07-08 incident: a customer uploaded an HTML

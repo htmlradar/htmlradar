@@ -52,7 +52,6 @@ vi.mock('../src/supabase.js', async () => {
     ...actual,
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
     getDocument: vi.fn(async () => doc),
-    getProfileTier: vi.fn(async () => 'free'),
     listAttachmentsForDocument: vi.fn(async () => []),
     getAttachment: vi.fn(async () => null),
     logAttachmentDownload: vi.fn(async () => undefined),

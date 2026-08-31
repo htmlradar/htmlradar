@@ -57,7 +57,6 @@ vi.mock('../src/supabase.js', async () => {
     ...actual,
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
     getDocument: vi.fn(async () => doc),
-    getProfileTier: vi.fn(async () => 'free'),
     // No attachment by this id. Enough to prove the download path was handled
     // where the request arrived rather than redirected away from it.
     getAttachment: vi.fn(async () => null),

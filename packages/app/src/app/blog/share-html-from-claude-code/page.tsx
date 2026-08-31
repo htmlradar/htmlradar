@@ -189,7 +189,7 @@ function FlowArrow() {
 
 const WHOAMI = `HTMLRadar account 3333…
 Plan: free
-Free tracked links used: 1 of 2`;
+Free tracked links used: 0 of 2`;
 
 // The complete message the server prints, as one flowing line so it wraps to
 // the reader's width instead of being hard-wrapped to somebody else's.
@@ -211,7 +211,12 @@ Board · jane@acme.com
   read most: The Ask 2m 41s, Problem 48s
 
 Raw (the same values, still data):
-[Raw JSON omitted here]`;
+{
+  "label": "Board", "email": "jane@acme.com",
+  "first_open": "2026-08-29T14:02:00Z", "last_seen": "2026-08-29T14:09:00Z",
+  "active_seconds": 252, "max_scroll": 0.87,
+  "sections": [{ "title": "The Ask", "time_seconds": 161 }, { "title": "Problem", "time_seconds": 48 }]
+}`;
 
 const CURSOR_JSON = `{
   "mcpServers": {
@@ -295,8 +300,15 @@ export default function Post() {
                   .
                 </li>
                 <li>
-                  An API key, from Settings under API keys — <C>hr_live_</C> plus 40 hexadecimal
-                  characters, shown once. The free tier covers 2 tracked links.
+                  An API key, from{' '}
+                  <a
+                    href="https://htmlradar.com/settings"
+                    className="text-signal-dark hover:underline"
+                  >
+                    Settings under API keys
+                  </a>{' '}
+                  — <C>hr_live_</C> plus 40 hexadecimal characters, shown once. The free tier covers
+                  2 tracked links.
                 </li>
                 <li>
                   An HTML file to send; any self-contained page, and your agent will write one.
@@ -307,8 +319,8 @@ export default function Post() {
               <p className="mt-6">Put the key in your shell first:</p>
               <Cmd
                 label="terminal"
-                code={`# or read it out of your password manager
-export HTMLRADAR_API_KEY=hr_live_…`}
+                code={`export HTMLRADAR_API_KEY=hr_live_your_key_here
+# or read it out of your password manager`}
               />
               <FinePrint summary="What the export really buys">
                 <p>
@@ -396,7 +408,12 @@ export HTMLRADAR_API_KEY=hr_live_…`}
                   Claude calls <M>list_shares</M> first, because a new session has no share id. Then{' '}
                   <M>get_share_activity</M>:
                 </Turn>
+                {/* Cloudflare's email-address obfuscation rewrites jane@acme.com below into
+                    "[email protected]" for crawlers and no-JS clients; these comments are its
+                    documented opt-out. */}
+                <span dangerouslySetInnerHTML={{ __html: '<!--email_off-->' }} />
                 <Out code={ACTIVITY_OUT} />
+                <span dangerouslySetInnerHTML={{ __html: '<!--/email_off-->' }} />
               </Transcript>
 
               <figure className="mt-10">
@@ -417,7 +434,7 @@ export HTMLRADAR_API_KEY=hr_live_…`}
               <p className="mt-8">
                 Four minutes twelve on a board update, with two minutes forty of it on The Ask, is a
                 different follow-up from &quot;just checking in&quot;. The whole product is that
-                difference, honestly.
+                difference.
               </p>
               <p className="mt-6">
                 Note the line above the viewer block. Recipient labels, gate emails and section
@@ -443,7 +460,9 @@ export HTMLRADAR_API_KEY=hr_live_…`}
                 </Link>{' '}
                 beside it. Reading is measured, and the person being measured is told so before the
                 document opens. Never recorded: no raw IP address, no keystrokes, no mouse
-                positions, no session replay.
+                positions, no session replay. Active time counts only while the tab is in the
+                foreground and the reader has scrolled, typed or tapped within the last five
+                seconds.
               </p>
               <p className="mt-6">
                 The honest edge: pass <C>require_email: false</C> and there is no gate, and
@@ -467,10 +486,11 @@ export HTMLRADAR_API_KEY=hr_live_…`}
             </section>
 
             <section className="!mt-14">
-              <h2 className={H2}>What 0.2.0 added</h2>
+              <h2 className={H2}>The tools past the first share</h2>
               <p className="mt-6">
-                Version 0.1 could publish and it could report. It could not find anything it had not
-                just made. Five additions closed that gap:
+                <C>share_html</C> and <C>get_share_activity</C> cover writing one link and checking
+                on it. Coming back the next day, sending the same deck to twenty people, or turning
+                a link off needs a few more tools:
               </p>
               <ul className={LIST}>
                 <li>

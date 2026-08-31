@@ -8,7 +8,9 @@ workers_dev = false  # cron-only worker, no HTTP entrypoint exposed
 # 15-min-or-less regression before the founder checks email.
 [triggers]
 # Second cron: 04:00 UTC / 09:30 IST — daily thread scan, Telegram only.
-crons = ["*/5 * * * *", "0 4 * * *"]
+# Third cron: 03:30 UTC — daily maintenance sentinel, half an hour before the
+# scan so the scan_run row it reads is yesterday's finished one.
+crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *"]
 
 # Non-sensitive config travels in [vars] so they're visible in the
 # wrangler.toml diff. Everything else is a Worker secret, set once with

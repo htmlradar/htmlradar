@@ -32,6 +32,11 @@
 // we already own. Replay failures log to console, never email — a
 // lagging dashboard is not pageable.
 //
+// And a second daily job that watches the company rather than the product: the
+// maintenance sentinel at 03:30 UTC (see sentinel below), which reports the
+// machine-checkable duties in docs/control/MAINTENANCE-REGISTER.md and whether
+// any maintenance session has stamped a heartbeat in the last two days.
+//
 // And one job that isn't monitoring at all: a once-a-day scan of Hacker News
 // and Reddit for people asking the question this product answers, Telegrammed
 // to the founder so he can reply as himself (see scanThreads). It lives here
@@ -599,7 +604,7 @@ async function scanReddit(query: string, sinceMs: number): Promise<ScanResult> {
 // The chat id does, because it is not a secret (it is the founder's own chat)
 // and without it a row can't be attributed to a destination.
 
-type OutboxKind = 'alert' | 'scan' | 'scan_run' | 'test';
+type OutboxKind = 'alert' | 'scan' | 'scan_run' | 'test' | 'heartbeat' | 'sentinel';
 
 interface OutboxRow {
   kind: OutboxKind;
@@ -768,6 +773,197 @@ export async function scanThreads(env: Env, gapMs: number = SCAN_QUERY_GAP_MS): 
   console.log(`[scan] ${sent} of ${hits.size} item(s) sent — telegram ok:${ok}`);
 }
 
+// ---------------------------------------------------------------------------
+// Daily maintenance sentinel.
+//
+// docs/control/MAINTENANCE-REGISTER.md lists the duties that never close — the
+// abuse queue, failed notification emails, yesterday's thread scan. Reading
+// them was a thing a session did by hand, which means "nobody looked for two
+// days" and "somebody looked and all was well" left the same trace: none.
+//
+// This is the machine-checkable half of that register, once a day, plus one
+// check on the human half: has any maintenance session stamped a heartbeat in
+// the last 48 hours? A sentinel that only watched the database would go on
+// reporting all-clear through a fortnight of nobody running the register at
+// all, which is the failure it exists to catch.
+//
+// 03:30 UTC, half an hour BEFORE the 04:00 thread scan, so the scan_run row it
+// looks for is yesterday's finished run (23.5 hours old) rather than today's
+// still-running one. That is also why the window is 26 hours: the same slack
+// scanThreads gives itself.
+//
+// Quiet by default. A clean run says nothing at all — a daily "all fine" is
+// how a channel gets muted — except on Monday, when one line proves the cron
+// is alive and reports how fresh the heartbeat is. Everything it does say goes
+// out as ONE message: six findings are one glance, six messages are noise.
+//
+// Every check runs inside its own try/catch, so a failure in one cannot hide
+// the other five, and a check that could not run at all is reported as
+// "check unavailable" rather than silently counting as clean. An unreadable
+// table is not an empty table.
+
+const SENTINEL_WINDOW_MS = 24 * 60 * 60_000;
+// Matches scanThreads' own 26-hour window — see above.
+const SENTINEL_SCAN_WINDOW_MS = 26 * 60 * 60_000;
+const HEARTBEAT_STALE_HOURS = 48;
+// One finding is one line; a run of 429s must not push the message past
+// Telegram's 4096-char cap.
+const SENTINEL_DETAIL_CHARS = 300;
+
+interface AbuseRow {
+  reason: string;
+  document_id: string | null;
+}
+
+interface ScanRunRow {
+  created_at: string;
+  meta: { fetches?: ScanFetch[]; total_items?: number } | null;
+}
+
+/**
+ * `nowMs` is the scheduled event's timestamp, not Date.now(): the Monday
+ * all-clear keys off it, and passing it in is what makes both that and the
+ * heartbeat arithmetic testable without freezing the clock.
+ */
+export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<void> {
+  const headers = {
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+  const since = (ms: number) => encodeURIComponent(new Date(nowMs - ms).toISOString());
+
+  const findings: string[] = [];
+  const meta: Record<string, unknown> = {};
+
+  // One runner so every check gets the same isolation and the same wording for
+  // "this check could not run", without five copies of the same try/catch.
+  const run = async (name: string, check: () => Promise<string | null>): Promise<void> => {
+    try {
+      const finding = await check();
+      if (finding) findings.push(finding);
+    } catch (err) {
+      findings.push(`check unavailable: ${name} — ${(err as Error).message}`);
+    }
+  };
+
+  // Abuse queue. Recipient reports name a share; the upload screen's automated
+  // flags name a document (schema/039), and they are different work — a report
+  // is somebody complaining, a flag is a heuristic firing.
+  await run('abuse_reports', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/abuse_reports` +
+        `?created_at=gte.${since(SENTINEL_WINDOW_MS)}&select=reason,document_id`,
+      { headers },
+    );
+    if (!res.ok) throw new Error(`abuse_reports read HTTP ${res.status}`);
+    const rows = (await res.json()) as AbuseRow[];
+    meta['abuse_reports'] = rows.length;
+    if (rows.length === 0) return null;
+    const flags = rows.filter((r) => r.document_id).length;
+    const reasons = [...new Set(rows.map((r) => r.reason))].join(', ');
+    return (
+      `abuse: ${rows.length} new in 24h — ${rows.length - flags} recipient report(s), ` +
+      `${flags} automated flag(s) [${reasons}]`
+    );
+  });
+
+  // Failed notification emails. The 5-minute cron already alarms on a 30-minute
+  // window; this is the register's 2-day duty, so it looks back a full day and
+  // catches anything that failed and healed while nobody was watching.
+  await run('notifications_log', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/notifications_log` +
+        `?status=eq.failed&created_at=gte.${since(SENTINEL_WINDOW_MS)}&select=count`,
+      { headers: { ...headers, Prefer: 'count=exact' } },
+    );
+    if (!res.ok) throw new Error(`notifications_log read HTTP ${res.status}`);
+    const failed = parseInt((res.headers.get('content-range') ?? '0-0/0').split('/')[1] ?? '0', 10);
+    meta['notifications_failed'] = failed;
+    return failed > 0
+      ? `notifications: ${failed} email(s) failed in 24h — see notifications_log`
+      : null;
+  });
+
+  // Yesterday's thread scan. A missing scan_run row is the finding schema/038
+  // was written for: it is what a cron that never fired looks like.
+  await run('scan_run', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+        `?kind=eq.scan_run&created_at=gte.${since(SENTINEL_SCAN_WINDOW_MS)}` +
+        `&order=created_at.desc&limit=1&select=created_at,meta`,
+      { headers },
+    );
+    if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
+    const row = ((await res.json()) as ScanRunRow[])[0];
+    if (!row) {
+      meta['scan_run'] = null;
+      return 'thread scan: no scan_run row in the last 26h — the 04:00 UTC scan did not run, or could not write its row';
+    }
+    const fetches = row.meta?.fetches ?? [];
+    const items = row.meta?.total_items ?? 0;
+    const bad = fetches.filter((f) => f.error || f.status !== 200);
+    meta['scan_run'] = { at: row.created_at, items, fetches: fetches.length, failed: bad.length };
+    if (bad.length === 0) return null;
+    const detail = bad
+      .map((f) => `${f.source} ${f.query}: ${f.error ?? `HTTP ${f.status}`}`)
+      .join('; ');
+    return (
+      `thread scan: ${items} item(s), ${bad.length} of ${fetches.length} fetch(es) failed — ` +
+      detail.slice(0, SENTINEL_DETAIL_CHARS)
+    );
+  });
+
+  // The human half. Infinity when there is no heartbeat row at all, which
+  // reads as infinitely stale and needs no second branch in the comparison.
+  let heartbeatHours = Infinity;
+  await run('heartbeat', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+        `?kind=eq.heartbeat&order=created_at.desc&limit=1&select=created_at`,
+      { headers },
+    );
+    if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
+    const row = ((await res.json()) as { created_at: string }[])[0];
+    if (row) {
+      heartbeatHours = Math.round(((nowMs - Date.parse(row.created_at)) / 3_600_000) * 10) / 10;
+    }
+    meta['heartbeat_hours'] = heartbeatHours;
+    if (heartbeatHours <= HEARTBEAT_STALE_HOURS) return null;
+    return (
+      'heartbeat: no maintenance session has stamped the register in two days ' +
+      (Number.isFinite(heartbeatHours)
+        ? `(last ${heartbeatHours}h ago)`
+        : '(no heartbeat row ever)')
+    );
+  });
+
+  if (findings.length > 0) {
+    // Plain text, no parse_mode: a stray underscore in a thread title or an
+    // error string must not 400 the whole message.
+    const text = [
+      `HTMLRadar sentinel — ${new Date(nowMs).toISOString().slice(0, 10)}`,
+      ...findings.map((f) => `• ${f}`),
+    ].join('\n');
+    await sendTelegram(env, 'sentinel', 'maintenance-sentinel', text, {
+      ...meta,
+      findings: findings.length,
+    });
+    return;
+  }
+
+  // Clean. Silent every day but Monday, when one line is the proof that the
+  // silence means "checked and fine" rather than "cron is dead".
+  if (new Date(nowMs).getUTCDay() === 1) {
+    await sendTelegram(
+      env,
+      'sentinel',
+      'maintenance-sentinel',
+      `Sentinel: all clear this week; last heartbeat ${heartbeatHours}h ago`,
+      meta,
+    );
+  }
+}
+
 export default {
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // The daily 04:00 UTC trigger (see wrangler.toml) is the thread scan and
@@ -777,6 +973,17 @@ export default {
       await scanThreads(env).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[scan] failed:', (err as Error).message);
+      });
+      return;
+    }
+
+    // 03:30 UTC: the daily maintenance sentinel, also on its own. It reads the
+    // event's own timestamp rather than the clock so the Monday all-clear
+    // fires on the schedule's Monday, not on a retry's.
+    if (event.cron === '30 3 * * *') {
+      await sentinel(env, event.scheduledTime).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[sentinel] failed:', (err as Error).message);
       });
       return;
     }

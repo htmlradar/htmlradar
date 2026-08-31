@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type Env, recordOutbox, scanThreads, sendTelegram } from '../src/index.js';
+import { type Env, recordOutbox, sendTelegram } from '../src/index.js';
 
 // The outbox is the answer to a question nobody could answer before: what did
 // this worker actually say, and when it said nothing, why?
@@ -171,113 +171,5 @@ describe('the receipt never costs the founder the message', () => {
     await expect(
       recordOutbox(env, { kind: 'test', source: 'manual', message: 'x', telegram_ok: null }),
     ).resolves.toBeUndefined();
-  });
-});
-
-describe('a scan run is recorded even when it says nothing', () => {
-  // The empty feeds both sources answer with when there is genuinely nothing.
-  const emptyHN = new Response(JSON.stringify({ hits: [] }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
-  const emptyReddit = new Response('<feed></feed>', {
-    status: 200,
-    headers: { 'content-type': 'application/atom+xml' },
-  });
-
-  it('writes one scan_run row with zero items and sends no message', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { outbox, telegram } = stubWorld((url) => {
-      if (url.startsWith('https://hn.algolia.com')) return emptyHN;
-      if (url.startsWith('https://www.reddit.com')) return emptyReddit;
-      return null;
-    });
-
-    await scanThreads(env, 0);
-
-    expect(telegram).toHaveLength(0);
-    expect(outbox).toHaveLength(1);
-    const run = outbox[0]!;
-    expect(run.kind).toBe('scan_run');
-    expect(run.source).toBe('scanThreads');
-    expect(run.telegram_ok).toBeNull();
-    expect(run.meta).toMatchObject({ total_items: 0, items_sent: 0, message_sent: false });
-    // Five queries against two sources: every one of the ten is accounted for.
-    expect(run.meta!['fetches']).toHaveLength(10);
-  });
-
-  it('names the source, query, status and count of every fetch', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const blocked = new Response('<html>blocked</html>', {
-      status: 200,
-      headers: { 'content-type': 'text/html' },
-    });
-    const { outbox } = stubWorld((url) => {
-      if (url.startsWith('https://hn.algolia.com')) return new Response('', { status: 503 });
-      if (url.startsWith('https://www.reddit.com')) return blocked;
-      return null;
-    });
-
-    await scanThreads(env, 0);
-
-    const fetches = outbox[0]!.meta!['fetches'] as {
-      source: string;
-      query: string;
-      status: number | null;
-      items: number;
-      error?: string;
-    }[];
-    expect(fetches).toHaveLength(10);
-    const hn = fetches.find((f) => f.source === 'HN')!;
-    expect(hn).toMatchObject({ status: 503, items: 0 });
-    expect(hn.query).toBeTruthy();
-    // A 200 with an HTML body is Reddit refusing, not Reddit finding nothing.
-    const reddit = fetches.find((f) => f.source === 'Reddit')!;
-    expect(reddit.status).toBe(200);
-    expect(reddit.error).toContain('Reddit refused');
-  });
-
-  it('writes both a scan row and a scan_run row when it does have something to say', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const hnHit = new Response(
-      JSON.stringify({
-        hits: [
-          {
-            objectID: '42',
-            title: 'Looking for a DocSend alternative',
-            story_title: null,
-            comment_text: null,
-          },
-        ],
-      }),
-      { status: 200, headers: { 'content-type': 'application/json' } },
-    );
-    const { outbox, telegram } = stubWorld((url) => {
-      if (url.startsWith('https://hn.algolia.com')) return hnHit;
-      if (url.startsWith('https://www.reddit.com')) return emptyReddit;
-      if (url.startsWith(TELEGRAM_URL)) return telegramOk;
-      return null;
-    });
-
-    await scanThreads(env, 0);
-
-    expect(telegram).toHaveLength(1);
-    expect(telegram[0]!.text).toContain('Looking for a DocSend alternative');
-    expect(outbox.map((r) => r.kind)).toEqual(['scan', 'scan_run']);
-    // The sent row carries the message verbatim; the run row carries the run.
-    expect(outbox[0]!.message).toBe(telegram[0]!.text);
-    expect(outbox[0]!.telegram_ok).toBe(true);
-    expect(outbox[1]!.telegram_ok).toBe(true);
-    expect(outbox[1]!.meta).toMatchObject({ message_sent: true, items_sent: 1 });
-  });
-
-  it('does nothing at all without Telegram credentials', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { outbox, spy } = stubWorld(() => null);
-
-    await scanThreads({ ...env, TELEGRAM_BOT_TOKEN: undefined } as Env, 0);
-
-    expect(spy).not.toHaveBeenCalled();
-    expect(outbox).toHaveLength(0);
   });
 });

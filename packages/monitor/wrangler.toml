@@ -7,10 +7,15 @@ workers_dev = false  # cron-only worker, no HTTP entrypoint exposed
 # Every 5 minutes. Cheapest possible cadence that still catches a
 # 15-min-or-less regression before the founder checks email.
 [triggers]
-# Second cron: 04:00 UTC / 09:30 IST — daily thread scan, Telegram only.
+# Second cron: 04:00 UTC / 09:30 IST — the listening radar's mining scan. Reads
+#   the Google Alerts feeds, Hacker News and Reddit, classifies and scores every
+#   item, and stores it in radar_items. Sends no message.
 # Third cron: 03:30 UTC — daily maintenance sentinel, half an hour before the
-# scan so the scan_run row it reads is yesterday's finished one.
-crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *"]
+#   scan so the scan_run row it reads is yesterday's finished one.
+# Fourth cron: 05:00 UTC — the daily digest, an hour after the mining scan, so
+#   it reads a finished harvest. Drafts founder-voice replies for the worthwhile
+#   items and Telegrams one batch; Monday carries the weekly insight too.
+crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *", "0 5 * * *"]
 
 # Non-sensitive config travels in [vars] so they're visible in the
 # wrangler.toml diff. Everything else is a Worker secret, set once with
@@ -22,7 +27,13 @@ crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *"]
 #   QA_BOT_USER_ID        profile id of the QA smoke-test account; its rows
 #                         are skipped during replay so synthetic traffic
 #                         never reaches the dashboards
-#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID   optional, daily thread scan
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID   optional, daily digest destination
+#   ALERT_FEEDS           the listening radar's Google Alerts RSS feed URLs,
+#                         newline- or comma-separated ('phrase|url' or bare url);
+#                         secret because a feed URL is readable by anyone holding
+#                         it; unset = radar reads Hacker News and Reddit only
+#   RADAR_DRAFTS          reply-draft feature flag; '1'/'true'/'on' turns on the
+#                         drafted replies in the digest; unset = log-and-mine only
 [vars]
 SUPABASE_URL = "https://ewennjnxuqjzsgawbzur.supabase.co"
 RESEND_FROM = "HTMLRadar <hello@htmlradar.com>"

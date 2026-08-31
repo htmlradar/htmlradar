@@ -1,0 +1,445 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  DISCLOSURE,
+  type Env,
+  type RadarCategory,
+  REPLY_THRESHOLD,
+  classifyItem,
+  dailyDigest,
+  draftReply,
+  parseAlertFeeds,
+  scanThreads,
+  scoreIntent,
+  unwrapGoogleUrl,
+  weeklyInsight,
+} from '../src/index.js';
+
+// The radar has two mandates and these tests hold both. "Mine everything":
+// every item every source returns is classified, scored, and upserted into
+// radar_items regardless of score — noise included. "Daily batch approval": the
+// digest lists the worthwhile items with a drafted reply the founder approves in
+// a tap, never posting anything itself, and the draft always carries the
+// "I built this" disclosure. No test touches the network — every fetch is stubbed.
+
+const env = {
+  SUPABASE_URL: 'https://db.test',
+  SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+  RESEND_API_KEY: 'resend-key',
+  RESEND_FROM: 'HTMLRadar <hello@htmlradar.com>',
+  ALERT_TO: 'hello@htmlradar.com',
+  POSTHOG_HOST: 'https://posthog.test',
+  TELEGRAM_BOT_TOKEN: 'bot-token-that-must-never-appear-in-a-row',
+  TELEGRAM_CHAT_ID: '106874',
+  ALERT_FEEDS: 'share html file|https://www.google.com/alerts/feeds/111/222',
+} as Env;
+
+const RADAR_URL = 'https://db.test/rest/v1/radar_items';
+const OUTBOX_URL = 'https://db.test/rest/v1/telegram_outbox';
+const TELEGRAM_URL = 'https://api.telegram.org/bot';
+
+// 05:00 UTC on the Monday (2026-08-31) and the Tuesday after it. The weekly
+// insight keys off the UTC day, so these two are the only ones that matter.
+const MONDAY = Date.parse('2026-08-31T05:00:00.000Z');
+const TUESDAY = Date.parse('2026-09-01T05:00:00.000Z');
+
+afterEach(() => vi.restoreAllMocks());
+
+function json(body: unknown, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+    ...init,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pure functions: parsing, classification, scoring, drafting.
+
+describe('parseAlertFeeds splits the ALERT_FEEDS secret', () => {
+  it('returns nothing for an unset secret', () => {
+    expect(parseAlertFeeds(undefined)).toEqual([]);
+    expect(parseAlertFeeds('')).toEqual([]);
+  });
+
+  it('parses phrase|url and bare url, across newlines and commas, dropping comments', () => {
+    const raw =
+      'share html file|https://a.test/1 , https://b.test/2\n# a comment\npapermark|https://c.test/3';
+    expect(parseAlertFeeds(raw)).toEqual([
+      { phrase: 'share html file', url: 'https://a.test/1' },
+      { phrase: '', url: 'https://b.test/2' },
+      { phrase: 'papermark', url: 'https://c.test/3' },
+    ]);
+  });
+
+  it('drops anything that is not an http URL', () => {
+    expect(parseAlertFeeds('not-a-url\nphrase|also-not\nhttps://ok.test/x')).toEqual([
+      { phrase: '', url: 'https://ok.test/x' },
+    ]);
+  });
+});
+
+describe('unwrapGoogleUrl recovers the real destination', () => {
+  it('extracts and decodes the url= parameter from a Google redirect', () => {
+    const href =
+      'https://www.google.com/url?rct=j&sa=t&url=https%3A%2F%2Fnews.example.com%2Fpost&ct=ga';
+    expect(unwrapGoogleUrl(href)).toBe('https://news.example.com/post');
+  });
+
+  it('leaves a plain URL untouched', () => {
+    expect(unwrapGoogleUrl('https://plain.example.com/x')).toBe('https://plain.example.com/x');
+  });
+});
+
+describe('classifyItem sorts every item into one bucket, most-specific first', () => {
+  const cases: [string, RadarCategory][] = [
+    ['How do I share an html file with a client?', 'buyer_question'],
+    ['Best DocSend alternative for a small startup', 'competitor_mention'],
+    ['I wish there was a tool that tracked who read my deck', 'product_feedback'],
+    ['Tried HTMLRadar this week, here are my thoughts?', 'reputation'],
+    ['Ten facts about the history of paper making', 'noise'],
+  ];
+  for (const [title, expected] of cases) {
+    it(`${expected}: ${title}`, () => {
+      expect(classifyItem(title)).toBe(expected);
+    });
+  }
+
+  it('lets a competitor-with-pain outrank a bare question mark', () => {
+    // "DocSend alternative?" is both a question and a competitor mention; the
+    // more specific competitor bucket wins.
+    expect(classifyItem('Any good DocSend alternative?')).toBe('competitor_mention');
+  });
+
+  it('lets our own name outrank everything, even a competitor comparison', () => {
+    expect(classifyItem('HTMLRadar vs DocSend, which should I use?')).toBe('reputation');
+  });
+});
+
+describe('scoreIntent ranks a direct question over a listicle over a mention', () => {
+  const nowIso = new Date(TUESDAY).toISOString();
+  const q = (extra: Partial<Parameters<typeof scoreIntent>[0]>) =>
+    scoreIntent(
+      { category: 'buyer_question', title: 'x', ...extra } as Parameters<typeof scoreIntent>[0],
+      TUESDAY,
+    );
+
+  it('scores a recent direct question far above a recent listicle', () => {
+    const question = scoreIntent(
+      { category: 'buyer_question', title: 'how do i share an html file?', published_at: nowIso },
+      TUESDAY,
+    );
+    const listicle = scoreIntent(
+      {
+        category: 'competitor_mention',
+        title: '10 best docsend alternatives',
+        published_at: nowIso,
+      },
+      TUESDAY,
+    );
+    expect(question).toBeGreaterThan(listicle);
+    expect(question).toBeGreaterThanOrEqual(REPLY_THRESHOLD);
+    expect(listicle).toBeLessThan(REPLY_THRESHOLD);
+  });
+
+  it('boosts recent items over stale ones', () => {
+    const recent = q({ published_at: nowIso });
+    const stale = q({ published_at: new Date(TUESDAY - 10 * 24 * 3_600_000).toISOString() });
+    expect(recent).toBeGreaterThan(stale);
+  });
+
+  it('keeps noise near the floor and never below zero', () => {
+    expect(scoreIntent({ category: 'noise', title: 'history of paper' }, TUESDAY)).toBeLessThan(20);
+    // noise base 8 minus a listicle penalty must clamp at 0, not go negative.
+    expect(
+      scoreIntent({ category: 'noise', title: 'top list of paper roundup' }, TUESDAY),
+    ).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('draftReply always discloses and reads as a draft', () => {
+  const categories: RadarCategory[] = [
+    'buyer_question',
+    'competitor_mention',
+    'product_feedback',
+    'reputation',
+  ];
+  for (const category of categories) {
+    it(`${category}: carries the disclosure and the DRAFT marker`, () => {
+      const draft = draftReply({ category, title: 'a thread' });
+      expect(draft).toContain(DISCLOSURE);
+      expect(draft.startsWith('DRAFT')).toBe(true);
+      // Where a competitor genuinely fits, name it out loud.
+      expect(draft).toContain('Papermark');
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// scanThreads — the mining scan.
+
+/** A Google Alerts Atom feed with one entry. */
+function feedXml(title: string, realUrl: string, published: string): string {
+  const wrapped = `https://www.google.com/url?url=${encodeURIComponent(realUrl)}&ct=ga`;
+  return `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>Google Alert - share html file</title>
+    <entry>
+      <title type="html">${title}</title>
+      <link href="${wrapped.replace(/&/g, '&amp;')}"/>
+      <published>${published}</published>
+      <content type="html">${title}</content>
+    </entry>
+  </feed>`;
+}
+
+const emptyReddit = new Response('<feed></feed>', {
+  status: 200,
+  headers: { 'content-type': 'application/atom+xml' },
+});
+
+interface OutboxWrite {
+  kind: string;
+  telegram_ok: boolean | null;
+  message: string;
+  meta?: Record<string, unknown>;
+}
+
+/** Routes fetches for the mining scan: feed, HN, Reddit, the radar upsert, and
+ *  the outbox. Captures what was upserted and what was recorded. */
+function stubMiningWorld(opts: { feed?: Response; hn?: Response; radarStatus?: number }) {
+  const upserts: unknown[][] = [];
+  const outbox: OutboxWrite[] = [];
+  const telegram: unknown[] = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+      if (url.startsWith(TELEGRAM_URL)) {
+        telegram.push(body);
+        return json({ ok: true, result: { message_id: 1 } });
+      }
+      if (url.startsWith(RADAR_URL) && init?.method === 'POST') {
+        upserts.push(body as unknown[]);
+        return new Response('', { status: opts.radarStatus ?? 201 });
+      }
+      if (url.startsWith(OUTBOX_URL) && init?.method === 'POST') {
+        outbox.push(body as OutboxWrite);
+        return new Response('', { status: 201 });
+      }
+      if (url.startsWith('https://www.google.com/alerts')) {
+        return (opts.feed ?? new Response('<feed></feed>', { status: 200 })).clone();
+      }
+      if (url.startsWith('https://hn.algolia.com')) {
+        return (opts.hn ?? json({ hits: [] })).clone();
+      }
+      if (url.startsWith('https://www.reddit.com')) return emptyReddit.clone();
+      throw new Error(`unexpected fetch: ${url}`);
+    },
+  );
+  return { upserts, outbox, telegram };
+}
+
+describe('scanThreads mines every source into radar_items and stays silent', () => {
+  it('classifies, scores, and upserts what it finds, and never messages the founder', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const nowIso = new Date(TUESDAY).toISOString();
+    const { upserts, outbox, telegram } = stubMiningWorld({
+      feed: new Response(
+        feedXml('How to share an html file from Claude?', 'https://blog.test/a', nowIso),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/atom+xml' },
+        },
+      ),
+      hn: json({
+        hits: [
+          {
+            objectID: '42',
+            title: 'Looking for a DocSend alternative',
+            story_title: null,
+            comment_text: null,
+            created_at_i: Math.floor(TUESDAY / 1000),
+          },
+        ],
+      }),
+    });
+
+    await scanThreads(env, 0, TUESDAY);
+
+    // No founder-facing message: the digest does that, not the scan.
+    expect(telegram).toHaveLength(0);
+
+    // Everything mined lands in one upsert batch.
+    expect(upserts).toHaveLength(1);
+    const rows = upserts[0]!;
+    const byUrl = new Map(rows.map((r) => [(r as { source_url: string }).source_url, r]));
+    const feedRow = byUrl.get('https://blog.test/a') as {
+      category: string;
+      intent_score: number;
+      source: string;
+    };
+    expect(feedRow.source).toBe('GoogleAlerts');
+    expect(feedRow.category).toBe('buyer_question');
+    expect(feedRow.intent_score).toBeGreaterThanOrEqual(REPLY_THRESHOLD);
+    const hnRow = byUrl.get('https://news.ycombinator.com/item?id=42') as { category: string };
+    expect(hnRow.category).toBe('competitor_mention');
+
+    // The scan_run row the sentinel reads is written, with telegram_ok null.
+    const run = outbox.find((r) => r.kind === 'scan_run')!;
+    expect(run.telegram_ok).toBeNull();
+    expect(run.meta).toMatchObject({ total_items: 2, items_stored: 2 });
+    // One feed + six phrases across HN and Reddit = 13 fetches accounted for.
+    expect((run.meta!['fetches'] as unknown[]).length).toBe(13);
+  });
+
+  it('records a store failure in the scan_run row rather than throwing', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { outbox } = stubMiningWorld({
+      hn: json({
+        hits: [
+          {
+            objectID: '7',
+            title: 'DocSend alternative recommendations?',
+            story_title: null,
+            comment_text: null,
+            created_at_i: Math.floor(TUESDAY / 1000),
+          },
+        ],
+      }),
+      radarStatus: 500,
+    });
+
+    await scanThreads(env, 0, TUESDAY);
+
+    const run = outbox.find((r) => r.kind === 'scan_run')!;
+    expect(run.meta).toMatchObject({ items_stored: 0 });
+    expect(run.meta!['store_error']).toContain('HTTP 500');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dailyDigest and weeklyInsight.
+
+interface DigestWorld {
+  recent?: unknown[];
+  weekly?: unknown[];
+}
+
+function stubDigestWorld(world: DigestWorld) {
+  const outbox: OutboxWrite[] = [];
+  const telegram: { text: string }[] = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+      if (url.startsWith(TELEGRAM_URL)) {
+        telegram.push(body as { text: string });
+        return json({ ok: true, result: { message_id: 1 } });
+      }
+      if (url.startsWith(OUTBOX_URL) && init?.method === 'POST') {
+        outbox.push(body as OutboxWrite);
+        return new Response('', { status: 201 });
+      }
+      // readRecentRadarItems asks for non-noise; weeklyInsight asks for limit=500.
+      if (url.startsWith(RADAR_URL) && url.includes('limit=500')) return json(world.weekly ?? []);
+      if (url.startsWith(RADAR_URL)) return json(world.recent ?? []);
+      throw new Error(`unexpected fetch: ${url}`);
+    },
+  );
+  return { outbox, telegram };
+}
+
+const recentItems = [
+  {
+    source: 'HN',
+    source_url: 'https://news.ycombinator.com/item?id=1',
+    title: 'How do I share an html file and see who read it?',
+    snippet: null,
+    category: 'buyer_question',
+    intent_score: 90,
+    published_at: null,
+  },
+  {
+    source: 'GoogleAlerts',
+    source_url: 'https://blog.test/roundup',
+    title: '11 best DocSend alternatives, a roundup',
+    snippet: null,
+    category: 'competitor_mention',
+    intent_score: 42,
+    published_at: null,
+  },
+];
+
+describe('dailyDigest sends one batch, drafts only the worthwhile, silent when quiet', () => {
+  it('lists every non-noise item with its link and category', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram, outbox } = stubDigestWorld({ recent: recentItems });
+
+    await dailyDigest(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    const text = telegram[0]!.text;
+    expect(text).toContain('How do I share an html file');
+    expect(text).toContain('https://news.ycombinator.com/item?id=1');
+    expect(text).toContain('category: buyer_question');
+    expect(text).toContain('category: competitor_mention');
+    // Drafts are OFF by default (RADAR_DRAFTS unset) — log-and-mine only.
+    expect(text).not.toContain('DRAFT');
+    expect(outbox[0]).toMatchObject({ kind: 'radar' });
+  });
+
+  it('attaches a disclosed draft to items over the threshold when drafts are enabled', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram } = stubDigestWorld({ recent: recentItems });
+
+    await dailyDigest({ ...env, RADAR_DRAFTS: '1' }, TUESDAY);
+
+    const text = telegram[0]!.text;
+    // The 90-score buyer question gets a draft; the 42-score listicle does not.
+    expect(text).toContain('DRAFT (personal account, edit before posting)');
+    expect(text).toContain(DISCLOSURE);
+    // Exactly one draft: the item below REPLY_THRESHOLD stays undrafted.
+    expect(text.match(/DRAFT \(personal account/g)).toHaveLength(1);
+  });
+
+  it('says nothing on a quiet weekday', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram, outbox } = stubDigestWorld({ recent: [] });
+
+    await dailyDigest(env, TUESDAY);
+
+    expect(telegram).toHaveLength(0);
+    expect(outbox).toHaveLength(0);
+  });
+
+  it('still sends the weekly insight on a quiet Monday', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram } = stubDigestWorld({ recent: [], weekly: [] });
+
+    await dailyDigest(env, MONDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).toContain('Weekly insight: nothing logged in the last 7 days');
+  });
+});
+
+describe('weeklyInsight summarises the pattern, not a raw dump', () => {
+  it('groups the week by category with representative titles', async () => {
+    stubDigestWorld({
+      weekly: [
+        { category: 'buyer_question', title: 'How do I share an html file?' },
+        { category: 'buyer_question', title: 'Share a claude artifact with tracking?' },
+        { category: 'competitor_mention', title: 'DocSend alternative that is open source' },
+        { category: 'noise', title: 'unrelated thread' },
+      ],
+    });
+
+    const text = await weeklyInsight(env, MONDAY);
+
+    expect(text).toContain('Logged this week: 4 item(s)');
+    expect(text).toContain('2 buyer question(s)');
+    expect(text).toContain('Recurring buyer questions:');
+    expect(text).toContain('How do I share an html file?');
+    expect(text).toContain('Competitor-pain moments:');
+  });
+});

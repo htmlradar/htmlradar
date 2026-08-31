@@ -66,10 +66,23 @@ export interface Env {
   // PostHog key the replay no-ops; without a QA id nothing is filtered.
   POSTHOG_PROJECT_KEY?: string;
   QA_BOT_USER_ID?: string;
-  // Thread scan (see scanThreads). Optional: absent means the scan no-ops
-  // rather than the worker failing to boot.
+  // Thread scan / daily digest (see scanThreads, dailyDigest). Optional: absent
+  // means the founder-facing digest no-ops rather than the worker failing to
+  // boot. Mining still runs — it needs only the Supabase service role.
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
+  // The listening radar's Google Alerts RSS feeds, as a newline- or
+  // comma-separated list. Each entry is a feed URL, optionally prefixed with a
+  // 'phrase|' label (the phrase the alert watches). Secret, never in the repo:
+  // anyone with a feed URL can read it. Absent means the radar reads Hacker
+  // News and Reddit only.
+  ALERT_FEEDS?: string;
+  // Reply-draft feature flag. Truthy ('1'/'true'/'on') turns on the drafted
+  // replies inside the daily digest; absent or falsy leaves the radar in
+  // log-and-mine-only mode (it still lists worthwhile items, just without a
+  // drafted reply). Held off until the draft generation and the disclosure
+  // guardrail have been reviewed.
+  RADAR_DRAFTS?: string;
 }
 
 // What a healthy production answers, one entry per probe.
@@ -395,51 +408,64 @@ async function checkWebhookHealth(env: Env): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Daily thread scan.
+// The listening radar — sources, mining, and the daily digest.
 //
 // The one acquisition channel that works here is the founder answering a real
 // question in a real thread, as himself, the same day it was asked. The part
-// that kills it is the searching — nobody greps Hacker News and Reddit every
-// morning. So the worker does that half and Telegrams the shortlist: five
-// queries, two keyless sources, one message a day, replies still human.
+// that kills it is the searching — nobody greps the web every morning. So the
+// worker does that half. It reads three keyless sources once a day, logs and
+// categorises EVERYTHING it sees into radar_items (the "mine everything"
+// mandate — even items nobody ever replies to become intelligence), then a
+// second cron an hour later drafts founder-voice replies for the worthwhile
+// few and delivers them in one daily digest the founder approves in a tap.
 //
-// Deliberately stateless: no scoring, no "already seen" table. A 26-hour
-// window against a once-a-day cron means the occasional repeat, which costs
-// one glance — cheaper than a KV namespace to remember what was read. Zero
-// hits sends nothing at all; a daily "found nothing" message is how a channel
-// gets muted, and a muted channel is worse than no channel.
+// The three sources, in the order Lever 11 of the distribution playbook lays
+// them out (docs/playbooks/PLAYBOOK-DISTRIBUTION-AND-TRUST-0-TO-1.md):
+//   1. The six Google Alerts RSS feeds (URLs in the ALERT_FEEDS secret) —
+//      Google's own watch on newly published pages containing our phrases.
+//   2. Hacker News' Algolia search — the builder conversation, keyless.
+//   3. Reddit's search RSS — rate-limited to ~1 call/minute, so spaced.
+//
+// The six phrases are the data-backed set from
+// docs/workstreams/seo-and-indexing/KEYWORD-BASIS-2026-08-31.md, grounded in
+// real typed searches and real forum phrasings rather than armchair guesses.
+//
+// Unlike the old stateless scan, this one remembers: radar_items is keyed on
+// source_url, so re-seeing a thread is idempotent (its last_seen_at moves, its
+// first_seen_at and acted flag do not). That is what lets the digest ask "what
+// is new in the last 24 hours" rather than re-sending yesterday's shortlist.
 
-interface ThreadHit {
-  source: string;
-  title: string;
-  url: string;
-  angle: string;
-}
-
-// Each query carries the line the founder can open a reply with. Plain, no
+// Each phrase carries the line the founder can open a reply with. Plain, no
 // pitch — threads punish marketing voice, and he has to be able to say it in
-// his own words in under five minutes.
+// his own words in under five minutes. These angles feed the drafted replies.
 const SCAN_QUERIES: { query: string; angle: string }[] = [
   {
     query: '"docsend alternative"',
-    angle: 'Open-source alternative that tracks HTML rather than uploaded PDFs; free for 2 links.',
+    angle:
+      'Open-source alternative that tracks HTML rather than uploaded PDFs; free for two links.',
   },
   {
-    query: '"share claude artifact"',
+    query: '"claude artifact" share',
     angle:
       'A published artifact gives you a URL and nothing else; HTMLRadar adds who opened it and which sections they read.',
   },
   {
-    query: '"share html file" link',
+    query: '"share html file"',
     angle: 'Paste or upload the HTML, get a link that keeps it a live page and shows reads.',
   },
   {
-    query: 'papermark alternative',
+    query: 'papermark',
     angle: 'Both open source; HTMLRadar is for HTML, not file uploads.',
   },
   {
-    query: '"track who opened" proposal',
-    angle: 'Per-client link, email gate optional, section-level read timeline.',
+    query: '"send proposal"',
+    angle:
+      'Per-client link, email gate optional, section-level read timeline; the open-source, $15 equivalent of DocSend for proposals.',
+  },
+  {
+    query: '"track who opened"',
+    angle:
+      'We built the read side of this for HTML documents: who opened, when, and which sections they actually read.',
   },
 ];
 
@@ -454,11 +480,6 @@ const SCAN_TIMEOUT_MS = 8_000;
 // ceiling. ponytail: 45s is a measured compromise, not a limit Reddit
 // documents — raise it toward 60s if queries still come back throttled.
 const SCAN_QUERY_GAP_MS = 45_000;
-const SCAN_MAX_ITEMS = 10;
-// Telegram hard-caps a message at 4096 chars. Stop short of it rather than
-// find out in prod which item got sliced in half.
-const SCAN_MAX_CHARS = 3_800;
-const SCAN_TITLE_CHARS = 120;
 
 const ENTITIES: Record<string, string> = {
   '&amp;': '&',
@@ -487,6 +508,7 @@ interface HNHit {
   title: string | null;
   story_title: string | null;
   comment_text: string | null;
+  created_at_i: number | null;
 }
 
 // Both sources pad their results: the HN index is configured allOptional, so
@@ -509,9 +531,20 @@ function matchesQuery(query: string, haystack: string): boolean {
 // contributed nothing. "Reddit answered 429" and "Reddit answered 200 with no
 // matching threads" are the same empty list and very different facts, and
 // until this row existed neither of them was written down anywhere.
+/** One item a source returned. `published_at` is ISO-8601 when the source
+ *  dates its results (all three do), which is what feeds the recency boost in
+ *  the intent score. `snippet` is any body text the source carried, used for
+ *  classification and stored alongside the item. */
+interface SourceItem {
+  title: string;
+  url: string;
+  published_at?: string;
+  snippet?: string;
+}
+
 interface ScanResult {
   status: number;
-  items: { title: string; url: string }[];
+  items: SourceItem[];
   /** Why a successful response still yielded nothing, when that isn't obvious. */
   error?: string;
 }
@@ -535,6 +568,12 @@ async function scanHN(query: string, sinceSec: number): Promise<ScanResult> {
       // Stories have a title; comments only have their body.
       title: clean(hit.title ?? hit.comment_text ?? ''),
       url: `https://news.ycombinator.com/item?id=${hit.objectID}`,
+      // The thread a comment lives under is the useful context for a comment hit.
+      ...(hit.story_title ? { snippet: clean(hit.story_title) } : {}),
+      // created_at_i is unix seconds; the radar wants ISO for published_at.
+      ...(hit.created_at_i
+        ? { published_at: new Date(hit.created_at_i * 1000).toISOString() }
+        : {}),
     }));
   return { status: res.status, items };
 }
@@ -565,7 +604,7 @@ async function scanReddit(query: string, sinceMs: number): Promise<ScanResult> {
     };
   }
   const xml = await res.text();
-  const items: { title: string; url: string }[] = [];
+  const items: SourceItem[] = [];
   for (const match of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
     const entry = match[1] ?? '';
     // t=week, not t=day: Reddit's own filter keys off post time rather than
@@ -579,9 +618,265 @@ async function scanReddit(query: string, sinceMs: number): Promise<ScanResult> {
     if (!url || !title) continue;
     const content = /<content[^>]*>([\s\S]*?)<\/content>/.exec(entry)?.[1] ?? '';
     if (!matchesQuery(query, clean(`${title} ${content}`))) continue;
-    items.push({ title: clean(title), url: clean(url) });
+    const snippet = clean(content);
+    items.push({
+      title: clean(title),
+      url: clean(url),
+      published_at: updated,
+      ...(snippet ? { snippet } : {}),
+    });
   }
   return { status: res.status, items };
+}
+
+// ---------------------------------------------------------------------------
+// Google Alerts RSS feeds — source three.
+//
+// Google Alerts watches what gets PUBLISHED (not who searched), and delivers
+// matches as Atom. Each <entry> carries a <title type="html"> with the matched
+// terms wrapped in <b>, a <link href> that is a google.com/url redirect to the
+// real page, a <published> timestamp, and a <content> summary. The feed URLs
+// are secret (ALERT_FEEDS): anyone holding one can read that feed, so they
+// never enter the repo.
+
+interface AlertFeed {
+  /** The phrase the alert watches, for traceability and draft angle. */
+  phrase: string;
+  url: string;
+}
+
+// Split the ALERT_FEEDS secret. Newline- or comma-separated; each entry is a
+// feed URL, optionally 'phrase|url'. Blank lines and '#' comments are dropped,
+// so the ops backup file's own lines paste in verbatim.
+export function parseAlertFeeds(raw: string | undefined): AlertFeed[] {
+  if (!raw) return [];
+  return raw
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !s.startsWith('#'))
+    .map((entry) => {
+      const bar = entry.lastIndexOf('|');
+      if (bar === -1) return { phrase: '', url: entry };
+      return { phrase: entry.slice(0, bar).trim(), url: entry.slice(bar + 1).trim() };
+    })
+    .filter((f) => f.url.startsWith('http'));
+}
+
+// Google wraps every result link as https://www.google.com/url?...&url=<real>.
+// The wrapper is per-fetch, so deduping on it would fail; unwrap to the real
+// destination, which is stable.
+export function unwrapGoogleUrl(href: string): string {
+  const m = /[?&]url=([^&]+)/.exec(href);
+  if (!m || !m[1]) return href;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return href;
+  }
+}
+
+async function scanFeed(feed: AlertFeed, sinceMs: number): Promise<ScanResult> {
+  let res: Response;
+  try {
+    res = await fetch(feed.url, { signal: AbortSignal.timeout(SCAN_TIMEOUT_MS) });
+  } catch (err) {
+    return { status: 0, items: [], error: `fetch threw: ${(err as Error).message}` };
+  }
+  if (!res.ok) return { status: res.status, items: [] };
+  const xml = await res.text();
+  const items: SourceItem[] = [];
+  for (const match of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const entry = match[1] ?? '';
+    const rawTitle = /<title[^>]*>([\s\S]*?)<\/title>/.exec(entry)?.[1];
+    const href = /<link[^>]*href="([^"]+)"/.exec(entry)?.[1];
+    if (!rawTitle || !href) continue;
+    const published = /<published>([^<]+)<\/published>/.exec(entry)?.[1];
+    // Re-apply the 26-hour window against <published> so a feed's older backlog
+    // does not resurface every day — the same slack scanReddit gives itself.
+    if (published && Date.parse(published) < sinceMs) continue;
+    const content = clean(/<content[^>]*>([\s\S]*?)<\/content>/.exec(entry)?.[1] ?? '');
+    items.push({
+      title: clean(rawTitle),
+      url: unwrapGoogleUrl(clean(href)),
+      ...(published ? { published_at: published } : {}),
+      ...(content ? { snippet: content } : {}),
+    });
+  }
+  return { status: res.status, items };
+}
+
+// ---------------------------------------------------------------------------
+// Classification and intent scoring — pure functions, the "mine everything"
+// core.
+//
+// Every item the radar sees is categorised and scored, and every item is
+// stored regardless of score. Classification is a precedence ladder: the first
+// rule that matches wins, most-specific first. Scoring is a small additive
+// model — a direct question outranks a listicle outranks a passing mention,
+// and recent beats stale — deliberately explainable rather than clever, so a
+// surprising score can be read off the inputs.
+
+export type RadarCategory =
+  | 'buyer_question'
+  | 'competitor_mention'
+  | 'product_feedback'
+  | 'reputation'
+  | 'noise';
+
+// Our own name, in the forms people write it. A match here is reputation —
+// someone already knows us — whatever else the text contains.
+const BRAND_TERMS = ['htmlradar', 'html radar'];
+// The document-sharing competitors whose unhappy users are the highest-intent
+// audience there is. Distinctive tokens only, so a bare substring match is safe.
+const COMPETITOR_TERMS = [
+  'docsend',
+  'papermark',
+  'pandadoc',
+  'brieflink',
+  'docsketch',
+  'orangedox',
+  'sellizer',
+  'helprange',
+];
+// Pain paired with a competitor is the competitor_mention signal.
+const PAIN_TERMS = [
+  'alternative',
+  'alternatives',
+  ' vs ',
+  'versus',
+  'pricing',
+  'too expensive',
+  'expensive',
+  'cheaper',
+  'cancel',
+  'complaint',
+  'sucks',
+  'hate ',
+  'switch from',
+  'switching from',
+  'replace',
+  'replacement',
+];
+// Unmet-need phrasing → product_feedback.
+const FEEDBACK_TERMS = [
+  'i wish',
+  'wish there was',
+  'is there a tool',
+  'is there any tool',
+  'is there a way',
+  'looking for a tool',
+  'need a tool',
+  'anyone know a tool',
+  'any tool that',
+  'does anyone have a tool',
+];
+// Question phrasing → buyer_question (when nothing more specific matched).
+const QUESTION_TERMS = [
+  'how do i',
+  'how to',
+  'how can i',
+  'how does',
+  'what is the best',
+  "what's the best",
+  'best way to',
+  'anyone know',
+  'recommend',
+  'suggestions',
+  'ask hn',
+  'which ',
+];
+// Listicle markers depress intent: an article, not a person with a question.
+const LISTICLE_TERMS = ['best ', 'top ', 'roundup', 'list of', ' alternatives ', 'comparison of'];
+
+function containsAny(haystack: string, needles: string[]): boolean {
+  return needles.some((n) => haystack.includes(n));
+}
+
+/** Categorise an item from its title and snippet. Precedence: reputation,
+ *  competitor_mention, product_feedback, buyer_question, noise. Pure. */
+export function classifyItem(title: string, snippet = ''): RadarCategory {
+  const t = ` ${title} ${snippet} `.toLowerCase();
+  if (containsAny(t, BRAND_TERMS)) return 'reputation';
+  if (containsAny(t, COMPETITOR_TERMS) && containsAny(t, PAIN_TERMS)) return 'competitor_mention';
+  if (containsAny(t, FEEDBACK_TERMS)) return 'product_feedback';
+  if (t.includes('?') || containsAny(t, QUESTION_TERMS)) return 'buyer_question';
+  return 'noise';
+}
+
+// Category floor: how much intent the category carries before shape and recency.
+const CATEGORY_BASE: Record<RadarCategory, number> = {
+  buyer_question: 45,
+  product_feedback: 45,
+  competitor_mention: 40,
+  reputation: 35,
+  noise: 8,
+};
+
+/** Score buying intent 0–100 from category, phrasing shape, and recency. Pure;
+ *  `nowMs` is passed in so the recency term is testable without the clock. */
+export function scoreIntent(
+  item: { category: RadarCategory; title: string; snippet?: string; published_at?: string | null },
+  nowMs: number,
+): number {
+  const t = ` ${item.title} ${item.snippet ?? ''} `.toLowerCase();
+  let score = CATEGORY_BASE[item.category];
+  if (t.includes('?')) score += 20;
+  if (containsAny(t, FEEDBACK_TERMS) || containsAny(t, QUESTION_TERMS)) score += 12;
+  if (containsAny(t, LISTICLE_TERMS)) score -= 15;
+  if (item.published_at) {
+    const ageH = (nowMs - Date.parse(item.published_at)) / 3_600_000;
+    if (ageH < 24) score += 20;
+    else if (ageH < 72) score += 10;
+    else if (ageH < 168) score += 5;
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// A drafted reply is attached to a digest item only at or above this score.
+// A recent, direct buyer question lands 45 + 20 (question) + 12 (phrasing) + 20
+// (fresh) = 97; a recent competitor-pain thread ~72; a listicle ~40; a passing
+// mention below that. 60 is the clean gap between "a person asking, today" and
+// "an article or a stale mention" — worth a personal reply versus worth logging.
+export const REPLY_THRESHOLD = 60;
+
+// ---------------------------------------------------------------------------
+// radar_items — the durable insight base (schema/042).
+//
+// Every item every source returns is upserted here, keyed on source_url. The
+// upsert is idempotent by design: re-seeing a thread moves last_seen_at but
+// leaves first_seen_at and acted untouched (those two columns are deliberately
+// absent from the payload, so PostgREST's merge-duplicates cannot overwrite
+// them). That is what lets the digest ask "new in the last 24 hours" and what
+// stops an item the founder already acted on coming back.
+
+interface RadarItem {
+  source: string;
+  source_url: string;
+  title: string;
+  snippet: string | null;
+  published_at: string | null;
+  category: RadarCategory;
+  intent_score: number;
+  last_seen_at: string;
+  meta: Record<string, unknown>;
+}
+
+async function upsertRadarItems(env: Env, items: RadarItem[]): Promise<void> {
+  if (items.length === 0) return;
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/radar_items?on_conflict=source_url`, {
+    method: 'POST',
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      // merge-duplicates = INSERT ... ON CONFLICT DO UPDATE over the columns
+      // present in the body; return=minimal keeps the response small.
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify(items),
+  });
+  if (!res.ok)
+    throw new Error(`radar_items upsert HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -604,7 +899,7 @@ async function scanReddit(query: string, sinceMs: number): Promise<ScanResult> {
 // The chat id does, because it is not a secret (it is the founder's own chat)
 // and without it a row can't be attributed to a destination.
 
-type OutboxKind = 'alert' | 'scan' | 'scan_run' | 'test' | 'heartbeat' | 'sentinel';
+type OutboxKind = 'alert' | 'scan' | 'scan_run' | 'test' | 'heartbeat' | 'sentinel' | 'radar';
 
 interface OutboxRow {
   kind: OutboxKind;
@@ -689,39 +984,90 @@ interface ScanFetch {
   error?: string;
 }
 
-// gapMs is a parameter for the same reason probe's retryMs is: so a test does
-// not sit through three minutes of real rate-limit spacing.
-export async function scanThreads(env: Env, gapMs: number = SCAN_QUERY_GAP_MS): Promise<void> {
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
-    // eslint-disable-next-line no-console
-    console.log('[scan] no Telegram credentials set — skipping');
-    return;
-  }
+// Stored rows are kept modest — a feed's <content> can run long, and nothing
+// downstream needs the whole thing.
+const RADAR_TITLE_CHARS = 300;
+const RADAR_SNIPPET_CHARS = 500;
 
-  const sinceMs = Date.now() - SCAN_WINDOW_MS;
+// gapMs is a parameter for the same reason probe's retryMs is: so a test does
+// not sit through minutes of real rate-limit spacing. nowMs is a parameter so
+// the recency term of the score is reproducible under test.
+export async function scanThreads(
+  env: Env,
+  gapMs: number = SCAN_QUERY_GAP_MS,
+  nowMs: number = Date.now(),
+): Promise<void> {
+  const sinceMs = nowMs - SCAN_WINDOW_MS;
   const sinceSec = Math.floor(sinceMs / 1000);
-  // Keyed by URL: the same thread surfaces under several queries, and the
-  // first query to find it owns the angle.
-  const hits = new Map<string, ThreadHit>();
-  // Ten entries, one per fetch, whatever happens to each. This is the whole
-  // reason a scan run stops being a black box.
+  const nowIso = new Date(nowMs).toISOString();
+  // Keyed by source_url: the same thread surfaces under several phrases and
+  // several sources, and the first to find it owns the row.
+  const radar = new Map<string, RadarItem>();
+  // One entry per fetch, whatever happens to each. This is the whole reason a
+  // scan run stops being a black box, and what the sentinel reads.
   const fetches: ScanFetch[] = [];
 
-  for (const [i, { query, angle }] of SCAN_QUERIES.entries()) {
+  // Classify, score, and remember every item a fetch returned. Mine everything:
+  // noise is stored the same as a buyer question — the only difference is score.
+  const ingest = (source: string, query: string, found: ScanResult): void => {
+    fetches.push({
+      source,
+      query,
+      status: found.status,
+      items: found.items.length,
+      ...(found.error ? { error: found.error } : {}),
+    });
+    for (const it of found.items) {
+      if (!it.title || !it.url || radar.has(it.url)) continue;
+      const category = classifyItem(it.title, it.snippet);
+      const intent_score = scoreIntent(
+        {
+          category,
+          title: it.title,
+          ...(it.snippet !== undefined ? { snippet: it.snippet } : {}),
+          published_at: it.published_at ?? null,
+        },
+        nowMs,
+      );
+      radar.set(it.url, {
+        source,
+        source_url: it.url,
+        title: it.title.slice(0, RADAR_TITLE_CHARS),
+        snippet: it.snippet ? it.snippet.slice(0, RADAR_SNIPPET_CHARS) : null,
+        published_at: it.published_at ?? null,
+        category,
+        intent_score,
+        last_seen_at: nowIso,
+        meta: { matched: query },
+      });
+    }
+  };
+
+  // Source one: the Google Alerts feeds. Same host, no tight rate limit, so
+  // fetched back to back.
+  for (const feed of parseAlertFeeds(env.ALERT_FEEDS)) {
+    try {
+      ingest('GoogleAlerts', feed.phrase || feed.url, await scanFeed(feed, sinceMs));
+    } catch (err) {
+      fetches.push({
+        source: 'GoogleAlerts',
+        query: feed.phrase || feed.url,
+        status: null,
+        items: 0,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  // Sources two and three: HN and Reddit, per phrase, spaced for Reddit's limit.
+  for (const [i, { query }] of SCAN_QUERIES.entries()) {
     for (const source of ['HN', 'Reddit'] as const) {
       try {
-        const found =
-          source === 'HN' ? await scanHN(query, sinceSec) : await scanReddit(query, sinceMs);
-        fetches.push({
+        ingest(
           source,
           query,
-          status: found.status,
-          items: found.items.length,
-          ...(found.error ? { error: found.error } : {}),
-        });
-        for (const { title, url } of found.items) {
-          if (title && !hits.has(url)) hits.set(url, { source, title, url, angle });
-        }
+          source === 'HN' ? await scanHN(query, sinceSec) : await scanReddit(query, sinceMs),
+        );
       } catch (err) {
         // One dead source or one bad query must not cost the whole scan — but
         // it does go in the run row, which is the only place anyone will look.
@@ -733,44 +1079,232 @@ export async function scanThreads(env: Env, gapMs: number = SCAN_QUERY_GAP_MS): 
     }
   }
 
-  // Still no message when there is nothing to say — a daily "found nothing" is
-  // how a channel gets muted. What changed is that the run itself is now
-  // recorded either way, a few lines down.
-  let sent = 0;
-  let ok: boolean | null = null;
-  if (hits.size > 0) {
-    // Plain text on purpose — no parse_mode, so a stray underscore in a thread
-    // title can't 400 the whole message.
-    let text = `HTMLRadar thread scan — ${new Date().toISOString().slice(0, 10)}`;
-    for (const hit of hits.values()) {
-      if (sent >= SCAN_MAX_ITEMS) break;
-      const block =
-        `\n\n${hit.source} — ${hit.title.slice(0, SCAN_TITLE_CHARS)}` +
-        `\n${hit.url}\nAngle: ${hit.angle}`;
-      if (text.length + block.length > SCAN_MAX_CHARS) break;
-      text += block;
-      sent++;
-    }
-    ok = await sendTelegram(env, 'scan', 'scanThreads', text, {
-      items_sent: sent,
-      items_found: hits.size,
-    });
+  // Mine everything: store every item, whatever its score or category. A store
+  // failure is recorded, not thrown — the run row still has to be written.
+  const items = [...radar.values()];
+  let stored = items.length;
+  let storeError: string | null = null;
+  try {
+    await upsertRadarItems(env, items);
+  } catch (err) {
+    stored = 0;
+    storeError = (err as Error).message;
   }
 
-  // Always, sent or not. The run that finds nothing used to leave no trace at
-  // all, which looked exactly like a cron that never fired.
+  // The scan_run row, always, which the sentinel reads to prove the cron fired.
+  // telegram_ok is null: this scan sends no founder-facing message — the 05:00
+  // digest does — so there was no Telegram send to succeed or fail.
   await recordOutbox(env, {
     kind: 'scan_run',
     source: 'scanThreads',
     message:
-      `${hits.size} item(s) across ${fetches.length} fetch(es); ` +
-      (hits.size > 0 ? `${sent} sent, telegram ok:${ok}` : 'nothing sent'),
-    telegram_ok: ok,
-    meta: { fetches, total_items: hits.size, items_sent: sent, message_sent: hits.size > 0 },
+      `${items.length} item(s) mined across ${fetches.length} fetch(es)` +
+      (storeError ? `; store FAILED: ${storeError}` : `; ${stored} stored`),
+    telegram_ok: null,
+    meta: {
+      fetches,
+      total_items: items.length,
+      items_stored: stored,
+      ...(storeError ? { store_error: storeError } : {}),
+    },
   });
 
   // eslint-disable-next-line no-console
-  console.log(`[scan] ${sent} of ${hits.size} item(s) sent — telegram ok:${ok}`);
+  console.log(
+    `[radar] mined ${items.length} item(s) across ${fetches.length} fetch(es); stored ${stored}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The daily digest and the weekly insight.
+//
+// The digest is the founder-facing half, on its own 05:00 cron an hour after
+// the mining scan. It reads what was first seen in the last 24 hours, drops
+// noise, ranks by intent, shows the top ten, and for the worthwhile few (score
+// at or above REPLY_THRESHOLD) attaches a drafted reply he can approve in a tap
+// and post himself. It marks nothing acted — acted defaults false and stays
+// false until he tells us he replied; there is no auto-post. On a quiet day it
+// stays silent, except Monday, when the weekly insight rides along so that
+// unanswered items still become intelligence.
+
+const DIGEST_WINDOW_MS = 24 * 60 * 60_000;
+const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60_000;
+const DIGEST_MAX_ITEMS = 10;
+// Telegram hard-caps at 4096; stop well short so the appended weekly section
+// and a draft can't push the last item past the cliff.
+const DIGEST_MAX_CHARS = 3_800;
+
+const SOURCE_LABEL: Record<string, string> = {
+  GoogleAlerts: 'Google Alerts',
+  HN: 'Hacker News',
+  Reddit: 'Reddit',
+};
+
+interface RadarRow {
+  source: string;
+  source_url: string;
+  title: string;
+  snippet: string | null;
+  category: RadarCategory;
+  intent_score: number;
+  published_at: string | null;
+}
+
+// The disclosure that MUST appear in every drafted reply — the "I built this"
+// line the platforms and honesty both require. draftReply guarantees it; a test
+// holds the guarantee. This is the guardrail Sol reviews before drafts go live.
+export const DISCLOSURE = 'Full disclosure: I built HTMLRadar.';
+
+/** A founder-voice reply DRAFT for one item. A scaffold he edits, not a
+ *  finished post: plain first-person, the mandatory disclosure, and — where it
+ *  genuinely fits — Papermark named as the honest pick for PDFs. Pure. */
+export function draftReply(item: { category: RadarCategory; title: string }): string {
+  let body: string;
+  switch (item.category) {
+    case 'competitor_mention':
+      body =
+        'For an open-source route, Papermark is the usual answer for PDFs — its own repo calls itself the open-source DocSend alternative. ' +
+        'If what you send is HTML rather than an uploaded file, that is the gap I built for: a link that stays a live page and shows who opened it and which sections they read. ' +
+        `${DISCLOSURE} It is AGPL, self-hostable, free for two tracked links. Either way, send one real document to yourself and read the per-section numbers — that is the feature.`;
+      break;
+    case 'product_feedback':
+      body =
+        'This exists. You paste or upload the HTML and get a link that stays a live page and reports who opened it, when, and which sections they actually read — not just a count of opens. ' +
+        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links. If your document is a PDF rather than HTML, Papermark is the honest pick.`;
+      break;
+    case 'reputation':
+      body =
+        'Happy to answer anything here. ' +
+        `${DISCLOSURE} Treat this as the maker talking, not a neutral review. For PDFs specifically, Papermark is often the better fit than what I built.`;
+      break;
+    case 'buyer_question':
+    default:
+      body =
+        'You can do this without emailing the file: paste or upload the HTML and share a link that stays a live page and shows who opened it and which sections they read. ' +
+        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links. If what you are sending is a PDF instead, Papermark is the honest pick.`;
+      break;
+  }
+  // Belt to the braces above: no draft ever ships without the disclosure.
+  if (!body.includes(DISCLOSURE)) body = `${DISCLOSURE} ${body}`;
+  return `DRAFT (personal account, edit before posting): ${body}`;
+}
+
+function draftsEnabled(env: Env): boolean {
+  const v = (env.RADAR_DRAFTS ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
+
+const radarHeaders = (env: Env) => ({
+  apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+  Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+});
+
+async function readRecentRadarItems(env: Env, nowMs: number): Promise<RadarRow[]> {
+  const since = encodeURIComponent(new Date(nowMs - DIGEST_WINDOW_MS).toISOString());
+  const res = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/radar_items` +
+      `?first_seen_at=gte.${since}&category=neq.noise` +
+      `&order=intent_score.desc,first_seen_at.desc&limit=${DIGEST_MAX_ITEMS}` +
+      `&select=source,source_url,title,snippet,category,intent_score,published_at`,
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`radar_items read HTTP ${res.status}`);
+  return (await res.json()) as RadarRow[];
+}
+
+/** The weekly pattern summary: what recurred, not a raw dump. Monday only. */
+export async function weeklyInsight(env: Env, nowMs: number): Promise<string> {
+  const since = encodeURIComponent(new Date(nowMs - WEEKLY_WINDOW_MS).toISOString());
+  const res = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/radar_items` +
+      `?first_seen_at=gte.${since}&order=intent_score.desc&limit=500` +
+      `&select=source,title,category,intent_score`,
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`radar_items weekly read HTTP ${res.status}`);
+  const rows = (await res.json()) as { category: RadarCategory; title: string }[];
+  if (rows.length === 0) return 'Weekly insight: nothing logged in the last 7 days.';
+
+  const byCat = (c: RadarCategory) => rows.filter((r) => r.category === c);
+  const counts = (c: RadarCategory) => byCat(c).length;
+  const top = (c: RadarCategory, n: number) =>
+    byCat(c)
+      .slice(0, n)
+      .map((r) => `  · ${r.title.slice(0, 100)}`)
+      .join('\n');
+
+  const sections: string[] = [
+    `Weekly insight — ${new Date(nowMs).toISOString().slice(0, 10)}`,
+    `Logged this week: ${rows.length} item(s) — ${counts('buyer_question')} buyer question(s), ` +
+      `${counts('competitor_mention')} competitor-pain, ${counts('product_feedback')} product feedback, ` +
+      `${counts('reputation')} reputation, ${counts('noise')} noise.`,
+  ];
+  if (counts('buyer_question') > 0)
+    sections.push(`Recurring buyer questions:\n${top('buyer_question', 5)}`);
+  if (counts('competitor_mention') > 0)
+    sections.push(`Competitor-pain moments:\n${top('competitor_mention', 5)}`);
+  if (counts('product_feedback') > 0)
+    sections.push(`Product-feedback themes:\n${top('product_feedback', 5)}`);
+  return sections.join('\n\n');
+}
+
+export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise<void> {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
+    // eslint-disable-next-line no-console
+    console.log('[digest] no Telegram credentials set — skipping');
+    return;
+  }
+  const isMonday = new Date(nowMs).getUTCDay() === 1;
+  const items = await readRecentRadarItems(env, nowMs);
+
+  // Non-Monday with nothing above the noise floor: stay silent. A daily "found
+  // nothing" is how a channel gets muted. Monday always speaks — see below.
+  if (items.length === 0 && !isMonday) {
+    // eslint-disable-next-line no-console
+    console.log('[digest] nothing above the noise floor — staying silent');
+    return;
+  }
+
+  // On Monday the weekly insight rides along (or is the whole message). Build it
+  // first so the item loop can leave room for it under Telegram's cap.
+  const weekly = isMonday ? await weeklyInsight(env, nowMs) : '';
+  const budget = DIGEST_MAX_CHARS - (weekly ? weekly.length + 4 : 0);
+  const withDrafts = draftsEnabled(env);
+
+  const lines: string[] = [
+    `HTMLRadar radar — daily digest — ${new Date(nowMs).toISOString().slice(0, 10)}`,
+  ];
+  let shown = 0;
+  let drafted = 0;
+  for (const it of items) {
+    const block =
+      `\n\n[${SOURCE_LABEL[it.source] ?? it.source}] ${it.title}` +
+      `\n${it.source_url}` +
+      `\ncategory: ${it.category} · intent ${it.intent_score}`;
+    const draft = withDrafts && it.intent_score >= REPLY_THRESHOLD ? `\n${draftReply(it)}` : '';
+    if (lines.join('').length + block.length + draft.length > budget) break;
+    lines.push(block);
+    if (draft) {
+      lines.push(draft);
+      drafted++;
+    }
+    shown++;
+  }
+  if (weekly) lines.push(`\n\n${weekly}`);
+
+  const text = lines.join('');
+  await sendTelegram(env, 'radar', 'daily-digest', text, {
+    items_shown: shown,
+    items_available: items.length,
+    drafts: drafted,
+    drafts_enabled: withDrafts,
+    monday: isMonday,
+    // The URLs shown, so a later "he replied to #2" can flip acted on the right row.
+    item_urls: items.slice(0, shown).map((i) => i.source_url),
+  });
+
+  // eslint-disable-next-line no-console
+  console.log(`[digest] ${shown} item(s), ${drafted} draft(s), monday:${isMonday}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -984,6 +1518,18 @@ export default {
       await sentinel(env, event.scheduledTime).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[sentinel] failed:', (err as Error).message);
+      });
+      return;
+    }
+
+    // 05:00 UTC: the daily digest, an hour after the 04:00 mining scan so it
+    // reads a finished radar_items harvest, not one still being written. It
+    // reads the event's own timestamp so the Monday weekly-insight keys off the
+    // schedule's Monday, not a retry's.
+    if (event.cron === '0 5 * * *') {
+      await dailyDigest(env, event.scheduledTime).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[digest] failed:', (err as Error).message);
       });
       return;
     }

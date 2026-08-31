@@ -41,7 +41,7 @@ const PRO_FEATURES = [
   'Everything in Free, plus:',
   'Unlimited tracked links',
   'Name your own links: htmlradar.page/r/acme-proposal',
-  'No “Powered by HTMLRadar” footer on recipient views',
+  'No HTMLRadar promotion in the footer on recipient views',
   'Priority email support, response inside one business day',
 ];
 

@@ -74,12 +74,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const supabase = serviceClient();
-  const share = await findOwnedShare<{ id: string; slug: string; owner_id: string }>(
-    supabase,
-    caller.userId,
-    params.id,
-    'id, slug',
-  );
+  const share = await findOwnedShare<{
+    id: string;
+    slug: string;
+    owner_id: string;
+    host_handle: string | null;
+  }>(supabase, caller.userId, params.id, 'id, slug, host_handle');
   if (!share) return errorResponse(NOT_FOUND);
 
   const revokedAt = revoked ? new Date().toISOString() : null;
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   return jsonResponse(200, {
     share_id: share.id,
-    url: shareUrl(share.slug),
+    url: shareUrl(share.slug, share.host_handle),
     revoked,
     revoked_at: revokedAt,
   });

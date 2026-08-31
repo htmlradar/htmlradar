@@ -21,7 +21,7 @@ import { requireUser, serverClient } from '@/lib/supabase-server';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { CopySlugButton } from '@/components/CopySlugButton';
 import { isMetaSectionTitle } from '@/lib/section-filter';
-import { SHARE_HOST } from '@/lib/share-url';
+import { shareUrlLabel } from '@/lib/share-url';
 
 export const runtime = 'edge';
 
@@ -153,7 +153,7 @@ export default async function ShareAnalyticsPage({
     : share.expires_at && new Date(share.expires_at) < new Date()
       ? ('expired' as const)
       : ('live' as const);
-  const fullUrl = `${SHARE_HOST}/r/${share.slug}`;
+  const fullUrl = shareUrlLabel(share.slug, share.host_handle);
 
   return (
     <div className="py-8">
@@ -190,11 +190,12 @@ export default async function ShareAnalyticsPage({
 
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-paper px-4 py-3 md:max-w-2xl">
         <span className="min-w-0 flex-1 truncate font-mono text-[13.5px] text-ink">{fullUrl}</span>
-        <CopySlugButton slug={share.slug} />
+        <CopySlugButton slug={share.slug} hostHandle={share.host_handle} />
       </div>
 
       <div className="mt-12">
         <ShareAnalytics
+          hostHandle={share.host_handle}
           shareSlug={share.slug}
           recipientLabel={share.recipient_label}
           viewers={visibleViewers}

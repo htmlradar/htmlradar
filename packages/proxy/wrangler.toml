@@ -63,6 +63,32 @@ LEGACY_HOSTS = "htmlradar.com"
 # no already-sent link changes its address in any state.
 TRUST_WRAPPER = ""
 
+# The trust layer's OTHER gate: handle links (Gate 2 in the design's
+# "Migration order, gates, and rollback"), and the whole of its rollback.
+#
+# THIS ONE LINE IS THE SETTING FOR BOTH HALVES. wrangler hands it to the
+# Worker, where it gates the apex-to-handle redirect; the deploy workflow's
+# preflight reads this same line into NEXT_PUBLIC_TRUST_HANDLES for the
+# application build, where it gates allocating a handle on a customer's first
+# share and stamping it on new links. Sol's ninth finding: the redirects and
+# the newly generated links must switch off together, so they read one value.
+#
+# Two states:
+#   ""  OFF — how it ships. No handle is ever allocated, no share stores a
+#       hostname, every link is the apex link it has always been.
+#   "*" ON — Gate 2. A customer's first share after this allocates their
+#       handle, new links are stamped with it and printed as
+#       {handle}.htmlradar.page/r/{slug}, and apex requests for those shares
+#       redirect there.
+#
+# Rolling back is this value and one deploy. Handles and stored hostnames are
+# immutable and stay behind, which is harmless: the shares carrying them keep
+# resolving on their own host, because the stored-hostname rules that serve
+# them are not gated. Nothing already sent moves in either direction.
+#
+# Needs the wildcard record and route below installed first.
+TRUST_HANDLES = ""
+
 # WILDCARD ROUTE, NOT YET INSTALLED. Per-customer hostnames need one wildcard
 # DNS record (*.htmlradar.page, proxied) and one more route here:
 #

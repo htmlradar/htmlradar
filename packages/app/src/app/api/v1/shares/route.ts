@@ -48,6 +48,7 @@ import { readQuota } from '@/lib/quota';
 import { captureServerEvent } from '@/lib/events';
 import { logServerError } from '@/lib/error-log';
 import { shareUrl } from '@/lib/share-url';
+import { stampShareHost } from '@/lib/handle';
 
 export const runtime = 'edge';
 
@@ -412,6 +413,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // The link's hostname, and the owner's handle if this is their first share
+  // since the gate opened. Returns null and touches nothing while the gate is
+  // off, which is today: the URL below is then the apex URL it has always
+  // been. A failure here is not a failure of the call — the link still opens,
+  // on the apex — so nothing is rolled back for it.
+  const hostHandle = await stampShareHost(supabase, caller.userId, share.id);
+
   // Both events are emitted only once the whole call has succeeded — a
   // document that gets rolled back above never happened as far as analytics
   // is concerned. A second link on an existing document creates no document,
@@ -448,7 +456,7 @@ export async function POST(req: NextRequest) {
   return jsonResponse(201, {
     share_id: share.id,
     document_id: documentId,
-    url: shareUrl(share.slug),
+    url: shareUrl(share.slug, hostHandle),
     dashboard_url: `${SITE_URL}/docs/${documentId}`,
   });
 }
@@ -482,7 +490,9 @@ export async function GET(req: NextRequest) {
   const supabase = serviceClient();
   let query = supabase
     .from('document_shares')
-    .select('id, slug, document_id, recipient_label, created_at, revoked_at, expires_at')
+    .select(
+      'id, slug, document_id, recipient_label, created_at, revoked_at, expires_at, host_handle',
+    )
     .eq('owner_id', caller.userId)
     // Both columns, in both places: the sort and the cursor have to agree, or
     // rows sharing a timestamp fall between two pages.
@@ -543,7 +553,7 @@ export async function GET(req: NextRequest) {
     shares: rows.map((row) => ({
       share_id: row.id,
       slug: row.slug,
-      url: shareUrl(row.slug),
+      url: shareUrl(row.slug, row.host_handle),
       recipient_label: row.recipient_label,
       document_id: row.document_id,
       document_title: titleById.get(row.document_id) ?? null,
@@ -569,6 +579,9 @@ interface ShareListRow {
   created_at: string;
   revoked_at: string | null;
   expires_at: string | null;
+  // Null on every share created before handle links were switched on, which
+  // is every share that exists today: those are served on the apex forever.
+  host_handle: string | null;
 }
 
 interface SessionListRow {

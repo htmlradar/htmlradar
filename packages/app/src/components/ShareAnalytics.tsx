@@ -31,6 +31,9 @@ interface SectionRow {
 
 export interface ShareAnalyticsProps {
   shareSlug: string;
+  // The hostname the share stores (schema/043), or null for the apex — every
+  // printed and copied address goes through shareUrl with it.
+  hostHandle: string | null;
   recipientLabel: string | null;
   viewers: Viewer[];
   sessions: Session[];
@@ -70,6 +73,7 @@ function formatDuration(seconds: number): string {
 
 export function ShareAnalytics({
   shareSlug,
+  hostHandle,
   recipientLabel,
   viewers,
   sessions,
@@ -83,6 +87,7 @@ export function ShareAnalytics({
     return (
       <WaitingState
         shareSlug={shareSlug}
+        hostHandle={hostHandle}
         recipientLabel={recipientLabel}
         shareStatus={shareStatus}
       />
@@ -206,14 +211,16 @@ function Stat({
 
 function WaitingState({
   shareSlug,
+  hostHandle,
   recipientLabel,
   shareStatus = 'live',
 }: {
   shareSlug: string;
+  hostHandle: string | null;
   recipientLabel: string | null;
   shareStatus?: 'live' | 'revoked' | 'expired';
 }) {
-  const fullUrl = shareUrl(shareSlug);
+  const fullUrl = shareUrl(shareSlug, hostHandle);
   const who = recipientLabel ?? 'the recipient';
 
   // Revoked/expired with no reads: don't tell the owner to send a link that
@@ -254,7 +261,7 @@ function WaitingState({
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper px-4 py-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">{fullUrl}</span>
-        <CopySlugButton slug={shareSlug} />
+        <CopySlugButton slug={shareSlug} hostHandle={hostHandle} />
       </div>
     </div>
   );

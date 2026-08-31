@@ -21,6 +21,8 @@ import {
 } from '@/lib/attachments';
 import { describeSlugError, validateShareSlug } from '@/lib/share-slug';
 import { SHARE_BASE, shareUrl } from '@/lib/share-url';
+import { stampShareHost } from '@/lib/handle';
+import { serviceClient } from '@/lib/api-auth';
 
 // Shared parse for the two allowlist textareas. Domains in one field,
 // specific emails in another. Both accept comma- and newline-separated
@@ -172,6 +174,14 @@ export async function createShareFormAction(formData: FormData): Promise<CreateS
       });
       if (toggleErr) throw new Error(toggleErr.message);
     }
+
+    // The link's hostname, and the owner's handle if this is their first share
+    // since the gate opened. With the gate off — today — this returns null
+    // without reaching the database, no handle is allocated, and the link
+    // stays the apex link it has always been. It needs the service role:
+    // schema/032 narrowed the profile write grant so a customer's own session
+    // cannot write `handle` at all, which is the point.
+    if (createdId) await stampShareHost(serviceClient(), user.id, createdId);
 
     await captureServerEvent({
       event: 'share.created',
@@ -465,7 +475,7 @@ export async function previewShareAction(
   try {
     const { data: share, error } = await supabase
       .from('document_shares')
-      .select('slug, owner_id, document_id')
+      .select('slug, owner_id, document_id, host_handle')
       .eq('id', shareId)
       .single();
     if (error) throw new Error(error.message);
@@ -480,7 +490,7 @@ export async function previewShareAction(
     }
 
     const token = await issueOwnerPreviewToken(share.slug, secret);
-    const url = `${shareUrl(share.slug)}?owner_preview=${encodeURIComponent(token)}`;
+    const url = `${shareUrl(share.slug, share.host_handle)}?owner_preview=${encodeURIComponent(token)}`;
 
     await captureServerEvent({
       event: 'share.preview_opened',

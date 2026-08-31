@@ -23,7 +23,19 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // agent reading a slug off an old email must still be understood. Any other
 // host is rejected, so a link that merely looks like ours cannot be used to
 // probe for shares.
-const LINK_HOSTS = [SHARE_HOST, SITE_HOST].join('|').replace(/\./g, '\\.');
+//
+// A third shape once handle links are switched on: a link on the owner's own
+// subdomain, `{handle}.htmlradar.page/r/{slug}`. One label only, matching the
+// format schema/043 enforces — an extra level is somebody else's host, not
+// ours. The handle is not used to find the share: `host_handle` is stored on
+// the row and the lookup below is scoped to the caller's own shares anyway,
+// so accepting the label here only means an assistant can paste the link it
+// was given.
+const escapeHost = (host: string): string => host.replace(/\./g, '\\.');
+const HANDLE_LABEL = '[a-z0-9][a-z0-9-]{1,22}[a-z0-9]';
+const LINK_HOSTS = [`(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`, escapeHost(SITE_HOST)].join(
+  '|',
+);
 const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
 
 /**

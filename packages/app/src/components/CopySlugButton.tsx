@@ -9,11 +9,11 @@ import { Check, Copy } from 'lucide-react';
 import { captureClientEvent } from '@/lib/events-client';
 import { shareUrl } from '@/lib/share-url';
 
-export function CopySlugButton({ slug }: { slug: string }) {
+export function CopySlugButton({ slug, hostHandle }: { slug: string; hostHandle: string | null }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    const fullUrl = shareUrl(slug);
+    const fullUrl = shareUrl(slug, hostHandle);
     void captureClientEvent('share.copied', { slug });
     try {
       await navigator.clipboard.writeText(fullUrl);

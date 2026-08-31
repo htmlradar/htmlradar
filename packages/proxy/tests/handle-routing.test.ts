@@ -100,7 +100,12 @@ const env = {
   SESSION_SECRET: 'test-session-secret',
   TRACKER_URL: 'https://htmlradar.com/v1/tracker.js',
   TRUST_WRAPPER: '*',
+  TRUST_HANDLES: '*',
 } as unknown as Env;
+
+// Gate 2 off: the same worker with handle links rolled back. Only rule 2, the
+// apex-to-handle redirect, is supposed to notice.
+const handlesOff = { ...env, TRUST_HANDLES: '' } as Env;
 
 const ctx = {
   waitUntil: () => {},
@@ -209,6 +214,27 @@ describe('rule 2 — a share that stores a hostname is redirected there from the
     });
     expect(res.status).toBe(308);
     expect(res.headers.get('Location')).toBe('https://acme.htmlradar.page/r/acme-proposal/auth');
+  });
+
+  // Gate 2's rollback, and the half of it that lives in the Worker. With the
+  // setting off the redirect stops, and the share is served where it was
+  // asked for instead — the link still opens, which is the point: rolling
+  // back must strand nothing. Its handle host keeps working too, because the
+  // rules that serve it there are not gated.
+  it('is served in place on the apex once the gate is rolled back', async () => {
+    const res = await fetchAs('https://htmlradar.page/r/acme-proposal', {}, handlesOff);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Location')).toBeNull();
+  });
+
+  it('still answers on its own host once the gate is rolled back', async () => {
+    const res = await fetchAs('https://acme.htmlradar.page/r/acme-proposal', {}, handlesOff);
+    expect(res.status).toBe(200);
+  });
+
+  it('still refuses another customer’s host once the gate is rolled back', async () => {
+    const res = await fetchAs('https://rival.htmlradar.page/r/acme-proposal', {}, handlesOff);
+    await expectStandardNotFound(res, 'a rival host with the gate off');
   });
 
   it('serves it in place on its own host', async () => {

@@ -338,7 +338,7 @@ function LinkSection({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewing, startPreview] = useTransition();
 
-  const url = shareUrl(share.slug);
+  const url = shareUrl(share.slug, share.host_handle);
   const customSlug = hasCustomSlug(share);
 
   const onCopy = async () => {
@@ -527,6 +527,13 @@ function ShareForm({
               we&apos;ll generate one. It cannot be changed once the link is created.
             </SectionNote>
             <div className="mt-3 flex items-stretch overflow-hidden rounded-md border border-line bg-paper focus-within:border-signal">
+              {/* ponytail: the apex host as the prefix, because there is no
+                  share yet to carry a stored hostname. Once handle links are
+                  switched on (TRUST_HANDLES) a Pro customer naming a link
+                  would see the apex here and receive a handle address — read
+                  the owner's handle in v2/page.tsx and pass it down when that
+                  gate opens. Cosmetic until then: the link created is correct
+                  either way. */}
               <span className="shrink-0 border-r border-line bg-paper-2/40 px-3 py-2 font-mono text-[12.5px] leading-normal text-graphite">
                 {SHARE_HOST}/r/
               </span>

@@ -63,6 +63,12 @@ export interface ShareRow {
   lock_deck: boolean;
   expires_at: string | null;
   revoked_at: string | null;
+  // The hostname this link was created for (schema/043). Null on every share
+  // that exists today: those are served on the apex, forever. Routing follows
+  // this column and never the owner's current handle, so an already-sent link
+  // never moves — which is why it travels with the row instead of being
+  // looked up.
+  host_handle: string | null;
   viewCount: number;
 }
 
@@ -403,7 +409,7 @@ function SharePane({
   const isRevoked = !!share.revoked_at;
   const isExpired = !!share.expires_at && new Date(share.expires_at) < new Date();
   const isLive = !isRevoked && !isExpired;
-  const fullUrl = shareUrl(share.slug);
+  const fullUrl = shareUrl(share.slug, share.host_handle);
 
   // Use the same identity resolver as the rail + tables so the
   // SharePane heading reads consistently across the page. Without
@@ -474,7 +480,7 @@ function SharePane({
           >
             {fullUrl}
           </span>
-          {isLive && <CopyInline slug={share.slug} />}
+          {isLive && <CopyInline slug={share.slug} hostHandle={share.host_handle} />}
         </div>
 
         {/* Gate row — one chip per gate condition. Replaces the prior
@@ -510,6 +516,7 @@ function SharePane({
       {analytics && analytics.sessions.length > 0 ? (
         <ShareAnalytics
           shareSlug={share.slug}
+          hostHandle={share.host_handle}
           recipientLabel={share.recipient_label}
           viewers={analytics.viewers}
           sessions={analytics.sessions}
@@ -528,7 +535,11 @@ function SharePane({
           hideSessions
         />
       ) : isLive ? (
-        <WaitingInline shareSlug={share.slug} recipientLabel={share.recipient_label} />
+        <WaitingInline
+          shareSlug={share.slug}
+          hostHandle={share.host_handle}
+          recipientLabel={share.recipient_label}
+        />
       ) : null}
     </section>
   );
@@ -619,9 +630,11 @@ function buildGateTags(share: ShareRow): ReactNode[] {
 
 function WaitingInline({
   shareSlug,
+  hostHandle,
   recipientLabel,
 }: {
   shareSlug: string;
+  hostHandle: string | null;
   recipientLabel: string | null;
 }) {
   return (
@@ -642,9 +655,9 @@ function WaitingInline({
       </div>
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper px-4 py-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">
-          {shareUrl(shareSlug)}
+          {shareUrl(shareSlug, hostHandle)}
         </span>
-        <CopyInline slug={shareSlug} />
+        <CopyInline slug={shareSlug} hostHandle={hostHandle} />
       </div>
     </div>
   );
@@ -1310,18 +1323,18 @@ function StatusPill({ tone, label }: { tone: 'signal' | 'alert'; label: string }
   );
 }
 
-function CopyInline({ slug }: { slug: string }) {
+function CopyInline({ slug, hostHandle }: { slug: string; hostHandle: string | null }) {
   const [copied, setCopied] = useState(false);
   const handle = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl(slug));
+      await navigator.clipboard.writeText(shareUrl(slug, hostHandle));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
       // navigator.clipboard fails in non-secure contexts; fall back to a
       // hidden-textarea copy so the action never silently no-ops.
       const el = document.createElement('textarea');
-      el.value = shareUrl(slug);
+      el.value = shareUrl(slug, hostHandle);
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');

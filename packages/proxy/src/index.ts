@@ -253,6 +253,10 @@ function resolveHost(hostname: string, env: Env): HostKind {
  *      links were only ever printed in handle form, so no session is
  *      disturbed. A method that carries a body redirects with 308, never 301,
  *      which would turn a gate submission into a GET and drop what was typed.
+ *      This rule alone sits behind TRUST_HANDLES — the same single setting
+ *      that lets the application print handle links — so a rollback stops the
+ *      redirects and the new links together. Off, such a share is simply
+ *      served in place on the apex.
  *   3. A handle host that does not match the share's stored hostname: not
  *      found, and identically so. Without this an abuser could have their own
  *      document served on a rival's host, or on microsoft.htmlradar.page, and
@@ -269,7 +273,7 @@ function enforceStoredHost(
   if (host.kind === 'handle') {
     return share.host_handle === host.handle ? null : notFound();
   }
-  if (!share.host_handle) return null;
+  if (!share.host_handle || !handleLinksEnabled(env)) return null;
   const target = new URL(url.toString());
   target.hostname = `${share.host_handle}.${shareHostOf(env)}`;
   target.protocol = 'https:';
@@ -293,6 +297,25 @@ const toWrapper = (slug: string): Response =>
  * alone, which is how it reaches QA shares first; "*" turns it on for
  * everybody.
  */
+/**
+ * Gate 2: are handle links switched on?
+ *
+ * Only rule 2 — the apex-to-handle redirect — asks. Rules 1, 3 and 4 are the
+ * safety rules (a share is served only on the hostname it stores, and every
+ * mismatch is the identical not-found), and gating those would be gating the
+ * thing that stops one customer's document being served on another's host.
+ * They stay on in every state.
+ *
+ * ONE SETTING REACHES BOTH HALVES: the same TRUST_HANDLES line in
+ * wrangler.toml is read into the application build as
+ * NEXT_PUBLIC_TRUST_HANDLES, where it gates allocating handles and stamping
+ * them on new shares. Sol's ninth finding — the redirects and the newly
+ * generated links must switch off together.
+ */
+function handleLinksEnabled(env: Env): boolean {
+  return (env.TRUST_HANDLES ?? '').trim() === '*';
+}
+
 function wrapperEnabled(slug: string, env: Env): boolean {
   const setting = (env.TRUST_WRAPPER ?? '').trim();
   if (!setting) return false;

@@ -98,6 +98,15 @@ jobs:
           # doesn't silently ship a different base than local/dev.
           SHARE_BASE="${SHARE_BASE:-https://htmlradar.page}"
           echo "Using NEXT_PUBLIC_SHARE_BASE=$SHARE_BASE"
+          # The trust layer's Gate 2 setting, read from the ONE place it is
+          # written: packages/proxy/wrangler.toml, which is also where
+          # wrangler reads it for the Worker. The Worker gates the
+          # apex-to-handle redirect with it and the app gates allocating and
+          # printing handle links with it, so the two halves cannot disagree
+          # (Sol's ninth finding). Absent or unreadable means off, which is
+          # the shipped state and the safe one.
+          TRUST_HANDLES=$(sed -n 's/^TRUST_HANDLES[[:space:]]*=[[:space:]]*"\(.*\)"$/\1/p' packages/proxy/wrangler.toml | head -1)
+          echo "Using NEXT_PUBLIC_TRUST_HANDLES=${TRUST_HANDLES:-(off)}"
           # Write a runner-local .env.production. This file lives only on
           # the ephemeral GitHub Actions runner — never committed to the
           # repo. Next.js auto-loads it during the build so NEXT_PUBLIC_*
@@ -107,6 +116,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
           NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
           NEXT_PUBLIC_SHARE_BASE=$SHARE_BASE
+          NEXT_PUBLIC_TRUST_HANDLES=$TRUST_HANDLES
           EOF
           echo "Preflight OK — .env.production written for build."
 

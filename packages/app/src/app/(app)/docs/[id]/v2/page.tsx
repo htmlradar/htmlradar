@@ -242,6 +242,7 @@ async function renderV2({
     lock_deck: Boolean(s.lock_deck ?? true),
     expires_at: s.expires_at,
     revoked_at: s.revoked_at,
+    host_handle: (s.host_handle as string | null) ?? null,
     viewCount: sessionsByShare[s.id]?.length ?? 0,
   }));
 

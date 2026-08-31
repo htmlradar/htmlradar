@@ -78,13 +78,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     slug: string;
     owner_id: string;
     recipient_label: string | null;
-  }>(supabase, caller.userId, params.id, 'id, slug, recipient_label');
+    host_handle: string | null;
+  }>(supabase, caller.userId, params.id, 'id, slug, recipient_label, host_handle');
 
   // Someone else's link is indistinguishable from one that does not exist —
   // a key must not be usable to probe for share ids.
   if (!share) return errorResponse(NOT_FOUND);
 
-  const url = shareUrl(share.slug);
+  const url = shareUrl(share.slug, share.host_handle);
 
   const [{ data: viewerRows }, { data: sessionRows }] = await Promise.all([
     supabase.from('viewers').select('*').eq('share_id', share.id),

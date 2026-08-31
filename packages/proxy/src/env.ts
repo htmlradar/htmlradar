@@ -32,6 +32,22 @@ export interface Env {
   // Rolling back is this setting and one deploy; no database change either
   // way, and no already-sent link changes its address in any state.
   TRUST_WRAPPER?: string;
+  // The trust layer's OTHER gate: handle links (Gate 2 in the design's
+  // "Migration order, gates, and rollback").
+  //
+  // ONE SETTING REACHES BOTH HALVES, which is Sol's ninth finding. This line
+  // in wrangler.toml is what wrangler hands the Worker, and the deploy
+  // workflow's preflight reads the same line into NEXT_PUBLIC_TRUST_HANDLES
+  // for the application build. The Worker half gates the apex-to-handle
+  // redirect; the application half gates allocating a handle and stamping it
+  // on new shares. They cannot disagree, so newly generated handle links and
+  // the redirects that serve them switch off together.
+  //
+  // Two states: "" or unset is off, "*" is on. Off, a share that already
+  // stores a hostname is served in place on the apex instead of redirected —
+  // it still opens, and its handle-host address still works, because the
+  // stored-hostname rules that serve it are NOT gated. Only the redirect is.
+  TRUST_HANDLES?: string;
   // Git commit bound at deploy time (`wrangler deploy --var GIT_SHA:...` from
   // .github/workflows/deploy.yml); absent under `wrangler dev` and in tests.
   GIT_SHA?: string;

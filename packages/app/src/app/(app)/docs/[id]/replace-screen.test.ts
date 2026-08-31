@@ -24,6 +24,10 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/events', () => ({ captureServerEvent: vi.fn(async () => undefined) }));
+// The share actions in the same module now reach the handle allocator, which
+// reaches the error log, which imports Next's `server-only` — a module that
+// resolves inside the Next build and nowhere else.
+vi.mock('@/lib/error-log', () => ({ logServerError: vi.fn(async () => undefined) }));
 vi.mock('@/lib/quota', () => ({ readQuota: async () => ({ atCap: false, used: 0 }) }));
 vi.mock('@/lib/preview-token', () => ({
   issueOwnerDocPreviewToken: async () => 'tok',

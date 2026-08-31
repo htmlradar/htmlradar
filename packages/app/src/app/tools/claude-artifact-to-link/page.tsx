@@ -20,7 +20,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Share a Claude Artifact as a Link | HTMLRadar',
   description:
-    'Save or export a Claude artifact as an HTML file, drop it here, and get a tracked link. See who opened it, which sections they read, and for how long.',
+    'How to share an HTML file from Claude: save or export the artifact as an HTML file, drop it here, and get a tracked link that shows who opened it, which sections they read, and for how long.',
   path: '/tools/claude-artifact-to-link',
 });
 
@@ -28,6 +28,10 @@ const FAQ = [
   {
     q: 'How do I share a Claude artifact with someone else?',
     a: 'Save or export the artifact as an HTML file, drop that file on this page, and sign in. HTMLRadar gives you a link anyone can open in a browser, with no account on their side.',
+  },
+  {
+    q: 'How do I share an HTML file from Claude?',
+    a: 'Copy or download the artifact as one self-contained HTML file — Claude lets you view the code and save it — then drop that file on this page and sign in. You get a tracked link anyone can open in a browser, and it tells you who opened it and which sections they read.',
   },
   {
     q: 'Which artifacts work here?',

@@ -15,7 +15,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'How to Share a Claude Artifact and See Who Opened It | HTMLRadar',
   description:
-    'How to share a Claude artifact and see who opened it: export it as HTML, send a tracked HTMLRadar link, and get section-level attention and active read time.',
+    'How to share a Claude artifact and see who opened it: export it as an HTML file, send a tracked HTMLRadar link, and get section-level attention and active read time.',
   path: '/for/claude-artifacts',
 });
 
@@ -36,10 +36,10 @@ export default function ClaudeArtifactsPage() {
             How to share a Claude artifact and see who opened it.
           </h1>
           <DirectAnswer updated="August 2026">
-            To see who opened a Claude artifact, export it as HTML, upload it to HTMLRadar, and send
-            the tracked link instead of the artifact URL. You get who opened it, which sections they
-            read and for how long, plus an optional email gate, password and expiry. Free for two
-            tracked links, open source.
+            To see who opened a Claude artifact, export it as an HTML file, upload it to HTMLRadar,
+            and send the tracked link instead of the artifact URL. You get who opened it, which
+            sections they read and for how long, plus an optional email gate, password and expiry.
+            Free for two tracked links, open source.
           </DirectAnswer>
 
           <section className="mt-10">

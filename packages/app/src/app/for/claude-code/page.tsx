@@ -12,7 +12,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'HTMLRadar for Claude Code — Track What You Generate | HTMLRadar',
   description:
-    'Generate an HTML deck in Claude Code, publish it as a tracked link without leaving the terminal, and ask Claude the next day whether the recipient read it.',
+    'Share an HTML file from Claude Code as a tracked link: generate the deck or report in the terminal, publish it without leaving Claude Code, and ask the next day whether the recipient read it.',
   path: '/for/claude-code',
 });
 
@@ -100,11 +100,11 @@ export default function ForClaudeCodePage() {
             Claude Code wrote the deck. Find out if they read it.
           </h1>
           <DirectAnswer updated="August 2026">
-            HTMLRadar lets Claude Code publish an HTML deck, proposal or report as a tracked link,
-            ask afterwards who opened it and which sections they read, send the same document to
-            more people one link at a time, switch a link off, and rewrite the document behind links
-            that have already gone out. Install the plugin, generate as usual, and the whole loop
-            stays in the terminal. Free for two links, then $15 a month.
+            HTMLRadar lets Claude Code share an HTML file it generated — a deck, proposal or report
+            — as a tracked link, ask afterwards who opened it and which sections they read, send the
+            same document to more people one link at a time, switch a link off, and rewrite the
+            document behind links that have already gone out. Install the plugin, generate as usual,
+            and the whole loop stays in the terminal. Free for two links, then $15 a month.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Claude Code is very good at producing a finished HTML document — a board update, a

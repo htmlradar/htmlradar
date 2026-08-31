@@ -18,9 +18,9 @@ import { HtmlToolPanel } from '../HtmlToolPanel';
 export const runtime = 'edge';
 
 export const metadata = pageMeta({
-  title: 'HTML File to Link Converter (Free) | HTMLRadar',
+  title: 'Share an HTML File as a Link (Free) | HTMLRadar',
   description:
-    'Free HTML file to link converter. Drop an HTML file, preview it in your browser, and get a shareable link that shows who opened it and which sections they read.',
+    'Share an HTML file as a link: drop the file, preview it in your browser, and get a shareable link that shows who opened it and which sections they read. Free HTML-to-link tool.',
   path: '/tools/html-to-link',
 });
 
@@ -61,13 +61,13 @@ export default async function HtmlToLinkToolPage({ searchParams }: { searchParam
           />
           <SectionMark>HTMLRadar · Free tool</SectionMark>
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[52px]">
-            Turn an HTML file into a link you can share.
+            Share an HTML file as a link, and see who reads it.
           </h1>
           <DirectAnswer updated="August 2026">
-            Drop your HTML file on this page. It previews in your browser, then you sign in and
-            HTMLRadar gives you a link you can send anyone. The link shows who opened it, which
-            sections they read, and for how long. Free for two tracked links, then $15 a month. Open
-            source.
+            To share an HTML file as a link, drop it on this page. It previews in your browser, then
+            you sign in and HTMLRadar gives you a link you can send anyone. The link shows who
+            opened it, which sections they read, and for how long. Free for two tracked links, then
+            $15 a month. Open source.
           </DirectAnswer>
 
           <div className="mt-8">
@@ -137,18 +137,15 @@ export default async function HtmlToLinkToolPage({ searchParams }: { searchParam
           <div className="mt-16 border-t border-line pt-10">
             <p className="text-[14px] leading-relaxed text-ink-soft">
               Related:{' '}
+              <Link href="/how-to/share-an-html-file" className="text-signal-dark hover:underline">
+                how to share an HTML file
+              </Link>
+              ,{' '}
               <Link
                 href="/tools/claude-artifact-to-link"
                 className="text-signal-dark hover:underline"
               >
                 share a Claude artifact as a link
-              </Link>
-              ,{' '}
-              <Link
-                href="/tools/claude-artifact-to-pdf"
-                className="text-signal-dark hover:underline"
-              >
-                Claude artifact to PDF
               </Link>
               , and{' '}
               <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">

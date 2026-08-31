@@ -78,6 +78,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/how-to/share-an-html-file`,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
     { url: `${baseUrl}/self-hosted`, changeFrequency: 'monthly', priority: 0.7 },
     {
       url: `${baseUrl}/pl/alternatywa-dla-docsend`,

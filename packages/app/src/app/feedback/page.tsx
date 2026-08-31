@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { SectionMark } from '@/components/SectionMark';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { serverClient } from '@/lib/supabase-server';
 import { submitFeedback } from './actions';
 
@@ -41,9 +42,9 @@ export default async function FeedbackPage({
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <SectionMark>HTMLRadar · Feedback</SectionMark>
-          <h1 className="text-letterpress mt-6 font-serif text-[44px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[60px]">
+          <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Tell us what we missed.
           </h1>
           <p className="mt-6 max-w-lg text-[15.5px] leading-relaxed text-ink-soft">
@@ -150,17 +151,9 @@ export default async function FeedbackPage({
               </button>
             </form>
           )}
-
-          <div className="mt-20 border-t border-line pt-10">
-            <a
-              href="/"
-              className="link-slide font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </a>
-          </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

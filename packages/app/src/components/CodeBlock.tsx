@@ -10,7 +10,7 @@ export function CodeBlock({ label, code }: { label?: string; code: string }) {
           {label}
         </div>
       ) : null}
-      <pre className="overflow-x-auto px-4 py-4 font-mono text-[12.5px] leading-[1.55] text-ink">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words px-4 py-4 font-mono text-[12.5px] leading-[1.55] text-ink">
         {code}
       </pre>
     </div>

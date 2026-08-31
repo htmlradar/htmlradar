@@ -4,6 +4,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { ArticleLd, BreadcrumbLd } from '@/components/JsonLd';
 import { pageMeta } from '@/lib/seo';
@@ -22,7 +23,7 @@ export default function Post() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <ArticleLd
             headline="How I built HTMLRadar"
             datePublished="2026-05-14"
@@ -317,15 +318,10 @@ const cookie = \`\${payload}.\${mac}\`;`}
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }
@@ -429,8 +425,8 @@ function WhatLivesWhereTable() {
     ['Resend API key', 'Supabase Vault', 'decrypted at trigger time'],
   ];
   return (
-    <figure className="my-2 overflow-hidden rounded-2xl border border-line bg-paper">
-      <table className="w-full text-[13px]">
+    <figure className="my-2 overflow-x-auto rounded-2xl border border-line bg-paper">
+      <table className="w-full min-w-[560px] text-[13px]">
         <thead className="bg-paper-2/50 text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
           <tr>
             <th className="px-4 py-3">Data</th>
@@ -458,7 +454,7 @@ function CodeBlock({ file, code }: { file: string; code: string }) {
       <div className="border-b border-line bg-paper-2/60 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
         {file}
       </div>
-      <pre className="overflow-x-auto px-4 py-4 font-mono text-[12.5px] leading-[1.55] text-ink">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words px-4 py-4 font-mono text-[12.5px] leading-[1.55] text-ink">
         {code}
       </pre>
     </div>

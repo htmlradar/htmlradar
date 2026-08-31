@@ -5,13 +5,24 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
+import { DashboardMock, type SectionRow } from '@/components/mocks/DashboardMock';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
+
+// The same dashboard drawing, labelled for a proposal instead of a deck.
+const PROPOSAL_SECTIONS: SectionRow[] = [
+  { label: 'Pricing', time: '4m 06s', pct: 100, tone: 'signal' },
+  { label: 'Scope', time: '3m 41s', pct: 90, tone: 'signal' },
+  { label: 'Timeline', time: '1m 12s', pct: 29, tone: 'signal' },
+  { label: 'Team', time: '18s', pct: 7, tone: 'soft' },
+  { label: 'Case studies', time: '—', pct: 0, tone: 'soft' },
+];
 
 export const metadata = pageMeta({
   title: 'Client Proposal Tracking — Know When It’s Read | HTMLRadar',
@@ -25,7 +36,7 @@ export default function ProposalTrackingPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -45,9 +56,8 @@ export default function ProposalTrackingPage() {
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             You sent the proposal Tuesday. It&apos;s Friday. Do you follow up — or is that pushy?
-            Proposal tracking replaces that guess with a fact: the client opened it Thursday at 4pm,
-            spent four minutes on scope, and parked on the pricing section twice. Follow up Friday
-            morning. That&apos;s not pushy; that&apos;s well-timed.
+            Proposal tracking replaces that guess with a read report, and the read report tells you
+            which morning to write. That&apos;s not pushy; that&apos;s well-timed.
           </p>
 
           <section className="mt-12">
@@ -68,11 +78,21 @@ export default function ProposalTrackingPage() {
               See which sections did the selling
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              Reads are measured per section — scope, timeline, team, pricing — with a three-second
-              floor so a scroll-past doesn&apos;t count. You&apos;ll know if pricing got thirty
-              seconds or five minutes, whether the case studies were read at all, and who inside the
-              client&apos;s team the link was forwarded to. An email lands on the first real read,
-              so the follow-up window never slips past you.
+              Reads are measured per section, with a three-second floor so a scroll-past
+              doesn&apos;t count.
+            </p>
+            {/* The paragraph that used to run here read this panel out in words —
+                which section got five minutes, which got thirty seconds. */}
+            <div className="mt-6">
+              <DashboardMock
+                title="Acme · Statement of work"
+                recipient="Dana · Acme Operations"
+                sections={PROPOSAL_SECTIONS}
+              />
+            </div>
+            <p className="mt-6 text-[16px] leading-relaxed text-ink-soft">
+              You also see who inside the client&apos;s team the link was forwarded to. An email
+              lands on the first real read, so the follow-up window never slips past you.
             </p>
           </section>
 
@@ -159,15 +179,10 @@ export default function ProposalTrackingPage() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

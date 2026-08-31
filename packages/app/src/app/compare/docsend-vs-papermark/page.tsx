@@ -5,6 +5,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
@@ -25,7 +26,7 @@ export default function DocsendVsPapermarkPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -191,15 +192,10 @@ export default function DocsendVsPapermarkPage() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

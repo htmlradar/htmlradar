@@ -13,7 +13,10 @@ const config: Config = {
     extend: {
       colors: {
         paper: { DEFAULT: '#FBF1E8', 2: '#F4E1CB', 3: '#EDD5BD' },
-        ink: { DEFAULT: '#1F1108', soft: '#3A2818' },
+        // ink DEFAULT is the v2 --ink. It was #1F1108 until 2026-08-31, which
+        // made every inner-page heading read a shade colder than the home
+        // page's. Kept in step with globals.css and landing-v2.css.
+        ink: { DEFAULT: '#2A1812', soft: '#3A2818' },
         graphite: '#876959',
         signal: { DEFAULT: '#7A1F2E', dark: '#5A1521' },
         'signal-soft': '#D9B5B0',

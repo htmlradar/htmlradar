@@ -4,6 +4,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { SectionMark } from '@/components/SectionMark';
 import { pageMeta } from '@/lib/seo';
@@ -40,7 +41,7 @@ export default function ToolsIndexPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -48,7 +49,7 @@ export default function ToolsIndexPage() {
             ]}
           />
           <SectionMark>HTMLRadar · Free tools</SectionMark>
-          <h1 className="text-letterpress mt-6 font-serif text-[44px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[60px]">
+          <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Free tools.
           </h1>
           <p className="mt-6 max-w-lg text-[15.5px] leading-relaxed text-ink-soft">
@@ -71,17 +72,9 @@ export default function ToolsIndexPage() {
               </li>
             ))}
           </ul>
-
-          <div className="mt-20 border-t border-line pt-10">
-            <Link
-              href="/"
-              className="link-slide font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
-          </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

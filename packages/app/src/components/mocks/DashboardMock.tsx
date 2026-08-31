@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 
-interface SectionRow {
+export interface SectionRow {
   label: string;
   time: string;
   pct: number;
@@ -27,7 +27,20 @@ const SECTIONS: SectionRow[] = [
 const SPARK = [0, 0, 1, 0, 2, 0, 3];
 const TICKER_MS = 1100;
 
-export function DashboardMock() {
+// Three optional overrides so a proposal page can show proposal sections
+// instead of a seed deck's. Everything else — the layout, the tickers, the
+// sparkline — is the same drawing.
+interface DashboardMockProps {
+  title?: string;
+  recipient?: string;
+  sections?: SectionRow[];
+}
+
+export function DashboardMock({
+  title = 'Seed Deck. Q2.',
+  recipient = 'Marc · Halbrook Capital',
+  sections = SECTIONS,
+}: DashboardMockProps = {}) {
   const [progress, setProgress] = useState(0);
   const ref = useRef<HTMLDivElement | null>(null);
   const playedRef = useRef(false);
@@ -77,7 +90,7 @@ export function DashboardMock() {
           <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
             htmlradar.com / r / swift-falcon-a3f2
           </div>
-          <div className="mt-2 font-serif text-2xl text-ink">Seed Deck. Q2.</div>
+          <div className="mt-2 font-serif text-2xl text-ink">{title}</div>
         </div>
         <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
           <span className="size-1.5 rounded-full bg-signal" />
@@ -88,13 +101,13 @@ export function DashboardMock() {
       <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-full bg-paper-3 font-mono text-[12px] font-medium text-ink-soft">
-            M
+            {recipient.charAt(0)}
           </span>
           <div>
             <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
               Recipient
             </div>
-            <div className="mt-0.5 text-[14px] font-medium text-ink">Marc · Halbrook Capital</div>
+            <div className="mt-0.5 text-[14px] font-medium text-ink">{recipient}</div>
           </div>
         </div>
         <div className="flex items-baseline gap-6">
@@ -149,7 +162,7 @@ export function DashboardMock() {
           Time spent per section
         </div>
         <ul className="mt-3 space-y-2.5">
-          {SECTIONS.map((s) => {
+          {sections.map((s) => {
             const width = Math.max(s.pct * progress, 1);
             return (
               <li key={s.label} className="grid grid-cols-[1fr_auto] items-center gap-3">

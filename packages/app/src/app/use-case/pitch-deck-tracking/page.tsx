@@ -4,10 +4,14 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
+import { DashboardMock } from '@/components/mocks/DashboardMock';
+import { ShareStack } from '@/components/mocks/ShareStack';
+import { VersionSwap } from '@/components/mocks/VersionSwap';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
@@ -24,7 +28,7 @@ export default function PitchDeckTrackingPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -65,10 +69,16 @@ export default function PitchDeckTrackingPage() {
               Which slides did they actually read?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              Open tracking tells you nothing about conviction. Section-level dwell does. HTMLRadar
-              shows time per section: 2m 41s on the Ask, a re-read of Team, twelve seconds on
-              Problem, Market sizing skipped entirely. That&apos;s a different follow-up than
-              &ldquo;just checking in.&rdquo;
+              Open tracking tells you nothing about conviction. Section-level dwell does.
+            </p>
+            {/* The paragraph that used to sit here read out this exact dashboard —
+                the seconds on the Ask, the skipped Market sizing — so the mock
+                replaces it rather than sitting under a description of itself. */}
+            <div className="mt-6">
+              <DashboardMock />
+            </div>
+            <p className="mt-6 text-[16px] leading-relaxed text-ink-soft">
+              That&apos;s a different follow-up than &ldquo;just checking in.&rdquo;
             </p>
             <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">
               Attachments ride under the same link — financial model, cap table, data-room files —
@@ -80,16 +90,19 @@ export default function PitchDeckTrackingPage() {
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
               One link per investor
             </h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              Each investor gets their own tracked link, so reads never blur together. Per share you
-              can set an email gate, a password, an expiry date, a domain allow-list, and a download
-              lock — and revoke any link with one toggle the moment the round closes or the
-              conversation goes cold.
+            <div className="mt-6">
+              <ShareStack />
+            </div>
+            <p className="mt-6 text-[16px] leading-relaxed text-ink-soft">
+              Per share you can set an email gate, a password, an expiry date, a domain allow-list,
+              and a download lock — and revoke any link with one toggle the moment the round closes
+              or the conversation goes cold.
             </p>
-            <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">
-              Updated the deck? Replace the file and every link you already sent serves the new
-              version. No re-sending, no &ldquo;v3-final-FINAL.pdf.&rdquo;
-            </p>
+            {/* Replaces "replace the file and every link serves the new version" —
+                the chips and the unchanged slug say it without the sentence. */}
+            <div className="mt-8">
+              <VersionSwap />
+            </div>
           </section>
 
           <section className="mt-12">
@@ -163,15 +176,10 @@ export default function PitchDeckTrackingPage() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

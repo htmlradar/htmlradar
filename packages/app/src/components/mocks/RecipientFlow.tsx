@@ -1,4 +1,9 @@
-// RecipientFlow — three-panel horizontal flow used in §05.
+// RecipientFlow — three-panel horizontal flow.
+//
+// Goes horizontal at xl rather than lg: three panels plus two arrows need more
+// than a max-w-3xl article column, and at lg the third panel ran off the right
+// edge of /for/claude-artifacts. Below xl the panels stack, which fits any
+// column width.
 // Shows the end-to-end recipient experience: the email notification
 // firing for the sender, the tracked-link browser frame with the gate,
 // and the rendered document with the chrome footer.
@@ -8,7 +13,7 @@ import { EmailNotificationMock } from './EmailNotificationMock';
 
 export function RecipientFlow() {
   return (
-    <div className="grid grid-cols-1 items-center gap-y-6 lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:gap-x-3">
+    <div className="grid grid-cols-1 items-center gap-y-6 xl:grid-cols-[1fr_auto_1fr_auto_1fr] xl:gap-x-3">
       <FlowPanel
         title="The link arrives"
         body="Marc opens the tracked share from his inbox. Three seconds later the sender's notification fires."

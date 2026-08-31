@@ -6,6 +6,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { ArticleLd, BreadcrumbLd } from '@/components/JsonLd';
 import { pageMeta } from '@/lib/seo';
@@ -24,7 +25,7 @@ export default function Post() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <ArticleLd
             headline="Decks moved to HTML. I built the read tracking for it."
             datePublished="2026-08-30"
@@ -262,15 +263,10 @@ export default function Post() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

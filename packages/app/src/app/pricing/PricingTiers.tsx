@@ -33,7 +33,6 @@ const FREE_FEATURES = [
   'Email-domain and per-email allow-lists',
   'Files attached to a deck: 20 files · 25 MB each · 100 MB per doc',
   'Per-share download permission, every download logged',
-  'Real-time email when a real read happens',
   'Link names are picked for you: htmlradar.page/r/swift-falcon-a3f9c2',
   '“Powered by HTMLRadar” footer on the viewer',
 ];
@@ -60,6 +59,7 @@ export function PricingTiers({ proHref }: { proHref: string }) {
           name="Hosted · Free"
           price="$0"
           cadence="forever"
+          description="Not a trial — the two links stay free, with the full tracking on both."
           features={FREE_FEATURES}
           ctaLabel="Start free"
           ctaHref="/sign-in"

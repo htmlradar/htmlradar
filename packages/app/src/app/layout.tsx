@@ -3,8 +3,13 @@ import type { ReactNode } from 'react';
 import { Newsreader, JetBrains_Mono } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
 import { EventTracker } from '@/components/EventTracker';
+import { NavAutoHide } from '@/components/NavAutoHide';
 import { OrganizationLd } from '@/components/JsonLd';
 import './globals.css';
+// The v2 design language is the site's ONE design system: its :root tokens,
+// the floating nav pill (.v2-nav) and the footer grid (.v2-foot) are loaded
+// globally so inner pages cannot drift back into a second look.
+import './landing-v2.css';
 
 // Newsreader — variable serif for editorial headlines. Less ubiquitous
 // than Fraunces in the SaaS-landing-page rotation, more newspaper than
@@ -91,6 +96,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen font-sans">
         <OrganizationLd />
         <EventTracker />
+        <NavAutoHide />
         {children}
       </body>
     </html>

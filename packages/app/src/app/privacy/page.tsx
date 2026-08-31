@@ -4,6 +4,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
 import { pageMeta } from '@/lib/seo';
@@ -22,13 +23,13 @@ export default function PrivacyPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <Reveal reveal={false}>
             <SectionMark>HTMLRadar · Hosted service</SectionMark>
           </Reveal>
 
           <Reveal reveal={false} delay={0.05}>
-            <h1 className="text-letterpress mt-8 font-serif text-[44px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[60px]">
+            <h1 className="text-letterpress mt-8 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
               Privacy.
             </h1>
           </Reveal>
@@ -219,50 +220,9 @@ export default function PrivacyPage() {
               </p>
             </Section>
           </div>
-
-          <div className="mt-20 border-t border-line pt-10">
-            <Link
-              href="/"
-              className="link-slide font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
-          </div>
         </article>
-
-        <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
-            <div className="font-mono text-[12px] tracking-wide text-graphite">
-              HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
-            </div>
-            <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
-              <Link href="/why" className="link-slide hover:text-signal-dark">
-                Why this exists
-              </Link>
-              <Link href="/blog" className="link-slide hover:text-signal-dark">
-                Blog
-              </Link>
-              <a
-                href="https://github.com/htmlradar/htmlradar"
-                className="link-slide hover:text-signal-dark"
-                target="_blank"
-                rel="noopener"
-              >
-                GitHub
-              </a>
-              <Link href="/pricing" className="link-slide hover:text-signal-dark">
-                Pricing
-              </Link>
-              <Link href="/privacy" className="link-slide hover:text-signal-dark">
-                Privacy
-              </Link>
-              <Link href="/terms" className="link-slide hover:text-signal-dark">
-                Terms
-              </Link>
-            </nav>
-          </div>
-        </footer>
       </main>
+      <V2Footer />
     </>
   );
 }

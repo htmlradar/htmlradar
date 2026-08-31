@@ -13,6 +13,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
 import { SectionMark } from '@/components/SectionMark';
@@ -49,7 +50,7 @@ export default function ClaudeArtifactToPdfToolPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-3xl px-6 py-16 md:py-20">
+        <article className="mx-auto max-w-3xl px-6 pb-16 pt-28 md:pb-20 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -57,7 +58,7 @@ export default function ClaudeArtifactToPdfToolPage() {
             ]}
           />
           <SectionMark>HTMLRadar · Free tool</SectionMark>
-          <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[52px]">
+          <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Turn a Claude artifact into a PDF, in your browser.
           </h1>
           <DirectAnswer updated="August 2026">
@@ -143,15 +144,10 @@ export default function ClaudeArtifactToPdfToolPage() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

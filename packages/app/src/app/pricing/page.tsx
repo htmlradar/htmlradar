@@ -16,8 +16,8 @@ import type { Metadata } from 'next';
 import { FaqLd } from '@/components/JsonLd';
 import { V2Footer } from '@/components/V2Footer';
 import { PricingTiers } from './PricingTiers';
+import { EmailNotificationMock } from '@/components/mocks/EmailNotificationMock';
 import { pageMeta } from '@/lib/seo';
-import '../landing-v2.css';
 
 export const dynamic = 'force-static';
 
@@ -125,10 +125,15 @@ export default function PricingPage() {
       {/* ─────────────────────── TIERS ─────────────────────── */}
       <section style={{ padding: '40px 56px 100px', maxWidth: 1180, margin: '0 auto' }}>
         <PricingTiers proHref={proHref} />
+        {/* The free tier used to list "real-time email when a real read happens"
+            as a bullet. This is that email. */}
+        <div style={{ maxWidth: 520, margin: '36px auto 0' }}>
+          <EmailNotificationMock />
+        </div>
       </section>
 
       {/* ─────────────────────── SELF-HOST (dark card) ─────────────────────── */}
-      <section className="v2-os" style={{ padding: '40px 56px 100px' }}>
+      <section className="v2-os v2-os-tight">
         <div className="v2-os-card">
           <div>
             <div className="kicker">Self-host</div>

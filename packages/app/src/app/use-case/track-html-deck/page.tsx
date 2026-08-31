@@ -6,10 +6,12 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
+import { DashboardMock } from '@/components/mocks/DashboardMock';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
@@ -26,7 +28,7 @@ export default function TrackHtmlDeckPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -65,10 +67,14 @@ export default function TrackHtmlDeckPage() {
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
               What do you see when someone reads it?
             </h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              A dashboard for each recipient: active read time, scroll depth, and time per section.
-              The tracker attributes reading time to the headings and slides they actually viewed. A
-              three-second dwell floor keeps quick scroll-pasts from counting as reads.
+            {/* The heading asks for a picture. It used to get a paragraph
+                describing one; now it gets the picture. */}
+            <div className="mt-6">
+              <DashboardMock />
+            </div>
+            <p className="mt-6 text-[16px] leading-relaxed text-ink-soft">
+              The tracker attributes reading time to the headings and slides the recipient actually
+              viewed. A three-second dwell floor keeps quick scroll-pasts from counting as reads.
             </p>
           </section>
 
@@ -148,15 +154,10 @@ export default function TrackHtmlDeckPage() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

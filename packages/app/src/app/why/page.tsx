@@ -6,10 +6,11 @@
 // specific claim about what HTMLRadar does. Third-person editorial.
 
 import Link from 'next/link';
-import { ListedOn } from '@/components/ListedOn';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { Reveal } from '@/components/Reveal';
 import { SectionMark } from '@/components/SectionMark';
+import { DwellThreshold } from '@/components/mocks/DwellThreshold';
 import { pageMeta } from '@/lib/seo';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
@@ -27,13 +28,13 @@ export default function WhyPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <Reveal reveal={false}>
             <SectionMark>Why HTMLRadar exists</SectionMark>
           </Reveal>
 
           <Reveal reveal={false} delay={0.05}>
-            <h1 className="text-letterpress mt-8 text-balance font-serif text-[44px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[68px]">
+            <h1 className="text-letterpress mt-8 text-balance font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
               HTML{' '}
               <span className="italic text-signal" style={{ fontVariationSettings: '"opsz" 144' }}>
                 quietly won.
@@ -89,9 +90,14 @@ export default function WhyPage() {
             <Reveal delay={0.48}>
               <p className="border-t border-line pt-7 text-ink">
                 HTMLRadar tracks who reads HTML at the section level. It emails you on the first
-                real read — five seconds on the page, not a bounce — and tells you which sections
-                kept them past three seconds.
+                real read — five seconds on the page, not a bounce.
               </p>
+            </Reveal>
+
+            {/* Draws the sentence that used to end this page: a section only
+                counts as read once the reader stays past three seconds. */}
+            <Reveal delay={0.54}>
+              <DwellThreshold />
             </Reveal>
           </div>
 
@@ -115,49 +121,8 @@ export default function WhyPage() {
             </div>
           </Reveal>
         </article>
-
-        <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 md:flex-row md:items-center md:justify-between">
-            <div className="font-mono text-[12px] tracking-wide text-graphite">
-              HTML<span className="text-signal">Radar</span>. Document tracking for HTML.
-            </div>
-            <nav className="flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[12px] text-graphite">
-              <Link href="/why" className="link-slide hover:text-signal-dark">
-                Why this exists
-              </Link>
-              <Link href="/blog" className="link-slide hover:text-signal-dark">
-                Blog
-              </Link>
-              <Link href="/compare/docsend" className="link-slide hover:text-signal-dark">
-                vs DocSend
-              </Link>
-              <Link
-                href="/use-case/pitch-deck-tracking"
-                className="link-slide hover:text-signal-dark"
-              >
-                Pitch deck tracking
-              </Link>
-              <a
-                href="https://github.com/htmlradar/htmlradar"
-                className="link-slide hover:text-signal-dark"
-                target="_blank"
-                rel="noopener"
-              >
-                GitHub
-              </a>
-              <Link href="/pricing" className="link-slide hover:text-signal-dark">
-                Pricing
-              </Link>
-              <Link href="/privacy" className="link-slide hover:text-signal-dark">
-                Privacy
-              </Link>
-            </nav>
-          </div>
-          <div className="mx-auto max-w-6xl px-6 pb-10">
-            <ListedOn />
-          </div>
-        </footer>
       </main>
+      <V2Footer />
     </>
   );
 }

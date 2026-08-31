@@ -15,10 +15,16 @@
     --font-sans: var(--font-geist-sans);
   }
 
+  /* One design system. These two values ARE the v2 --bg / --ink tokens from
+     landing-v2.css. Before 2026-08-31 the body was #fbf1e8 on #1f1108 while
+     the home page painted #f4ecde on #2a1812 over the top, so clicking from
+     home to any inner page shifted background and text colour at once and
+     read as a different website. Change these only together with
+     landing-v2.css's --bg / --ink. */
   html,
   body {
-    background: #fbf1e8;
-    color: #1f1108;
+    background: #f4ecde;
+    color: #2a1812;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -32,12 +38,17 @@
     color: #fbf1e8;
   }
 
-  /* Subtle dotted texture on warm paper — adds depth without being a
-     "card grid" or gradient. Only on the body background. */
-  body {
-    background-image: radial-gradient(rgba(31, 17, 8, 0.04) 1px, transparent 1px);
-    background-size: 24px 24px;
-    background-position: 0 0;
+  /* The dotted body texture was removed with the same change: it was painted
+     on every page EXCEPT the two the brand is judged by, which made the seam
+     worse rather than better. Solid cream everywhere now. */
+
+  /* Headlines break where the browser likes unless told otherwise, which
+     orphaned the last word of roughly two dozen headings ("it." alone on a
+     third line). One rule, every heading on the site. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 
   /* When the user prefers reduced motion, kill everything that moves. */

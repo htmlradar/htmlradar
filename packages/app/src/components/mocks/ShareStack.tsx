@@ -42,8 +42,12 @@ const SHARES: ShareCard[] = [
 
 export function ShareStack() {
   const [hovered, setHovered] = useState(false);
-  const baseSpacing = 14;
-  const fannedSpacing = 56;
+  // Resting spacing was 14px until 2026-08-31, which stacked the three cards
+  // almost exactly on top of each other: on a phone, where there is no hover,
+  // the mock read as one card with a shadow — the opposite of the point it is
+  // making. 52px clears each card's name and slug at rest; hover fans them further.
+  const baseSpacing = 52;
+  const fannedSpacing = 72;
   const spacing = hovered ? fannedSpacing : baseSpacing;
 
   return (

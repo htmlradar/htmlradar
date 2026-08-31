@@ -8,10 +8,12 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
+import { V2Footer } from '@/components/V2Footer';
 import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { Faq } from '@/components/Faq';
+import { RecipientFlow } from '@/components/mocks/RecipientFlow';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
@@ -28,7 +30,7 @@ export default function ClaudeArtifactsPage() {
     <>
       <NavBar />
       <main className="relative">
-        <article className="mx-auto max-w-3xl px-6 py-20 md:py-28">
+        <article className="mx-auto max-w-3xl px-6 pb-20 pt-28 md:pb-28 md:pt-32">
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -53,7 +55,7 @@ export default function ClaudeArtifactsPage() {
               the same HTML.
             </p>
             <div className="mt-5 overflow-x-auto rounded-2xl border border-line bg-paper">
-              <table className="w-full text-[14px]">
+              <table className="w-full min-w-[560px] text-[14px]">
                 <thead className="bg-paper-2/40 text-left font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
                   <tr>
                     <th className="px-5 py-3">What you want to know</th>
@@ -127,11 +129,17 @@ export default function ClaudeArtifactsPage() {
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
               What the recipient sees, and what you see
             </h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">
-              The recipient sees the HTML you supplied. HTMLRadar adds its tracker when the page is
-              served; free links also carry a small &ldquo;Powered by HTMLRadar&rdquo; badge. Your
-              source file stays unchanged. In the dashboard, headings become section labels, so you
-              can see active read time, scroll depth, and which parts received sustained attention.
+            {/* Drawn rather than described: the notification firing, the gate,
+                and the rendered page. The paragraph that walked through those
+                three moments in words is gone. */}
+            <div className="mt-6 xl:-mx-40">
+              <RecipientFlow />
+            </div>
+            <p className="mt-6 text-[16px] leading-relaxed text-ink-soft">
+              Your source file stays unchanged — the tracker is added to the page HTMLRadar serves,
+              and free links also carry a small &ldquo;Powered by HTMLRadar&rdquo; badge. In the
+              dashboard, headings become section labels, so you can see active read time, scroll
+              depth, and which parts received sustained attention.
             </p>
           </section>
 
@@ -211,15 +219,10 @@ export default function ClaudeArtifactsPage() {
               </Link>
               .
             </p>
-            <Link
-              href="/"
-              className="link-slide mt-6 inline-block font-mono text-[12px] uppercase tracking-[0.16em] text-graphite hover:text-signal-dark"
-            >
-              ← Back to home
-            </Link>
           </div>
         </article>
       </main>
+      <V2Footer />
     </>
   );
 }

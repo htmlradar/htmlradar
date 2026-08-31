@@ -24,7 +24,6 @@ import { SoftwareApplicationLd } from '@/components/JsonLd';
 import { pageMeta } from '@/lib/seo';
 import { LandingEffects } from './LandingEffects';
 import { AuthLink, AuthText } from './AuthCta';
-import './landing-v2.css';
 
 export const metadata = pageMeta({
   title: 'Track an HTML Document — See Who Read It | HTMLRadar',

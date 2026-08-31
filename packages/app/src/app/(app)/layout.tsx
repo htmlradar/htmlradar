@@ -17,7 +17,7 @@ export const runtime = 'edge';
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <NavBar />
+      <NavBar app />
       <TimezoneSync />
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
     </>

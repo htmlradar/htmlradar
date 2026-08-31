@@ -221,6 +221,11 @@ export async function ensureHandle(admin: SupabaseClient, userId: string): Promi
  * at all while the gate is off. Stamping is deliberately not fatal: a share
  * whose hostname could not be written is still a link that opens, on the apex,
  * forever — so a failure here loses the prettier address and nothing else.
+ *
+ * It is called after the share row exists, inside the caller's own try block,
+ * so it must not throw. A rejected fetch here would otherwise turn a share
+ * that WAS created into "Failed to create the share" and leave the customer
+ * looking at a form for a link they already have.
  */
 export async function stampShareHost(
   admin: SupabaseClient,
@@ -229,27 +234,37 @@ export async function stampShareHost(
 ): Promise<string | null> {
   if (!handleLinksEnabled()) return null;
 
-  const handle = await ensureHandle(admin, userId);
-  if (!handle) return null;
+  try {
+    const handle = await ensureHandle(admin, userId);
+    if (!handle) return null;
 
-  // `owner_id` is on the filter as well as the id because this client is the
-  // service role and carries no session to scope the write for it. The
-  // trigger in schema/043 refuses a hostname that is not the owner's own
-  // handle regardless — this is the belt.
-  const { error } = await admin
-    .from('document_shares')
-    .update({ host_handle: handle })
-    .eq('id', shareId)
-    .eq('owner_id', userId);
+    // `owner_id` is on the filter as well as the id because this client is the
+    // service role and carries no session to scope the write for it. The
+    // trigger in schema/043 refuses a hostname that is not the owner's own
+    // handle regardless — this is the belt.
+    const { error } = await admin
+      .from('document_shares')
+      .update({ host_handle: handle })
+      .eq('id', shareId)
+      .eq('owner_id', userId);
 
-  if (error) {
+    if (error) {
+      await logServerError({
+        source: 'lib.handle',
+        message: error.message,
+        userId,
+        context: { step: 'stamp_share_host', share_id: shareId, handle },
+      });
+      return null;
+    }
+    return handle;
+  } catch (e) {
     await logServerError({
       source: 'lib.handle',
-      message: error.message,
+      message: e instanceof Error ? e.message : 'stamping the share hostname threw',
       userId,
-      context: { step: 'stamp_share_host', share_id: shareId, handle },
+      context: { step: 'stamp_share_host', share_id: shareId },
     });
     return null;
   }
-  return handle;
 }

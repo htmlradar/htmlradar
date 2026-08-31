@@ -318,6 +318,19 @@ describe('stamping a new share with its hostname', () => {
     expect(calls.some((c) => c.table === 'document_shares')).toBe(false);
   });
 
+  // The share row already exists by the time this runs, inside the caller's
+  // own try block. A throw here would turn a share that WAS created into
+  // "Failed to create the share" — so it cannot throw, whatever the network
+  // does.
+  it('never throws, so a created share is never reported as a failure', async () => {
+    const admin = {
+      from: () => {
+        throw new Error('fetch failed');
+      },
+    } as unknown as SupabaseClient;
+    await expect(stampShareHost(admin, USER, SHARE)).resolves.toBeNull();
+  });
+
   // A hostname that could not be written is not a failed share: the link
   // opens on the apex, forever. So the caller is told to print the apex
   // address, which is the one that will actually be served.

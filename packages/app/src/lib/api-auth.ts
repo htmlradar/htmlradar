@@ -70,6 +70,61 @@ export function serviceClient() {
 export interface ApiCaller {
   userId: string;
   tier: 'free' | 'pro';
+  /**
+   * What the key itself may do (schema/040). A read-only key authenticates
+   * exactly like a full one and is refused at the routes that write, so a
+   * watching assistant can hold a credential that cannot publish, revoke or
+   * replace anything. A key created before 040 reads as 'full', which is what
+   * it has always been.
+   */
+  scope: ApiKeyScope;
+}
+
+export type ApiKeyScope = 'full' | 'read_only';
+
+/**
+ * The hourly creation budget, by plan (31 August 2026 decision).
+ *
+ * Pro rises to 75 so a hundred personalised links fit inside ninety minutes;
+ * free stays at 30. Both are abuse controls rather than pricing — the free
+ * plan's actual limit is the two lifetime links the database enforces.
+ */
+export function creationMax(tier: 'free' | 'pro'): number {
+  return tier === 'pro' ? 75 : 30;
+}
+
+// Listing and revoking are cheap reads and one-column writes; the budget is
+// there so a loop cannot sweep an account, not because the work is expensive.
+export const CHEAP_MAX = 120;
+
+/**
+ * The most rows one listing call returns.
+ *
+ * A page an agent can read in one go, and a ceiling on what a single request
+ * costs to assemble. Fifty rather than everything, because "list my shares"
+ * on an account with ten thousand of them is a request nobody meant to make.
+ */
+export const PAGE_SIZE = 50;
+
+/**
+ * The `before` cursor of a listing request, or the response to send instead.
+ *
+ * The cursor is the `created_at` of the last row of the previous page, handed
+ * back as `next_before`, so paging is a timestamp comparison and needs no
+ * server-side state. Anything that is not a timestamp is refused rather than
+ * quietly ignored: silently returning page one to a caller that asked for
+ * page four is how a loop becomes infinite.
+ */
+export function readBefore(req: Request): { before: string | null } | { error: ApiErrorResponse } {
+  const raw = new URL(req.url).searchParams.get('before');
+  if (!raw) return { before: null };
+  const when = new Date(raw);
+  if (Number.isNaN(when.getTime())) {
+    return {
+      error: validationError('"before" must be an ISO 8601 timestamp, as returned in next_before.'),
+    };
+  }
+  return { before: when.toISOString() };
 }
 
 // Every public API limit is per hour. One window keeps the buckets, the
@@ -107,7 +162,12 @@ export interface ApiLimit {
   name: string;
   /** Counted against the whole account, or against the single key calling. */
   per: 'account' | 'key';
-  max: number;
+  /**
+   * The ceiling for this route, or a function of the caller's plan when the
+   * two plans differ (see creationMax). Per call site: one route's generosity
+   * is never another's.
+   */
+  max: number | ((tier: 'free' | 'pro') => number);
   /**
    * Optional second budget for the same route, counted on the caller's address
    * instead of their account. The account limit stops one customer running
@@ -115,6 +175,12 @@ export interface ApiLimit {
    * accounts, which the per-account counter cannot see.
    */
   perIpMax?: number;
+  /**
+   * This route changes something. Set on every route that creates, revokes or
+   * replaces, so a read-only key is refused here rather than at each route —
+   * a route that forgot the check would be a route the scope does not cover.
+   */
+  write?: boolean;
 }
 
 /**
@@ -219,17 +285,23 @@ export async function authenticateApiKey(req: Request, limit: ApiLimit): Promise
   const key = parseBearerKey(req.headers.get('authorization'));
   if (!key) return { error: await refuse(supabase, req) };
 
-  const { data: row } = await supabase
-    .from('api_keys')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('key_hash', await hashApiKey(key))
-    .is('revoked_at', null)
-    .select('id, user_id')
-    .maybeSingle();
+  const row = await findKeyRow(supabase, await hashApiKey(key));
   if (!row) return { error: await refuse(supabase, req) };
 
-  const subject = limit.per === 'account' ? (row.user_id as string) : (row.id as string);
-  const wait = await retryAfter(supabase, `api:${limit.name}:${subject}`, limit.max);
+  // Read before the limit rather than after it, because the creation budget
+  // is a function of the plan (creationMax). One extra read on a request that
+  // is about to be refused, and one number instead of two implementations of
+  // "which plan is this".
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('tier')
+    .eq('id', row.user_id)
+    .maybeSingle();
+  const tier: 'free' | 'pro' = profile?.tier === 'pro' ? 'pro' : 'free';
+
+  const subject = limit.per === 'account' ? row.user_id : row.id;
+  const max = typeof limit.max === 'function' ? limit.max(tier) : limit.max;
+  const wait = await retryAfter(supabase, `api:${limit.name}:${subject}`, max);
   if (wait > 0) return { error: rateLimited(wait) };
 
   // Checked after the account budget, so a caller inside its own limit is the
@@ -243,15 +315,45 @@ export async function authenticateApiKey(req: Request, limit: ApiLimit): Promise
     if (ipWait > 0) return { error: rateLimited(ipWait) };
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('tier')
-    .eq('id', row.user_id)
-    .maybeSingle();
+  // After the budgets, not before: a script looping on a route its key cannot
+  // use still runs into a 429, so the 403 is not a free retry.
+  const scope: ApiKeyScope = row.scope === 'read_only' ? 'read_only' : 'full';
+  if (limit.write && scope === 'read_only') return { error: READ_ONLY_KEY };
 
-  return {
-    caller: { userId: row.user_id as string, tier: profile?.tier === 'pro' ? 'pro' : 'free' },
-  };
+  return { caller: { userId: row.user_id, tier, scope } };
+}
+
+/**
+ * The key row, with `last_used_at` stamped in the same statement.
+ *
+ * ponytail: schema/040 adds `scope`, and migrations here are a human pasting
+ * SQL into an editor after the deploy has already landed. Between those two
+ * moments a select naming the column fails, and every API request with it, so
+ * the read falls back to the columns that have always existed and the key
+ * behaves as the full-access key it is today. Delete the fallback once 040 is
+ * applied.
+ */
+async function findKeyRow(
+  supabase: ReturnType<typeof serviceClient>,
+  keyHash: string,
+): Promise<{ id: string; user_id: string; scope?: string | null } | null> {
+  const stamp = { last_used_at: new Date().toISOString() };
+  const lookup = (columns: string) =>
+    supabase
+      .from('api_keys')
+      .update(stamp)
+      .eq('key_hash', keyHash)
+      .is('revoked_at', null)
+      .select(columns)
+      .maybeSingle();
+
+  const { data, error } = await lookup('id, user_id, scope');
+  if (error && /scope/.test(error.message)) {
+    console.warn('[api] api_keys has no scope column yet — schema/040 is not applied');
+    const fallback = await lookup('id, user_id');
+    return (fallback.data as { id: string; user_id: string } | null) ?? null;
+  }
+  return (data as { id: string; user_id: string; scope?: string | null } | null) ?? null;
 }
 
 /**
@@ -343,6 +445,29 @@ export interface ApiErrorResponse {
 }
 
 export const INVALID_KEY: ApiErrorResponse = { status: 401, body: { error: 'invalid_api_key' } };
+
+/**
+ * A read-only key on a route that writes.
+ *
+ * 403 rather than 401: the key is good, and it is the key its owner meant to
+ * make. The message says which key to use instead, because the caller is an
+ * assistant relaying it to a person who can create a full one.
+ */
+export const READ_ONLY_KEY: ApiErrorResponse = {
+  status: 403,
+  body: {
+    error: 'read_only_key',
+    message:
+      'This API key is read-only: it can list and read activity but cannot create, revoke or ' +
+      'replace anything. Create a full-access key at https://htmlradar.com/settings.',
+  },
+};
+
+/**
+ * Not the caller's, or not there at all — deliberately the same answer.
+ * A key must not be usable to probe for the ids of other accounts.
+ */
+export const NOT_FOUND: ApiErrorResponse = { status: 404, body: { error: 'not_found' } };
 
 export const FREE_LIMIT_REACHED: ApiErrorResponse = {
   status: 402,

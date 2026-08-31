@@ -1,4 +1,6 @@
-// POST /api/v1/shares — turn an HTML file (or a URL) into a tracked link.
+// POST /api/v1/shares — turn an HTML file (or a URL, or a document that
+// already exists) into a tracked link.
+// GET  /api/v1/shares — the links this account has, newest first.
 //
 // The whole endpoint is the browser flow with the form removed: the document
 // write is createDocumentForUser, shared verbatim with the /new server
@@ -7,16 +9,28 @@
 // cap, the chosen-address rules or the password minimum is re-implemented
 // here — those are triggers on document_shares and they fire the same way for
 // an API caller as for a signed-in one.
+//
+// `document_id` is the second link on a document that already exists, which
+// is the ordinary case on the website — one document, one link per recipient,
+// so the reading report separates them — and was unreachable from a machine
+// until now. It creates no document, so it uploads nothing and screens
+// nothing: the document it names went through the upload screen when it was
+// created.
 
 import type { NextRequest } from 'next/server';
 import {
   authenticateApiKey,
+  CHEAP_MAX,
+  creationMax,
   errorResponse,
   FREE_LIMIT_REACHED,
   INTERNAL,
   jsonResponse,
   mapCreateShareError,
   BODY_TIMED_OUT,
+  NOT_FOUND,
+  PAGE_SIZE,
+  readBefore,
   readBodyCapped,
   REQUEST_TIMEOUT,
   serviceClient,
@@ -37,6 +51,7 @@ export const runtime = 'edge';
 
 const SITE_URL = 'https://htmlradar.com';
 const ROUTE = '/api/v1/shares';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // The largest document the API will store. Deliberately far below the 30 MB
 // the browser upload accepts: a worker has 128 MB of memory and Cloudflare
@@ -61,6 +76,7 @@ const API_URL_MODE_ENABLED: boolean = false;
 interface CreateShareBody {
   html?: unknown;
   url?: unknown;
+  document_id?: unknown;
   title?: unknown;
   recipient_label?: unknown;
   require_email?: unknown;
@@ -133,16 +149,17 @@ async function rollbackDocument(
 }
 
 export async function POST(req: NextRequest) {
-  // 30 creations an hour per account, and 120 an hour from any one address.
-  // The account budget is counted on the account rather than the key so a
-  // second key is not a second budget; the address budget is what a script
-  // signing up for accounts in bulk runs into, which the account one cannot
-  // see.
+  // 75 creations an hour per account on Pro, 30 on free, and 120 an hour from
+  // any one address. The account budget is counted on the account rather than
+  // the key so a second key is not a second budget; the address budget is what
+  // a script signing up for accounts in bulk runs into, which the account one
+  // cannot see.
   const auth = await authenticateApiKey(req, {
     name: 'shares',
     per: 'account',
-    max: 30,
+    max: creationMax,
     perIpMax: 120,
+    write: true,
   });
   if ('error' in auth) return errorResponse(auth.error);
   const { caller } = auth;
@@ -177,15 +194,21 @@ export async function POST(req: NextRequest) {
   // --- what to track -------------------------------------------------
   const html = typeof body.html === 'string' ? body.html : null;
   const url = stringOrNull(body.url);
-  if (html === null && url === null) {
-    return errorResponse(validationError('Provide either "html" or "url".'));
+  const existingDocumentId = stringOrNull(body.document_id);
+  const given = [html, url, existingDocumentId].filter((v) => v !== null).length;
+  if (given === 0) {
+    return errorResponse(validationError('Provide one of "html", "url" or "document_id".'));
   }
-  if (html !== null && url !== null) {
-    return errorResponse(validationError('Provide "html" or "url", not both.'));
+  if (given > 1) {
+    return errorResponse(
+      validationError('Provide only one of "html", "url" and "document_id" in a single call.'),
+    );
   }
 
   let bytes: Uint8Array | null = null;
-  if (html !== null) {
+  if (existingDocumentId !== null) {
+    if (!UUID.test(existingDocumentId)) return errorResponse(NOT_FOUND);
+  } else if (html !== null) {
     bytes = new TextEncoder().encode(html);
     // Checked before anything is written or uploaded.
     if (bytes.byteLength > MAX_API_HTML_BYTES) return errorResponse(tooLarge(MAX_API_HTML_BYTES));
@@ -266,30 +289,53 @@ export async function POST(req: NextRequest) {
 
   // --- write ---------------------------------------------------------
   let documentId: string;
-  try {
-    documentId = await createDocumentForUser(
-      supabase,
-      caller.userId,
-      title,
-      bytes ? { type: 'upload', bytes, filename: null } : { type: 'url', url: url! },
-    );
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Could not store the document.';
-    await logServerError({
-      source: 'api.v1.shares',
-      message,
-      userId: caller.userId,
-      route: ROUTE,
-      context: { step: 'create_document', source_type: bytes ? 'upload' : 'url' },
-    });
-    await captureServerEvent({
-      event: 'document.upload_failed',
-      distinctId: caller.userId,
-      userId: caller.userId,
-      properties: { source_type: bytes ? 'upload' : 'url', reason: message, via: 'api' },
-    });
-    return errorResponse(STORAGE_FAILED);
+  if (existingDocumentId !== null) {
+    // Ownership is the whole of the check. A document belonging to somebody
+    // else, or one the customer has deleted, is not found rather than refused:
+    // a key must not be usable to discover that a document id exists.
+    const { data: document } = await supabase
+      .from('documents')
+      .select('id')
+      .eq('id', existingDocumentId)
+      .eq('owner_id', caller.userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!document) return errorResponse(NOT_FOUND);
+    documentId = existingDocumentId;
+  } else {
+    try {
+      documentId = await createDocumentForUser(
+        supabase,
+        caller.userId,
+        title,
+        bytes ? { type: 'upload', bytes, filename: null } : { type: 'url', url: url! },
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not store the document.';
+      await logServerError({
+        source: 'api.v1.shares',
+        message,
+        userId: caller.userId,
+        route: ROUTE,
+        context: { step: 'create_document', source_type: bytes ? 'upload' : 'url' },
+      });
+      await captureServerEvent({
+        event: 'document.upload_failed',
+        distinctId: caller.userId,
+        userId: caller.userId,
+        properties: { source_type: bytes ? 'upload' : 'url', reason: message, via: 'api' },
+      });
+      return errorResponse(STORAGE_FAILED);
+    }
   }
+
+  // Undoing the document is only ever right for a document this call created.
+  // A refused link on somebody's existing deck must leave the deck, and every
+  // link already pointing at it, exactly where they were.
+  const undoDocument = () =>
+    existingDocumentId !== null
+      ? Promise.resolve()
+      : rollbackDocument(supabase, caller.userId, documentId, bytes !== null);
 
   const { data: created, error } = await supabase.rpc('create_share_as', {
     p_user_id: caller.userId,
@@ -304,7 +350,7 @@ export async function POST(req: NextRequest) {
     p_slug: slug,
   });
   if (error) {
-    await rollbackDocument(supabase, caller.userId, documentId, bytes !== null);
+    await undoDocument();
     const mapped = mapCreateShareError(error.message);
     // Anything mapCreateShareError did not recognise comes back as a bare
     // 500, so this is the only place the actual Postgres message survives.
@@ -325,7 +371,7 @@ export async function POST(req: NextRequest) {
     slug?: string;
   } | null;
   if (!share?.id || !share.slug) {
-    await rollbackDocument(supabase, caller.userId, documentId, bytes !== null);
+    await undoDocument();
     await logServerError({
       source: 'api.v1.shares',
       message: 'create_share_as returned no row',
@@ -352,7 +398,7 @@ export async function POST(req: NextRequest) {
       // One API call is one act. A link that quietly ignores a setting the
       // caller asked for is not the link they asked for, so it goes back with
       // its document (schema/001 cascades the share from the document).
-      await rollbackDocument(supabase, caller.userId, documentId, bytes !== null);
+      await undoDocument();
       await logServerError({
         source: 'api.v1.shares',
         message: lockError.message,
@@ -366,13 +412,16 @@ export async function POST(req: NextRequest) {
 
   // Both events are emitted only once the whole call has succeeded — a
   // document that gets rolled back above never happened as far as analytics
-  // is concerned.
-  await captureServerEvent({
-    event: 'document.created',
-    distinctId: caller.userId,
-    userId: caller.userId,
-    properties: { source_type: bytes ? 'upload' : 'url', doc_id: documentId, via: 'api' },
-  });
+  // is concerned. A second link on an existing document creates no document,
+  // so it says nothing about one.
+  if (existingDocumentId === null) {
+    await captureServerEvent({
+      event: 'document.created',
+      distinctId: caller.userId,
+      userId: caller.userId,
+      properties: { source_type: bytes ? 'upload' : 'url', doc_id: documentId, via: 'api' },
+    });
+  }
 
   await captureServerEvent({
     event: 'share.created',
@@ -389,6 +438,7 @@ export async function POST(req: NextRequest) {
       lock_deck: lockDeck,
       is_first_share: quota.used === 0,
       custom_slug: !!slug,
+      existing_document: existingDocumentId !== null,
       via: 'api',
     },
   });
@@ -399,4 +449,128 @@ export async function POST(req: NextRequest) {
     url: shareUrl(share.slug),
     dashboard_url: `${SITE_URL}/docs/${documentId}`,
   });
+}
+
+/**
+ * GET /api/v1/shares — the account's links, newest first.
+ *
+ * The gap this closes: get_share_activity needs an identifier an assistant
+ * can only have if it created the link in the same conversation. Everything
+ * here is the caller's own by an explicit owner filter — there is no listing
+ * RPC and no session to scope to, so the filter is the whole of the security
+ * and it is written on every query below.
+ *
+ * "Opened" is the dashboard's own definition, not a row count: the owner's
+ * internal test reads are out, and so are phantom sessions that bounced with
+ * no active time and no scroll. A list that says opened where the activity
+ * report says not opened would be worse than no list.
+ */
+export async function GET(req: NextRequest) {
+  const auth = await authenticateApiKey(req, {
+    name: 'shares-list',
+    per: 'account',
+    max: CHEAP_MAX,
+  });
+  if ('error' in auth) return errorResponse(auth.error);
+  const { caller } = auth;
+
+  const cursor = readBefore(req);
+  if ('error' in cursor) return errorResponse(cursor.error);
+
+  const supabase = serviceClient();
+  let query = supabase
+    .from('document_shares')
+    .select('id, slug, document_id, recipient_label, created_at, revoked_at, expires_at')
+    .eq('owner_id', caller.userId)
+    .order('created_at', { ascending: false })
+    .limit(PAGE_SIZE);
+  if (cursor.before) query = query.lt('created_at', cursor.before);
+
+  const { data, error } = await query;
+  if (error) {
+    await logServerError({
+      source: 'api.v1.shares',
+      message: error.message,
+      userId: caller.userId,
+      route: ROUTE,
+      context: { step: 'list_shares' },
+    });
+    return errorResponse(INTERNAL);
+  }
+
+  const rows = (data ?? []) as ShareListRow[];
+  if (rows.length === 0) return jsonResponse(200, { shares: [], next_before: null });
+
+  const shareIds = rows.map((row) => row.id);
+  const documentIds = [...new Set(rows.map((row) => row.document_id))];
+
+  // Titles and reads, in parallel. Both are bounded by the page above: at
+  // most fifty shares and their documents, never the whole account.
+  const [documents, sessions, internalViewers] = await Promise.all([
+    supabase.from('documents').select('id, title').in('id', documentIds),
+    supabase
+      .from('sessions')
+      .select('share_id, viewer_id, started_at, bounced, active_time_seconds, max_scroll_depth')
+      .in('share_id', shareIds),
+    supabase.from('viewers').select('id').in('share_id', shareIds).eq('is_internal', true),
+  ]);
+
+  const titleById = new Map(
+    ((documents.data ?? []) as { id: string; title: string }[]).map((doc) => [doc.id, doc.title]),
+  );
+  const internal = new Set(((internalViewers.data ?? []) as { id: string }[]).map((v) => v.id));
+
+  const lastOpen = new Map<string, string>();
+  for (const session of (sessions.data ?? []) as SessionListRow[]) {
+    if (internal.has(session.viewer_id)) continue;
+    const phantom =
+      session.bounced === true &&
+      (session.active_time_seconds ?? 0) === 0 &&
+      (session.max_scroll_depth ?? 0) === 0;
+    if (phantom) continue;
+    const previous = lastOpen.get(session.share_id);
+    if (!previous || session.started_at > previous)
+      lastOpen.set(session.share_id, session.started_at);
+  }
+
+  const now = Date.now();
+  return jsonResponse(200, {
+    shares: rows.map((row) => ({
+      share_id: row.id,
+      slug: row.slug,
+      url: shareUrl(row.slug),
+      recipient_label: row.recipient_label,
+      document_id: row.document_id,
+      document_title: titleById.get(row.document_id) ?? null,
+      created_at: row.created_at,
+      revoked: row.revoked_at !== null,
+      revoked_at: row.revoked_at,
+      expires_at: row.expires_at,
+      expired: row.expires_at !== null && new Date(row.expires_at).getTime() <= now,
+      opened: lastOpen.has(row.id),
+      last_open: lastOpen.get(row.id) ?? null,
+    })),
+    // Only when the page was full. A short page is the end of the list, and
+    // a cursor there would send the caller round one more empty request.
+    next_before: rows.length === PAGE_SIZE ? (rows[rows.length - 1]?.created_at ?? null) : null,
+  });
+}
+
+interface ShareListRow {
+  id: string;
+  slug: string;
+  document_id: string;
+  recipient_label: string | null;
+  created_at: string;
+  revoked_at: string | null;
+  expires_at: string | null;
+}
+
+interface SessionListRow {
+  share_id: string;
+  viewer_id: string;
+  started_at: string;
+  bounced: boolean | null;
+  active_time_seconds: number | null;
+  max_scroll_depth: number | null;
 }

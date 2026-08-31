@@ -24,16 +24,20 @@ export interface ApiKeyRow {
 type CreateResult = { ok: boolean; key?: string; error?: string };
 type RevokeResult = { ok: boolean; error?: string };
 
+/** What a key may do (schema/040). Full is the default and what every key made before it is. */
+export type ApiKeyScope = 'full' | 'read_only';
+
 export function ApiKeys({
   keys,
   createAction,
   revokeAction,
 }: {
   keys: ApiKeyRow[];
-  createAction: (label: string) => Promise<CreateResult>;
+  createAction: (label: string, scope: ApiKeyScope) => Promise<CreateResult>;
   revokeAction: (id: string) => Promise<RevokeResult>;
 }) {
   const [label, setLabel] = useState('');
+  const [scope, setScope] = useState<ApiKeyScope>('full');
   const [freshKey, setFreshKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -58,7 +62,17 @@ export function ApiKeys({
       <h2 className="font-serif text-[24px] leading-tight tracking-tightest text-ink">API keys</h2>
       <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-ink-soft">
         A key lets a script — or an AI assistant through the HTMLRadar MCP server — turn an HTML
-        file into a tracked link on your account. Keys carry the same limits your account has.
+        file into a tracked link on your account. Keys carry the same limits your account has. A
+        read-only key can list your documents and links and read who opened them, and nothing else:
+        it cannot create a link, switch one off, or replace a document. Give an assistant that only
+        watches and reports one of those.
+      </p>
+      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-ink-soft">
+        Use HTMLRadar from Claude Code, Cursor or any agent: create a key here, then follow{' '}
+        <a href="/mcp" className="text-signal-dark underline underline-offset-4 hover:no-underline">
+          htmlradar.com/mcp
+        </a>
+        .
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -74,6 +88,18 @@ export function ApiKeys({
           placeholder="What is it for? e.g. Claude Desktop"
           className="w-full max-w-xs rounded-md border border-line bg-paper px-3 py-2 text-[14px] text-ink placeholder:text-graphite focus:border-signal focus:outline-none sm:w-auto"
         />
+        <label htmlFor="api-key-scope" className="sr-only">
+          What the key may do
+        </label>
+        <select
+          id="api-key-scope"
+          value={scope}
+          onChange={(e) => setScope(e.target.value as ApiKeyScope)}
+          className="w-full max-w-xs rounded-md border border-line bg-paper px-3 py-2 text-[14px] text-ink focus:border-signal focus:outline-none sm:w-auto"
+        >
+          <option value="full">Full access — create, revoke, replace</option>
+          <option value="read_only">Read-only — list and read activity</option>
+        </select>
         <button
           type="button"
           disabled={isPending}
@@ -81,7 +107,7 @@ export function ApiKeys({
             setError(null);
             setFreshKey(null);
             startTransition(async () => {
-              const r = await createAction(label);
+              const r = await createAction(label, scope);
               if (!r.ok || !r.key) {
                 setError(r.error ?? 'Could not create the key. Try again.');
                 return;

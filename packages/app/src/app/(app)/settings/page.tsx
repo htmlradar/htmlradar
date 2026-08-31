@@ -328,7 +328,10 @@ function ProSuccessBanner({ proUntil }: { proUntil: string | null }) {
 // The insert goes through the cookie-scoped client, so the api_keys RLS
 // policies (schema/034) are what bind the row to this user; the service role
 // is not involved and cannot be talked into writing a key for someone else.
-async function createApiKeyAction(label: string): Promise<{
+async function createApiKeyAction(
+  label: string,
+  scope: 'full' | 'read_only' = 'full',
+): Promise<{
   ok: boolean;
   key?: string;
   error?: string;
@@ -336,16 +339,28 @@ async function createApiKeyAction(label: string): Promise<{
   'use server';
   const user = await requireUser();
   const cleanLabel = label.trim().slice(0, 60) || 'API key';
+  const cleanScope = scope === 'read_only' ? 'read_only' : 'full';
   const key = generateApiKey();
 
-  const { error } = await serverClient()
-    .from('api_keys')
-    .insert({
-      user_id: user.id,
-      key_hash: await hashApiKey(key),
-      key_prefix: apiKeyPrefix(key),
-      label: cleanLabel,
-    });
+  const row = {
+    user_id: user.id,
+    key_hash: await hashApiKey(key),
+    key_prefix: apiKeyPrefix(key),
+    label: cleanLabel,
+  };
+
+  const insert = (values: Record<string, unknown>) =>
+    serverClient().from('api_keys').insert(values);
+
+  let { error } = await insert({ ...row, scope: cleanScope });
+  // ponytail: schema/040 is applied by hand after the deploy that needs it, so
+  // between the two a key naming `scope` cannot be written at all. A key made
+  // in that window is a full-access key, which is what every key was before
+  // this. Delete this fallback once 040 has been applied.
+  if (error && /scope/.test(error.message)) {
+    console.warn('[api] api_keys has no scope column yet — schema/040 is not applied');
+    ({ error } = await insert(row));
+  }
   if (error) {
     // The ten-live-keys cap is a trigger on api_keys (schema/034), because the
     // insert policy lets a signed-in session write key rows straight through
@@ -377,7 +392,7 @@ async function createApiKeyAction(label: string): Promise<{
     event: 'api_key.created',
     distinctId: user.id,
     userId: user.id,
-    properties: { label: cleanLabel },
+    properties: { label: cleanLabel, scope: cleanScope },
   });
   return { ok: true, key };
 }

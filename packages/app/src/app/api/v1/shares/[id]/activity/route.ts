@@ -18,42 +18,35 @@
 // reused here is the filtering rules, not a copy of its output shape.
 
 import type { NextRequest } from 'next/server';
-import { authenticateApiKey, errorResponse, jsonResponse, serviceClient } from '@/lib/api-auth';
+import {
+  authenticateApiKey,
+  errorResponse,
+  jsonResponse,
+  NOT_FOUND,
+  serviceClient,
+} from '@/lib/api-auth';
+import { findOwnedShare } from '@/lib/api-share-lookup';
 import { isMetaSectionTitle } from '@/lib/section-filter';
-import { SHARE_SLUG_PATTERN } from '@/lib/share-slug';
-import { SHARE_HOST, shareUrl } from '@/lib/share-url';
+import { shareUrl } from '@/lib/share-url';
 import type { Session, SectionEvent, Viewer } from '@/lib/types';
 
 export const runtime = 'edge';
 
-const SITE_URL = 'https://htmlradar.com';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const NOT_FOUND = { status: 404, body: { error: 'not_found' } };
-
-// The link as the app prints it, or the path part of it. Nothing looser: this
-// is a lookup key, and "close enough" here is a way to hand someone the
-// wrong share's activity.
-//
-// Two hosts are accepted. Recipient links live on the content domain now, and
-// every link handed out before that move named the application domain — an
-// agent reading a slug off an old email must still be understood. Any other
-// host is rejected, so a link that merely looks like ours cannot be used to
-// probe for shares.
-const LINK_HOSTS = [SHARE_HOST, new URL(SITE_URL).host].join('|').replace(/\./g, '\\.');
-const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
-
 /**
- * The slug in what the caller passed, or null.
+ * Where the reader was and what they read on, per person.
  *
- * An agent that was not the one to call share_html knows the share by what
- * the dashboard and the link show, which is the slug, not the id. So the
- * path segment may be a bare slug, the `/r/<slug>` path or the whole link;
- * the shape is then checked against the same rule the database enforces on
- * every slug it stores, so a malformed value costs a regex and not a query.
+ * Off unless the caller asks for it (`?include_detail=true`), which is the
+ * 31 August decision written down: this is a named person's location and
+ * device, it would be passing through a language model, and the minimal
+ * report answers "was it read, and which parts" without any of it. Everything
+ * here is already loaded for the grouping below, so asking costs no extra
+ * query — the parameter is about what leaves the building, not about work.
  */
-function slugOf(raw: string): string | null {
-  const candidate = LINK.exec(raw)?.[1] ?? raw;
-  return SHARE_SLUG_PATTERN.test(candidate) ? candidate : null;
+interface ViewerDetail {
+  country: string | null;
+  city: string | null;
+  device: string | null;
+  referrer: string | null;
 }
 
 interface ViewerOut {
@@ -64,6 +57,7 @@ interface ViewerOut {
   active_seconds: number;
   max_scroll: number;
   sections: { title: string; time_seconds: number }[];
+  detail?: ViewerDetail;
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -74,24 +68,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if ('error' in auth) return errorResponse(auth.error);
   const { caller } = auth;
 
+  // Opt-in, and only the exact word: an absent, empty or misspelt parameter
+  // means the minimal report, never the detailed one.
+  const includeDetail = new URL(req.url).searchParams.get('include_detail') === 'true';
+
   const supabase = serviceClient();
-  let lookup = supabase.from('document_shares').select('id, slug, owner_id, recipient_label');
-  if (UUID.test(params.id)) {
-    lookup = lookup.eq('id', params.id);
-  } else {
-    // A slug is only ever looked up within the caller's own shares, so a slug
-    // that belongs to another account is not found rather than found and then
-    // refused: the query cannot say whether it exists. A malformed value is
-    // a 404 too, not a Postgres cast error surfaced to the caller.
-    const slug = slugOf(params.id);
-    if (!slug) return errorResponse(NOT_FOUND);
-    lookup = lookup.eq('owner_id', caller.userId).eq('slug', slug);
-  }
-  const { data: share } = await lookup.maybeSingle();
+  const share = await findOwnedShare<{
+    id: string;
+    slug: string;
+    owner_id: string;
+    recipient_label: string | null;
+  }>(supabase, caller.userId, params.id, 'id, slug, recipient_label');
 
   // Someone else's link is indistinguishable from one that does not exist —
   // a key must not be usable to probe for share ids.
-  if (!share || share.owner_id !== caller.userId) return errorResponse(NOT_FOUND);
+  if (!share) return errorResponse(NOT_FOUND);
 
   const url = shareUrl(share.slug);
 
@@ -139,7 +130,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const groups = new Map<
     string,
-    { email: string | null; sessions: Session[]; sections: Map<string, SectionRow> }
+    {
+      email: string | null;
+      sessions: Session[];
+      sections: Map<string, SectionRow>;
+      viewers: Viewer[];
+    }
   >();
   for (const session of sessions) {
     const key = groupKeyOf(session.viewer_id);
@@ -147,8 +143,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       email: viewerById.get(session.viewer_id)?.email ?? null,
       sessions: [],
       sections: new Map<string, SectionRow>(),
+      viewers: [],
     };
     group.sessions.push(session);
+    const viewer = viewerById.get(session.viewer_id);
+    if (viewer && !group.viewers.includes(viewer)) group.viewers.push(viewer);
     groups.set(key, group);
   }
 
@@ -185,6 +184,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         // recorded ordinal (older reads) fall to the end.
         .sort((a, b) => a.ordinal - b.ordinal)
         .map((s) => ({ title: s.title, time_seconds: round(s.seconds) })),
+      ...(includeDetail ? { detail: detailOf(group.viewers) } : {}),
     }))
     .sort((a, b) => (a.first_open < b.first_open ? -1 : 1));
 
@@ -200,6 +200,24 @@ interface SectionRow {
   title: string;
   seconds: number;
   ordinal: number;
+}
+
+/**
+ * Where this person read from, taken from their most recent visit.
+ *
+ * One person can be several viewer rows — the same email on a laptop and a
+ * phone — and the answer a sender wants is where they were the last time,
+ * not an average of two places. Anything the tracker did not record stays
+ * null rather than being guessed at from another row.
+ */
+function detailOf(viewers: Viewer[]): ViewerDetail {
+  const latest = [...viewers].sort((a, b) => (a.last_seen < b.last_seen ? 1 : -1))[0];
+  return {
+    country: latest?.country_code ?? null,
+    city: latest?.city ?? null,
+    device: latest?.device_type ?? null,
+    referrer: latest?.referrer ?? null,
+  };
 }
 
 // section_events for these sessions, minus the meta/structural ones.

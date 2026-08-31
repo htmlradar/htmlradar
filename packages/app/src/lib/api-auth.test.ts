@@ -15,6 +15,9 @@ import {
   API_KEY_PREFIX,
   authenticateApiKey,
   BODY_TIMED_OUT,
+  creationMax,
+  READ_ONLY_KEY,
+  readBefore,
   FREE_LIMIT_REACHED,
   generateApiKey,
   hashApiKey,
@@ -405,7 +408,7 @@ describe('the rate limiter when the database is the thing that is broken', () =>
     const auth = await authenticateApiKey(apiRequest(), SHARES_LIMIT);
 
     // Fails open: a Supabase outage is not the caller's doing.
-    expect(auth).toEqual({ caller: { userId: 'user-1', tier: 'free' } });
+    expect(auth).toEqual({ caller: { userId: 'user-1', tier: 'free', scope: 'full' } });
     // And the second budget is still spent, rather than skipped by the throw.
     expect(buckets).toEqual(['api:shares:user-1', 'api:shares-ip:203.0.113.9']);
     // Silence is the part that is not acceptable: both failures are logged.
@@ -421,7 +424,7 @@ describe('the rate limiter when the database is the thing that is broken', () =>
     supabase.current = stubSupabase(() => Promise.reject(new Error('connection reset')));
 
     await expect(authenticateApiKey(apiRequest(), SHARES_LIMIT)).resolves.toEqual({
-      caller: { userId: 'user-1', tier: 'free' },
+      caller: { userId: 'user-1', tier: 'free', scope: 'full' },
     });
   });
 });
@@ -433,6 +436,176 @@ describe('URL mode', () => {
       body: {
         error: 'validation',
         message: 'URL mode is not yet available through the API; upload the HTML instead.',
+      },
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The key's own powers, and the plan's own budget (schema/040, MCP 0.2.0).
+// ---------------------------------------------------------------------------
+
+/**
+ * A Supabase stub that answers with the key row and plan it is given, and
+ * records the ceiling every rate-limit call was made with. `scopeColumn: false`
+ * is the database that has not had schema/040 applied: a select naming `scope`
+ * comes back as an error, exactly as PostgREST answers for a missing column.
+ */
+function stubAccount({
+  scope,
+  tier,
+  scopeColumn = true,
+}: {
+  scope?: string;
+  tier?: 'free' | 'pro';
+  scopeColumn?: boolean;
+}) {
+  const maxima: { bucket: string; max: number }[] = [];
+  const client = {
+    from: (table: string) => {
+      let columns = '';
+      const chain: Record<string, unknown> = {
+        update: () => chain,
+        select: (c: string) => {
+          columns = c;
+          return chain;
+        },
+        eq: () => chain,
+        is: () => chain,
+        maybeSingle: () => {
+          if (table === 'profiles') return Promise.resolve({ data: { tier: tier ?? 'free' } });
+          if (!scopeColumn && columns.includes('scope')) {
+            return Promise.resolve({
+              data: null,
+              error: { message: 'column api_keys.scope does not exist' },
+            });
+          }
+          return Promise.resolve({
+            data: { id: 'key-1', user_id: 'user-1', ...(scope ? { scope } : {}) },
+          });
+        },
+      };
+      return chain;
+    },
+    rpc: (_name: string, args: { p_key: string; p_max_count: number }) => {
+      maxima.push({ bucket: args.p_key, max: args.p_max_count });
+      return Promise.resolve({ data: 0, error: null });
+    },
+  };
+  return { client, maxima };
+}
+
+describe('the creation budget follows the plan', () => {
+  it('is 75 an hour on Pro and 30 on free', () => {
+    expect(creationMax('pro')).toBe(75);
+    expect(creationMax('free')).toBe(30);
+  });
+
+  it('spends the Pro ceiling for a Pro account and the free one for a free account', async () => {
+    for (const [tier, expected] of [
+      ['pro', 75],
+      ['free', 30],
+    ] as const) {
+      const { client, maxima } = stubAccount({ tier });
+      supabase.current = client;
+      const auth = await authenticateApiKey(apiRequest(), {
+        name: 'shares',
+        per: 'account',
+        max: creationMax,
+        perIpMax: 120,
+        write: true,
+      });
+      expect(auth).toEqual({ caller: { userId: 'user-1', tier, scope: 'full' } });
+      expect(maxima).toEqual([
+        { bucket: 'api:shares:user-1', max: expected },
+        { bucket: 'api:shares-ip:203.0.113.9', max: 120 },
+      ]);
+    }
+  });
+});
+
+describe('a read-only key', () => {
+  it('is refused on a route that writes, with a 403 saying what to do', async () => {
+    const { client } = stubAccount({ scope: 'read_only' });
+    supabase.current = client;
+    const auth = await authenticateApiKey(apiRequest(), {
+      name: 'shares',
+      per: 'account',
+      max: creationMax,
+      write: true,
+    });
+    expect(auth).toEqual({ error: READ_ONLY_KEY });
+    expect(READ_ONLY_KEY.status).toBe(403);
+    expect(String(READ_ONLY_KEY.body['message'])).toMatch(/read-only/);
+    expect(String(READ_ONLY_KEY.body['message'])).toMatch(/htmlradar\.com\/settings/);
+  });
+
+  it('is allowed on a route that only reads', async () => {
+    const { client } = stubAccount({ scope: 'read_only' });
+    supabase.current = client;
+    await expect(
+      authenticateApiKey(apiRequest(), { name: 'activity', per: 'key', max: 300 }),
+    ).resolves.toEqual({ caller: { userId: 'user-1', tier: 'free', scope: 'read_only' } });
+  });
+
+  // The budgets are spent before the scope is read, so a script looping on a
+  // route its key cannot use still runs into a 429 rather than a free retry.
+  it('still spends its budget on the call it is refused for', async () => {
+    const { client, maxima } = stubAccount({ scope: 'read_only' });
+    supabase.current = client;
+    await authenticateApiKey(apiRequest(), {
+      name: 'shares',
+      per: 'account',
+      max: creationMax,
+      write: true,
+    });
+    expect(maxima).toEqual([{ bucket: 'api:shares:user-1', max: 30 }]);
+  });
+});
+
+// ponytail: delete this test with the fallback it covers, once 040 is applied.
+describe('a database that has not had schema/040 applied', () => {
+  it('authenticates the key as full access rather than failing the request', async () => {
+    const { client } = stubAccount({ scopeColumn: false });
+    supabase.current = client;
+    await expect(
+      authenticateApiKey(apiRequest(), {
+        name: 'shares',
+        per: 'account',
+        max: creationMax,
+        write: true,
+      }),
+    ).resolves.toEqual({ caller: { userId: 'user-1', tier: 'free', scope: 'full' } });
+  });
+});
+
+describe('the listing cursor', () => {
+  const listRequest = (query: string) =>
+    new Request(`https://htmlradar.com/api/v1/shares${query}`, {
+      headers: { authorization: `Bearer ${VALID}` },
+    });
+
+  it('is absent when the caller did not ask for a page', () => {
+    expect(readBefore(listRequest(''))).toEqual({ before: null });
+  });
+
+  it('normalises a timestamp the caller passed back', () => {
+    expect(readBefore(listRequest('?before=2026-08-30T10:00:00Z'))).toEqual({
+      before: '2026-08-30T10:00:00.000Z',
+    });
+  });
+
+  // Silently returning page one to a caller that asked for page four is how a
+  // paging loop becomes an infinite one.
+  it('refuses a cursor that is not a timestamp rather than ignoring it', () => {
+    const result = readBefore(listRequest('?before=yesterday'));
+    expect(result).toEqual({
+      error: {
+        status: 422,
+        body: {
+          error: 'validation',
+          message: '"before" must be an ISO 8601 timestamp, as returned in next_before.',
+        },
       },
     });
   });

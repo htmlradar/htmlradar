@@ -134,6 +134,13 @@ create index if not exists idx_abuse_reports_document
 --
 -- Never raises. An upload must not fail because an operator could not be
 -- emailed about it, and the insert has already happened by the time this runs.
+-- Anything that does go wrong lands in notifications_log with status 'failed'
+-- rather than disappearing — see the exception handler at the bottom.
+--
+-- Note `coalesce` is written bare. It is a parser construct rather than a
+-- function and cannot be schema-qualified at all, exactly as 037 says; writing
+-- `pg_catalog.coalesce` is a runtime error, which is how the first version of
+-- this function failed.
 -- ------------------------------------------------------------
 create or replace function public.notify_screen_flag()
 returns trigger
@@ -177,7 +184,7 @@ begin
   -- Plain text, same reasoning as report_abuse: the body carries a document
   -- title the customer wrote, and text/plain cannot carry markup into the
   -- reader's client, so there is nothing to escape and nothing to get wrong.
-  v_subject := 'Upload screen flag: ' || pg_catalog.coalesce(v_doc.title, 'untitled document');
+  v_subject := 'Upload screen flag: ' || coalesce(v_doc.title, 'untitled document');
   v_body := pg_catalog.format(
     E'An uploaded document scored at or above the phishing screen threshold.\n'
     'Nothing was blocked — the customer has their document and can share it.\n'
@@ -193,12 +200,12 @@ begin
     'Report id %s\n'
     'Runbook: docs/workstreams/security/ABUSE-RUNBOOK.md\n'
     'At most five of these per account per hour.\n',
-    pg_catalog.coalesce(new.note, '(no signals recorded)'),
-    pg_catalog.coalesce(v_doc.title, '(untitled)'),
+    coalesce(new.note, '(no signals recorded)'),
+    coalesce(v_doc.title, '(untitled)'),
     v_doc.id::text,
     v_doc.owner_id::text,
     v_doc.created_at::text,
-    pg_catalog.coalesce(v_doc.r2_key, '(none)'),
+    coalesce(v_doc.r2_key, '(none)'),
     new.id::text
   );
 
@@ -222,8 +229,16 @@ begin
   update public.abuse_reports set notified_at = pg_catalog.now() where id = new.id;
   return null;
 exception when others then
-  -- The row is already written and that is the part that matters. A failed
-  -- send must not roll back the flag it was announcing.
+  -- The row is already written and that is the part that matters, so a failed
+  -- send must not roll back the flag it was announcing. But it must not vanish
+  -- either: the first version of this function swallowed a hard error here
+  -- (`pg_catalog.coalesce`, which is a parser construct and not a function),
+  -- and the only visible symptom was a null `notified_at` on a row nobody was
+  -- emailed about. The handler runs after its block has rolled back, in the
+  -- live outer transaction, so this row survives.
+  insert into public.notifications_log (session_id, email_to, status, error_message)
+  values (null, v_to, 'failed',
+          'notify_screen_flag: ' || pg_catalog.left(SQLERRM, 400));
   return null;
 end;
 $$;

@@ -52,6 +52,28 @@ import { escapeHtml } from './escape.js';
 // withNoIndex builds its header from this constant.
 export const FRAME_SANDBOX = 'allow-scripts allow-forms allow-popups allow-downloads';
 
+// The WHOLE policy a response carrying customer HTML gets, as ONE header.
+//
+// It is one header because it used to be two. The opaque-origin sandbox was
+// set in index.ts's withNoIndex and the frame-ancestors/base-uri/form-action
+// directives in inject.ts, each on its own `Content-Security-Policy`, and a
+// response whose shape came out of only one of those two places carried only
+// half the defence. Built here, once, so a serving path cannot acquire one
+// half without the other.
+//
+// form-action 'none' is the credential-harvesting defence: a convincing
+// sign-in page uploaded as a document cannot post what a visitor types, to us
+// or to anyone else. frame-ancestors is 'none' everywhere except the framed
+// route, where it becomes 'self' — the wrapper and the frame share a host, so
+// 'self' names exactly one framer: us.
+//
+// NOT for the gate, opt-out and error PAGES. Those are HTMLRadar's own forms
+// and they POST back, so form-action 'none' would break the password and
+// email gates. They carry the sandbox alone; withNoIndex gives them that.
+export const documentCsp = (framed: boolean): string =>
+  `sandbox ${FRAME_SANDBOX}; frame-ancestors ${framed ? "'self'" : "'none'"}; ` +
+  `base-uri 'none'; form-action 'none'`;
+
 // Denied on the wrapper, and again on the frame — the two features that can
 // paint outside a frame's rectangle. camera/microphone/geolocation/payment are
 // along for the ride: nothing on this page uses them, and denying them here
@@ -62,13 +84,14 @@ export const FRAME_PERMISSIONS_POLICY = 'fullscreen=(), picture-in-picture=()';
 
 // Marker header, stripped by withNoIndex on the way out.
 //
-// withNoIndex appends an opaque-origin sandbox CSP to every response, which is
-// exactly right for customer HTML and exactly wrong for this page. An opaque
-// origin has no registrable domain, and the browser computes a request's
-// "same-site" answer from the TOP-LEVEL document's site — so a sandboxed
-// wrapper would make its own frame request cross-site and the gate cookies
-// auth.ts issues would not be sent with it. The wrapper needs its real origin
-// for the same reason it may hold no customer HTML: it is the trusted half.
+// Every other response on this worker carries an opaque-origin sandbox CSP,
+// which is exactly right for customer HTML and exactly wrong for this page.
+// An opaque origin has no registrable domain, and the browser computes a
+// request's "same-site" answer from the TOP-LEVEL document's site — so a
+// sandboxed wrapper would make its own frame request cross-site and the gate
+// cookies auth.ts issues would not be sent with it. The wrapper needs its
+// real origin for the same reason it may hold no customer HTML: it is the
+// trusted half.
 //
 // Its own CSP is stricter than the sandbox would be anyway — `default-src
 // 'none'` with nonced style and script, nothing external, no forms.

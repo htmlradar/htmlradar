@@ -86,7 +86,7 @@ import {
 } from './auth.js';
 import { fetchDocumentHtml } from './fetch-html.js';
 import { geoFromRequest, injectTracker } from './inject.js';
-import { wrapperPage, FRAME_SANDBOX, OWN_PAGE_HEADER } from './wrapper.js';
+import { documentCsp, wrapperPage, FRAME_SANDBOX, OWN_PAGE_HEADER } from './wrapper.js';
 import {
   emailGateForm,
   expired,
@@ -175,13 +175,6 @@ function withNoIndex(res: Response, env: Env): Response {
   // origin, so they cannot reach application storage or make same-origin
   // requests to it. Their own scripts still run.
   //
-  // Applied here rather than in inject.ts because the owner preview route
-  // builds its own Response and never calls injectTracker; this helper wraps
-  // every response, including the error path.
-  //
-  // append, not set: a response may already carry a policy from inject.ts,
-  // and multiple CSP headers combine restrictively.
-  //
   // Interim hardening. Recipient documents should move to an origin that
   // holds no application cookies.
   //
@@ -191,13 +184,21 @@ function withNoIndex(res: Response, env: Env): Response {
   // question from the top-level document's site, so a sandboxed wrapper would
   // make its own frame request cross-site and the gate cookies would not be
   // sent with it. wrapper.ts sets the marker; it never reaches the reader.
-  // Everything else on this worker — every response carrying customer HTML,
-  // frame and print alike, and the error path — is sandboxed here, once, so no
-  // future response shape can be added without it.
+  //
+  // WHAT THIS SETS is the sandbox ALONE, and only on a response that carries
+  // no policy of its own: the gate, opt-out and error pages, attachment
+  // downloads, the tracker. Those pages must NOT get form-action 'none' —
+  // they are HTMLRadar's own forms and they post back. A response carrying
+  // customer HTML has already set the whole merged policy through
+  // documentCsp, which contains this same sandbox; appending a second header
+  // here is what let the two halves of the document's defence be set in two
+  // places and diverge. tests/document-csp.test.ts walks every route and
+  // asserts what each one ends up with, which is now the guarantee that no
+  // future response shape escapes the sandbox.
   if (out.headers.has(OWN_PAGE_HEADER)) {
     out.headers.delete(OWN_PAGE_HEADER);
-  } else {
-    out.headers.append('Content-Security-Policy', `sandbox ${FRAME_SANDBOX}`);
+  } else if (!out.headers.has('Content-Security-Policy')) {
+    out.headers.set('Content-Security-Policy', `sandbox ${FRAME_SANDBOX}`);
   }
   return out;
 }
@@ -412,7 +413,10 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
         'Content-Type': 'text/html; charset=utf-8',
         // The recipient path sets these via injectTracker; mirror the
         // framing/sniffing protections on the owner-preview response so
-        // arbitrary sender HTML can't be framed or content-sniffed.
+        // arbitrary sender HTML can't be framed or content-sniffed. The CSP
+        // is the same builder that path uses, so the sender's raw upload is
+        // not the one place a hosted document's forms may still submit.
+        'Content-Security-Policy': documentCsp(false),
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',

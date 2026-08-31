@@ -1,6 +1,6 @@
 import type { Attachment, Share } from './supabase.js';
 import { escapeHtml } from './escape.js';
-import { FRAME_PERMISSIONS_POLICY } from './wrapper.js';
+import { documentCsp, FRAME_PERMISSIONS_POLICY } from './wrapper.js';
 
 interface InjectOptions {
   share: Share;
@@ -112,24 +112,15 @@ export function injectTracker(html: Response, opts: InjectOptions): Response {
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   headers.set('X-Content-Type-Options', 'nosniff');
   // Minimal CSP. Customer HTML may contain arbitrary inline scripts/styles,
-  // so we can't lock script-src. We do constrain framing, base-uri, and
-  // form-action to limit the blast radius of malicious docs.
-  //
-  // form-action 'none': a hosted document's forms cannot submit anywhere.
-  // This is the credential-harvesting defence — a convincing sign-in page
-  // uploaded as a document can no longer post what a visitor types, to us or
-  // to anyone else. Nothing legitimate loses: the tracker's own email gate
-  // calls preventDefault and sends the address with fetch, which form-action
-  // does not govern, and the proxy's gate and opt-out pages are separate
-  // responses that never carry this header.
-  //
-  // frame-ancestors: 'none' everywhere except the framed route, where it
-  // becomes 'self' — the single relaxation the trust layer makes. The wrapper
-  // and the frame share a host, so 'self' names exactly one framer: us.
-  headers.set(
-    'Content-Security-Policy',
-    `frame-ancestors ${opts.framed ? "'self'" : "'none'"}; base-uri 'none'; form-action 'none';`,
-  );
+  // so we can't lock script-src. The opaque-origin sandbox, framing, base-uri
+  // and form-action are what limit the blast radius of malicious docs, and
+  // they arrive as ONE header built by documentCsp — see wrapper.ts for why
+  // they may not be set in two places again. Nothing legitimate loses to
+  // form-action: the tracker's own email gate calls preventDefault and sends
+  // the address with fetch, which form-action does not govern, and the
+  // proxy's gate and opt-out pages are separate responses that never carry
+  // this header.
+  headers.set('Content-Security-Policy', documentCsp(opts.framed ?? false));
   return new Response(out.body, { status: out.status, headers });
 }
 

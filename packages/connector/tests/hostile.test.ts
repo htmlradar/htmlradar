@@ -258,6 +258,21 @@ describe('what the application returns', () => {
     expect((await approve(env, tx, 'shares:read')).status).toBe(502);
   });
 
+  it('is refused when the answer is larger than the cap, without buffering it', async () => {
+    const env = makeEnv();
+    network.exchange = () =>
+      new Response('x'.repeat(64 * 1024), { headers: { 'content-type': 'application/json' } });
+    const tx = (await handoff(env)).searchParams.get('tx') ?? '';
+    expect((await approve(env, tx, 'shares:read')).status).toBe(502);
+  });
+
+  it('is refused when the answer is not JSON at all', async () => {
+    const env = makeEnv();
+    network.exchange = () => new Response('<html>a proxy error page</html>');
+    const tx = (await handoff(env)).searchParams.get('tx') ?? '';
+    expect((await approve(env, tx, 'shares:read')).status).toBe(502);
+  });
+
   it('is refused when an identifier is not usable', async () => {
     const env = makeEnv();
     network.exchange = () =>

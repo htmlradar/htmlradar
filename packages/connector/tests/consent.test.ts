@@ -60,7 +60,11 @@ describe('/authorize', () => {
     expect(response.status).toBe(400);
     // Refused by the library before our own guard sees it: with no registration
     // endpoint there are no stored clients, so a bare name resolves to nothing.
-    expect(await response.text()).toContain('Invalid client_id');
+    // What the caller is told is one fixed sentence — the library's own message
+    // can name internals and is written to the log instead.
+    const text = await response.text();
+    expect(text).toContain('not one this server can serve');
+    expect(text).not.toContain('client_id');
   });
 
   it('refuses a redirect address the client did not publish', async () => {

@@ -185,3 +185,61 @@ export function tooManyRequests(retryAfter: number): Response {
     { status: 429, headers: { 'retry-after': String(retryAfter), 'cache-control': 'no-store' } },
   );
 }
+
+/**
+ * Which browser origins may call /mcp.
+ *
+ * Bearer tokens are not cookies, so a permissive policy is not automatic
+ * account theft — but any page that gets hold of a token should not also get a
+ * free browser channel to spend it on. Native clients send no Origin at all and
+ * are unaffected by any of this; they are allowed through untouched.
+ */
+export const ALLOWED_ORIGINS = new Set([
+  'https://claude.ai',
+  'https://www.claude.ai',
+  'https://claude.com',
+  'https://www.claude.com',
+]);
+
+/** A host we are willing to be reached on: the configured one, or a loopback for local runs. */
+export function isLoopbackHost(host: string): boolean {
+  const name = host.split(':')[0] ?? '';
+  return name === 'localhost' || name === '127.0.0.1' || name === '[::1]' || name === '::1';
+}
+
+/**
+ * Why this Worker cannot safely serve a request, or null when it can.
+ *
+ * Checked on every request rather than once at module load, because a Worker
+ * has no startup hook that can refuse to start — the first request is the
+ * earliest honest moment. The answer names the variable and never its value.
+ */
+export function configurationProblem(env: Env): string | null {
+  for (const name of ['CONNECT_SIGNING_SECRET', 'CONNECT_EXCHANGE_SECRET'] as const) {
+    const value = env[name];
+    if (typeof value !== 'string' || value.length < 32) {
+      return `${name} is missing or shorter than 32 characters`;
+    }
+  }
+  if (env.CONNECT_SIGNING_SECRET === env.CONNECT_EXCHANGE_SECRET) {
+    // They rotate separately on purpose: a leak of the signing secret must not
+    // also be key theft.
+    return 'CONNECT_SIGNING_SECRET and CONNECT_EXCHANGE_SECRET are the same value';
+  }
+  for (const name of ['APP_BASE_URL', 'API_BASE_URL', 'SERVER_URL'] as const) {
+    const value = env[name];
+    if (!value) return `${name} is not set`;
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      return `${name} is not a URL`;
+    }
+    // The exchange secret and a live API key travel to API_BASE_URL, so plain
+    // HTTP is only ever acceptable against a loopback address on a dev machine.
+    if (parsed.protocol !== 'https:' && !isLoopbackHost(parsed.host)) {
+      return `${name} is not an https address`;
+    }
+  }
+  return null;
+}

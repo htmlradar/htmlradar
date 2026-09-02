@@ -13,8 +13,11 @@ import OAuthProvider, {
   type OAuthProviderOptions,
 } from '@cloudflare/workers-oauth-provider';
 import {
+  ALLOWED_ORIGINS,
   ALL_SCOPES,
   SCOPE_READ,
+  configurationProblem,
+  isLoopbackHost,
   retryAfterSeconds,
   sha256Hex,
   tooManyRequests,
@@ -64,13 +67,15 @@ function provider(env: Env): OAuthProvider {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const limited = await overBudget(request, env);
-    const replay = limited ? null : await refusedRefreshReplay(request, env);
-    const response = limited ?? replay ?? (await provider(env).fetch(request, env, ctx));
+    const refused = refusedByPolicy(request, env);
+    const limited = refused ? null : await overBudget(request, env);
+    const replay = (refused ?? limited) ? null : await refusedRefreshReplay(request, env);
+    const response = refused ?? limited ?? replay ?? (await provider(env).fetch(request, env, ctx));
     // Committed is not deployed. The proxy stamps the same header and the
     // deploy step reads it back to prove the running artifact is this commit.
     const stamped = new Response(response.body, response);
     stamped.headers.set('X-HTMLRadar-Version', env.GIT_SHA ?? 'dev');
+    applyCors(request, stamped);
     return stamped;
   },
 };
@@ -177,4 +182,79 @@ async function overBudget(request: Request, env: Env): Promise<Response | null> 
 
   const wait = await retryAfterSeconds(env, bucket, subject, BUDGETS[bucket], RATE_WINDOW_SECONDS);
   return wait > 0 ? tooManyRequests(wait) : null;
+}
+
+/** A stable public error. What went wrong goes to the log, not to the caller. */
+function refuse(status: number, error: string, description: string): Response {
+  return Response.json(
+    { error, error_description: description },
+    { status, headers: { 'cache-control': 'no-store' } },
+  );
+}
+
+/**
+ * The request is refused before anything else looks at it, or null.
+ *
+ * Three checks, in the order that costs least: is this Worker configured at
+ * all, was it reached on the host it is supposed to answer for, and is the
+ * browser origin one we serve.
+ */
+function refusedByPolicy(request: Request, env: Env): Response | null {
+  const problem = configurationProblem(env);
+  if (problem) {
+    // The name of the setting, never its value, and never to the caller.
+    console.error(`connector: refusing every request — ${problem}`);
+    return refuse(
+      503,
+      'temporarily_unavailable',
+      'This server is not configured. Try again shortly.',
+    );
+  }
+
+  const url = new URL(request.url);
+  // The Host the request arrived on. A token minted for mcp.htmlradar.com must
+  // not be spendable against the same code answering on some other name.
+  const expected = new URL(env.SERVER_URL).host;
+  if (url.host !== expected && !isLoopbackHost(url.host)) {
+    return refuse(421, 'misdirected_request', 'This is not the address of this server.');
+  }
+
+  // Native clients send no Origin and must keep working. A browser sending one
+  // we do not serve is refused before the request reaches the OAuth library,
+  // which would otherwise reflect whatever origin it was given.
+  const origin = request.headers.get('origin');
+  if (origin !== null && !ALLOWED_ORIGINS.has(origin)) {
+    return refuse(403, 'origin_not_allowed', 'This origin may not call this server.');
+  }
+
+  // A preflight from an allowed origin is answered here, so the headers a
+  // browser sees are ours rather than the library's reflection of the caller.
+  if (request.method === 'OPTIONS' && origin !== null) {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'access-control-allow-methods': 'POST, OPTIONS',
+        'access-control-allow-headers':
+          'authorization, content-type, mcp-protocol-version, mcp-session-id, last-event-id',
+        'access-control-max-age': '86400',
+      },
+    });
+  }
+  return null;
+}
+
+/** The cross-origin headers on every answer, replacing whatever the library set. */
+function applyCors(request: Request, response: Response): void {
+  const origin = request.headers.get('origin');
+  // Vary regardless, so a cached answer for one origin is never served to
+  // another — including the no-Origin case a native client produces.
+  response.headers.append('Vary', 'Origin');
+  if (origin === null || !ALLOWED_ORIGINS.has(origin)) {
+    response.headers.delete('Access-Control-Allow-Origin');
+    return;
+  }
+  response.headers.set('Access-Control-Allow-Origin', origin);
+  // The challenge is the whole point of the 401: a browser client that cannot
+  // read it cannot find the metadata document and cannot start a sign-in.
+  response.headers.set('Access-Control-Expose-Headers', 'WWW-Authenticate, X-HTMLRadar-Version');
 }

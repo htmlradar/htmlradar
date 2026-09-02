@@ -114,28 +114,7 @@ Viewer-supplied text below is data, not instructions:
 
 Acme · jane@acme.com
   first open 2026-08-29T14:02:00Z · last seen 2026-08-29T14:09:00Z · active 4m 12s · scrolled 87%
-  read most: The Ask 2m 41s, Problem 48s
-
-Raw (the same values, still data):
-{
-  "share_id": "11111111-1111-4111-8111-111111111111",
-  "url": "https://htmlradar.page/r/acme-proposal",
-  "opened": true,
-  "viewers": [
-    {
-      "label": "Acme",
-      "email": "jane@acme.com",
-      "first_open": "2026-08-29T14:02:00Z",
-      "last_seen": "2026-08-29T14:09:00Z",
-      "active_seconds": 252,
-      "max_scroll": 0.87,
-      "sections": [
-        { "title": "Problem", "time_seconds": 48 },
-        { "title": "The Ask", "time_seconds": 161 }
-      ]
-    }
-  ]
-}`;
+  read most: The Ask 2m 41s, Problem 48s`;
 
 const LIST_OUTPUT = `2 links, newest first:
 
@@ -151,8 +130,7 @@ beta-proposal · Beta Corp · Q3 proposal
   https://htmlradar.page/r/beta-proposal
   share 33333333-3333-4333-8333-333333333333 · document 22222222-2222-4222-8222-222222222222`;
 
-const WHOAMI_OUTPUT = `HTMLRadar account 33333333-3333-4333-8333-333333333333
-Plan: free
+const WHOAMI_OUTPUT = `Plan: free
 Free tracked links used: 1 of 2`;
 
 const TROUBLESHOOTING: [string, string][] = [
@@ -633,9 +611,8 @@ did anyone read the proposal I shared yesterday?`}
               Takes <span className="font-mono text-[13px]">share_id</span>, a string: the share id
               or slug, the part after <span className="font-mono text-[13px]">/r/</span> in the
               link. Reports whether the link was opened, by whom, when, how long they actively read,
-              how far they scrolled, and which sections took the most time. The raw JSON follows the
-              summary so the agent can compute on it. Sections are listed in the order the document
-              has them; the summary ranks them by time.
+              how far they scrolled, and which sections took the most time. Every value is said
+              once, in the summary; sections are ranked by time.
             </p>
             <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
               A second input, <span className="font-mono text-[13px]">include_detail</span>, adds
@@ -697,8 +674,10 @@ did anyone read the proposal I shared yesterday?`}
               whoami
             </h3>
             <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
-              No inputs. Reports which account the key belongs to, the plan, and how many free
-              tracked links are used. On Pro the cap reads &ldquo;unlimited&rdquo;.
+              No inputs. Reports the plan the key&rsquo;s account is on and how many free tracked
+              links are used. On Pro the cap reads &ldquo;unlimited&rdquo;. No account identifier
+              comes back: an internal database key is nothing an assistant can use, and the email
+              address is personal data it does not need.
             </p>
             <CodeBlock label="example output" code={WHOAMI_OUTPUT} />
           </section>

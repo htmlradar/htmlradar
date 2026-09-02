@@ -111,7 +111,7 @@ const manifest = {
     },
     {
       name: 'whoami',
-      description: 'Show the HTMLRadar account, plan and free links used.',
+      description: 'Show the HTMLRadar plan and how many free tracked links are left.',
       inputSchema: toolSchemas.whoami,
     },
   ],

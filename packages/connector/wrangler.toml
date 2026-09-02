@@ -1,0 +1,64 @@
+name = "htmlradar-connector"
+main = "src/index.ts"
+
+# Two requirements from the OAuth library, both load-bearing:
+#
+#   compatibility_date >= 2024-11-11 — the Client ID Metadata Document fetch
+#   uses the `cache` option on fetch(), which does not exist before that date.
+#
+#   global_fetch_strictly_public — restricts this Worker's outbound fetch to
+#   publicly routable addresses. workers-oauth-provider only advertises
+#   `client_id_metadata_document_supported` when the flag is set, because
+#   without it an attacker can point a client_id URL at a private address and
+#   make the Worker fetch it (server-side request forgery). Removing this flag
+#   silently turns CIMD off, which is how the connector would stop accepting
+#   any client at all.
+compatibility_date = "2026-05-01"
+compatibility_flags = ["global_fetch_strictly_public"]
+
+# One address, as with the proxy and the monitor. The endpoint users paste is
+# https://mcp.htmlradar.com/mcp and there is no second one.
+workers_dev = false
+
+# A Cloudflare Custom Domain on the existing htmlradar.com zone: Cloudflare
+# creates the DNS record and the certificate, so unlike htmlradar.page there is
+# no second zone and no manual record. Removing a Custom Domain leaves its
+# certificate behind — a runbook line, not a deploy step.
+[[routes]]
+pattern = "mcp.htmlradar.com"
+custom_domain = true
+
+[vars]
+# The application: where the consent page lives and where the seven tools send
+# their API calls. One host today; separate names because they are separate
+# concerns and a self-hoster may split them.
+APP_BASE_URL = "https://htmlradar.com"
+API_BASE_URL = "https://htmlradar.com"
+# The RFC 8707 resource identifier this server issues tokens for. Access tokens
+# are pinned to it, so a token minted for anything else is refused at /mcp.
+SERVER_URL = "https://mcp.htmlradar.com/mcp"
+
+# Secrets — set with `wrangler secret put <NAME>`, never in this file:
+#
+#   CONNECT_SIGNING_SECRET   HMAC key for both legs of the consent hand-off
+#                            (Worker -> /connect, and /connect -> the callback).
+#                            The application holds the same value.
+#   CONNECT_EXCHANGE_SECRET  bearer credential for the server-to-server handle
+#                            exchange at /api/v1/connect/exchange, and for the
+#                            application's calls to /connect/revoke here.
+#
+# Two values on separate rotations, deliberately: a leak of the signing secret
+# must not become key theft.
+
+# The OAuth library's own store: clients (fetched CIMD documents), grants and
+# tokens. Also holds our short-lived `tx:` records — the parsed authorization
+# request, parked for the ten minutes the user spends on the consent page.
+#
+# INFRA LANE: create the namespace and replace this id. Until then `wrangler
+# dev` works (miniflare makes a local one) and `wrangler deploy` does not.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "REPLACE_WITH_OAUTH_KV_NAMESPACE_ID"
+
+[observability]
+enabled = true

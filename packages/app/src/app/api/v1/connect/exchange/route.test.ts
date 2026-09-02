@@ -3,10 +3,19 @@ import type { NextRequest } from 'next/server';
 
 const db = vi.hoisted(() => ({
   consumed: false,
+  retryAfter: 0,
   filters: {} as Record<string, unknown>,
 }));
 
 vi.mock('@/lib/api-auth', () => ({
+  addressRetryAfter: async () => db.retryAfter,
+  errorResponse: (err: { status: number; body: unknown; headers?: Record<string, string> }) =>
+    Response.json(err.body, { status: err.status, headers: err.headers ?? {} }),
+  rateLimited: (seconds: number) => ({
+    status: 429,
+    body: { error: 'rate_limited', retry_after_seconds: seconds },
+    headers: { 'retry-after': String(seconds) },
+  }),
   readBodyCapped: (req: Request) => req.text(),
   serviceClient: () => ({
     from: () => {
@@ -71,6 +80,7 @@ async function exchangeWithAuthorization(authorization: string) {
 beforeEach(() => {
   process.env['CONNECT_EXCHANGE_SECRET'] = 'exchange-test-secret';
   db.consumed = false;
+  db.retryAfter = 0;
   db.filters = {};
 });
 
@@ -102,5 +112,14 @@ describe('POST /api/v1/connect/exchange', () => {
     expect(db.filters.expires_at).toEqual(expect.any(String));
 
     expect(await exchange()).toEqual({ status: 400, body: { error: 'used_or_expired' } });
+  });
+
+  it('answers 429 before it even looks at the secret', async () => {
+    db.retryAfter = 47;
+    expect(await exchangeWithAuthorization('Bearer wrong-secret')).toEqual({
+      status: 429,
+      body: { error: 'rate_limited', retry_after_seconds: 47 },
+    });
+    expect(db.consumed).toBe(false);
   });
 });

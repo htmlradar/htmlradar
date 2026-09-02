@@ -1,5 +1,11 @@
 import type { NextRequest } from 'next/server';
-import { readBodyCapped, serviceClient } from '@/lib/api-auth';
+import {
+  addressRetryAfter,
+  errorResponse,
+  rateLimited,
+  readBodyCapped,
+  serviceClient,
+} from '@/lib/api-auth';
 import { constantTimeEqual, sha256Hex } from '@/lib/connect';
 
 export const runtime = 'edge';
@@ -10,7 +16,17 @@ function json(body: Record<string, unknown>, status: number): Response {
   return Response.json(body, { status });
 }
 
+// One consent per connection, and a handful of retries. Anything past this
+// from one address is either a broken client or somebody guessing the shared
+// secret, and both should be made to wait.
+const EXCHANGES_PER_HOUR = 60;
+
 export async function POST(req: NextRequest): Promise<Response> {
+  // Before the secret is compared, so a guesser spends budget on every attempt
+  // rather than only on the ones that get further.
+  const wait = await addressRetryAfter(req, 'connect-exchange', EXCHANGES_PER_HOUR);
+  if (wait > 0) return errorResponse(rateLimited(wait));
+
   const expected = process.env['CONNECT_EXCHANGE_SECRET'] ?? '';
   const match = /^Bearer[ \t]+(\S+)$/.exec(req.headers.get('authorization')?.trim() ?? '');
   if (!expected || !match?.[1] || !(await constantTimeEqual(match[1], expected))) {

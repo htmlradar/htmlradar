@@ -7,9 +7,12 @@ vi.mock('@/lib/supabase-server', () => ({
   serverClient: vi.fn(),
 }));
 vi.mock('@/lib/api-auth', () => ({
+  addressRetryAfter: async () => 0,
   apiKeyPrefix: vi.fn(),
+  errorResponse: vi.fn(),
   generateApiKey: vi.fn(),
   hashApiKey: vi.fn(),
+  rateLimited: vi.fn(),
 }));
 vi.mock('@/lib/error-log', () => ({ logServerError: vi.fn() }));
 

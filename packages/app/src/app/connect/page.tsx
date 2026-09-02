@@ -1,4 +1,6 @@
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { addressRetryAfterFor } from '@/lib/api-auth';
 import {
   FULL_SCOPE,
   READ_SCOPE,
@@ -62,7 +64,23 @@ function ErrorPage({ message }: { message: string }) {
   );
 }
 
+// Consent is a once-in-a-while thing. A hundred renders an hour from one
+// address is already far more than a person reconnecting a few clients, and it
+// is the budget that stops this page being used to probe signatures.
+const CONSENT_RENDERS_PER_HOUR = 100;
+
 export default async function ConnectPage({ searchParams }: { searchParams?: SearchParams }) {
+  const wait = await addressRetryAfterFor(
+    headers().get('cf-connecting-ip')?.trim() ?? '',
+    'connect-page',
+    CONSENT_RENDERS_PER_HOUR,
+  );
+  if (wait > 0) {
+    return (
+      <ErrorPage message="Too many connection attempts from this network. Wait a minute and start again from Claude." />
+    );
+  }
+
   const request = requestFrom(searchParams ?? {});
   const secret = process.env['CONNECT_SIGNING_SECRET'] ?? '';
   if (!(await validConnectRequest(request, secret))) {

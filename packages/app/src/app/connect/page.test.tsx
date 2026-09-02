@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { hmacSign } from '@/lib/connect';
 
-const state = vi.hoisted(() => ({ redirect: '' }));
+const state = vi.hoisted(() => ({ redirect: '', wait: 0 }));
 
 vi.mock('next/navigation', () => ({
   redirect: (target: string) => {
@@ -13,6 +13,8 @@ vi.mock('@/lib/supabase-server', () => ({
   serverClient: () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }),
   requireUser: vi.fn(),
 }));
+vi.mock('next/headers', () => ({ headers: () => new Headers() }));
+vi.mock('@/lib/api-auth', () => ({ addressRetryAfterFor: async () => state.wait }));
 import ConnectPage from './page';
 
 describe('GET /connect while signed out', () => {
@@ -35,5 +37,12 @@ describe('GET /connect while signed out', () => {
     expect(state.redirect).toBe(
       `/sign-in?next=${encodeURIComponent(`/connect?${new URLSearchParams(searchParams)}`)}`,
     );
+  });
+
+  it('says so, rather than redirecting, when the address is over its budget', async () => {
+    state.wait = 30;
+    const page = await ConnectPage({ searchParams: {} });
+    state.wait = 0;
+    expect(JSON.stringify(page)).toContain('Too many connection attempts');
   });
 });

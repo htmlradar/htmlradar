@@ -135,3 +135,53 @@ export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
+
+/**
+ * A fixed-window counter in the one key-value namespace this Worker already
+ * has. Returns the seconds to wait, or 0 when the caller is inside its budget.
+ *
+ * ponytail: fixed window, not a sliding one, and one read plus one write per
+ * counted request. A caller can therefore send `max` at the very end of one
+ * window and `max` again at the start of the next. That is the known ceiling,
+ * and it is fine for the job — this exists to stop a script hammering
+ * /authorize and /token, not to shape traffic to the second. The upgrade path
+ * is Cloudflare's own rate-limiting binding, which needs no storage at all;
+ * take it if the key-value cost ever shows up in a bill.
+ *
+ * Fails open, like the application's limiter and for the same reason: this is
+ * abuse control, not authorisation, and a key-value hiccup must not close the
+ * connector. The failure is not silent — it is one line on stderr with no
+ * caller identity in it.
+ */
+export async function retryAfterSeconds(
+  env: Env,
+  bucket: string,
+  subject: string,
+  max: number,
+  windowSeconds: number,
+): Promise<number> {
+  const now = nowSeconds();
+  const windowStart = now - (now % windowSeconds);
+  const key = `rl:${bucket}:${windowStart}:${subject}`;
+  try {
+    const used = Number((await env.OAUTH_KV.get(key)) ?? '0');
+    if (used >= max) return windowStart + windowSeconds - now;
+    // Written with a lifetime, so nothing here is ever swept by hand. The
+    // minimum a key-value namespace accepts is 60 seconds.
+    await env.OAUTH_KV.put(key, String(used + 1), {
+      expirationTtl: Math.max(60, windowSeconds),
+    });
+    return 0;
+  } catch {
+    console.error(`connector: rate limit counter unavailable for bucket ${bucket}`);
+    return 0;
+  }
+}
+
+/** The 429 the contract asks for: a Retry-After header and a readable body. */
+export function tooManyRequests(retryAfter: number): Response {
+  return Response.json(
+    { error: 'rate_limited', retry_after_seconds: retryAfter },
+    { status: 429, headers: { 'retry-after': String(retryAfter), 'cache-control': 'no-store' } },
+  );
+}

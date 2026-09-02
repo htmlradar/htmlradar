@@ -12,7 +12,14 @@ import OAuthProvider, {
   getOAuthApi,
   type OAuthProviderOptions,
 } from '@cloudflare/workers-oauth-provider';
-import { ALL_SCOPES, SCOPE_READ, sha256Hex, type Env } from './common.js';
+import {
+  ALL_SCOPES,
+  SCOPE_READ,
+  retryAfterSeconds,
+  sha256Hex,
+  tooManyRequests,
+  type Env,
+} from './common.js';
 import consentHandler from './consent.js';
 import mcpHandler from './mcp.js';
 
@@ -57,8 +64,9 @@ function provider(env: Env): OAuthProvider {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const replay = await refusedRefreshReplay(request, env);
-    const response = replay ?? (await provider(env).fetch(request, env, ctx));
+    const limited = await overBudget(request, env);
+    const replay = limited ? null : await refusedRefreshReplay(request, env);
+    const response = limited ?? replay ?? (await provider(env).fetch(request, env, ctx));
     // Committed is not deployed. The proxy stamps the same header and the
     // deploy step reads it back to prove the running artifact is this commit.
     const stamped = new Response(response.body, response);
@@ -122,4 +130,51 @@ async function refusedRefreshReplay(request: Request, env: Env): Promise<Respons
     },
     { status: 400, headers: { 'cache-control': 'no-store' } },
   );
+}
+
+/**
+ * What each endpoint costs, per minute.
+ *
+ * /authorize and /token are counted on the caller's address, because that is
+ * the only thing an unauthenticated caller has. /mcp is counted on the grant
+ * instead — one connection, one budget — so a whole office behind one address
+ * is not one customer's problem, and a runaway client is only its own.
+ */
+const BUDGETS = {
+  authorize: 20,
+  token: 60,
+  mcp: 240,
+} as const;
+
+const RATE_WINDOW_SECONDS = 60;
+
+/** The 429 to send instead of serving this request, or null. */
+async function overBudget(request: Request, env: Env): Promise<Response | null> {
+  const path = new URL(request.url).pathname;
+  const address = request.headers.get('cf-connecting-ip')?.trim() || 'unknown';
+
+  let bucket: keyof typeof BUDGETS;
+  let subject = address;
+  if (path === '/authorize') {
+    bucket = 'authorize';
+  } else if (path === '/token') {
+    bucket = 'token';
+  } else if (path === '/mcp') {
+    bucket = 'mcp';
+    // `userId:grantId` off the bearer token. Not a secret and not the whole
+    // token: it names a connection, which is what the budget belongs to. A
+    // request with no usable token falls back to the address, so an
+    // unauthenticated flood is still counted.
+    const parts = (
+      /^Bearer[ \t]+(\S+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? ''
+    )
+      .split(':')
+      .slice(0, 2);
+    if (parts.length === 2 && parts[0] && parts[1]) subject = parts.join(':');
+  } else {
+    return null;
+  }
+
+  const wait = await retryAfterSeconds(env, bucket, subject, BUDGETS[bucket], RATE_WINDOW_SECONDS);
+  return wait > 0 ? tooManyRequests(wait) : null;
 }

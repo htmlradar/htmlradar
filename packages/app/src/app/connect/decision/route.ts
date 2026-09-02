@@ -1,5 +1,13 @@
 import type { NextRequest } from 'next/server';
-import { apiKeyPrefix, generateApiKey, hashApiKey, type ApiKeyScope } from '@/lib/api-auth';
+import {
+  addressRetryAfter,
+  apiKeyPrefix,
+  errorResponse,
+  generateApiKey,
+  hashApiKey,
+  rateLimited,
+  type ApiKeyScope,
+} from '@/lib/api-auth';
 import {
   CONNECT_CALLBACK_URL,
   CONNECTOR_LABEL_PREFIX,
@@ -56,7 +64,15 @@ function connectPath(request: ConnectRequest, problem: string): string {
   return safeNext(`/connect?${query}`);
 }
 
+// The expensive half of consent: this route mints a key. The ten-live-key
+// trigger already caps how many can exist, but the trigger fires per account
+// and this budget is per address, which is the case the trigger cannot see.
+const DECISIONS_PER_HOUR = 60;
+
 export async function POST(req: NextRequest): Promise<Response> {
+  const wait = await addressRetryAfter(req, 'connect-decision', DECISIONS_PER_HOUR);
+  if (wait > 0) return errorResponse(rateLimited(wait));
+
   const form = await req.formData();
   const request = requestFrom(form);
   const secret = process.env['CONNECT_SIGNING_SECRET'] ?? '';

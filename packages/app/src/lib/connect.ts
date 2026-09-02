@@ -100,7 +100,6 @@ export async function validConnectRequest(
   }
   const scopes = request.scope.split(' ');
   if (
-    scopes[0] !== READ_SCOPE ||
     scopes.some((scope) => scope !== READ_SCOPE && scope !== 'shares:write') ||
     new Set(scopes).size !== scopes.length
   ) {

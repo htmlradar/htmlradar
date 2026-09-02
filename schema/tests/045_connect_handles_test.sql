@@ -140,5 +140,15 @@ begin
 end;
 $$;
 
+do $$
+declare v_count int;
+begin
+  perform public.purge_connect_handles();
+  select count(*) into v_count from connect_handles where tx = repeat('c', 32);
+  if v_count <> 0 then raise exception 'FAIL C1: purge_connect_handles() left an expired row behind'; end if;
+  raise notice 'PASS  C1 purge_connect_handles() removes an expired row';
+end;
+$$;
+
 reset role;
 rollback;

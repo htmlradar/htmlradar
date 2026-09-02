@@ -15,7 +15,54 @@ vi.mock('@/lib/error-log', () => ({ logServerError: vi.fn() }));
 
 import { POST } from './route';
 
+async function signedValues(overrides: Partial<Record<string, string>> = {}) {
+  const secret = process.env['CONNECT_SIGNING_SECRET']!;
+  const values = {
+    tx: 'd'.repeat(32),
+    client_id: 'https://claude.ai/.well-known/oauth-client',
+    client_host: 'claude.ai',
+    scope: 'shares:read',
+    exp: '2000000000',
+    sig: '',
+    nonce: '',
+    decision: 'cancel',
+    ...overrides,
+  };
+  values.sig = await hmacSign(
+    `${values.tx}\n${values.client_id}\n${values.client_host}\n${values.scope}\n${values.exp}`,
+    secret,
+  );
+  return values;
+}
+
+function postDecision(values: Record<string, string>): Promise<Response> {
+  return POST(
+    new Request('https://htmlradar.com/connect/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(values),
+    }) as unknown as NextRequest,
+  );
+}
+
 describe('POST /connect/decision', () => {
+  it('refuses a missing, forged, or another user’s nonce', async () => {
+    process.env['CONNECT_SIGNING_SECRET'] = 'decision-test-secret';
+    const secret = process.env['CONNECT_SIGNING_SECRET'];
+
+    const missing = await signedValues({ nonce: '' });
+    const forged = await signedValues({ nonce: 'not-a-real-nonce.deadbeef' });
+    const otherUser = await signedValues();
+    otherUser.nonce = await createConsentNonce(otherUser.tx, 'user-2', otherUser.exp, secret);
+
+    for (const values of [missing, forged, otherUser]) {
+      const response = await postDecision(values);
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get('location')!);
+      expect(`${location.origin}${location.pathname}`).toBe('https://htmlradar.com/connect');
+    }
+  });
+
   it('returns the contract-required 302 and signed denial', async () => {
     process.env['CONNECT_SIGNING_SECRET'] = 'decision-test-secret';
     const values = {

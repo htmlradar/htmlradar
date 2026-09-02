@@ -100,6 +100,11 @@ export async function POST(req: NextRequest): Promise<Response> {
     .single();
 
   if (keyError || !keyRow) {
+    // The ten-live-keys cap is a trigger on api_keys (schema/034); see the
+    // same handling in settings/page.tsx's createApiKeyAction.
+    if (keyError?.message.includes('api_key_limit')) {
+      return redirectTo(req, connectPath(request, 'key_limit'));
+    }
     await logServerError({
       source: 'connect.api_key_create',
       message: 'Connector API key insert failed',

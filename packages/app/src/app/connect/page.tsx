@@ -77,6 +77,12 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
   } = await supabase.auth.getUser();
   if (!user) redirect(`/sign-in?next=${encodeURIComponent(connectPath(request))}`);
 
+  if (one(searchParams?.problem) === 'key_limit') {
+    return (
+      <ErrorPage message="You already have 10 active keys. Revoke one in Settings, then try again." />
+    );
+  }
+
   if (one(searchParams?.problem) === 'create_failed') {
     return (
       <ErrorPage message="HTMLRadar could not create this connection. Try allowing it again." />

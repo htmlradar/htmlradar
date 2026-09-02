@@ -136,6 +136,16 @@ export default function ForClaudeCodePage() {
               </Link>{' '}
               are one command each.
             </p>
+            <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
+              In Claude Desktop or at claude.ai there is a shorter route with no key and no
+              terminal: open Settings, then Connectors, then Add custom connector, and paste{' '}
+              <span className="font-mono text-[14px]">https://mcp.htmlradar.com/mcp</span>. You sign
+              in to HTMLRadar the first time Claude uses a tool.{' '}
+              <Link href="/mcp#connector" className="text-signal-dark hover:underline">
+                The four steps in full
+              </Link>
+              .
+            </p>
           </section>
 
           <section className="mt-14">

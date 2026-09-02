@@ -52,13 +52,20 @@ SERVER_URL = "https://mcp.htmlradar.com/mcp"
 
 # The OAuth library's own store: clients (fetched CIMD documents), grants and
 # tokens. Also holds our short-lived `tx:` records — the parsed authorization
-# request, parked for the ten minutes the user spends on the consent page.
+# request, parked for the ten minutes the user spends on the consent page, and
+# the fixed-window rate-limit counters (`rl:` keys, which expire on their own).
 #
-# INFRA LANE: create the namespace and replace this id. Until then `wrangler
-# dev` works (miniflare makes a local one) and `wrangler deploy` does not.
+# A namespace id is an account-scoped identifier, not a credential: it is
+# useless without an API token that can reach the account, which is why it sits
+# here in the open the way the proxy's binding ids do.
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "REPLACE_WITH_OAUTH_KV_NAMESPACE_ID"
+id = "157b5769ebb440e99fa12aa428206ffa"
 
+# Observability is on, and the callback handle travels in a query string. Before
+# this Worker is left running with logs retained, confirm in the Cloudflare
+# dashboard that query values and Authorization headers are redacted — a handle
+# is single-use and expires in 120 seconds, so a log line is not a live
+# credential, but it is still not something to keep.
 [observability]
 enabled = true

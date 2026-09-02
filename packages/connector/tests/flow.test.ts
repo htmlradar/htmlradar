@@ -226,13 +226,7 @@ describe('revocation', () => {
     const wrongSecret = await fetchRevoke(env, 'Bearer wrong', 'user-1');
     expect(wrongSecret.status).toBe(401);
 
-    const grantId = accessToken.split(':')[1] ?? '';
-    const revoked = await fetchRevoke(
-      env,
-      'Bearer test-exchange-secret-value-32-byte!!',
-      'user-1',
-      grantId,
-    );
+    const revoked = await fetchRevoke(env, 'Bearer test-exchange-secret-value-32-byte!!', 'user-1');
     expect(revoked.status).toBe(204);
 
     const after = await rpc(env, accessToken, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
@@ -244,7 +238,7 @@ async function fetchRevoke(
   env: ReturnType<typeof makeEnv>,
   authorization: string,
   userId: string,
-  grantId = 'grant-1',
+  apiKeyId = 'key-row-1',
 ): Promise<Response> {
   const { call } = await import('./harness.js');
   return call(
@@ -252,7 +246,7 @@ async function fetchRevoke(
     new Request('https://mcp.htmlradar.com/connect/revoke', {
       method: 'POST',
       headers: { authorization, 'content-type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, grant_id: grantId }),
+      body: JSON.stringify({ user_id: userId, api_key_id: apiKeyId }),
     }),
   );
 }

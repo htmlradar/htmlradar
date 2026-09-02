@@ -194,6 +194,16 @@ async function callback(env: Env, url: URL): Promise<Response> {
     // it does not authenticate.
     metadata: { apiKeyId: granted.api_key_id, grantedAt: nowSeconds() },
     props,
+    // Grants coexist, one per connection. The library's default is to revoke
+    // every earlier grant for the same user, client document and redirect
+    // address, which would mean connecting from a second Claude account — or
+    // reconnecting from a second browser — silently disconnects the first.
+    // Each consent mints its own `hr_live_` key, each key is listed and
+    // revocable on its own in Settings, and that key is the authoritative off
+    // switch, so nothing is gained by folding two connections into one grant.
+    // The default exists to stop stale props causing re-auth loops; our props
+    // never change inside a grant, because a new consent makes a new key.
+    revokeExistingGrants: false,
   });
   return Response.redirect(redirectTo, 302);
 }
@@ -263,13 +273,36 @@ async function revoke(request: Request, env: Env): Promise<Response> {
   }
   const body = (await request.json().catch(() => null)) as {
     user_id?: string;
-    grant_id?: string;
+    api_key_id?: string;
   } | null;
-  if (!body?.user_id || !body?.grant_id) {
-    return new Response('user_id and grant_id are required.', { status: 400 });
+  if (!body?.user_id || !body?.api_key_id) {
+    return new Response('user_id and api_key_id are required.', { status: 400 });
   }
-  await env.OAUTH_PROVIDER.revokeGrant(body.grant_id, body.user_id);
-  return new Response(null, { status: 204 });
+  // The application never learns a grant identifier — the grant only exists
+  // after the exchange, inside completeAuthorization, which returns a redirect
+  // and nothing else. It does know the key identifier it minted, which the
+  // grant carries in its (unencrypted, by the library's design) metadata. So
+  // the Worker does the lookup: every grant this user holds whose metadata
+  // names that key is revoked. Nought, one or several — all three are 204,
+  // because the caller asked for a key to have no grants and afterwards it has
+  // none.
+  const { user_id: userId, api_key_id: apiKeyId } = body;
+  let cursor: string | undefined;
+  let revoked = 0;
+  do {
+    const page = await env.OAUTH_PROVIDER.listUserGrants(userId, {
+      limit: 100,
+      ...(cursor ? { cursor } : {}),
+    });
+    for (const grant of page.items) {
+      if ((grant.metadata as { apiKeyId?: unknown } | null)?.apiKeyId === apiKeyId) {
+        await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
+        revoked += 1;
+      }
+    }
+    cursor = page.cursor;
+  } while (cursor);
+  return new Response(null, { status: 204, headers: { 'X-Grants-Revoked': String(revoked) } });
 }
 
 function clientErrorUrl(parked: AuthRequest, error: string): string {

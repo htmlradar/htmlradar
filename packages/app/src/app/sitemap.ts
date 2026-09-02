@@ -20,7 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/`, changeFrequency: 'weekly', priority: 1 },
     { url: `${baseUrl}/why`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
-    // /sign-in and /feedback are utility pages, not search results.
+    // /sign-in, /feedback and /connect are utility pages, not search results.
     // Their page metadata sets noindex, so they are deliberately omitted.
     { url: `${baseUrl}/privacy`, changeFrequency: 'yearly', priority: 0.4 },
     { url: `${baseUrl}/terms`, changeFrequency: 'yearly', priority: 0.4 },

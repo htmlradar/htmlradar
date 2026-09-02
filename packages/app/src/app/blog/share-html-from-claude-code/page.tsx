@@ -192,7 +192,7 @@ Free tracked links used: 0 of 2`;
 
 // The complete message the server prints, as one flowing line so it wraps to
 // the reader's width instead of being hard-wrapped to somebody else's.
-const STARTUP_ERROR = `htmlradar-mcp: HTMLRADAR_API_KEY is the unresolved placeholder "\${HTMLRADAR_API_KEY}", which means the variable was not set in the environment the client started from. Export it in your shell (export HTMLRADAR_API_KEY=hr_live_...) before starting Claude Code or the client that launches this server. Create a key at https://htmlradar.com/settings (under "API keys") and pass it to this server as the HTMLRADAR_API_KEY environment variable.`;
+const STARTUP_ERROR = `htmlradar-mcp: HTMLRADAR_API_KEY is the unresolved placeholder "\${HTMLRADAR_API_KEY}", which means the variable was not set in the environment the client started from, so this server cannot reach HTMLRadar yet. Export it in your shell (export HTMLRADAR_API_KEY=hr_live_...) before starting Claude Code or the client that launches this server. Create a key at https://htmlradar.com/settings (under "API keys") and pass it to this server as the HTMLRADAR_API_KEY environment variable. Then restart this client so it picks the key up.`;
 
 const SHARE_OUT = `Tracked link: https://htmlradar.page/r/q3-board-update
 Dashboard:    https://htmlradar.com/docs/2222…
@@ -359,16 +359,18 @@ export default function Post() {
               </FinePrint>
               <FinePrint summary="If that first tool call fails">
                 <p>
-                  Run <C>npx -y htmlradar-mcp</C> by hand. Some clients report a server as connected
-                  even when it exited at startup, and the server prints its actual reason before
-                  going:
+                  Ask Claude anything that touches HTMLRadar and read what the tool returns. Since
+                  0.3.0 a server with no usable key stays up and answers every tool with the reason,
+                  so the sentence reaches you inside the conversation. Running{' '}
+                  <C>npx -y htmlradar-mcp</C> by hand prints the same line to the terminal:
                 </p>
                 <Transcript title="npx -y htmlradar-mcp">
                   <Out code={STARTUP_ERROR} />
                 </Transcript>
                 <p>
                   An unexported variable in the shell that launched the client is the most common
-                  failure by a distance.
+                  failure by a distance. Before 0.3.0 this one exited at startup, which several
+                  clients still reported as connected.
                 </p>
               </FinePrint>
             </section>

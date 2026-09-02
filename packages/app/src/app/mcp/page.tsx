@@ -140,7 +140,7 @@ const TROUBLESHOOTING: [string, string][] = [
   ],
   [
     'HTMLRadar rejected the API key',
-    'Three usual causes. A character came along with the paste: keys are exactly hr_live_ plus 40 hexadecimal characters. The key was revoked at htmlradar.com/settings: create a new one. Or the variable was never exported, so the client passed the literal text ${HTMLRADAR_API_KEY} through: since 0.1.1 the server refuses to start in that case and its message names the placeholder. Run the command by hand to see it.',
+    'Two usual causes, and one that no longer looks like this. A character came along with the paste: keys are exactly hr_live_ plus 40 hexadecimal characters. Or the key was revoked at htmlradar.com/settings: create a new one. The third cause, the variable never being exported so the client passed the literal text ${HTMLRADAR_API_KEY} through, reads differently since 0.3.0: every tool returns the instruction to export the variable and restart, and the server stays up.',
   ],
   [
     'Free accounts get 2 tracked links',
@@ -708,8 +708,8 @@ did anyone read the proposal I shared yesterday?`}
             <p className="text-[15px] leading-relaxed text-ink-soft">
               To see only the startup check, run{' '}
               <span className="font-mono text-[13px]">npx -y htmlradar-mcp</span> directly: with a
-              placeholder or malformed key it prints what is wrong and exits, and with no key at all
-              it prints what to do and keeps running.
+              placeholder, absent or malformed key it prints what to do and keeps running, so the
+              same line reaches you from a tool call as well.
             </p>
           </section>
 

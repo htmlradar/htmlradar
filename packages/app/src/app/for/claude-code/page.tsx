@@ -262,8 +262,9 @@ export default function ForClaudeCodePage() {
               One failure is specific to Claude Code: the plugin passes{' '}
               <span className="font-mono text-[14px]">{'${HTMLRADAR_API_KEY}'}</span> through
               literally when the variable was not exported in the shell that started Claude Code.
-              Since 0.1.1 the server refuses to start and names that placeholder in its message.
-              Export the key, restart Claude Code, and it connects.
+              Since 0.3.0 the server starts anyway and every tool returns the instruction to export
+              the variable, instead of exiting while Claude Code shows it as connected. Export the
+              key, restart Claude Code, and it connects.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.3.0</span> and

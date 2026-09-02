@@ -1,6 +1,6 @@
 {
   "name": "htmlradar-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for HTMLRadar — publish the HTML your agent just wrote as a tracked link, then ask whether the recipient read it.",
   "license": "AGPL-3.0-or-later",
   "author": "HTMLRadar <hello@htmlradar.com>",
@@ -34,7 +34,7 @@
     "cursor"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "node esbuild.config.mjs",
@@ -46,11 +46,12 @@
     "build:mcpb": "node esbuild.config.mjs && node scripts/build-mcpb.mjs"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@types/node": "^20.11.0",
     "esbuild": "^0.20.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0",
-    "zod": "4.1.11"
+    "zod": "4.5.4"
   }
 }

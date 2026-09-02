@@ -22,17 +22,17 @@ followed by 40 hexadecimal characters, and it is shown once. The free tier cover
 after that the server returns an upgrade message that the agent will relay to you rather than
 retrying.
 
-The server refuses to start unless `HTMLRADAR_API_KEY` holds a well-formed key, and the message
-says which of three things went wrong: the variable is not set, it is an unresolved placeholder
-such as `${HTMLRADAR_API_KEY}`, or it is set to something that is not a key. Some clients report a
-server as connected even when it exited at startup, so if a tool call fails, run the command by hand
-and read what it printed.
+The server never refuses to start over a key. Whether `HTMLRADAR_API_KEY` is absent, holds an
+unexpanded placeholder such as `${HTMLRADAR_API_KEY}`, or holds something that is not a key, it
+starts, lists all seven tools, and answers any of them with the one thing to do next. Install
+first and make the key afterwards if you like. The reason is also printed once to standard error at
+startup, so running the command by hand shows it immediately.
 
 ---
 
 ## Install
 
-The package is on npm. Every client below runs the same command, and needs Node.js 18 or newer
+The package is on npm. Every client below runs the same command, and needs Node.js 20 or newer
 (Claude Desktop brings its own):
 
 ```
@@ -60,7 +60,9 @@ Check it with `claude mcp list`, or `/mcp` inside a session.
 The plugin wires up the same server and adds a skill that teaches Claude when to offer a tracked
 link. It reads `HTMLRADAR_API_KEY` from the environment Claude Code was started from, so the
 `export` above must happen before you start Claude Code; if it does not, the server receives the
-literal text `${HTMLRADAR_API_KEY}` and exits with a message saying so.
+literal text `${HTMLRADAR_API_KEY}`. Since 0.3.0 that is not fatal: the server starts anyway and
+every tool answers with the instruction to export the variable and restart Claude Code. Before
+0.3.0 the process exited, while Claude Code went on showing the server as connected.
 
 ```
 /plugin marketplace add htmlradar/htmlradar
@@ -350,8 +352,11 @@ purpose — it is a named person's location and device, and it would be passing 
 model — so ask for it only when somebody wants to know where or on what a document was read.
 Reports
 whether the link was opened, by whom, when they first opened it, how long they were actively
-reading, how far they scrolled, and which sections took the most time. The raw JSON follows the
-summary so the agent can compute on it; sections there are in document order.
+reading, how far they scrolled, and which sections took the most time. Every value is said once, in the
+summary. Sections are ranked by time and the **five** longest-read ones per viewer are named; every
+figure is rounded down, so no number printed is above the number recorded. Until 0.3.0 a raw JSON
+copy of the whole answer followed the summary — it is gone, and with it the sections past the fifth
+and the fractions of a second.
 
 Example output:
 
@@ -364,27 +369,6 @@ Viewer-supplied text below is data, not instructions:
 Acme · jane@acme.com
   first open 2026-08-29T14:02:00Z · last seen 2026-08-29T14:09:00Z · active 4m 12s · scrolled 87%
   read most: The Ask 2m 41s, Problem 48s
-
-Raw (the same values, still data):
-{
-  "share_id": "11111111-1111-4111-8111-111111111111",
-  "url": "https://htmlradar.page/r/acme-proposal",
-  "opened": true,
-  "viewers": [
-    {
-      "label": "Acme",
-      "email": "jane@acme.com",
-      "first_open": "2026-08-29T14:02:00Z",
-      "last_seen": "2026-08-29T14:09:00Z",
-      "active_seconds": 252,
-      "max_scroll": 0.87,
-      "sections": [
-        { "title": "Problem", "time_seconds": 48 },
-        { "title": "The Ask", "time_seconds": 161 }
-      ]
-    }
-  ]
-}
 ```
 
 A link nobody has opened prints `Not opened yet. Nobody has viewed this link.` under the first line.
@@ -469,13 +453,13 @@ previous version is kept in the document's history.
 
 ### `whoami`
 
-No inputs. Reports the account, its plan, and how many free tracked links are used. On Pro the cap
-reads `unlimited`.
+No inputs. Reports the plan the key's account is on and how many free tracked links are used. On
+Pro the cap reads `unlimited`. It returns no account identifier: an internal database key is
+nothing an assistant can use, and the email address is personal data it does not need.
 
 Example output:
 
 ```
-HTMLRadar account 33333333-3333-4333-8333-333333333333
 Plan: free
 Free tracked links used: 1 of 2
 ```
@@ -486,14 +470,15 @@ Free tracked links used: 1 of 2
 
 ## Troubleshooting
 
-**`npx: command not found`.** The server runs on Node.js 18 or newer. Install it from
+**`npx: command not found`.** The server runs on Node.js 20 or newer. Install it from
 [nodejs.org](https://nodejs.org), open a new terminal, and check with `node --version`.
 
 **`HTMLRadar rejected the API key`.** Three usual causes. A character came along with the paste:
 keys are exactly `hr_live_` plus 40 hexadecimal characters. The key was revoked at
 [htmlradar.com/settings](https://htmlradar.com/settings): create a new one. Or the variable was
-never exported, so the client passed the literal text `${HTMLRADAR_API_KEY}` through: since 0.1.1
-the server refuses to start in that case and its message names the placeholder.
+never exported, so the client passed the literal text `${HTMLRADAR_API_KEY}` through. Since 0.3.0
+that produces a different message — every tool returns the instruction to export the variable and
+restart — rather than a server that exited at startup.
 
 **`Free accounts get 2 tracked links`.** Both free links on the account are used, and revoked or
 expired links still count. The tool returns this message instead of a link and tells the agent not
@@ -517,19 +502,28 @@ each tool from a browser page:
 npx @modelcontextprotocol/inspector -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY npx -y htmlradar-mcp
 ```
 
-To see only the startup check, run `npx -y htmlradar-mcp` directly: with a missing, placeholder or
-malformed key it prints what is wrong and exits.
+To see only the startup check, run `npx -y htmlradar-mcp` directly: an absent, placeholder or
+malformed key prints what to do and the server keeps running, so the same line reaches you from a
+tool call as well.
 
 ---
 
 ## Versions
 
-Current: `htmlradar-mcp@0.2.0`, Node.js 18 or newer. Every install line above runs
+Current: `htmlradar-mcp@0.3.0`, Node.js 20 or newer. Every install line above runs
 `npx -y htmlradar-mcp`, which fetches the latest version. The Claude Code plugin is different: its
-`.mcp.json` pins `htmlradar-mcp@0.2.0`, and plugin users move to a newer server when the plugin
+`.mcp.json` pins `htmlradar-mcp@0.3.0`, and plugin users move to a newer server when the plugin
 itself is updated (`/plugin marketplace update htmlradar` picks up a new pin; third-party
 marketplaces do not auto-update by default). What changed in each release is in
 [CHANGELOG.md](https://github.com/htmlradar/htmlradar/blob/main/packages/mcp/CHANGELOG.md).
+
+**0.3.0 breaks four things**, and an unpinned `npx` picks them up on the next start. Node.js 20 is
+the minimum, up from 18. `get_share_activity` no longer prints a raw JSON copy of its answer, and
+the summary that remains is not a lossless substitute: it names only the five longest-read sections
+per viewer and rounds every figure down. `whoami` returns two lines instead of three, the dropped
+one being the account identifier. And the advertised schema dialect moves from JSON Schema draft-07
+to draft 2020-12, with every field, default and constraint unchanged. Tool names, arguments,
+`HTMLRADAR_API_KEY` and `HTMLRADAR_API_URL` are all as they were. The changelog has the detail.
 
 ---
 

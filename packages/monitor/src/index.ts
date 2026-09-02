@@ -83,6 +83,25 @@ export interface Env {
   // drafted reply). Held off until the draft generation and the disclosure
   // guardrail have been reviewed.
   RADAR_DRAFTS?: string;
+  // One-tap Reddit posting (see the section below dailyDigest). All five are
+  // optional and all five are needed together: with any of them missing the
+  // digest still sends its drafts, just as plain text to copy, and the webhook
+  // answers 404 as though it did not exist.
+  //
+  // The shared secret Telegram puts in X-Telegram-Bot-Api-Secret-Token on
+  // every webhook delivery. It is the only thing standing between the open
+  // internet and a handler that can post as the founder, so an unset secret
+  // disables the endpoint rather than opening it.
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  // The "script" app's credentials from reddit.com/prefs/apps, plus the
+  // permanent refresh token ops/scripts/reddit_auth.py obtains once.
+  REDDIT_CLIENT_ID?: string;
+  REDDIT_CLIENT_SECRET?: string;
+  REDDIT_REFRESH_TOKEN?: string;
+  // The founder's Reddit username, for the descriptive User-Agent Reddit's API
+  // rules ask for. A secret rather than a [vars] entry only because it is a
+  // personal handle and this repository is public.
+  REDDIT_USERNAME?: string;
 }
 
 // What a healthy production answers, one entry per probe.
@@ -974,15 +993,21 @@ export async function recordOutbox(env: Env, row: OutboxRow): Promise<void> {
   }
 }
 
-/** Sends one Telegram message and records it. Returns whether Telegram took it. */
-export async function sendTelegram(
+/** Sends one Telegram message and records it. Returns whether Telegram took it,
+ *  and the id of the message it created — the id matters only to the one-tap
+ *  flow, which has to find this message again when a button on it is tapped or
+ *  the founder replies to it. `replyMarkup` is the inline keyboard, absent for
+ *  every caller that is just talking. */
+export async function sendTelegramMessage(
   env: Env,
   kind: OutboxKind,
   source: string,
   text: string,
   meta: Record<string, unknown> = {},
-): Promise<boolean> {
+  replyMarkup?: Record<string, unknown>,
+): Promise<{ ok: boolean; messageId: number | null }> {
   let ok = false;
+  let messageId: number | null = null;
   let error: string | null = null;
   try {
     const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -992,6 +1017,7 @@ export async function sendTelegram(
         chat_id: env.TELEGRAM_CHAT_ID,
         text,
         disable_web_page_preview: true,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
       signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
     });
@@ -999,7 +1025,9 @@ export async function sendTelegram(
     // HTML, and json() would throw away the status and body that explain it.
     const body = await res.text();
     try {
-      ok = res.ok && (JSON.parse(body) as { ok?: boolean }).ok === true;
+      const parsed = JSON.parse(body) as { ok?: boolean; result?: { message_id?: number } };
+      ok = res.ok && parsed.ok === true;
+      messageId = parsed.result?.message_id ?? null;
     } catch {
       ok = false;
     }
@@ -1015,7 +1043,18 @@ export async function sendTelegram(
     telegram_error: error,
     meta: { ...meta, chat_id: env.TELEGRAM_CHAT_ID },
   });
-  return ok;
+  return { ok, messageId };
+}
+
+/** Sends one Telegram message and records it. Returns whether Telegram took it. */
+export async function sendTelegram(
+  env: Env,
+  kind: OutboxKind,
+  source: string,
+  text: string,
+  meta: Record<string, unknown> = {},
+): Promise<boolean> {
+  return (await sendTelegramMessage(env, kind, source, text, meta)).ok;
 }
 
 /** One entry per fetch in a scan run, for the scan_run row's meta. */
@@ -1210,6 +1249,17 @@ interface RadarRow {
 // holds the guarantee. This is the guardrail Sol reviews before drafts go live.
 export const DISCLOSURE = 'Full disclosure: I built HTMLRadar.';
 
+// The Telegram framing, not part of the reply. It exists so the founder can
+// never mistake a draft for something already said — and it is a named export
+// because the one-tap flow has to strip it: what goes to Reddit is the body,
+// never the label wrapped around it for his eyes.
+export const DRAFT_PREFIX = 'DRAFT (personal account, edit before posting): ';
+
+/** The reply body without the Telegram-only label. This is what gets posted. */
+export function draftBody(draft: string): string {
+  return draft.startsWith(DRAFT_PREFIX) ? draft.slice(DRAFT_PREFIX.length) : draft;
+}
+
 // Evidence the item itself is about sharing or tracking a document — the
 // actual audience for what HTMLRadar does — rather than a question the
 // classifier's shape rules alone caught. Required before a buyer_question or
@@ -1293,7 +1343,7 @@ export function draftReply(item: {
   }
   // Belt to the braces above: no draft ever ships without the disclosure.
   if (!body.includes(DISCLOSURE)) body = `${DISCLOSURE} ${body}`;
-  return `DRAFT (personal account, edit before posting): ${body}`;
+  return `${DRAFT_PREFIX}${body}`;
 }
 
 function draftsEnabled(env: Env): boolean {
@@ -1411,6 +1461,16 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
   const weekly = isMonday ? await weeklyInsight(env, nowMs) : '';
   const budget = DIGEST_MAX_CHARS - (weekly ? weekly.length + 4 : 0);
   const withDrafts = draftsEnabled(env);
+  // Whether a draft can carry buttons at all. It needs the Reddit secrets AND a
+  // Reddit thread to answer: a Hacker News or Google Alerts item has nothing to
+  // tap, so its draft still rides inside the digest as text to copy.
+  const oneTap = oneTapReady(env);
+  const offers: {
+    source_url: string;
+    thing_id: string;
+    subreddit: string;
+    draft_text: string;
+  }[] = [];
 
   const lines: string[] = [
     `HTMLRadar radar — daily digest — ${new Date(nowMs).toISOString().slice(0, 10)}`,
@@ -1423,13 +1483,23 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
       `\n${it.source_url}` +
       `\ncategory: ${it.category} · intent ${it.intent_score}`;
     const raw = withDrafts && it.intent_score >= REPLY_THRESHOLD ? draftReply(it) : null;
-    const draft = raw ? `\n${raw}` : '';
+    const thread = raw && oneTap ? parseRedditThread(it.source_url) : null;
+    // A tappable draft leaves a pointer here and travels as its own message
+    // below; the text is not repeated twice on one phone screen.
+    const draft = raw ? (thread ? '\nDraft below — Post as me / Skip.' : `\n${raw}`) : '';
     if (lines.join('').length + block.length + draft.length > budget) break;
     lines.push(block);
     if (draft) {
       lines.push(draft);
       drafted++;
     }
+    if (raw && thread)
+      offers.push({
+        source_url: it.source_url,
+        thing_id: thread.thingId,
+        subreddit: thread.subreddit,
+        draft_text: raw,
+      });
     shown++;
   }
   if (weekly) lines.push(`\n\n${weekly}`);
@@ -1440,13 +1510,605 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
     items_available: items.length,
     drafts: drafted,
     drafts_enabled: withDrafts,
+    one_tap: offers.length,
     monday: isMonday,
     // The URLs shown, so a later "he replied to #2" can flip acted on the right row.
     item_urls: items.slice(0, shown).map((i) => i.source_url),
   });
 
+  // After the digest, never inside it: each tappable draft is its own message,
+  // because an inline keyboard belongs to one message and one decision.
+  for (const offer of offers) await offerDraft(env, offer);
+
   // eslint-disable-next-line no-console
-  console.log(`[digest] ${shown} item(s), ${drafted} draft(s), monday:${isMonday}`);
+  console.log(
+    `[digest] ${shown} item(s), ${drafted} draft(s), ${offers.length} tappable, monday:${isMonday}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// One-tap posting: a draft, two buttons, the founder's own account.
+//
+// WHAT CHANGED AND WHAT DID NOT
+//
+// The SOP rule is unchanged: only the founder speaks in public, and nothing
+// here posts without him. What changed is the distance between deciding and
+// doing. A draft used to arrive as text he had to copy, then find the thread,
+// then paste — two minutes, every one of which was a chance to not bother.
+// Now the draft arrives as its own message with two buttons. "Post as me"
+// posts that exact text as a comment on that thread from HIS Reddit account;
+// "Skip" closes it. The tap IS the speaking.
+//
+// He can also reply to a draft message with his own wording. That replaces the
+// text and comes back as a NEW message with its own buttons — an edit is never
+// posted on the strength of the tap that was never given to it.
+//
+// THE FOUR SAFETY RAILS
+//
+//   1. Idempotent. A second tap on a posted draft posts nothing; it re-shows
+//      the permalink. Telegram retries a webhook it thinks failed, so "the same
+//      tap arrives twice" is normal traffic, not a freak case. The claim below
+//      is a compare-and-swap: the row moves pending/edited -> posted in one
+//      conditional PATCH, and only the delivery that wins the swap calls Reddit.
+//   2. One comment per thread, ever. Checked here, and enforced by a partial
+//      unique index in schema/046 for the case this code cannot see: two
+//      different drafts for the same thread.
+//   3. Five posts per rolling 24 hours, hard. Reddit's own spam heuristics are
+//      the reason, and so is the fact that a founder who comments six times a
+//      day reads as a marketer.
+//   4. Every Reddit refusal comes back into the Telegram message in plain
+//      words. A tap that silently did nothing would be the worst outcome here.
+//
+// The tokens: the refresh token is a Worker secret, exchanged for a short-lived
+// access token on each post and never written to a row, a log, or a message.
+// Nothing in this section prints any of them.
+
+const REDDIT_DAILY_CAP = 5;
+const ONETAP_WINDOW_MS = 24 * 60 * 60_000;
+
+/** The subreddit and the thread's fullname behind a Reddit thread URL, or null
+ *  when the URL is not a Reddit thread. The fullname ('t3_' + the base-36 id
+ *  in the path) is what Reddit's comment endpoint takes as the parent. Google
+ *  Alerts and Hacker News items land here too and correctly get null: they are
+ *  offered as copy-and-paste drafts, the way every draft used to be. */
+export function parseRedditThread(url: string): { subreddit: string; thingId: string } | null {
+  const m =
+    /^https?:\/\/(?:[a-z0-9-]+\.)?reddit\.com\/r\/([a-z0-9_]+)\/comments\/([a-z0-9]+)/i.exec(url);
+  if (!m || !m[1] || !m[2]) return null;
+  return { subreddit: m[1], thingId: `t3_${m[2].toLowerCase()}` };
+}
+
+/** True when every secret the one-tap path needs is set. Missing any of them
+ *  leaves the radar exactly as it was: drafts still arrive, as text to copy. */
+export function oneTapReady(env: Env): boolean {
+  return Boolean(
+    env.TELEGRAM_BOT_TOKEN &&
+    env.TELEGRAM_CHAT_ID &&
+    env.TELEGRAM_WEBHOOK_SECRET &&
+    env.REDDIT_CLIENT_ID &&
+    env.REDDIT_CLIENT_SECRET &&
+    env.REDDIT_REFRESH_TOKEN,
+  );
+}
+
+interface DraftRow {
+  id: string;
+  source_url: string;
+  thing_id: string;
+  subreddit: string | null;
+  draft_text: string;
+  status: string;
+  permalink: string | null;
+  telegram_message_id: number | null;
+}
+
+const DRAFT_COLS =
+  'id,source_url,thing_id,subreddit,draft_text,status,permalink,telegram_message_id';
+
+const draftsUrl = (env: Env, query: string) => `${env.SUPABASE_URL}/rest/v1/radar_drafts?${query}`;
+
+const draftWriteHeaders = (env: Env, prefer: string) => ({
+  ...radarHeaders(env),
+  'Content-Type': 'application/json',
+  Prefer: prefer,
+});
+
+async function createDraft(
+  env: Env,
+  row: { source_url: string; thing_id: string; subreddit: string; draft_text: string },
+): Promise<DraftRow | null> {
+  const res = await fetch(draftsUrl(env, `select=${DRAFT_COLS}`), {
+    method: 'POST',
+    headers: draftWriteHeaders(env, 'return=representation'),
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`radar_drafts insert HTTP ${res.status}`);
+  return ((await res.json()) as DraftRow[])[0] ?? null;
+}
+
+async function readDraft(env: Env, id: string): Promise<DraftRow | null> {
+  const res = await fetch(
+    draftsUrl(env, `id=eq.${encodeURIComponent(id)}&select=${DRAFT_COLS}&limit=1`),
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
+  return ((await res.json()) as DraftRow[])[0] ?? null;
+}
+
+/** The draft a Telegram reply is answering. Newest first, because an edited
+ *  draft's message id moves to the replacement message and the old id is left
+ *  behind on a row that is no longer the live one. */
+async function readDraftByMessage(env: Env, messageId: number): Promise<DraftRow | null> {
+  const res = await fetch(
+    draftsUrl(
+      env,
+      `telegram_message_id=eq.${messageId}&order=created_at.desc&limit=1&select=${DRAFT_COLS}`,
+    ),
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
+  return ((await res.json()) as DraftRow[])[0] ?? null;
+}
+
+async function patchDraft(env: Env, id: string, patch: Record<string, unknown>): Promise<void> {
+  const res = await fetch(draftsUrl(env, `id=eq.${encodeURIComponent(id)}`), {
+    method: 'PATCH',
+    headers: draftWriteHeaders(env, 'return=minimal'),
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error(`radar_drafts update HTTP ${res.status}`);
+}
+
+/** The compare-and-swap that makes a double tap harmless. The filter is part of
+ *  the UPDATE, so exactly one of two simultaneous deliveries can move the row
+ *  out of pending/edited; the loser gets an empty array back and posts nothing.
+ *  Returns true for the winner only. */
+async function claimDraft(env: Env, id: string, nowIso: string): Promise<boolean> {
+  const res = await fetch(
+    draftsUrl(env, `id=eq.${encodeURIComponent(id)}&status=in.(pending,edited)&select=id`),
+    {
+      method: 'PATCH',
+      headers: draftWriteHeaders(env, 'return=representation'),
+      body: JSON.stringify({ status: 'posted', posted_at: nowIso, updated_at: nowIso }),
+    },
+  );
+  // A 409 is the partial unique index refusing a second posted row for a thread
+  // some other draft already answered. Not the winner either way.
+  if (!res.ok) return false;
+  return ((await res.json()) as unknown[]).length > 0;
+}
+
+/** The permalink of an existing comment on this thread, or null. */
+async function threadAlreadyPosted(env: Env, thingId: string): Promise<string | null> {
+  const res = await fetch(
+    draftsUrl(
+      env,
+      `thing_id=eq.${encodeURIComponent(thingId)}&status=eq.posted&select=permalink&limit=1`,
+    ),
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
+  const row = ((await res.json()) as { permalink: string | null }[])[0];
+  return row ? (row.permalink ?? 'already posted') : null;
+}
+
+/** How many comments went out in the last 24 hours. The limit on the query is
+ *  the cap plus slack: this only ever needs to answer "at least five?". */
+async function postedInWindow(env: Env, nowMs: number): Promise<number> {
+  const since = encodeURIComponent(new Date(nowMs - ONETAP_WINDOW_MS).toISOString());
+  const res = await fetch(
+    draftsUrl(
+      env,
+      `status=eq.posted&posted_at=gte.${since}&select=id&limit=${REDDIT_DAILY_CAP + 1}`,
+    ),
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
+  return ((await res.json()) as unknown[]).length;
+}
+
+// ---------------------------------------------------------------------------
+// Reddit.
+
+/** Reddit's API rules ask for a descriptive User-Agent naming the human behind
+ *  the app. Falls back to the scan's generic one when the username is unset. */
+function redditUserAgent(env: Env): string {
+  return env.REDDIT_USERNAME ? `htmlradar-radar/1.0 by ${env.REDDIT_USERNAME}` : REDDIT_USER_AGENT;
+}
+
+/** Exchanges the permanent refresh token for a short-lived access token. The
+ *  error carries the status and nothing else — the request that failed holds
+ *  both the client secret and the refresh token, and neither may ever reach a
+ *  message, a row, or a log line. */
+async function redditAccessToken(env: Env): Promise<string> {
+  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${btoa(`${env.REDDIT_CLIENT_ID}:${env.REDDIT_CLIENT_SECRET}`)}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': redditUserAgent(env),
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: env.REDDIT_REFRESH_TOKEN ?? '',
+    }),
+    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    throw new Error(
+      res.status === 400 || res.status === 401
+        ? 'Reddit would not accept the saved login. The refresh token has probably been ' +
+            'revoked — re-run ops/scripts/reddit_auth.py and set the secret again.'
+        : `Reddit would not issue an access token (HTTP ${res.status}). Probably temporary.`,
+    );
+  }
+  const token = ((await res.json()) as { access_token?: string }).access_token;
+  if (!token) throw new Error('Reddit returned no access token.');
+  return token;
+}
+
+/** Posts one comment and returns its absolute permalink. Everything it throws
+ *  is already a sentence fit to show the founder. */
+async function postRedditComment(env: Env, thingId: string, text: string): Promise<string> {
+  const token = await redditAccessToken(env);
+  const res = await fetch('https://oauth.reddit.com/api/comment', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': redditUserAgent(env),
+    },
+    body: new URLSearchParams({ api_type: 'json', thing_id: thingId, text }),
+    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+  });
+  const raw = await res.text();
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403)
+      throw new Error(
+        `Reddit refused the account (HTTP ${res.status}). Either the login expired or that ` +
+          'subreddit does not accept comments from this account.',
+      );
+    if (res.status === 429)
+      throw new Error('Reddit is rate-limiting the account right now. Try again in a few minutes.');
+    throw new Error(`Reddit refused with HTTP ${res.status}: ${raw.slice(0, 200)}`);
+  }
+  let parsed: {
+    json?: { errors?: string[][]; data?: { things?: { data?: { permalink?: string } }[] } };
+  };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    throw new Error('Reddit answered with something that was not JSON. Nothing was posted.');
+  }
+  // Reddit reports a rejected comment inside a 200: json.errors is a list of
+  // [code, human sentence, field] triples. The sentence is the useful half.
+  const errors = parsed.json?.errors ?? [];
+  if (errors.length > 0) {
+    throw new Error(errors.map((e) => e[1] ?? e[0] ?? 'unspecified').join('; '));
+  }
+  const permalink = parsed.json?.data?.things?.[0]?.data?.permalink;
+  if (!permalink) throw new Error('Reddit accepted the comment but did not say where it is.');
+  return permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
+}
+
+// ---------------------------------------------------------------------------
+// The Telegram side of the loop: keyboards, edits, and the callback answer.
+
+/** The two buttons. callback_data is capped at 64 bytes by Telegram, which is
+ *  why the row's id travels rather than the draft. */
+function draftKeyboard(id: string): Record<string, unknown> {
+  return {
+    inline_keyboard: [
+      [
+        { text: 'Post as me', callback_data: `post:${id}` },
+        { text: 'Skip', callback_data: `skip:${id}` },
+      ],
+    ],
+  };
+}
+
+/** Rebuilt from the row rather than stored, so an edit and the original render
+ *  identically and there is one definition of what a draft message looks like. */
+function draftMessageText(d: Pick<DraftRow, 'subreddit' | 'source_url' | 'draft_text'>): string {
+  return (
+    `Reply ready — r/${d.subreddit ?? 'reddit'}\n${d.source_url}\n\n` +
+    `${draftBody(d.draft_text)}\n\nTap to post this as you, or reply with your own wording.`
+  );
+}
+
+/** Fire-and-forget Telegram call for the housekeeping methods. Never throws: by
+ *  the time these run the comment usually already exists on Reddit, and a
+ *  failure to redraw a message must not turn a success into a reported failure. */
+async function telegramCall(
+  env: Env,
+  method: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(`[onetap] telegram ${method} failed:`, (err as Error).message);
+  }
+}
+
+/** Rewrites a draft message. An absent keyboard removes the buttons — that is
+ *  what "this is settled" looks like on a phone. */
+async function editDraftMessage(
+  env: Env,
+  messageId: number | null,
+  text: string,
+  keyboard?: Record<string, unknown>,
+): Promise<void> {
+  if (!messageId) return;
+  await telegramCall(env, 'editMessageText', {
+    chat_id: env.TELEGRAM_CHAT_ID,
+    message_id: messageId,
+    text,
+    disable_web_page_preview: true,
+    reply_markup: keyboard ?? { inline_keyboard: [] },
+  });
+}
+
+/** Clears the spinner on the tapped button. Telegram shows `text` as a toast. */
+async function answerCallback(env: Env, callbackId: string, text: string): Promise<void> {
+  await telegramCall(env, 'answerCallbackQuery', { callback_query_id: callbackId, text });
+}
+
+// ---------------------------------------------------------------------------
+// Offering a draft: one row, one message, two buttons.
+
+/** Writes the draft row and sends its message. Never throws — the digest has
+ *  already gone out by the time this runs, and one failed offer must not take
+ *  the rest of the batch with it. */
+export async function offerDraft(
+  env: Env,
+  offer: { source_url: string; thing_id: string; subreddit: string; draft_text: string },
+): Promise<void> {
+  try {
+    const row = await createDraft(env, offer);
+    if (!row) return;
+    const sent = await sendTelegramMessage(
+      env,
+      'radar',
+      'onetap-offer',
+      draftMessageText(row),
+      { draft_id: row.id, thing_id: row.thing_id },
+      draftKeyboard(row.id),
+    );
+    // Without the message id a later reply cannot be traced back to this draft,
+    // so record it before anything else can arrive.
+    if (sent.messageId) await patchDraft(env, row.id, { telegram_message_id: sent.messageId });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[onetap] could not offer a draft:', (err as Error).message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The webhook.
+
+interface TelegramCallbackQuery {
+  id: string;
+  data?: string;
+  message?: { message_id: number };
+}
+
+interface TelegramMessage {
+  message_id: number;
+  text?: string;
+  reply_to_message?: { message_id: number };
+}
+
+export interface TelegramUpdate {
+  callback_query?: TelegramCallbackQuery;
+  message?: TelegramMessage;
+}
+
+async function handleSkip(env: Env, cb: TelegramCallbackQuery, draft: DraftRow): Promise<void> {
+  const messageId = cb.message?.message_id ?? draft.telegram_message_id;
+  if (draft.status === 'posted') {
+    await editDraftMessage(
+      env,
+      messageId,
+      `${draftMessageText(draft)}\n\nPosted: ${draft.permalink ?? 'on Reddit'}`,
+    );
+    await answerCallback(env, cb.id, 'Already posted.');
+    return;
+  }
+  await patchDraft(env, draft.id, { status: 'skipped' });
+  await editDraftMessage(env, messageId, `${draftMessageText(draft)}\n\nSkipped.`);
+  await answerCallback(env, cb.id, 'Skipped.');
+}
+
+async function handlePost(
+  env: Env,
+  cb: TelegramCallbackQuery,
+  draft: DraftRow,
+  nowMs: number,
+): Promise<void> {
+  const messageId = cb.message?.message_id ?? draft.telegram_message_id;
+  const body = draftMessageText(draft);
+
+  // Rail 1: already done. A second tap re-shows the permalink and posts nothing.
+  if (draft.status === 'posted') {
+    await editDraftMessage(env, messageId, `${body}\n\nPosted: ${draft.permalink ?? 'on Reddit'}`);
+    await answerCallback(env, cb.id, 'Already posted.');
+    return;
+  }
+  if (draft.status === 'skipped') {
+    await answerCallback(env, cb.id, 'You skipped this one.');
+    return;
+  }
+  if (!oneTapReady(env)) {
+    await editDraftMessage(
+      env,
+      messageId,
+      `${body}\n\nNot posted: the Reddit account is not connected yet.`,
+      draftKeyboard(draft.id),
+    );
+    await answerCallback(env, cb.id, 'Reddit is not connected.');
+    return;
+  }
+
+  // Rail 2: one comment per thread, ever.
+  const existing = await threadAlreadyPosted(env, draft.thing_id);
+  if (existing) {
+    await editDraftMessage(
+      env,
+      messageId,
+      `${body}\n\nNot posted: you already commented on this thread — ${existing}`,
+    );
+    await answerCallback(env, cb.id, 'Already commented on that thread.');
+    return;
+  }
+
+  // Rail 3: five a day.
+  if ((await postedInWindow(env, nowMs)) >= REDDIT_DAILY_CAP) {
+    await editDraftMessage(
+      env,
+      messageId,
+      `${body}\n\nNot posted: that would be more than ${REDDIT_DAILY_CAP} comments in 24 hours. ` +
+        'The button still works tomorrow.',
+      draftKeyboard(draft.id),
+    );
+    await answerCallback(env, cb.id, `Daily cap of ${REDDIT_DAILY_CAP} reached.`);
+    return;
+  }
+
+  // Rail 1 again, against the delivery Telegram retried: only the winner of the
+  // swap goes on to call Reddit.
+  const nowIso = new Date(nowMs).toISOString();
+  if (!(await claimDraft(env, draft.id, nowIso))) {
+    await answerCallback(env, cb.id, 'That one is already being posted.');
+    return;
+  }
+
+  const text = draftBody(draft.draft_text);
+  try {
+    const permalink = await postRedditComment(env, draft.thing_id, text);
+    await patchDraft(env, draft.id, { permalink, error: null });
+    await editDraftMessage(env, messageId, `${body}\n\nPosted: ${permalink}`);
+    await answerCallback(env, cb.id, 'Posted.');
+    await recordOutbox(env, {
+      kind: 'radar',
+      source: 'onetap-post',
+      message: text,
+      telegram_ok: null,
+      meta: { draft_id: draft.id, thing_id: draft.thing_id, permalink },
+    });
+  } catch (err) {
+    // Releasing the claim on failure is deliberate: the thread has no comment
+    // on it, so it must not stay marked as though it had.
+    const reason = (err as Error).message;
+    await patchDraft(env, draft.id, { status: 'failed', posted_at: null, error: reason });
+    await editDraftMessage(
+      env,
+      messageId,
+      `${body}\n\nNot posted. ${reason}`,
+      draftKeyboard(draft.id),
+    );
+    await answerCallback(env, cb.id, 'Reddit refused — see the message.');
+  }
+}
+
+/** A reply in Telegram is the founder rewording a draft. It replaces the text
+ *  and comes back as a NEW message with its own buttons; the old message loses
+ *  its buttons so there is exactly one live offer per draft. Nothing posts. */
+async function handleEdit(env: Env, msg: TelegramMessage): Promise<void> {
+  const parentId = msg.reply_to_message?.message_id;
+  const text = (msg.text ?? '').trim();
+  if (!parentId || !text) return;
+  const draft = await readDraftByMessage(env, parentId);
+  // A reply to anything else in the chat is not our business.
+  if (!draft) return;
+  if (draft.status === 'posted') {
+    await sendTelegram(
+      env,
+      'radar',
+      'onetap-edit',
+      `That one is already posted, so the edit changes nothing: ${draft.permalink ?? 'on Reddit'}`,
+      { draft_id: draft.id },
+    );
+    return;
+  }
+  await patchDraft(env, draft.id, { draft_text: text, status: 'edited' });
+  await editDraftMessage(
+    env,
+    parentId,
+    `${draftMessageText(draft)}\n\nReplaced by your edit below.`,
+  );
+  const edited = { ...draft, draft_text: text };
+  const sent = await sendTelegramMessage(
+    env,
+    'radar',
+    'onetap-edit',
+    draftMessageText(edited),
+    { draft_id: draft.id, thing_id: draft.thing_id, edited: true },
+    draftKeyboard(draft.id),
+  );
+  if (sent.messageId) await patchDraft(env, draft.id, { telegram_message_id: sent.messageId });
+}
+
+/** Routes one Telegram update. nowMs is a parameter so the daily cap's window
+ *  is reproducible under test. */
+export async function handleTelegramUpdate(
+  env: Env,
+  update: TelegramUpdate,
+  nowMs: number = Date.now(),
+): Promise<void> {
+  const cb = update.callback_query;
+  if (cb) {
+    const [action, id] = (cb.data ?? '').split(':');
+    if ((action !== 'post' && action !== 'skip') || !id) {
+      await answerCallback(env, cb.id, 'That button means nothing to me.');
+      return;
+    }
+    const draft = await readDraft(env, id);
+    if (!draft) {
+      await answerCallback(env, cb.id, 'That draft is gone.');
+      return;
+    }
+    if (action === 'skip') await handleSkip(env, cb, draft);
+    else await handlePost(env, cb, draft, nowMs);
+    return;
+  }
+  if (update.message?.reply_to_message) await handleEdit(env, update.message);
+}
+
+/** The webhook. Everything that is not an authenticated POST to the one path is
+ *  a 404 — not a 401, because a 401 confirms the address is worth attacking.
+ *  An unset TELEGRAM_WEBHOOK_SECRET is the same 404: no secret, no endpoint.
+ *
+ *  It answers 200 to every authenticated delivery, even one that threw, because
+ *  Telegram redelivers anything else and a redelivery loop over a handler that
+ *  posts to Reddit is the last thing this wants. The compare-and-swap in
+ *  handlePost is what makes that safe. */
+export async function handleWebhookRequest(request: Request, env: Env): Promise<Response> {
+  const notFound = new Response('Not found', { status: 404 });
+  if (request.method !== 'POST') return notFound;
+  if (new URL(request.url).pathname !== '/telegram/webhook') return notFound;
+  if (!env.TELEGRAM_WEBHOOK_SECRET) return notFound;
+  if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.TELEGRAM_WEBHOOK_SECRET)
+    return notFound;
+  let update: TelegramUpdate;
+  try {
+    update = (await request.json()) as TelegramUpdate;
+  } catch {
+    return new Response('Bad request', { status: 400 });
+  }
+  try {
+    await handleTelegramUpdate(env, update);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[onetap] update failed:', (err as Error).message);
+  }
+  return new Response('ok');
 }
 
 // ---------------------------------------------------------------------------
@@ -1684,6 +2346,13 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
 }
 
 export default {
+  // The only HTTP this worker answers: Telegram delivering a button tap or a
+  // reply to a draft. Everything else, every path and every method, is a 404.
+  // See handleWebhookRequest for why an unset secret is also a 404.
+  fetch(request: Request, env: Env): Promise<Response> {
+    return handleWebhookRequest(request, env);
+  },
+
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // The daily 04:00 UTC trigger (see wrangler.toml) is the thread scan and
     // nothing else. Cloudflare calls scheduled() once per matching cron

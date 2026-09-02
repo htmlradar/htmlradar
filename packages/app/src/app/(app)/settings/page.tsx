@@ -14,8 +14,10 @@ import { SectionMark } from '@/components/SectionMark';
 import { UpgradePending } from '@/components/UpgradePending';
 import { SubscriptionControls } from '@/components/SubscriptionControls';
 import { apiKeyPrefix, generateApiKey, hashApiKey } from '@/lib/api-auth';
+import { CONNECTOR_LABEL_PREFIX } from '@/lib/connect';
 import { AnnualSwitch } from './AnnualSwitch';
 import { ApiKeys, type ApiKeyRow } from './ApiKeys';
+import { ConnectedApps } from './ConnectedApps';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -457,6 +459,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     .from('api_keys')
     .select('id, label, key_prefix, created_at, last_used_at, revoked_at')
     .order('created_at', { ascending: false });
+  const keyRows = (apiKeys ?? []) as ApiKeyRow[];
+  const connectorKeys = keyRows.filter((key) => key.label.startsWith(CONNECTOR_LABEL_PREFIX));
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
   let subState: ActiveSubscription | null = null;
@@ -563,10 +567,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
       </div>
 
       <ApiKeys
-        keys={(apiKeys ?? []) as ApiKeyRow[]}
+        keys={keyRows.filter((key) => !key.label.startsWith(CONNECTOR_LABEL_PREFIX))}
         createAction={createApiKeyAction}
         revokeAction={revokeApiKeyAction}
       />
+
+      <ConnectedApps keys={connectorKeys} revokeAction={revokeApiKeyAction} />
 
       <form action={signOut} className="mt-12 border-t border-line pt-8">
         <button

@@ -3,13 +3,19 @@
 // Every call resolves to a discriminated union rather than throwing. An MCP
 // tool that throws surfaces to the calling agent as a protocol error with a
 // stack trace attached; a tool that returns text surfaces as something the
-// agent can read and relay. So nothing in here throws except `loadConfig`,
-// which runs once at startup before the transport is connected.
+// agent can read and relay. Nothing in here throws, `loadConfig` included:
+// a server that exits at startup is reported as connected by several clients,
+// so the user meets a dead server instead of an instruction.
 
 export interface Config {
-  /** Empty when no key was set: the server still starts, and every tool says so. */
+  /** Empty whenever the environment did not supply a usable key. */
   apiKey: string;
   baseUrl: string;
+  /**
+   * Why `apiKey` is empty, as one sentence naming the next step. Absent when
+   * the key is usable. Every tool returns this instead of calling the API.
+   */
+  keyProblem?: string;
 }
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; message: string };
@@ -95,53 +101,65 @@ export interface MeResponse {
 }
 
 // The shape the app generates (packages/app/src/lib/api-auth.ts): the prefix
-// and 20 random bytes as lowercase hex. Checked at startup because a client
-// that launches this server with a wrong value still reports it as connected;
-// the user would only find out on the first tool call, from a message that
-// says the key was rejected when in fact no key was ever given.
-const API_KEY_PATTERN = /^hr_live_[0-9a-f]{40}$/;
+// and 20 random bytes as lowercase hex. `hr_test_` is accepted as plausible
+// too, for a self-hosted instance reached through HTMLRADAR_API_URL; only
+// `hr_live_` is issued by htmlradar.com today. Anything else never had a
+// chance of authenticating, so it is treated as no key at all rather than
+// sent to the API to come back as "the key was rejected".
+const API_KEY_PATTERN = /^hr_(live|test)_[0-9a-f]{40}$/;
+
+// What Claude Code's plugin, and several other clients, pass through verbatim
+// when the variable they were told to forward was never exported.
+const PLACEHOLDER_PATTERN = /^\$\{.*\}$/;
 
 const WHERE_TO_GET_A_KEY =
   'Create a key at https://htmlradar.com/settings (under "API keys") and pass it to this ' +
   'server as the HTMLRADAR_API_KEY environment variable.';
 
-// A key is not required to start. Somebody who installs the server before
-// making a key used to get a process that exited at launch, which several
-// clients still show as connected — a dead server rather than an
-// instruction. Now the server starts and every tool answers with this.
+// A usable key is not required to start, and none of the three ways of not
+// having one is fatal. Exiting at launch produced the dead server this
+// release exists to remove: the client still shows the server as connected,
+// so the user gets silence instead of the sentence below.
 export const NO_API_KEY_MESSAGE = `HTMLRADAR_API_KEY is not set, so this server cannot reach HTMLRadar yet. ${WHERE_TO_GET_A_KEY} Then restart this client so it picks the key up.`;
+
+export function placeholderKeyMessage(value: string): string {
+  return (
+    `HTMLRADAR_API_KEY is the unresolved placeholder "${value}", which means the variable was ` +
+    'not set in the environment the client started from, so this server cannot reach HTMLRadar ' +
+    'yet. Export it in your shell (export HTMLRADAR_API_KEY=hr_live_...) before starting Claude ' +
+    `Code or the client that launches this server. ${WHERE_TO_GET_A_KEY} Then restart this ` +
+    'client so it picks the key up.'
+  );
+}
+
+export const MALFORMED_API_KEY_MESSAGE =
+  'HTMLRADAR_API_KEY does not look like an HTMLRadar API key, so this server cannot reach ' +
+  'HTMLRadar yet. Keys are "hr_live_" followed by 40 hexadecimal characters. ' +
+  `${WHERE_TO_GET_A_KEY} Then restart this client so it picks the key up.`;
+
+/** Why this value cannot be used as a key, or null when it can. */
+function keyProblem(apiKey: string): string | null {
+  if (!apiKey) return NO_API_KEY_MESSAGE;
+  if (PLACEHOLDER_PATTERN.test(apiKey)) return placeholderKeyMessage(apiKey);
+  if (!API_KEY_PATTERN.test(apiKey)) return MALFORMED_API_KEY_MESSAGE;
+  return null;
+}
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const apiKey = env['HTMLRADAR_API_KEY']?.trim() ?? '';
-  // A wrong key is still fatal, and says which of the two things is wrong: a
-  // server that starts with a value that can never work would report the
-  // problem once per tool call instead of once at launch.
-  if (apiKey.includes('${')) {
-    throw new Error(
-      `HTMLRADAR_API_KEY is the unresolved placeholder "${apiKey}", which means the variable ` +
-        'was not set in the environment the client started from. Export it in your shell ' +
-        '(export HTMLRADAR_API_KEY=hr_live_...) before starting Claude Code or the client that ' +
-        `launches this server. ${WHERE_TO_GET_A_KEY}`,
-    );
-  }
-  if (apiKey && !API_KEY_PATTERN.test(apiKey)) {
-    throw new Error(
-      'HTMLRADAR_API_KEY does not look like an HTMLRadar API key. Keys are "hr_live_" followed ' +
-        `by 40 hexadecimal characters. ${WHERE_TO_GET_A_KEY}`,
-    );
-  }
   // Trailing slashes make every request path double-slashed, which some
   // edge routers 301 to a URL that drops the Authorization header.
   const baseUrl = (env['HTMLRADAR_API_URL']?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '');
-  return { apiKey, baseUrl };
+  const problem = keyProblem(apiKey);
+  return problem === null ? { apiKey, baseUrl } : { apiKey: '', baseUrl, keyProblem: problem };
 }
 
 export async function apiFetch<T>(
   config: Config,
   path: string,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; signal?: AbortSignal | undefined },
 ): Promise<ApiResult<T>> {
-  if (!config.apiKey) return { ok: false, message: NO_API_KEY_MESSAGE };
+  if (!config.apiKey) return { ok: false, message: config.keyProblem ?? NO_API_KEY_MESSAGE };
 
   const method = init?.method ?? 'GET';
   const headers: Record<string, string> = { authorization: `Bearer ${config.apiKey}` };
@@ -152,9 +170,21 @@ export async function apiFetch<T>(
     response = await fetch(`${config.baseUrl}${path}`, {
       method,
       headers,
+      ...(init?.signal ? { signal: init.signal } : {}),
       ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
     });
   } catch (error) {
+    // Cancellation is best effort and is never a claim that a write was
+    // undone: a POST the API already accepted stays accepted. What aborting
+    // buys is that we stop waiting, and that a request still in flight is
+    // not left running after the caller has gone.
+    if (init?.signal?.aborted) {
+      return {
+        ok: false,
+        message:
+          'The caller cancelled this call before HTMLRadar answered. If it was a create or a replace, it may still have been applied — check before trying again.',
+      };
+    }
     return {
       ok: false,
       message: `Could not reach the HTMLRadar API at ${config.baseUrl}: ${describe(error)}`,

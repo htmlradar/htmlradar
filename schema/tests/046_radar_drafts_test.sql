@@ -28,12 +28,17 @@
 --     -p 55432:5432 postgres:15
 --   export PGPASSWORD=postgres PGHOST=localhost PGPORT=55432 PGUSER=postgres
 --   psql -v ON_ERROR_STOP=1 -c "create role anon; create role authenticated;
---                               create role service_role bypassrls"
+--                               create role service_role bypassrls;
+--                               alter default privileges in schema public
+--                                 grant all on tables to service_role"
 --   psql -v ON_ERROR_STOP=1 -f schema/046_radar_drafts.sql
 --   psql -v ON_ERROR_STOP=1 -f schema/tests/046_radar_drafts_test.sql
 --
 -- 046 stands alone: it creates one table and depends on no earlier file, so
--- unlike 037's test this one does not need the 001/002/003 stack first.
+-- unlike 037's test this one does not need the 001/002/003 stack first. The
+-- default-privileges line above is not decoration: Supabase grants the service
+-- role every new public table that way, so a stock Postgres without it would
+-- fail C5 for a reason that does not exist on the real database.
 --
 -- Output is one NOTICE per test. Any failure raises and aborts the run.
 -- ------------------------------------------------------------

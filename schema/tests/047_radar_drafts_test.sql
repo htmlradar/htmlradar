@@ -1,6 +1,6 @@
--- 046_radar_drafts_test.sql
+-- 047_radar_drafts_test.sql
 -- ------------------------------------------------------------
--- Tests for 046_radar_drafts.sql — the invariants that belong to the database
+-- Tests for 047_radar_drafts.sql — the invariants that belong to the database
 -- rather than to the worker.
 --
 --   A. The status check refuses anything outside the seven states. The whole
@@ -24,7 +24,7 @@
 --
 -- WHAT IS NOT TESTED HERE: concurrency. A psql file inside one transaction has
 -- exactly one session, and the cap's atomicity is a claim about several. That
--- is 046_radar_drafts_concurrency_test.sh, which launches ten simultaneous
+-- is 047_radar_drafts_concurrency_test.sh, which launches ten simultaneous
 -- psql processes against the same throwaway database; run both. The Reddit and
 -- Telegram halves live in packages/monitor/tests/reddit-onetap.test.ts.
 --
@@ -42,10 +42,10 @@
 --                                 grant all on tables to service_role;
 --                               alter default privileges in schema public
 --                                 grant execute on functions to service_role"
---   psql -v ON_ERROR_STOP=1 -f schema/046_radar_drafts.sql
---   psql -v ON_ERROR_STOP=1 -f schema/tests/046_radar_drafts_test.sql
+--   psql -v ON_ERROR_STOP=1 -f schema/047_radar_drafts.sql
+--   psql -v ON_ERROR_STOP=1 -f schema/tests/047_radar_drafts_test.sql
 --
--- 046 stands alone: it creates its own tables and depends on no earlier file,
+-- 047 stands alone: it creates its own tables and depends on no earlier file,
 -- so unlike 037's test this one does not need the 001/002/003 stack first. The
 -- default-privileges lines above are not decoration: Supabase grants the
 -- service role every new public table and function that way, and a stock

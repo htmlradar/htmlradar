@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 046_radar_drafts_concurrency_test.sh
+# 047_radar_drafts_concurrency_test.sh
 # ---------------------------------------------------------------------------
-# The half of 046 that a single psql script cannot test: what happens when
+# The half of 047 that a single psql script cannot test: what happens when
 # several requests arrive at once.
 #
 # Sol's review made this necessary rather than nice. The daily cap used to be a
@@ -23,17 +23,17 @@
 #      including for the role the worker runs as.
 #
 # Self-contained. Starts its own throwaway PostgreSQL 15 in Docker, applies
-# schema/046, runs, and removes the container. Needs only Docker:
+# schema/047, runs, and removes the container. Needs only Docker:
 #
-#   schema/tests/046_radar_drafts_concurrency_test.sh
+#   schema/tests/047_radar_drafts_concurrency_test.sh
 #
 # Exits non-zero on the first failed assertion.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-MIGRATION="${HERE}/../046_radar_drafts.sql"
-CONTAINER="hr-046-concurrency-$$"
+MIGRATION="${HERE}/../047_radar_drafts.sql"
+CONTAINER="hr-047-concurrency-$$"
 PSQL="docker exec -i ${CONTAINER} psql -U postgres -v ON_ERROR_STOP=1 -tAq"
 
 cleanup() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
@@ -50,7 +50,7 @@ for _ in $(seq 1 40); do
 done
 
 # The roles Supabase provides, and the default privileges that make the service
-# role the writer — the same setup 046_radar_drafts_test.sql documents.
+# role the writer — the same setup 047_radar_drafts_test.sql documents.
 $PSQL -c "create role anon;
           create role authenticated;
           create role service_role bypassrls;

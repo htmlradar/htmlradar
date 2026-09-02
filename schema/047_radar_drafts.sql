@@ -1,4 +1,4 @@
--- 046_radar_drafts.sql
+-- 047_radar_drafts.sql
 -- ------------------------------------------------------------
 -- One row per drafted reply the founder can post with a tap, plus the
 -- reservation table that makes "one comment per thread, five a day" true

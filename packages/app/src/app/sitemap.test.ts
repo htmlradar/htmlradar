@@ -8,7 +8,7 @@ import sitemap from './sitemap';
 // their own page metadata sets `robots: { index: false }`, or (for /admin)
 // because the route is auth-gated and disallowed in robots.ts. Keep this
 // in sync with the "deliberately omitted" comments in sitemap.ts.
-const NOINDEX_ROUTES = new Set(['/sign-in', '/feedback']);
+const NOINDEX_ROUTES = new Set(['/sign-in', '/feedback', '/connect']);
 
 function pageFileToRoute(file: string): string {
   // "src/app/compare/docsend/page.tsx" -> "/compare/docsend"; "src/app/page.tsx" -> "/"

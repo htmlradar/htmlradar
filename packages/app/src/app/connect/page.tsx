@@ -11,6 +11,12 @@ import { serverClient } from '@/lib/supabase-server';
 
 export const runtime = 'edge';
 
+// A signed, single-use consent handoff, not a search result.
+export const metadata = {
+  title: 'Connect',
+  robots: { index: false, follow: false },
+};
+
 type SearchParams = Record<string, string | string[] | undefined>;
 
 function one(value: string | string[] | undefined): string {

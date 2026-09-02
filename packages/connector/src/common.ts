@@ -140,13 +140,22 @@ export async function sha256Hex(value: string): Promise<string> {
  * A fixed-window counter in the one key-value namespace this Worker already
  * has. Returns the seconds to wait, or 0 when the caller is inside its budget.
  *
- * ponytail: fixed window, not a sliding one, and one read plus one write per
- * counted request. A caller can therefore send `max` at the very end of one
- * window and `max` again at the start of the next. That is the known ceiling,
- * and it is fine for the job — this exists to stop a script hammering
- * /authorize and /token, not to shape traffic to the second. The upgrade path
- * is Cloudflare's own rate-limiting binding, which needs no storage at all;
- * take it if the key-value cost ever shows up in a bill.
+ * Every request writes its **own** key and then counts the keys in the window,
+ * rather than reading a number and writing it back one higher. That is the
+ * whole design: a read-modify-write loses updates under concurrency — two
+ * parallel requests both read 5 and both write 6, so the budget never
+ * advances — and a limiter that a parallel caller can hold still is not a
+ * limiter. Writes to distinct keys cannot lose each other.
+ *
+ * ponytail: the remaining race is bounded and stated rather than removed.
+ * Requests already in flight when the count is taken can each add one past the
+ * ceiling, so a caller with N parallel requests can overshoot by at most N-1
+ * once per window — never repeatedly, because the keys accumulate and the count
+ * only ever rises. Removing even that would mean a Durable Object per subject:
+ * a second billing surface and a stateful class in every future security
+ * review, to close a gap of a few requests a minute. The upgrade path, if it
+ * ever matters, is Cloudflare's own rate-limiting binding, which is atomic and
+ * needs no storage at all.
  *
  * Fails open, like the application's limiter and for the same reason: this is
  * abuse control, not authorisation, and a key-value hiccup must not close the
@@ -162,16 +171,19 @@ export async function retryAfterSeconds(
 ): Promise<number> {
   const now = nowSeconds();
   const windowStart = now - (now % windowSeconds);
-  const key = `rl:${bucket}:${windowStart}:${subject}`;
+  const prefix = `rl:${bucket}:${windowStart}:${subject}:`;
   try {
-    const used = Number((await env.OAUTH_KV.get(key)) ?? '0');
-    if (used >= max) return windowStart + windowSeconds - now;
-    // Written with a lifetime, so nothing here is ever swept by hand. The
+    // Written first, so a request always pays for itself even if it is about to
+    // be refused. A lifetime, so nothing here is ever swept by hand — the
     // minimum a key-value namespace accepts is 60 seconds.
-    await env.OAUTH_KV.put(key, String(used + 1), {
+    await env.OAUTH_KV.put(prefix + randomHex(8), '1', {
       expirationTtl: Math.max(60, windowSeconds),
     });
-    return 0;
+    // `limit` caps the read: past the ceiling the exact count does not matter,
+    // only that it is past it, and this keeps one page per call however hard
+    // somebody hammers the endpoint.
+    const spent = await env.OAUTH_KV.list({ prefix, limit: max + 1 });
+    return spent.keys.length > max ? windowStart + windowSeconds - now : 0;
   } catch {
     console.error(`connector: rate limit counter unavailable for bucket ${bucket}`);
     return 0;

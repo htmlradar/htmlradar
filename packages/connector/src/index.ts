@@ -138,12 +138,21 @@ async function refusedRefreshReplay(request: Request, env: Env): Promise<Respons
 }
 
 /**
- * What each endpoint costs, per minute.
+ * What each endpoint costs, per minute, per calling address.
  *
- * /authorize and /token are counted on the caller's address, because that is
- * the only thing an unauthenticated caller has. /mcp is counted on the grant
- * instead — one connection, one budget — so a whole office behind one address
- * is not one customer's problem, and a runaway client is only its own.
+ * The address is the only identity available before the OAuth library has
+ * authenticated anything, and it is the only one worth counting on: Cloudflare
+ * sets `cf-connecting-ip` itself and a caller cannot choose it. Anything taken
+ * out of the request — a token, a header, a path — is text the caller wrote,
+ * and counting on it hands them two ways out: a fresh value per request buys an
+ * unlimited budget, and a value belonging to somebody else spends theirs.
+ *
+ * ponytail: so `/mcp` is counted per address rather than per connection, and a
+ * whole office behind one address shares one budget. 240 a minute is generous
+ * enough that this costs nobody anything real. A genuine per-connection budget
+ * would have to be taken inside the protocol handler, where the grant is
+ * authenticated — worth adding the day one connection's traffic is a problem,
+ * not before.
  */
 const BUDGETS = {
   authorize: 20,
@@ -156,31 +165,18 @@ const RATE_WINDOW_SECONDS = 60;
 /** The 429 to send instead of serving this request, or null. */
 async function overBudget(request: Request, env: Env): Promise<Response | null> {
   const path = new URL(request.url).pathname;
+  const bucket =
+    path === '/authorize'
+      ? 'authorize'
+      : path === '/token'
+        ? 'token'
+        : path === '/mcp'
+          ? 'mcp'
+          : null;
+  if (bucket === null) return null;
+
   const address = request.headers.get('cf-connecting-ip')?.trim() || 'unknown';
-
-  let bucket: keyof typeof BUDGETS;
-  let subject = address;
-  if (path === '/authorize') {
-    bucket = 'authorize';
-  } else if (path === '/token') {
-    bucket = 'token';
-  } else if (path === '/mcp') {
-    bucket = 'mcp';
-    // `userId:grantId` off the bearer token. Not a secret and not the whole
-    // token: it names a connection, which is what the budget belongs to. A
-    // request with no usable token falls back to the address, so an
-    // unauthenticated flood is still counted.
-    const parts = (
-      /^Bearer[ \t]+(\S+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? ''
-    )
-      .split(':')
-      .slice(0, 2);
-    if (parts.length === 2 && parts[0] && parts[1]) subject = parts.join(':');
-  } else {
-    return null;
-  }
-
-  const wait = await retryAfterSeconds(env, bucket, subject, BUDGETS[bucket], RATE_WINDOW_SECONDS);
+  const wait = await retryAfterSeconds(env, bucket, address, BUDGETS[bucket], RATE_WINDOW_SECONDS);
   return wait > 0 ? tooManyRequests(wait) : null;
 }
 

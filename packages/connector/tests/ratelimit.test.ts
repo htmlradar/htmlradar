@@ -8,7 +8,6 @@ import {
   call,
   completeGrant,
   makeEnv,
-  rpc,
   stubNetwork,
   withCompatibilityFlag,
 } from './harness.js';
@@ -82,27 +81,56 @@ describe('the /token budget', () => {
 });
 
 describe('the /mcp budget', () => {
-  it('is counted per connection, not per address', async () => {
+  /** One protocol call from a chosen address, with a chosen bearer token. */
+  function mcp(env: Env, token: string, address: string): Promise<Response> {
+    return call(
+      env,
+      new Request(`${ORIGIN}/mcp`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'cf-connecting-ip': address,
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
+    );
+  }
+
+  it('cannot be escaped by choosing a different token each time', async () => {
     const env = makeEnv();
-    const first = await completeGrant(env);
-    const second = await completeGrant(env, { state: 'second' });
-
+    // Every request carries a token nobody issued, and a fresh one each time.
+    // If the budget were keyed on anything out of the token, this would buy an
+    // unlimited number of buckets and never be refused.
     for (let i = 0; i < 240; i += 1) {
-      const answer = await rpc(env, first.accessToken, {
-        jsonrpc: '2.0',
-        id: i,
-        method: 'tools/list',
-      });
-      expect(answer.status).not.toBe(429);
+      expect((await mcp(env, `user-${i}:grant-${i}:secret`, '198.51.100.9')).status).not.toBe(429);
     }
-    expect(
-      (await rpc(env, first.accessToken, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status,
-    ).toBe(429);
+    expect((await mcp(env, 'user-999:grant-999:secret', '198.51.100.9')).status).toBe(429);
+  });
 
-    // The other connection is untouched.
-    expect(
-      (await rpc(env, second.accessToken, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status,
-    ).toBe(200);
+  it('cannot be spent on somebody else, because the token is not the identity', async () => {
+    const env = makeEnv();
+    const victim = await completeGrant(env);
+
+    // An attacker at their own address, naming the victim's connection in the
+    // bearer token, exhausts their own budget and nobody else's.
+    for (let i = 0; i < 241; i += 1) await mcp(env, victim.accessToken, '203.0.113.99');
+    expect((await mcp(env, victim.accessToken, '203.0.113.99')).status).toBe(429);
+
+    // The victim, at their own address, is unaffected.
+    expect((await mcp(env, victim.accessToken, '198.51.100.1')).status).toBe(200);
+  });
+
+  it('does not lose parallel requests, so a concurrent caller cannot hold it still', async () => {
+    const env = makeEnv();
+    // All at once. A read-then-write counter loses these: every request reads
+    // the same value and writes the same value back, so the budget never moves
+    // and the ceiling is never reached.
+    await Promise.all(
+      Array.from({ length: 241 }, () => mcp(env, 'user-x:grant-x:secret', '192.0.2.50')),
+    );
+    expect((await mcp(env, 'user-x:grant-x:secret', '192.0.2.50')).status).toBe(429);
   });
 });
 

@@ -32,8 +32,25 @@ startup, so running the command by hand shows it immediately.
 
 ## Install
 
-The package is on npm. Every client below runs the same command, and needs Node.js 20 or newer
-(Claude Desktop brings its own):
+### Claude Desktop and claude.ai — paste one address
+
+These two take a web address rather than a command, so there is nothing on this page to install and
+no key to make first:
+
+```
+https://mcp.htmlradar.com/mcp
+```
+
+Settings, then Connectors, then **Add custom connector**, then paste and save. The first time Claude
+reaches for a tool it shows a Connect card: sign in to HTMLRadar, choose read-only (list your links
+and read who opened them) or read-and-publish (adds creating a link, replacing a document and
+switching a link off), and click Allow. The key is minted for that connection and never shown to
+you. Revoke it under **Connected apps** in [Settings](https://htmlradar.com/settings); access ends
+on the next tool call.
+
+Every other client runs the package instead, as does Claude Desktop if you would rather hold the key
+yourself. The package is on npm; every client below runs the same command, and needs Node.js 20 or
+newer (Claude Desktop brings its own):
 
 ```
 npx -y htmlradar-mcp

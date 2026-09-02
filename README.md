@@ -155,6 +155,21 @@ Full guide with deployment commands in [`docs/self-hosting.md`](./docs/self-host
 HTMLRadar ships an MCP server, so the agent that wrote the HTML can publish it as a tracked link —
 and ask, the next day, whether anyone read it.
 
+**Claude Desktop and claude.ai — one address, no install**
+
+Settings → Connectors → Add custom connector, and paste:
+
+```
+https://mcp.htmlradar.com/mcp
+```
+
+Nothing to install and no API key to make first. The first time Claude reaches for a tool it shows a
+Connect card; you sign in to HTMLRadar, choose read-only or read-and-publish, and the key is minted
+for that connection. Revoke it any time under **Connected apps** in
+[Settings](https://htmlradar.com/settings) — access ends on the next tool call.
+
+**Every other client — run the package**
+
 Create an API key at [htmlradar.com/settings](https://htmlradar.com/settings) under **API keys**,
 then export it, so the key never becomes a command-line argument that lands in your shell history:
 

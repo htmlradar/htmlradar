@@ -111,7 +111,11 @@ const WHERE_TO_GET_A_KEY =
 // instruction. Now the server starts and every tool answers with this.
 export const NO_API_KEY_MESSAGE = `HTMLRADAR_API_KEY is not set, so this server cannot reach HTMLRadar yet. ${WHERE_TO_GET_A_KEY} Then restart this client so it picks the key up.`;
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
+// The environment is passed in rather than read from `process.env` here: this
+// module is bundled into the connector Worker too, where `process` does not
+// exist. The stdio entry point hands it over, and stays the only file that
+// knows what a process is.
+export function loadConfig(env: Record<string, string | undefined>): Config {
   const apiKey = env['HTMLRADAR_API_KEY']?.trim() ?? '';
   // A wrong key is still fatal, and says which of the two things is wrong: a
   // server that starts with a value that can never work would report the

@@ -6,7 +6,7 @@ import { loadConfig, NO_API_KEY_MESSAGE } from './api.js';
 import { createServer } from './server.js';
 
 async function main(): Promise<void> {
-  const config = loadConfig();
+  const config = loadConfig(process.env);
   if (!config.apiKey) console.error(`htmlradar-mcp: ${NO_API_KEY_MESSAGE}`);
   const server = createServer(config);
   await server.connect(new StdioServerTransport());

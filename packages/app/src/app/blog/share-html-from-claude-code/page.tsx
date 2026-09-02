@@ -352,7 +352,7 @@ export default function Post() {
                 <p>
                   There is also a plugin — <C>/plugin marketplace add htmlradar/htmlradar</C>, then{' '}
                   <C>/plugin install htmlradar@htmlradar</C> — which adds the same server plus a
-                  skill that teaches Claude when to offer a link, pinned to 0.2.0 rather than always
+                  skill that teaches Claude when to offer a link, pinned to 0.3.0 rather than always
                   fetching the latest. Either route installs one bundled file with no runtime npm
                   dependencies, so <C>npx</C> is not quietly pulling 95 packages behind it.
                 </p>

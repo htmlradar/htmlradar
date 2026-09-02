@@ -452,7 +452,7 @@ function failure(message: string): CallToolResult {
 
 export function createServer(config: Config): McpServer {
   const server = new McpServer(
-    { name: 'htmlradar', version: '0.2.0' },
+    { name: 'htmlradar', version: '0.3.0' },
     {
       // The one consent sentence lives here and nowhere else. It is a routing
       // hint the client may or may not act on, not a security control: the

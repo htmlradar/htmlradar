@@ -3,6 +3,53 @@
 All notable changes to `htmlradar-mcp`. The plugin at `plugins/htmlradar` pins one of these versions
 in its `.mcp.json`; direct installs (`npx -y htmlradar-mcp`) always run the latest.
 
+## 0.3.0 — 2026-09-02
+
+Nothing new to call, and a better server in every client it is already installed in. Results say
+each thing once and carry no internal identifiers, descriptions state consequences instead of
+directing the model, a missing key is an instruction rather than a dead process, and the protocol
+kit is the version the Cloudflare Worker will share.
+
+### Changed
+
+- **`get_share_activity` no longer repeats its whole answer as raw JSON.** The summary was followed
+  by a `Raw (the same values, still data)` block containing every figure a second time. It doubled
+  the tokens on the one tool whose result can approach a client's size cap, and returning the
+  database row beside the readable answer is the pattern Anthropic's connector review criteria
+  reject. Nothing is lost: every value the block carried is in the summary above it.
+- **`whoami` no longer prints the account's identifier.** It was the internal database key, which
+  tells an assistant nothing it can act on, and OpenAI's review guidance names unnecessary internal
+  identifiers explicitly. The email address is not put in its place — that is personal data the
+  model does not need either. The plan and the free-link budget, which are the useful answer, stay.
+- **Tool descriptions state consequences, not behaviour.** Four of them told the model how to act:
+  two said never to call the tool unless the user asked, two said to confirm before calling. A tool
+  description is not a consent mechanism — the client decides what it asks before running a tool —
+  and directing behaviour from one is a review risk. What the model needs is what the call does in
+  the world, so those sentences stay: the sender is emailed when somebody opens a revoked link, and
+  recipients may already have read the contents being replaced. The one consent sentence now lives
+  only in the server's instructions, and the Claude Code plugin's skill still carries the longer
+  guidance.
+- **`replace_document` and `revoke_share` are marked destructive.** Both are reversible for the
+  account, and neither deletes anything, but a recipient loses a document they had or finds
+  different contents behind the same link. That is the reading of `destructiveHint` clients act on,
+  so a client that confirms destructive tools now confirms these two.
+- **A missing API key no longer kills the server.** Installing before creating a key produced a
+  process that exited at launch, which several clients still report as connected — a dead server
+  instead of an instruction. The server now starts, lists all seven tools, and answers any of them
+  with the one thing to do next. A key that is present but malformed, or an unresolved
+  `${HTMLRADAR_API_KEY}` placeholder, is still fatal at startup with the same messages as before.
+- **The protocol kit is now version 2** — `@modelcontextprotocol/server` and
+  `@modelcontextprotocol/client`, both pinned to 2.0.0, replacing the monolithic
+  `@modelcontextprotocol/sdk`. Cloudflare's stateless handler is documented against version 2, so
+  the remote connector can import this same server rather than a second copy of it. Two visible
+  consequences: **the package now needs Node.js 20 or newer**, which the kit requires, and the
+  advertised JSON Schema dialect moves from draft-07 to draft-2020-12, which the kit hard-codes.
+  Every schema keyword is otherwise identical to 0.2.0's, and the MCP Inspector's strict
+  portability lint still reports nothing.
+- The document-size check uses `TextEncoder` rather than `Buffer`, the one call in the shared
+  server that does not exist on Cloudflare Workers.
+- The Claude Code plugin pins `htmlradar-mcp@0.3.0`.
+
 ## 0.2.0 — 2026-08-31
 
 The server could publish and it could report. It could not find anything it had not just made, make

@@ -25,7 +25,7 @@ Keys are created at [htmlradar.com/settings](https://htmlradar.com/settings) und
 
 ## How it runs
 
-`.mcp.json` launches the published package with `npx -y htmlradar-mcp@0.2.0` and passes
+`.mcp.json` launches the published package with `npx -y htmlradar-mcp@0.3.0` and passes
 `HTMLRADAR_API_KEY` through from your environment. Nothing is bundled into the plugin, so a plugin
 update and a server update are separate things: bump the pinned version here when you want the
 newer server.

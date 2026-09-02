@@ -53,6 +53,15 @@ describe('the hand-off to the consent page', () => {
 
   it('narrows an unknown scope to read-only rather than passing it on', async () => {
     const env = makeEnv();
+    // The application grants what the narrowed request asked for; the Worker
+    // refuses anything wider (tests/hostile.test.ts).
+    network.exchange = () =>
+      Response.json({
+        user_id: 'user-1',
+        api_key: CONNECTOR_API_KEY,
+        api_key_id: 'key-row-1',
+        scope: 'shares:read',
+      });
     const { consent } = await completeGrant(env, { requested: 'admin:everything' });
     expect(consent.searchParams.get('scope')).toBe('shares:read');
   });

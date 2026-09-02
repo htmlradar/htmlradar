@@ -22,6 +22,13 @@ import {
 /** How long a parked authorization request, and its /connect link, stay valid. */
 export const CONSENT_TTL_SECONDS = 600;
 
+/**
+ * How long the application's signed answer stays valid — the contract's own
+ * figure, enforced as a ceiling and not only as a floor. Without the ceiling a
+ * signing key that leaked once could mint an answer good for a decade.
+ */
+export const CALLBACK_TTL_SECONDS = 120;
+
 /** Fixed on both sides on purpose: a return address that is never a parameter is never an open redirect. */
 export const CALLBACK_PATH = '/connect/callback';
 
@@ -124,7 +131,12 @@ async function callback(env: Env, url: URL): Promise<Response> {
     return new Response('This consent answer is not signed by HTMLRadar.', { status: 400 });
   }
   const expiresAt = Number(exp);
-  if (!Number.isFinite(expiresAt) || expiresAt < nowSeconds()) {
+  const now = nowSeconds();
+  // Both ends of the window. A signed answer that has passed is refused, and so
+  // is one whose expiry is further away than the contract allows an answer to
+  // be — the second check is what stops a signature, however obtained, from
+  // being good indefinitely.
+  if (!Number.isFinite(expiresAt) || expiresAt < now || expiresAt > now + CALLBACK_TTL_SECONDS) {
     return new Response('This consent answer has expired. Start the connection again.', {
       status: 400,
     });
@@ -147,16 +159,35 @@ async function callback(env: Env, url: URL): Promise<Response> {
     return new Response(`Could not finish the connection: ${describe(failure)}`, { status: 502 });
   }
 
+  // The three values that must agree before anything is stored, and the reason
+  // this check exists at all: the browser tells us one scope, the application
+  // tells us another, and the client asked for a third. If they are allowed to
+  // differ, the widest one wins by accident. So: what the application actually
+  // granted must be exactly what it signed into the browser leg, and that must
+  // be no broader than what the client asked for.
+  const signedScopes = scope.split(' ').filter(Boolean);
+  const grantedScopes = granted.scope.split(' ').filter(Boolean);
+  const requestedScopes = knownScopes(parked.scope);
+  if (
+    !sameScopes(grantedScopes, signedScopes) ||
+    !grantedScopes.every((one) => requestedScopes.includes(one)) ||
+    grantedScopes.length === 0
+  ) {
+    return new Response('This consent answer does not match the request it answers.', {
+      status: 400,
+    });
+  }
+
   const props: Props = {
     userId: granted.user_id,
     apiKey: granted.api_key,
     apiKeyId: granted.api_key_id,
-    scope: granted.scope,
+    scope: grantedScopes.join(' '),
   };
   const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
     request: parked,
     userId: granted.user_id,
-    scope: knownScopes(granted.scope.split(' ')),
+    scope: grantedScopes,
     // Storage-visible, by the library's own documentation: metadata and userId
     // are not encrypted because grants are enumerated and revoked by them. So
     // nothing here may be secret. The key identifier is not — it names a row,
@@ -191,7 +222,29 @@ async function exchangeHandle(env: Env, tx: string, code: string): Promise<Excha
   if (!body.user_id || !body.api_key || !body.api_key_id || !body.scope) {
     throw new Error('HTMLRadar returned an incomplete consent answer.');
   }
+  // Shapes, before any of it is believed. A row-mixing bug on the application
+  // side, or a compromised exchange endpoint, would show up here as something
+  // that is not an HTMLRadar key or not an identifier — and an unbounded string
+  // in `props` is an unbounded string in every token this grant ever mints.
+  if (!API_KEY_PATTERN.test(body.api_key)) {
+    throw new Error('HTMLRadar returned something that is not an HTMLRadar API key.');
+  }
+  if (!isIdentifier(body.user_id) || !isIdentifier(body.api_key_id)) {
+    throw new Error('HTMLRadar returned an unusable identifier.');
+  }
   return body as ExchangeResult;
+}
+
+/** The same shape `packages/mcp` checks: `hr_live_` and forty hex characters. */
+const API_KEY_PATTERN = /^hr_live_[0-9a-f]{40}$/;
+
+/** Printable, bounded, and free of the newline the signatures use as a separator. */
+function isIdentifier(value: string): boolean {
+  return value.length > 0 && value.length <= 100 && !/[\s]/.test(value);
+}
+
+function sameScopes(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && [...a].sort().join(' ') === [...b].sort().join(' ');
 }
 
 /**

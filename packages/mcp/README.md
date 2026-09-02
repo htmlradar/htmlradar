@@ -22,11 +22,12 @@ followed by 40 hexadecimal characters, and it is shown once. The free tier cover
 after that the server returns an upgrade message that the agent will relay to you rather than
 retrying.
 
-The server refuses to start unless `HTMLRADAR_API_KEY` holds a well-formed key, and the message
-says which of three things went wrong: the variable is not set, it is an unresolved placeholder
-such as `${HTMLRADAR_API_KEY}`, or it is set to something that is not a key. Some clients report a
-server as connected even when it exited at startup, so if a tool call fails, run the command by hand
-and read what it printed.
+With no key at all the server still starts, lists all seven tools, and answers any of them with the
+one thing to do next: create a key and set `HTMLRADAR_API_KEY`. Install first and make the key
+afterwards if you like. A key that is present but wrong is still fatal, and the message says which
+of the two things went wrong: it is an unresolved placeholder such as `${HTMLRADAR_API_KEY}`, or it
+is set to something that is not a key. Some clients report a server as connected even when it
+exited at startup, so if a tool call fails, run the command by hand and read what it printed.
 
 ---
 
@@ -496,8 +497,9 @@ each tool from a browser page:
 npx @modelcontextprotocol/inspector -e HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY npx -y htmlradar-mcp
 ```
 
-To see only the startup check, run `npx -y htmlradar-mcp` directly: with a missing, placeholder or
-malformed key it prints what is wrong and exits.
+To see only the startup check, run `npx -y htmlradar-mcp` directly: with a placeholder or malformed
+key it prints what is wrong and exits, and with no key at all it prints what to do and keeps
+running.
 
 ---
 

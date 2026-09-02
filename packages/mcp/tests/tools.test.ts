@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { loadConfig, type Config } from '../src/api.js';
+import { loadConfig, NO_API_KEY_MESSAGE, type Config } from '../src/api.js';
 import {
   createServer,
   createShare,
@@ -44,10 +44,14 @@ afterEach(() => {
 const wellFormedKey = 'hr_live_' + '0123456789abcdef0123456789abcdef01234567';
 
 describe('loadConfig', () => {
-  it('refuses to start without an API key, and says where to get one', () => {
-    expect(() => loadConfig({})).toThrow(/HTMLRADAR_API_KEY is not set/);
-    expect(() => loadConfig({})).toThrow(/htmlradar\.com\/settings/);
-    expect(() => loadConfig({ HTMLRADAR_API_KEY: '  ' })).toThrow(/is not set/);
+  // Installing before making a key used to produce a process that exited at
+  // launch, which several clients still show as connected.
+  it('starts without an API key rather than exiting', () => {
+    expect(loadConfig({})).toEqual({ apiKey: '', baseUrl: 'https://htmlradar.com' });
+    expect(loadConfig({ HTMLRADAR_API_KEY: '  ' })).toEqual({
+      apiKey: '',
+      baseUrl: 'https://htmlradar.com',
+    });
   });
 
   // Claude Code passes `${HTMLRADAR_API_KEY}` from the plugin's .mcp.json
@@ -80,6 +84,29 @@ describe('loadConfig', () => {
         HTMLRADAR_API_URL: 'http://localhost:3000//',
       }),
     ).toEqual({ apiKey: wellFormedKey, baseUrl: 'http://localhost:3000' });
+  });
+});
+
+describe('no API key', () => {
+  const keyless: Config = { apiKey: '', baseUrl: 'https://htmlradar.com' };
+
+  it('answers every tool with the one thing to do next, and never calls the API', async () => {
+    const fetchMock = mockFetch(200, {});
+    const results = [
+      await whoami(keyless),
+      await listShares(keyless, {}),
+      await getShareActivity(keyless, { share_id: 'shr_1' }),
+      await shareHtml(keyless, { html: '<p/>', require_email: true }),
+      await createShare(keyless, { document_id: 'doc_1', require_email: true }),
+      await revokeShare(keyless, { share_id: 'shr_1' }),
+      await replaceDocument(keyless, { document_id: 'doc_1', html: '<p/>' }),
+    ];
+    for (const result of results) {
+      expect(result.isError).toBe(true);
+      expect(body(result)).toBe(NO_API_KEY_MESSAGE);
+    }
+    expect(body(results[0]!)).toMatch(/htmlradar\.com\/settings/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

@@ -708,7 +708,8 @@ did anyone read the proposal I shared yesterday?`}
             <p className="text-[15px] leading-relaxed text-ink-soft">
               To see only the startup check, run{' '}
               <span className="font-mono text-[13px]">npx -y htmlradar-mcp</span> directly: with a
-              missing, placeholder or malformed key it prints what is wrong and exits.
+              placeholder or malformed key it prints what is wrong and exits, and with no key at all
+              it prints what to do and keeps running.
             </p>
           </section>
 

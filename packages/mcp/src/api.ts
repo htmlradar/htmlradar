@@ -7,6 +7,7 @@
 // which runs once at startup before the transport is connected.
 
 export interface Config {
+  /** Empty when no key was set: the server still starts, and every tool says so. */
   apiKey: string;
   baseUrl: string;
 }
@@ -104,11 +105,17 @@ const WHERE_TO_GET_A_KEY =
   'Create a key at https://htmlradar.com/settings (under "API keys") and pass it to this ' +
   'server as the HTMLRADAR_API_KEY environment variable.';
 
+// A key is not required to start. Somebody who installs the server before
+// making a key used to get a process that exited at launch, which several
+// clients still show as connected — a dead server rather than an
+// instruction. Now the server starts and every tool answers with this.
+export const NO_API_KEY_MESSAGE = `HTMLRADAR_API_KEY is not set, so this server cannot reach HTMLRadar yet. ${WHERE_TO_GET_A_KEY} Then restart this client so it picks the key up.`;
+
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
-  const apiKey = env['HTMLRADAR_API_KEY']?.trim();
-  if (!apiKey) {
-    throw new Error(`HTMLRADAR_API_KEY is not set. ${WHERE_TO_GET_A_KEY}`);
-  }
+  const apiKey = env['HTMLRADAR_API_KEY']?.trim() ?? '';
+  // A wrong key is still fatal, and says which of the two things is wrong: a
+  // server that starts with a value that can never work would report the
+  // problem once per tool call instead of once at launch.
   if (apiKey.includes('${')) {
     throw new Error(
       `HTMLRADAR_API_KEY is the unresolved placeholder "${apiKey}", which means the variable ` +
@@ -117,7 +124,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         `launches this server. ${WHERE_TO_GET_A_KEY}`,
     );
   }
-  if (!API_KEY_PATTERN.test(apiKey)) {
+  if (apiKey && !API_KEY_PATTERN.test(apiKey)) {
     throw new Error(
       'HTMLRADAR_API_KEY does not look like an HTMLRadar API key. Keys are "hr_live_" followed ' +
         `by 40 hexadecimal characters. ${WHERE_TO_GET_A_KEY}`,
@@ -134,6 +141,8 @@ export async function apiFetch<T>(
   path: string,
   init?: { method?: string; body?: unknown },
 ): Promise<ApiResult<T>> {
+  if (!config.apiKey) return { ok: false, message: NO_API_KEY_MESSAGE };
+
   const method = init?.method ?? 'GET';
   const headers: Record<string, string> = { authorization: `Bearer ${config.apiKey}` };
   if (init?.body !== undefined) headers['content-type'] = 'application/json';

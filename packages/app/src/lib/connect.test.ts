@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   consentPayload,
+  grantedScopeFor,
   hmacSign,
   isExpired,
   validConnectRequest,
@@ -61,5 +62,32 @@ describe('connector expiry', () => {
     expect(isExpired('100', 100)).toBe(true);
     expect(isExpired('99', 100)).toBe(true);
     expect(isExpired('not-a-time', 100)).toBe(true);
+  });
+});
+
+describe('the granted scope', () => {
+  it('is never wider than the request', () => {
+    // Every pair the Worker can legally sign, against both answers the page can
+    // give. The Worker refuses a grant wider than the request, so a row here
+    // that widened would dead-end a legal connection.
+    for (const requested of ['shares:read', 'shares:write', 'shares:read shares:write']) {
+      for (const choseFull of [true, false]) {
+        const granted = grantedScopeFor(requested, choseFull).split(' ').filter(Boolean);
+        const asked = requested.split(' ');
+        expect(granted.length).toBeGreaterThan(0);
+        for (const scope of granted) expect(asked).toContain(scope);
+      }
+    }
+  });
+
+  it('gives a write-only request exactly the write scope', () => {
+    expect(grantedScopeFor('shares:write', true)).toBe('shares:write');
+    expect(grantedScopeFor('shares:write', false)).toBe('shares:write');
+  });
+
+  it('offers the narrow choice only when read was asked for, and defaults to it', () => {
+    expect(grantedScopeFor('shares:read shares:write', false)).toBe('shares:read');
+    expect(grantedScopeFor('shares:read shares:write', true)).toBe('shares:read shares:write');
+    expect(grantedScopeFor('shares:read', true)).toBe('shares:read');
   });
 });

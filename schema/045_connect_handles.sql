@@ -17,7 +17,7 @@ create table if not exists public.connect_handles (
   user_id     uuid not null references auth.users(id) on delete cascade,
   api_key_id  uuid not null references public.api_keys(id) on delete cascade,
   api_key     text not null check (api_key ~ '^hr_live_[0-9a-f]{40}$'),
-  scope       text not null check (scope in ('shares:read', 'shares:read shares:write')),
+  scope       text not null check (scope in ('shares:read', 'shares:write', 'shares:read shares:write')),
   expires_at  timestamptz not null,
   created_at  timestamptz not null default now()
 );

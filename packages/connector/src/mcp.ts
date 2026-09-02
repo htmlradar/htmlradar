@@ -20,6 +20,9 @@ const handler = createMcpHandler((ctx) => {
   return createServer({
     apiKey: extra?.apiKey ?? '',
     baseUrl: extra?.baseUrl ?? DEFAULT_BASE_URL,
+    // So a rejected key tells a remote user to reconnect, rather than to check
+    // an environment variable they do not have.
+    remote: true,
   });
 });
 
@@ -28,8 +31,8 @@ export default {
     const props = (ctx as ExecutionContext & { props?: Props }).props;
     const granted = new Set((props?.scope ?? '').split(' ').filter(Boolean));
 
-    const blocked = await writeToolWithoutPermission(request, granted);
-    if (blocked) return insufficientScope(request, blocked);
+    const blocked = await toolWithoutPermission(request, granted);
+    if (blocked) return insufficientScope(request, blocked.tool, blocked.needs);
 
     return handler.fetch(request, {
       authInfo: {
@@ -46,22 +49,28 @@ export default {
 };
 
 /**
- * The name of a write tool this grant may not call, or null.
+ * A tool this grant may not call and the scope it needs, or null.
  *
  * Checked here rather than by hiding the tool from `tools/list`: a tool Claude
  * cannot see is a tool it cannot call, and a call it cannot make is a permission
  * upgrade the user is never offered. All seven stay visible to every grant, and
  * the refusal is what starts the step-up.
  *
+ * Both directions are enforced, not only the write one. A grant that asked for
+ * `shares:write` alone carries a full API key — the key has to be able to
+ * publish — so if the read tools were free to everyone, a write-only connection
+ * could read the account anyway. The scope, checked here, is what makes
+ * write-only actually mean write-only.
+ *
  * The body is read from a clone, so the request the handler serves is still
  * whole.
  */
-async function writeToolWithoutPermission(
+async function toolWithoutPermission(
   request: Request,
   granted: Set<string>,
-): Promise<string | null> {
+): Promise<{ tool: string; needs: string } | null> {
   if (request.method !== 'POST') return null;
-  if (granted.has(SCOPE_WRITE)) return null;
+  if (granted.has(SCOPE_READ) && granted.has(SCOPE_WRITE)) return null;
 
   let body: unknown;
   try {
@@ -76,9 +85,9 @@ async function writeToolWithoutPermission(
   for (const message of Array.isArray(body) ? body : [body]) {
     const call = message as { method?: unknown; params?: { name?: unknown } } | null;
     const name = call?.params?.name;
-    if (call?.method === 'tools/call' && typeof name === 'string' && WRITE_TOOLS.has(name)) {
-      return name;
-    }
+    if (call?.method !== 'tools/call' || typeof name !== 'string') continue;
+    const needs = WRITE_TOOLS.has(name) ? SCOPE_WRITE : SCOPE_READ;
+    if (!granted.has(needs)) return { tool: name, needs };
   }
   return null;
 }
@@ -90,7 +99,7 @@ async function writeToolWithoutPermission(
  * one, because clients do not reliably carry an earlier grant forward: asking
  * for the write scope alone can come back as a grant that has lost the read one.
  */
-function insufficientScope(request: Request, tool: string): Response {
+function insufficientScope(request: Request, tool: string, needs: string): Response {
   const url = new URL(request.url);
   const challenge =
     `Bearer error="insufficient_scope", ` +
@@ -99,7 +108,7 @@ function insufficientScope(request: Request, tool: string): Response {
   return new Response(
     JSON.stringify({
       error: 'insufficient_scope',
-      error_description: `${tool} needs the "${SCOPE_WRITE}" permission, which this connection was not given.`,
+      error_description: `${tool} needs the "${needs}" permission, which this connection was not given.`,
     }),
     {
       status: 403,

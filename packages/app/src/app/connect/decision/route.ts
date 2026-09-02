@@ -12,7 +12,8 @@ import {
   CONNECT_CALLBACK_URL,
   CONNECTOR_LABEL_PREFIX,
   FULL_SCOPE,
-  READ_SCOPE,
+  WRITE_SCOPE,
+  grantedScopeFor,
   hmacSign,
   randomBase64url,
   sha256Hex,
@@ -96,10 +97,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     return callback({ tx: request.tx, error: 'access_denied', exp: issueExp, sig });
   }
 
-  const requestedWrite = request.scope.split(' ').includes('shares:write');
-  const grantedScope =
-    requestedWrite && form.get('granted_scope') === FULL_SCOPE ? FULL_SCOPE : READ_SCOPE;
-  const keyScope: ApiKeyScope = grantedScope === FULL_SCOPE ? 'full' : 'read_only';
+  // Always a subset of what was asked for. A client that asked only to publish
+  // gets exactly `shares:write` — granting it the read scope it never asked for
+  // would be refused by the Worker, and would be wrong even if it were not.
+  const grantedScope = grantedScopeFor(request.scope, form.get('granted_scope') === FULL_SCOPE);
+  // The key has to be able to do what the grant allows. A grant that includes
+  // the write scope needs a full key; the OAuth scope, checked at every call in
+  // the Worker, is what keeps a write-only grant from reading.
+  const keyScope: ApiKeyScope = grantedScope.includes(WRITE_SCOPE) ? 'full' : 'read_only';
   const apiKey = generateApiKey();
   const label = `${CONNECTOR_LABEL_PREFIX}${request.clientHost}`.slice(0, 60);
   const supabase = serverClient();

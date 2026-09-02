@@ -117,6 +117,21 @@ select pg_temp.expect_error(
   '23514',
   'A6 an unknown event kind is refused');
 
+-- A client may legally ask for shares:write on its own, and the grant must be
+-- exactly what was asked for. If this constraint refused it, the consent page
+-- would dead-end a legal request with "could not create this connection".
+do $$
+begin
+  update connector_grants set scope = 'shares:write'
+   where api_key_id = (select v from t_ids where k = 'key_one');
+  raise notice 'PASS  A7 a write-only grant is a legal scope';
+end;
+$$;
+do $$ begin
+  update connector_grants set scope = 'shares:read'
+   where api_key_id = (select v from t_ids where k = 'key_one');
+end; $$;
+
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 

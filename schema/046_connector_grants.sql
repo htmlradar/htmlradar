@@ -11,6 +11,12 @@
 -- OAuth clean-up failed is a row somebody can find rather than a silence.
 --
 -- ORDERING: run this AFTER 034 (api_keys) and 040 (api_keys.scope).
+--
+-- It has no object dependency on 045, but 045 ships in the same connector
+-- release and must be applied FIRST all the same: 045 creates connect_handles,
+-- which the exchange endpoint reads, and schedules the purge that stops an
+-- unexchanged handle sitting on a live plaintext key. Applying 046 alone would
+-- leave the connector recording connections it cannot actually complete.
 -- ------------------------------------------------------------
 
 create table if not exists public.connector_grants (
@@ -22,7 +28,7 @@ create table if not exists public.connector_grants (
   api_key_id        uuid not null unique references public.api_keys(id) on delete cascade,
   client_id         text not null,
   client_host       text not null,
-  scope             text not null check (scope in ('shares:read', 'shares:read shares:write')),
+  scope             text not null check (scope in ('shares:read', 'shares:write', 'shares:read shares:write')),
   created_at        timestamptz not null default now(),
   -- Set when the Worker has confirmed the OAuth grant for this key is gone.
   -- Null while the key is live, and null-with-a-revoked-key is exactly the

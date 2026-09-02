@@ -84,6 +84,14 @@ select pg_temp.expect_error(
   '42501',
   'A3 a customer cannot read plaintext connector keys');
 
+-- A client may legally ask for shares:write on its own; the handle has to be
+-- able to carry that scope or the consent page dead-ends a legal request.
+insert into connect_handles (tx, code_hash, user_id, api_key_id, api_key, scope, expires_at)
+select repeat('d', 32), repeat('4', 64),
+       (select v from t_ids where k = 'one'), (select v from t_ids where k = 'key_one'),
+       'hr_live_dddddddddddddddddddddddddddddddddddddddd', 'shares:write', now() + interval '2 minutes';
+do $$ begin raise notice 'PASS  A4 a write-only handle is a legal scope'; end $$;
+
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 

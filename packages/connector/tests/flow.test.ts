@@ -202,6 +202,69 @@ describe('a read-only grant', () => {
   });
 });
 
+describe('a write-only grant', () => {
+  // A client may legally ask for `shares:write` alone. Before this was fixed the
+  // consent page could only answer read-only or read-and-write, both wider than
+  // the request, and the Worker refused both — so a legal request dead-ended.
+  const writeOnly = () =>
+    Response.json({
+      user_id: 'user-1',
+      api_key: CONNECTOR_API_KEY,
+      api_key_id: 'key-row-1',
+      scope: 'shares:write',
+    });
+
+  it('completes, and is granted exactly what it asked for', async () => {
+    const env = makeEnv();
+    network.exchange = writeOnly;
+    const { consent, tokenBody } = await completeGrant(env, { requested: 'shares:write' });
+    expect(consent.searchParams.get('scope')).toBe('shares:write');
+    expect(tokenBody['scope']).toBe('shares:write');
+  });
+
+  it('may publish', async () => {
+    const env = makeEnv();
+    network.exchange = writeOnly;
+    const { accessToken } = await completeGrant(env, { requested: 'shares:write' });
+    const called = await rpc(env, accessToken, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'share_html', arguments: { html: '<p>hello</p>' } },
+    });
+    expect(called.status).toBe(200);
+  });
+
+  it('may not read, even though its API key is a full one', async () => {
+    // The key has to be full — it has to be able to publish — so the OAuth
+    // scope is the only thing standing between a write-only connection and the
+    // account's links. It stands.
+    const env = makeEnv();
+    network.exchange = writeOnly;
+    const { accessToken } = await completeGrant(env, { requested: 'shares:write' });
+    const called = await rpc(env, accessToken, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'whoami', arguments: {} },
+    });
+    expect(called.status).toBe(403);
+    const challenge = called.headers.get('www-authenticate') ?? '';
+    expect(challenge).toContain('error="insufficient_scope"');
+    expect(challenge).toContain('scope="shares:read shares:write"');
+    expect(network.calls.some((entry) => entry.url.endsWith('/api/v1/me'))).toBe(false);
+  });
+
+  it('still sees all seven tools', async () => {
+    const env = makeEnv();
+    network.exchange = writeOnly;
+    const { accessToken } = await completeGrant(env, { requested: 'shares:write' });
+    const listed = await rpc(env, accessToken, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const tools = (await readRpc(listed))['result'] as { tools: { name: string }[] };
+    expect(tools.tools).toHaveLength(7);
+  });
+});
+
 describe('a full grant', () => {
   it('may call a write tool', async () => {
     const env = makeEnv();

@@ -3,7 +3,29 @@ const encoder = new TextEncoder();
 export const CONNECT_CALLBACK_URL = 'https://mcp.htmlradar.com/connect/callback';
 export const CONNECTOR_LABEL_PREFIX = 'Claude connector, ';
 export const READ_SCOPE = 'shares:read';
+export const WRITE_SCOPE = 'shares:write';
 export const FULL_SCOPE = 'shares:read shares:write';
+
+/**
+ * What the customer may actually be granted, given what was asked for.
+ *
+ * The grant is always a subset of the request — the Worker refuses anything
+ * wider, and it is right to. So the narrow choice is "only the read part of
+ * what was asked for", which exists only when read was asked for at all, and
+ * the wide choice is "everything that was asked for". A write-only request has
+ * no narrow choice and is granted exactly `shares:write`.
+ *
+ * Fails closed: anything other than an explicit choice of the wide option
+ * yields the narrow one where a narrow one exists.
+ */
+export function grantedScopeFor(requestScope: string, choseFull: boolean): string {
+  const requested = requestScope.split(' ').filter(Boolean);
+  const canNarrow = requested.includes(READ_SCOPE) && requested.includes(WRITE_SCOPE);
+  if (canNarrow && !choseFull) return READ_SCOPE;
+  // Canonical order, which is the order the Worker signs and the order the
+  // scope column's CHECK constraint expects.
+  return [READ_SCOPE, WRITE_SCOPE].filter((scope) => requested.includes(scope)).join(' ');
+}
 
 export interface ConnectRequest {
   tx: string;

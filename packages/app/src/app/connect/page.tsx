@@ -4,6 +4,7 @@ import { addressRetryAfterFor } from '@/lib/api-auth';
 import {
   FULL_SCOPE,
   READ_SCOPE,
+  WRITE_SCOPE,
   createConsentNonce,
   validConnectRequest,
   type ConnectRequest,
@@ -108,7 +109,11 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
   }
 
   const nonce = await createConsentNonce(request.tx, user.id, request.exp, secret);
-  const canWrite = request.scope.split(' ').includes('shares:write');
+  // Only ever offer what was actually asked for. A client that asked only to
+  // publish is not offered a read choice, and is not quietly given one.
+  const requested = request.scope.split(' ').filter(Boolean);
+  const canRead = requested.includes(READ_SCOPE);
+  const canWrite = requested.includes(WRITE_SCOPE);
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-16">
@@ -141,24 +146,26 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
             <legend className="font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
               Choose access
             </legend>
-            <label className="mt-3 flex cursor-pointer gap-3 rounded-xl border border-line bg-paper p-4 has-[:checked]:border-signal/60 has-[:checked]:bg-signal/5">
-              <input
-                type="radio"
-                name="granted_scope"
-                value={READ_SCOPE}
-                defaultChecked
-                className="mt-1 accent-signal"
-              />
-              <span>
-                <span className="block text-[14.5px] font-medium text-ink">Read-only</span>
-                <span className="mt-1 block text-[13.5px] leading-relaxed text-ink-soft">
-                  <span className="font-mono">shares:read</span> — see your links and who read them
-                  (<span className="font-mono">list_shares</span>,{' '}
-                  <span className="font-mono">get_share_activity</span>,{' '}
-                  <span className="font-mono">whoami</span>).
+            {canRead ? (
+              <label className="mt-3 flex cursor-pointer gap-3 rounded-xl border border-line bg-paper p-4 has-[:checked]:border-signal/60 has-[:checked]:bg-signal/5">
+                <input
+                  type="radio"
+                  name="granted_scope"
+                  value={READ_SCOPE}
+                  defaultChecked
+                  className="mt-1 accent-signal"
+                />
+                <span>
+                  <span className="block text-[14.5px] font-medium text-ink">Read-only</span>
+                  <span className="mt-1 block text-[13.5px] leading-relaxed text-ink-soft">
+                    <span className="font-mono">shares:read</span> — see your links, who read them,
+                    and your account details (<span className="font-mono">list_shares</span>,{' '}
+                    <span className="font-mono">get_share_activity</span>,{' '}
+                    <span className="font-mono">whoami</span>).
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+            ) : null}
 
             {canWrite ? (
               <label className="mt-3 flex cursor-pointer gap-3 rounded-xl border border-line bg-paper p-4 has-[:checked]:border-signal/60 has-[:checked]:bg-signal/5">
@@ -166,13 +173,16 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
                   type="radio"
                   name="granted_scope"
                   value={FULL_SCOPE}
+                  defaultChecked={!canRead}
                   className="mt-1 accent-signal"
                 />
                 <span>
-                  <span className="block text-[14.5px] font-medium text-ink">Read and publish</span>
+                  <span className="block text-[14.5px] font-medium text-ink">
+                    {canRead ? 'Read and publish' : 'Publish only'}
+                  </span>
                   <span className="mt-1 block text-[13.5px] leading-relaxed text-ink-soft">
                     <span className="font-mono">shares:write</span> — publish, replace and switch
-                    off links (adds <span className="font-mono">share_html</span>,{' '}
+                    off links (<span className="font-mono">share_html</span>,{' '}
                     <span className="font-mono">create_share</span>,{' '}
                     <span className="font-mono">replace_document</span>,{' '}
                     <span className="font-mono">revoke_share</span>).

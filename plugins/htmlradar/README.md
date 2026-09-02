@@ -20,7 +20,8 @@ Keys are created at [htmlradar.com/settings](https://htmlradar.com/settings) und
 - The seven HTMLRadar MCP tools: `share_html` publishes HTML as a tracked link, `create_share`
   makes another link for a document that already exists, `list_shares` lists what you have sent,
   `get_share_activity` reports who read it, `revoke_share` switches a link off, `replace_document`
-  puts new contents behind links already sent, and `whoami` reports the account and plan.
+  puts new contents behind links already sent, and `whoami` reports the plan and how many free
+  tracked links are left.
 - A `share-html` skill that teaches Claude when to offer a tracked link and when to leave it alone.
 
 ## How it runs

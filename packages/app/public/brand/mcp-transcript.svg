@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1143" viewBox="0 0 880 1143" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1103" viewBox="0 0 880 1103" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13">
 <title>Claude Code with the HTMLRadar plugin: who read the QA smoke deck</title>
-<rect width="880" height="1143" rx="12" fill="#0d1117" stroke="#30363d"/>
+<rect width="880" height="1103" rx="12" fill="#0d1117" stroke="#30363d"/>
 <path d="M12 0h856a12 12 0 0 1 12 12v32H0V12A12 12 0 0 1 12 0z" fill="#161b22"/>
 <line x1="0" y1="44" x2="880" y2="44" stroke="#30363d"/>
 <circle cx="24" cy="22" r="6" fill="#ff5f57"/><circle cx="44" cy="22" r="6" fill="#febc2e"/><circle cx="64" cy="22" r="6" fill="#28c840"/>
@@ -36,20 +36,18 @@
 <text x="28" y="675" fill="#e6edf3" xml:space="preserve">    theirs, but their active time was still only 8 seconds, so the page was open in the background</text>
 <text x="28" y="695" fill="#e6edf3" xml:space="preserve">    rather than being read.</text>
 <text x="28" y="745" fill="#79c0ff" xml:space="preserve">&gt; How many free HTMLRadar links do I have left?</text>
-<text x="28" y="775" fill="#e6edf3" xml:space="preserve">● I'll check your HTMLRadar account status with its `whoami` tool.</text>
+<text x="28" y="775" fill="#e6edf3" xml:space="preserve">● I'll check your HTMLRadar plan with its `whoami` tool.</text>
 <text x="28" y="805" fill="#8b949e" xml:space="preserve">● htmlradar - whoami</text>
-<text x="28" y="825" fill="#8b949e" xml:space="preserve">  ⎿  HTMLRadar account 98cefd41-1f0f-4055-a4a0-dff236d7df3a</text>
-<text x="28" y="845" fill="#8b949e" xml:space="preserve">     Plan: free</text>
-<text x="28" y="865" fill="#8b949e" xml:space="preserve">     Free tracked links used: 2 of 2</text>
-<text x="28" y="895" fill="#e6edf3" xml:space="preserve">● You have 0 free HTMLRadar links left.</text>
-<text x="28" y="915" fill="#e6edf3" xml:space="preserve">  </text>
-<text x="28" y="935" fill="#e6edf3" xml:space="preserve">  Here is what the account check returned:</text>
-<text x="28" y="955" fill="#e6edf3" xml:space="preserve">  </text>
-<text x="28" y="975" fill="#e6edf3" xml:space="preserve">  - Account: `98cefd41-1f0f-4055-a4a0-dff236d7df3a`</text>
-<text x="28" y="995" fill="#e6edf3" xml:space="preserve">  - Plan: free</text>
-<text x="28" y="1015" fill="#e6edf3" xml:space="preserve">  - Free tracked links used: 2 of 2</text>
-<text x="28" y="1035" fill="#e6edf3" xml:space="preserve">  </text>
-<text x="28" y="1055" fill="#e6edf3" xml:space="preserve">  The free plan gives you two tracked links, and both are already in use. If you want to share</text>
-<text x="28" y="1075" fill="#e6edf3" xml:space="preserve">  another HTML document as a tracked link, you will need to upgrade the account to a paid plan</text>
-<text x="28" y="1095" fill="#e6edf3" xml:space="preserve">  first. I did not create any new shares, so nothing has changed on your account.</text>
+<text x="28" y="825" fill="#8b949e" xml:space="preserve">  ⎿  Plan: free</text>
+<text x="28" y="845" fill="#8b949e" xml:space="preserve">     Free tracked links used: 2 of 2</text>
+<text x="28" y="875" fill="#e6edf3" xml:space="preserve">● You have 0 free HTMLRadar links left.</text>
+<text x="28" y="895" fill="#e6edf3" xml:space="preserve">  </text>
+<text x="28" y="915" fill="#e6edf3" xml:space="preserve">  Here is what the plan check returned:</text>
+<text x="28" y="935" fill="#e6edf3" xml:space="preserve">  </text>
+<text x="28" y="955" fill="#e6edf3" xml:space="preserve">  - Plan: free</text>
+<text x="28" y="975" fill="#e6edf3" xml:space="preserve">  - Free tracked links used: 2 of 2</text>
+<text x="28" y="995" fill="#e6edf3" xml:space="preserve">  </text>
+<text x="28" y="1015" fill="#e6edf3" xml:space="preserve">  The free plan gives you two tracked links, and both are already in use. If you want to share</text>
+<text x="28" y="1035" fill="#e6edf3" xml:space="preserve">  another HTML document as a tracked link, you will need to upgrade the account to a paid plan</text>
+<text x="28" y="1055" fill="#e6edf3" xml:space="preserve">  first. I did not create any new shares, so nothing has changed on your account.</text>
 </svg>

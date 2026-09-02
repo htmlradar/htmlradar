@@ -472,6 +472,14 @@ const SCAN_QUERIES: { query: string; angle: string }[] = [
 // 26 hours, not 24, so a run that slips can't open a gap the next one skips over.
 const SCAN_WINDOW_MS = 26 * 60 * 60_000;
 const SCAN_TIMEOUT_MS = 8_000;
+// HN's Algolia index is comparatively sparse for these six phrases — a 26-hour
+// lookback returns 0 hits most days, which reads as "HN is broken" when it is
+// only "HN is quiet". Widening HN alone to 7 days costs nothing: radar_items
+// dedupes on source_url and never resets first_seen_at on a re-seen thread
+// (see upsertRadarItems), so the same thread surfacing again is a no-op, not a
+// repeat in the digest. Reddit and Google Alerts keep the 26-hour window —
+// their volume doesn't need it and Reddit's t=week param already caps there.
+const HN_SCAN_WINDOW_MS = 7 * 24 * 60 * 60_000;
 // Reddit rate-limits anonymous search to roughly one call a minute per address,
 // so five back-to-back queries get four 429s and Reddit contributes nothing.
 // Spacing them costs wall-clock time, which a once-a-day cron has in abundance
@@ -480,6 +488,15 @@ const SCAN_TIMEOUT_MS = 8_000;
 // ceiling. ponytail: 45s is a measured compromise, not a limit Reddit
 // documents — raise it toward 60s if queries still come back throttled.
 const SCAN_QUERY_GAP_MS = 45_000;
+// A descriptive User-Agent, not a spoofed browser one: Reddit's bot detection
+// is more suspicious of a request claiming to be Chrome from a datacentre IP
+// than one that says plainly what it is. Kept close to the endpoints that use
+// it rather than up with the other scan constants.
+const REDDIT_USER_AGENT = 'htmlradar-radar/1.0 (+https://htmlradar.com)';
+// One retry, one host swap: www.reddit.com and old.reddit.com don't share a
+// rate-limit bucket, so a 429 or a stalled request against one is worth one
+// more try against the other before the query counts as failed.
+const REDDIT_RETRY_DELAY_MS = 5_000;
 
 const ENTITIES: Record<string, string> = {
   '&amp;': '&',
@@ -578,21 +595,43 @@ async function scanHN(query: string, sinceSec: number): Promise<ScanResult> {
   return { status: res.status, items };
 }
 
+function redditRssUrl(host: string, query: string): string {
+  return `https://${host}/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`;
+}
+
+function fetchRedditRss(host: string, query: string): Promise<Response> {
+  return fetch(redditRssUrl(host, query), {
+    headers: { 'User-Agent': REDDIT_USER_AGENT },
+    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+  });
+}
+
 // Reddit blocks datacentre IPs often enough that treating a refusal as an
 // error would take the HN half of the scan down with it. Anything that isn't
-// a 200 of XML is a silent skip for that query.
-async function scanReddit(query: string, sinceMs: number): Promise<ScanResult> {
-  const res = await fetch(
-    `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`,
-    {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-          '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      },
-      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
-    },
-  );
+// a 200 of XML is a silent skip for that query — except a 429 or a timeout,
+// which get one retry against old.reddit.com's search.rss before giving up.
+async function scanReddit(
+  query: string,
+  sinceMs: number,
+  retryDelayMs: number = REDDIT_RETRY_DELAY_MS,
+): Promise<ScanResult> {
+  let res: Response;
+  try {
+    res = await fetchRedditRss('www.reddit.com', query);
+    if (res.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      res = await fetchRedditRss('old.reddit.com', query);
+    }
+  } catch {
+    // A hung request (AbortSignal.timeout) or any other network throw is
+    // worth the same one retry against the other host.
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    try {
+      res = await fetchRedditRss('old.reddit.com', query);
+    } catch (err2) {
+      return { status: 0, items: [], error: `fetch threw: ${(err2 as Error).message}` };
+    }
+  }
   if (!res.ok) return { status: res.status, items: [] };
   // A 200 whose body is not XML is Reddit's block page, which used to be
   // indistinguishable from a 200 with no matching threads. Say which it was.
@@ -994,16 +1033,18 @@ interface ScanFetch {
 const RADAR_TITLE_CHARS = 300;
 const RADAR_SNIPPET_CHARS = 500;
 
-// gapMs is a parameter for the same reason probe's retryMs is: so a test does
-// not sit through minutes of real rate-limit spacing. nowMs is a parameter so
-// the recency term of the score is reproducible under test.
+// gapMs and redditRetryDelayMs are parameters for the same reason probe's
+// retryMs is: so a test does not sit through minutes of real rate-limit
+// spacing. nowMs is a parameter so the recency term of the score is
+// reproducible under test.
 export async function scanThreads(
   env: Env,
   gapMs: number = SCAN_QUERY_GAP_MS,
   nowMs: number = Date.now(),
+  redditRetryDelayMs: number = REDDIT_RETRY_DELAY_MS,
 ): Promise<void> {
   const sinceMs = nowMs - SCAN_WINDOW_MS;
-  const sinceSec = Math.floor(sinceMs / 1000);
+  const hnSinceSec = Math.floor((nowMs - HN_SCAN_WINDOW_MS) / 1000);
   const nowIso = new Date(nowMs).toISOString();
   // Keyed by source_url: the same thread surfaces under several phrases and
   // several sources, and the first to find it owns the row.
@@ -1071,7 +1112,9 @@ export async function scanThreads(
         ingest(
           source,
           query,
-          source === 'HN' ? await scanHN(query, sinceSec) : await scanReddit(query, sinceMs),
+          source === 'HN'
+            ? await scanHN(query, hnSinceSec)
+            : await scanReddit(query, sinceMs, redditRetryDelayMs),
         );
       } catch (err) {
         // One dead source or one bad query must not cost the whole scan — but

@@ -302,6 +302,18 @@ const emptyReddit = new Response('<feed></feed>', {
   headers: { 'content-type': 'application/atom+xml' },
 });
 
+/** A Reddit search.rss Atom entry, in the shape scanReddit's regexes parse. */
+function redditXml(title: string, url: string, updated: string): string {
+  return `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <entry>
+      <title>${title}</title>
+      <link href="${url}"/>
+      <updated>${updated}</updated>
+      <content type="html">${title}</content>
+    </entry>
+  </feed>`;
+}
+
 interface OutboxWrite {
   kind: string;
   telegram_ok: boolean | null;
@@ -311,7 +323,13 @@ interface OutboxWrite {
 
 /** Routes fetches for the mining scan: feed, HN, Reddit, the radar upsert, and
  *  the outbox. Captures what was upserted and what was recorded. */
-function stubMiningWorld(opts: { feed?: Response; hn?: Response; radarStatus?: number }) {
+function stubMiningWorld(opts: {
+  feed?: Response;
+  hn?: Response;
+  radarStatus?: number;
+  reddit?: Response;
+  redditFallback?: Response;
+}) {
   const upserts: unknown[][] = [];
   const outbox: OutboxWrite[] = [];
   const telegram: unknown[] = [];
@@ -337,7 +355,9 @@ function stubMiningWorld(opts: { feed?: Response; hn?: Response; radarStatus?: n
       if (url.startsWith('https://hn.algolia.com')) {
         return (opts.hn ?? json({ hits: [] })).clone();
       }
-      if (url.startsWith('https://www.reddit.com')) return emptyReddit.clone();
+      if (url.startsWith('https://www.reddit.com')) return (opts.reddit ?? emptyReddit).clone();
+      if (url.startsWith('https://old.reddit.com'))
+        return (opts.redditFallback ?? emptyReddit).clone();
       throw new Error(`unexpected fetch: ${url}`);
     },
   );
@@ -419,6 +439,38 @@ describe('scanThreads mines every source into radar_items and stays silent', () 
     const run = outbox.find((r) => r.kind === 'scan_run')!;
     expect(run.meta).toMatchObject({ items_stored: 0 });
     expect(run.meta!['store_error']).toContain('HTTP 500');
+  });
+});
+
+describe('scanReddit retries a 429 against old.reddit.com before giving up', () => {
+  it('falls back to old.reddit.com and still mines the item it returns', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { upserts, outbox } = stubMiningWorld({
+      reddit: new Response('', { status: 429 }),
+      redditFallback: new Response(
+        redditXml(
+          'DocSend alternative that is actually good',
+          'https://reddit.com/r/test/1',
+          new Date(TUESDAY).toISOString(),
+        ),
+        { status: 200, headers: { 'content-type': 'application/atom+xml' } },
+      ),
+    });
+
+    await scanThreads(env, 0, TUESDAY, 5);
+
+    const rows = upserts[0]!;
+    const item = rows.find(
+      (r) => (r as { source_url: string }).source_url === 'https://reddit.com/r/test/1',
+    );
+    expect(item).toBeTruthy();
+    const run = outbox.find((r) => r.kind === 'scan_run')!;
+    const redditFetches = (
+      run.meta!['fetches'] as { source: string; status: number | null }[]
+    ).filter((f) => f.source === 'Reddit');
+    // Every Reddit fetch got a 429 first and a 200 on the old.reddit.com retry —
+    // the recorded status is the retry's, since that's what the query landed on.
+    expect(redditFetches.every((f) => f.status === 200)).toBe(true);
   });
 });
 

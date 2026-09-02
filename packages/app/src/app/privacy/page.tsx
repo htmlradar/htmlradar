@@ -193,6 +193,18 @@ export default function PrivacyPage() {
                 Tracked share links may set a temporary cookie when a password is required, scoped
                 to that share. We do not use third-party cookies for analytics or advertising.
               </p>
+              <p className="mt-3">
+                On your first visit to htmlradar.com, we also set a cookie named{' '}
+                <code className="font-mono text-[14px] text-signal-dark">hr:src</code>, mirrored in
+                your browser's local storage, recording the page you arrived on and any campaign
+                tags in the link (such as{' '}
+                <code className="font-mono text-[14px] text-signal-dark">utm_source</code> or{' '}
+                <code className="font-mono text-[14px] text-signal-dark">gclid</code>). This tells
+                us which of our pages and channels bring people who sign up. It lives only on our
+                own domain, in a first-party cookie and local storage with no third-party trackers,
+                and lasts one year. You can clear it any time by clearing site data for
+                htmlradar.com in your browser.
+              </p>
             </Section>
 
             <Section title="Open source">

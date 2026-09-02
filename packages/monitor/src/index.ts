@@ -93,6 +93,11 @@ export interface Env {
   // internet and a handler that can post as the founder, so an unset secret
   // disables the endpoint rather than opening it.
   TELEGRAM_WEBHOOK_SECRET?: string;
+  // The founder's numeric Telegram user id. A shared webhook secret proves the
+  // caller holds a value; only this proves the tap came from him. Every
+  // callback and every reply is checked against it and against
+  // TELEGRAM_CHAT_ID, and anything else is dropped without an answer.
+  TELEGRAM_FOUNDER_USER_ID?: string;
   // The "script" app's credentials from reddit.com/prefs/apps, plus the
   // permanent refresh token ops/scripts/reddit_auth.py obtains once.
   REDDIT_CLIENT_ID?: string;
@@ -1518,7 +1523,7 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
 
   // After the digest, never inside it: each tappable draft is its own message,
   // because an inline keyboard belongs to one message and one decision.
-  for (const offer of offers) await offerDraft(env, offer);
+  for (const offer of offers) await offerDraft(env, offer, nowMs);
 
   // eslint-disable-next-line no-console
   console.log(
@@ -1529,65 +1534,88 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
 // ---------------------------------------------------------------------------
 // One-tap posting: a draft, two buttons, the founder's own account.
 //
-// WHAT CHANGED AND WHAT DID NOT
+// WHAT IT DOES
 //
-// The SOP rule is unchanged: only the founder speaks in public, and nothing
-// here posts without him. What changed is the distance between deciding and
-// doing. A draft used to arrive as text he had to copy, then find the thread,
-// then paste — two minutes, every one of which was a chance to not bother.
-// Now the draft arrives as its own message with two buttons. "Post as me"
-// posts that exact text as a comment on that thread from HIS Reddit account;
-// "Skip" closes it. The tap IS the speaking.
+// A draft that answers a Reddit thread arrives as its own Telegram message
+// with two buttons. "Post as me" posts that exact text from HIS Reddit
+// account; "Skip" closes it. Replying with different wording replaces the text
+// and comes back as a new message with its own buttons. The SOP rule is
+// unchanged — only the founder speaks in public — and the tap IS the speaking.
 //
-// He can also reply to a draft message with his own wording. That replaces the
-// text and comes back as a NEW message with its own buttons — an edit is never
-// posted on the strength of the tap that was never given to it.
+// WHAT SOL'S REVIEW CHANGED (3 Sep 2026)
 //
-// THE FOUR SAFETY RAILS
+// The first cut treated a callback carrying a draft id as proof of a tap. It
+// is not. These are the five things that now stand between an HTTP request and
+// a comment posted under the founder's name.
 //
-//   1. Idempotent. A second tap on a posted draft posts nothing; it re-shows
-//      the permalink. Telegram retries a webhook it thinks failed, so "the same
-//      tap arrives twice" is normal traffic, not a freak case. The claim below
-//      is a compare-and-swap: the row moves pending/edited -> posted in one
-//      conditional PATCH, and only the delivery that wins the swap calls Reddit.
-//   2. One comment per thread, ever. Checked here, and enforced by a partial
-//      unique index in schema/046 for the case this code cannot see: two
-//      different drafts for the same thread.
-//   3. Five posts per rolling 24 hours, hard. Reddit's own spam heuristics are
-//      the reason, and so is the fact that a founder who comments six times a
-//      day reads as a marketer.
-//   4. Every Reddit refusal comes back into the Telegram message in plain
-//      words. A tap that silently did nothing would be the worst outcome here.
+//   1. WHO. Every update must come from the configured founder user id, in the
+//      configured private chat. The webhook secret proves the request came
+//      from something holding a shared value; it cannot prove a human tapped.
+//      Telegram sends `from.id` and `chat.id` precisely so they can be checked.
+//   2. WHICH. An approval is bound to one message id, one immutable version of
+//      the text, and one single-use nonce with a 72-hour expiry. A tap on a
+//      stale message, an old version, a spent nonce or an expired draft does
+//      nothing but say why. This is what makes a leftover button — an edit
+//      race, or a keyboard Telegram failed to remove — inert rather than a
+//      way to post text that was never approved on that message.
+//   3. ONE WAY. `posted` and `skipped` are terminal, enforced by a database
+//      trigger, and every transition is conditional. A Skip arriving mid-post
+//      can no longer unclaim a draft Reddit is already being asked about.
+//   4. THE RESERVATION. An append-only row is written BEFORE the Reddit
+//      request leaves, inside the same locked function that counts the daily
+//      cap. It is never removed. A request whose answer never arrived leaves
+//      the draft in `reconcile`, and nothing is retried until a reconciliation
+//      check has looked at the account's own recent comments. The old design
+//      released its guard on failure, so a comment Reddit accepted but never
+//      acknowledged left the thread open to be commented on twice.
+//   5. NOTHING UPSTREAM IS QUOTED. Reddit's response body never reaches a row,
+//      a message or a log. A status and an error code map to one of OUR
+//      sentences; an unrecognised code is reported as a code, not as text.
 //
-// The tokens: the refresh token is a Worker secret, exchanged for a short-lived
-// access token on each post and never written to a row, a log, or a message.
-// Nothing in this section prints any of them.
+// The tokens: the refresh token is a Worker secret, exchanged for a
+// short-lived access token per post, and no code path here writes any of them
+// to a row, a log line, or a message.
 
+/** The worker's pre-flight copy of the cap, for a friendlier message before a
+ *  tap is spent. reserve_radar_post() in schema/046 is the authority; these two
+ *  disagreeing costs a nicer sentence, never a sixth comment. */
 const REDDIT_DAILY_CAP = 5;
 const ONETAP_WINDOW_MS = 24 * 60 * 60_000;
+/** How long a button stays tappable. Long enough for a weekend. */
+const DRAFT_TTL_MS = 72 * 60 * 60_000;
+/** Refuse to post when Reddit says this few calls remain in the window. */
+const REDDIT_RATELIMIT_FLOOR = 5;
+/** A Telegram update is a few kilobytes. Anything far past that is not one. */
+const MAX_WEBHOOK_BYTES = 32_768;
 
 /** The subreddit and the thread's fullname behind a Reddit thread URL, or null
- *  when the URL is not a Reddit thread. The fullname ('t3_' + the base-36 id
- *  in the path) is what Reddit's comment endpoint takes as the parent. Google
- *  Alerts and Hacker News items land here too and correctly get null: they are
- *  offered as copy-and-paste drafts, the way every draft used to be. */
+ *  when the URL is not a Reddit thread. The fullname ('t3_' + the base-36 id in
+ *  the path) is what Reddit's comment endpoint takes as the parent. The
+ *  trailing boundary is not decoration: without it a malformed path is
+ *  partially accepted and yields a parent id belonging to a different thread. */
 export function parseRedditThread(url: string): { subreddit: string; thingId: string } | null {
   const m =
-    /^https?:\/\/(?:[a-z0-9-]+\.)?reddit\.com\/r\/([a-z0-9_]+)\/comments\/([a-z0-9]+)/i.exec(url);
+    /^https?:\/\/(?:[a-z0-9-]+\.)?reddit\.com\/r\/([a-z0-9_]{2,32})\/comments\/([a-z0-9]{4,16})(?:[/?#]|$)/i.exec(
+      url,
+    );
   if (!m || !m[1] || !m[2]) return null;
   return { subreddit: m[1], thingId: `t3_${m[2].toLowerCase()}` };
 }
 
 /** True when every secret the one-tap path needs is set. Missing any of them
- *  leaves the radar exactly as it was: drafts still arrive, as text to copy. */
+ *  leaves the radar exactly as it was: drafts still arrive, as text to copy.
+ *  The founder's user id is in the list because without it the handler cannot
+ *  tell his tap from anybody else's. */
 export function oneTapReady(env: Env): boolean {
   return Boolean(
     env.TELEGRAM_BOT_TOKEN &&
     env.TELEGRAM_CHAT_ID &&
     env.TELEGRAM_WEBHOOK_SECRET &&
+    env.TELEGRAM_FOUNDER_USER_ID &&
     env.REDDIT_CLIENT_ID &&
     env.REDDIT_CLIENT_SECRET &&
-    env.REDDIT_REFRESH_TOKEN,
+    env.REDDIT_REFRESH_TOKEN &&
+    env.REDDIT_USERNAME,
   );
 }
 
@@ -1597,13 +1625,17 @@ interface DraftRow {
   thing_id: string;
   subreddit: string | null;
   draft_text: string;
+  version: number;
   status: string;
+  nonce: string | null;
+  nonce_used_at: string | null;
+  expires_at: string;
   permalink: string | null;
   telegram_message_id: number | null;
 }
 
 const DRAFT_COLS =
-  'id,source_url,thing_id,subreddit,draft_text,status,permalink,telegram_message_id';
+  'id,source_url,thing_id,subreddit,draft_text,version,status,nonce,nonce_used_at,expires_at,permalink,telegram_message_id';
 
 const draftsUrl = (env: Env, query: string) => `${env.SUPABASE_URL}/rest/v1/radar_drafts?${query}`;
 
@@ -1613,10 +1645,13 @@ const draftWriteHeaders = (env: Env, prefer: string) => ({
   Prefer: prefer,
 });
 
-async function createDraft(
-  env: Env,
-  row: { source_url: string; thing_id: string; subreddit: string; draft_text: string },
-): Promise<DraftRow | null> {
+/** A fresh single-use callback token. 32 hex characters, from the platform's
+ *  own CSPRNG — this is a bearer credential for speaking as the founder. */
+function newNonce(): string {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+async function createDraft(env: Env, row: Record<string, unknown>): Promise<DraftRow | null> {
   const res = await fetch(draftsUrl(env, `select=${DRAFT_COLS}`), {
     method: 'POST',
     headers: draftWriteHeaders(env, 'return=representation'),
@@ -1626,18 +1661,19 @@ async function createDraft(
   return ((await res.json()) as DraftRow[])[0] ?? null;
 }
 
-async function readDraft(env: Env, id: string): Promise<DraftRow | null> {
+/** The draft a callback token names. Used only to explain a refusal — the
+ *  guarantee is consumeNonce below, never this read. */
+async function readDraftByNonce(env: Env, nonce: string): Promise<DraftRow | null> {
   const res = await fetch(
-    draftsUrl(env, `id=eq.${encodeURIComponent(id)}&select=${DRAFT_COLS}&limit=1`),
+    draftsUrl(env, `nonce=eq.${encodeURIComponent(nonce)}&select=${DRAFT_COLS}&limit=1`),
     { headers: radarHeaders(env) },
   );
   if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
   return ((await res.json()) as DraftRow[])[0] ?? null;
 }
 
-/** The draft a Telegram reply is answering. Newest first, because an edited
- *  draft's message id moves to the replacement message and the old id is left
- *  behind on a row that is no longer the live one. */
+/** The draft a Telegram reply is answering. Newest first, because a re-offered
+ *  draft's message id moves to the replacement message. */
 async function readDraftByMessage(env: Env, messageId: number): Promise<DraftRow | null> {
   const res = await fetch(
     draftsUrl(
@@ -1650,165 +1686,321 @@ async function readDraftByMessage(env: Env, messageId: number): Promise<DraftRow
   return ((await res.json()) as DraftRow[])[0] ?? null;
 }
 
-async function patchDraft(env: Env, id: string, patch: Record<string, unknown>): Promise<void> {
-  const res = await fetch(draftsUrl(env, `id=eq.${encodeURIComponent(id)}`), {
-    method: 'PATCH',
-    headers: draftWriteHeaders(env, 'return=minimal'),
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
-  });
-  if (!res.ok) throw new Error(`radar_drafts update HTTP ${res.status}`);
-}
-
-/** The compare-and-swap that makes a double tap harmless. The filter is part of
- *  the UPDATE, so exactly one of two simultaneous deliveries can move the row
- *  out of pending/edited; the loser gets an empty array back and posts nothing.
- *  Returns true for the winner only. */
-async function claimDraft(env: Env, id: string, nowIso: string): Promise<boolean> {
+/** A conditional update. `filter` is appended to the id match, so a caller can
+ *  say "only if it is still pending" and mean it. Returns the rows that
+ *  actually changed, which is empty when the condition did not hold. */
+async function patchDraft(
+  env: Env,
+  id: string,
+  patch: Record<string, unknown>,
+  filter = '',
+): Promise<DraftRow[]> {
   const res = await fetch(
-    draftsUrl(env, `id=eq.${encodeURIComponent(id)}&status=in.(pending,edited)&select=id`),
+    draftsUrl(env, `id=eq.${encodeURIComponent(id)}${filter}&select=${DRAFT_COLS}`),
     {
       method: 'PATCH',
       headers: draftWriteHeaders(env, 'return=representation'),
-      body: JSON.stringify({ status: 'posted', posted_at: nowIso, updated_at: nowIso }),
+      body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
     },
   );
-  // A 409 is the partial unique index refusing a second posted row for a thread
-  // some other draft already answered. Not the winner either way.
-  if (!res.ok) return false;
-  return ((await res.json()) as unknown[]).length > 0;
+  // A 4xx here is the terminal-state trigger refusing to reopen a posted or
+  // skipped draft. That is a correct refusal, not an error to propagate.
+  if (!res.ok) return [];
+  return (await res.json()) as DraftRow[];
 }
 
-/** The permalink of an existing comment on this thread, or null. */
-async function threadAlreadyPosted(env: Env, thingId: string): Promise<string | null> {
+/** THE gate. One conditional update spends the nonce and moves the status, so
+ *  a replayed callback, a stale button, an expired draft and a terminal state
+ *  all fail in the database rather than in a sequence of checks that another
+ *  request can interleave with. Only the caller that gets a row back proceeds. */
+async function consumeNonce(
+  env: Env,
+  nonce: string,
+  version: number,
+  messageId: number,
+  nextStatus: string,
+  nowMs: number,
+): Promise<DraftRow | null> {
+  const nowIso = new Date(nowMs).toISOString();
   const res = await fetch(
     draftsUrl(
       env,
-      `thing_id=eq.${encodeURIComponent(thingId)}&status=eq.posted&select=permalink&limit=1`,
+      `nonce=eq.${encodeURIComponent(nonce)}` +
+        `&nonce_used_at=is.null` +
+        `&version=eq.${version}` +
+        `&telegram_message_id=eq.${messageId}` +
+        `&expires_at=gt.${encodeURIComponent(nowIso)}` +
+        `&status=in.(pending,edited,reconcile)` +
+        `&select=${DRAFT_COLS}`,
     ),
-    { headers: radarHeaders(env) },
+    {
+      method: 'PATCH',
+      headers: draftWriteHeaders(env, 'return=representation'),
+      body: JSON.stringify({ nonce_used_at: nowIso, status: nextStatus, updated_at: nowIso }),
+    },
   );
-  if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
-  const row = ((await res.json()) as { permalink: string | null }[])[0];
-  return row ? (row.permalink ?? 'already posted') : null;
+  if (!res.ok) return null;
+  return ((await res.json()) as DraftRow[])[0] ?? null;
 }
 
-/** How many comments went out in the last 24 hours. The limit on the query is
- *  the cap plus slack: this only ever needs to answer "at least five?". */
-async function postedInWindow(env: Env, nowMs: number): Promise<number> {
+/** Claims the thread and one slot of the daily cap in a single locked
+ *  statement (schema/046). Answers 'ok', 'thread_taken' or 'cap_reached'. */
+async function reservePost(env: Env, draftId: string, thingId: string): Promise<string> {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/reserve_radar_post`, {
+    method: 'POST',
+    headers: { ...radarHeaders(env), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_draft_id: draftId, p_thing_id: thingId }),
+  });
+  if (!res.ok) throw new Error(`reserve_radar_post HTTP ${res.status}`);
+  return String(await res.json());
+}
+
+/** The pre-flight cap count, for a friendly refusal before a tap is spent.
+ *  Counts reservations, the same ledger the function counts. */
+async function reservedInWindow(env: Env, nowMs: number): Promise<number> {
   const since = encodeURIComponent(new Date(nowMs - ONETAP_WINDOW_MS).toISOString());
   const res = await fetch(
-    draftsUrl(
-      env,
-      `status=eq.posted&posted_at=gte.${since}&select=id&limit=${REDDIT_DAILY_CAP + 1}`,
-    ),
+    `${env.SUPABASE_URL}/rest/v1/radar_post_reservations` +
+      `?created_at=gte.${since}&select=thing_id&limit=${REDDIT_DAILY_CAP + 1}`,
     { headers: radarHeaders(env) },
   );
-  if (!res.ok) throw new Error(`radar_drafts read HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`radar_post_reservations read HTTP ${res.status}`);
   return ((await res.json()) as unknown[]).length;
 }
 
 // ---------------------------------------------------------------------------
 // Reddit.
 
-/** Reddit's API rules ask for a descriptive User-Agent naming the human behind
- *  the app. Falls back to the scan's generic one when the username is unset. */
+/** Reddit's published User-Agent format: platform, application id, version,
+ *  and the human behind it. See the API rules wiki. */
 function redditUserAgent(env: Env): string {
-  return env.REDDIT_USERNAME ? `htmlradar-radar/1.0 by ${env.REDDIT_USERNAME}` : REDDIT_USER_AGENT;
+  return `web:htmlradar-radar:1.0 (by /u/${env.REDDIT_USERNAME ?? 'unknown'})`;
 }
 
+/** Our sentence for a Reddit refusal. Reddit's own prose is never shown: an
+ *  upstream body copied into a row and a message is a disclosure path we get
+ *  nothing for. An unknown code is reported as a code, and only after it has
+ *  been checked to be a code. */
+const REDDIT_REASONS: Record<string, string> = {
+  RATELIMIT: 'Reddit is rate-limiting the account. Try again in a few minutes.',
+  SUBREDDIT_NOTALLOWED: 'That subreddit does not accept comments from this account.',
+  SUBREDDIT_NOTALLOWED_NOAUTH: 'That subreddit does not accept comments from this account.',
+  THREAD_LOCKED: 'That thread is locked.',
+  TOO_OLD: 'That thread is archived and no longer takes comments.',
+  DELETED_LINK: 'That thread has been deleted.',
+  DELETED_COMMENT: 'The parent comment has been deleted.',
+  TOO_LONG: 'The reply is longer than Reddit accepts.',
+  NO_TEXT: 'Reddit saw an empty reply.',
+  USER_BLOCKED: 'That user has blocked this account.',
+  NOT_AUTHOR: 'This account is not allowed to reply there.',
+  BANNED_FROM_SUBREDDIT: 'This account is banned from that subreddit.',
+};
+
+function redditReason(code: string): string {
+  const known = REDDIT_REASONS[code];
+  if (known) return known;
+  // Only a code-shaped token is ever echoed, never free text from upstream.
+  const safe = /^[A-Z0-9_]{1,32}$/.test(code) ? code : 'unrecognised';
+  return `Reddit refused the reply (code ${safe}).`;
+}
+
+function redditStatusReason(status: number): string {
+  if (status === 401 || status === 403)
+    return 'Reddit refused the account. Either the saved login expired or that subreddit does not accept comments from it.';
+  if (status === 404) return 'Reddit could not find that thread.';
+  if (status === 429) return 'Reddit is rate-limiting the account. Try again in a few minutes.';
+  if (status >= 500) return `Reddit is having trouble (HTTP ${status}). Nothing was posted.`;
+  return `Reddit refused the reply (HTTP ${status}).`;
+}
+
+/** Thrown when the request definitely reached Reddit and was refused. Safe to
+ *  leave the draft as failed and retry later. */
+class RedditRefused extends Error {}
+/** Thrown when the request may have been received and we cannot tell. The
+ *  draft goes to `reconcile` and nothing is retried until it is checked. */
+class RedditAmbiguous extends Error {}
+
 /** Exchanges the permanent refresh token for a short-lived access token. The
- *  error carries the status and nothing else — the request that failed holds
- *  both the client secret and the refresh token, and neither may ever reach a
- *  message, a row, or a log line. */
+ *  error carries a status and nothing else — the request that failed holds both
+ *  the client secret and the refresh token. */
 async function redditAccessToken(env: Env): Promise<string> {
-  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${btoa(`${env.REDDIT_CLIENT_ID}:${env.REDDIT_CLIENT_SECRET}`)}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': redditUserAgent(env),
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: env.REDDIT_REFRESH_TOKEN ?? '',
-    }),
-    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
-  });
+  let res: Response;
+  try {
+    res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${btoa(`${env.REDDIT_CLIENT_ID}:${env.REDDIT_CLIENT_SECRET}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': redditUserAgent(env),
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: env.REDDIT_REFRESH_TOKEN ?? '',
+      }),
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    });
+  } catch {
+    // Nothing was posted: this call only mints a token.
+    throw new RedditRefused('Could not reach Reddit to sign in. Nothing was posted.');
+  }
   if (!res.ok) {
-    throw new Error(
+    throw new RedditRefused(
       res.status === 400 || res.status === 401
-        ? 'Reddit would not accept the saved login. The refresh token has probably been ' +
-            'revoked — re-run ops/scripts/reddit_auth.py and set the secret again.'
+        ? 'Reddit would not accept the saved login. The refresh token has probably been revoked — re-run ops/scripts/reddit_auth.py and set the secret again.'
         : `Reddit would not issue an access token (HTTP ${res.status}). Probably temporary.`,
     );
   }
-  const token = ((await res.json()) as { access_token?: string }).access_token;
-  if (!token) throw new Error('Reddit returned no access token.');
+  let token: string | undefined;
+  try {
+    token = ((await res.json()) as { access_token?: string }).access_token;
+  } catch {
+    token = undefined;
+  }
+  if (!token) throw new RedditRefused('Reddit returned no access token.');
   return token;
 }
 
-/** Posts one comment and returns its absolute permalink. Everything it throws
- *  is already a sentence fit to show the founder. */
-async function postRedditComment(env: Env, thingId: string, text: string): Promise<string> {
-  const token = await redditAccessToken(env);
-  const res = await fetch('https://oauth.reddit.com/api/comment', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': redditUserAgent(env),
-    },
-    body: new URLSearchParams({ api_type: 'json', thing_id: thingId, text }),
-    signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
-  });
-  const raw = await res.text();
-  if (!res.ok) {
-    if (res.status === 401 || res.status === 403)
-      throw new Error(
-        `Reddit refused the account (HTTP ${res.status}). Either the login expired or that ` +
-          'subreddit does not accept comments from this account.',
-      );
-    if (res.status === 429)
-      throw new Error('Reddit is rate-limiting the account right now. Try again in a few minutes.');
-    throw new Error(`Reddit refused with HTTP ${res.status}: ${raw.slice(0, 200)}`);
+interface RedditIdentity {
+  name: string;
+  /** Calls left in Reddit's current window, null when it said nothing. */
+  remaining: number | null;
+  /** Seconds until that window resets. */
+  resetSec: number | null;
+}
+
+/** Who the saved token actually belongs to, and how much quota is left. This
+ *  runs before every post for two reasons: it catches a token minted while
+ *  signed in as the wrong account, and its response headers are where Reddit
+ *  publishes the rate-limit state, so the back-off costs no extra call. */
+async function redditIdentity(env: Env, token: string): Promise<RedditIdentity> {
+  let res: Response;
+  try {
+    res = await fetch('https://oauth.reddit.com/api/v1/me', {
+      headers: { Authorization: `Bearer ${token}`, 'User-Agent': redditUserAgent(env) },
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    });
+  } catch {
+    throw new RedditRefused('Could not reach Reddit to check the account. Nothing was posted.');
   }
+  if (!res.ok) throw new RedditRefused(redditStatusReason(res.status));
+  const num = (h: string): number | null => {
+    const v = res.headers.get(h);
+    const n = v === null ? NaN : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  let name = '';
+  try {
+    name = String(((await res.json()) as { name?: string }).name ?? '');
+  } catch {
+    throw new RedditRefused('Reddit gave an unreadable answer when asked which account this is.');
+  }
+  return { name, remaining: num('x-ratelimit-remaining'), resetSec: num('x-ratelimit-reset') };
+}
+
+/** Posts one comment and returns its absolute permalink. Everything it throws
+ *  is already a sentence fit to show the founder, and says which of the two
+ *  kinds of failure it was. */
+async function postRedditComment(
+  env: Env,
+  token: string,
+  thingId: string,
+  text: string,
+): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch('https://oauth.reddit.com/api/comment', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': redditUserAgent(env),
+      },
+      body: new URLSearchParams({ api_type: 'json', thing_id: thingId, text }),
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    });
+  } catch {
+    // The request left. Whether Reddit acted on it is unknowable from here.
+    throw new RedditAmbiguous(
+      'The reply was sent but Reddit never answered, so it is not known whether it went up.',
+    );
+  }
+  if (res.status >= 500) {
+    throw new RedditAmbiguous(
+      `Reddit answered ${res.status} after taking the reply, so it is not known whether it went up.`,
+    );
+  }
+  if (!res.ok) throw new RedditRefused(redditStatusReason(res.status));
+
   let parsed: {
     json?: { errors?: string[][]; data?: { things?: { data?: { permalink?: string } }[] } };
   };
   try {
-    parsed = JSON.parse(raw) as typeof parsed;
+    parsed = (await res.json()) as typeof parsed;
   } catch {
-    throw new Error('Reddit answered with something that was not JSON. Nothing was posted.');
+    throw new RedditAmbiguous('Reddit answered with something unreadable after taking the reply.');
   }
   // Reddit reports a rejected comment inside a 200: json.errors is a list of
-  // [code, human sentence, field] triples. The sentence is the useful half.
+  // [code, prose, field]. Only the code is used; the prose is upstream text.
   const errors = parsed.json?.errors ?? [];
-  if (errors.length > 0) {
-    throw new Error(errors.map((e) => e[1] ?? e[0] ?? 'unspecified').join('; '));
-  }
+  if (errors.length > 0) throw new RedditRefused(redditReason(String(errors[0]?.[0] ?? '')));
+
   const permalink = parsed.json?.data?.things?.[0]?.data?.permalink;
-  if (!permalink) throw new Error('Reddit accepted the comment but did not say where it is.');
+  if (!permalink) {
+    throw new RedditAmbiguous('Reddit accepted the reply but did not say where it is.');
+  }
   return permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
 }
 
-// ---------------------------------------------------------------------------
-// The Telegram side of the loop: keyboards, edits, and the callback answer.
+/** Did the comment actually go up? Reads the account's own recent comments and
+ *  looks for one whose parent is this thread. This is the only honest way out
+ *  of an ambiguous outcome, and the only thing allowed to unblock a retry. */
+async function reconcileRedditComment(
+  env: Env,
+  token: string,
+  thingId: string,
+): Promise<string | null> {
+  const res = await fetch(
+    `https://oauth.reddit.com/user/${encodeURIComponent(env.REDDIT_USERNAME ?? '')}/comments?limit=100`,
+    {
+      headers: { Authorization: `Bearer ${token}`, 'User-Agent': redditUserAgent(env) },
+      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+    },
+  );
+  if (!res.ok) throw new RedditAmbiguous(redditStatusReason(res.status));
+  let listing: { data?: { children?: { data?: { link_id?: string; permalink?: string } }[] } };
+  try {
+    listing = (await res.json()) as typeof listing;
+  } catch {
+    throw new RedditAmbiguous('Reddit gave an unreadable answer when asked for recent comments.');
+  }
+  for (const child of listing.data?.children ?? []) {
+    if (child.data?.link_id === thingId) {
+      const p = child.data.permalink ?? '';
+      return p.startsWith('http') ? p : `https://www.reddit.com${p}`;
+    }
+  }
+  return null;
+}
 
-/** The two buttons. callback_data is capped at 64 bytes by Telegram, which is
- *  why the row's id travels rather than the draft. */
-function draftKeyboard(id: string): Record<string, unknown> {
+// ---------------------------------------------------------------------------
+// The Telegram side: keyboards, edits, and the callback answer.
+
+/** The two buttons. callback_data is capped at 64 bytes by Telegram; the
+ *  single-use token plus the version fits in 40. The DRAFT ID is deliberately
+ *  not in there — a durable identifier in a button is a replayable one. */
+function draftKeyboard(nonce: string, version: number): Record<string, unknown> {
   return {
     inline_keyboard: [
       [
-        { text: 'Post as me', callback_data: `post:${id}` },
-        { text: 'Skip', callback_data: `skip:${id}` },
+        { text: 'Post as me', callback_data: `post:${nonce}:${version}` },
+        { text: 'Skip', callback_data: `skip:${nonce}:${version}` },
       ],
     ],
   };
 }
 
-/** Rebuilt from the row rather than stored, so an edit and the original render
- *  identically and there is one definition of what a draft message looks like. */
+/** Rebuilt from the row rather than stored, so a re-offer and the original
+ *  render identically and there is one definition of what a draft looks like. */
 function draftMessageText(d: Pick<DraftRow, 'subreddit' | 'source_url' | 'draft_text'>): string {
   return (
     `Reply ready — r/${d.subreddit ?? 'reddit'}\n${d.source_url}\n\n` +
@@ -1817,8 +2009,10 @@ function draftMessageText(d: Pick<DraftRow, 'subreddit' | 'source_url' | 'draft_
 }
 
 /** Fire-and-forget Telegram call for the housekeeping methods. Never throws: by
- *  the time these run the comment usually already exists on Reddit, and a
- *  failure to redraw a message must not turn a success into a reported failure. */
+ *  the time these run the outcome is already recorded, and a failure to redraw
+ *  a message must not turn a success into a reported failure. It is safe for
+ *  these to fail — a button whose keyboard survives is inert anyway, because
+ *  its nonce is spent. */
 async function telegramCall(
   env: Env,
   method: string,
@@ -1837,21 +2031,15 @@ async function telegramCall(
   }
 }
 
-/** Rewrites a draft message. An absent keyboard removes the buttons — that is
- *  what "this is settled" looks like on a phone. */
-async function editDraftMessage(
-  env: Env,
-  messageId: number | null,
-  text: string,
-  keyboard?: Record<string, unknown>,
-): Promise<void> {
+/** Rewrites a draft message and removes its buttons. */
+async function editDraftMessage(env: Env, messageId: number | null, text: string): Promise<void> {
   if (!messageId) return;
   await telegramCall(env, 'editMessageText', {
     chat_id: env.TELEGRAM_CHAT_ID,
     message_id: messageId,
     text,
     disable_web_page_preview: true,
-    reply_markup: keyboard ?? { inline_keyboard: [] },
+    reply_markup: { inline_keyboard: [] },
   });
 }
 
@@ -1861,29 +2049,76 @@ async function answerCallback(env: Env, callbackId: string, text: string): Promi
 }
 
 // ---------------------------------------------------------------------------
-// Offering a draft: one row, one message, two buttons.
+// Offering a draft, and offering it again.
 
-/** Writes the draft row and sends its message. Never throws — the digest has
- *  already gone out by the time this runs, and one failed offer must not take
- *  the rest of the batch with it. */
+/** Sends a draft's message with fresh buttons and records which message and
+ *  which token are now the live ones. Used for the first offer, for an edit,
+ *  and for a retry after reconciliation — one definition of "this is now the
+ *  live offer", so a re-offer can never leave two live buttons behind. */
+async function sendOffer(env: Env, draft: DraftRow, note: string): Promise<void> {
+  const text = note ? `${draftMessageText(draft)}\n\n${note}` : draftMessageText(draft);
+  const sent = await sendTelegramMessage(
+    env,
+    'radar',
+    'onetap-offer',
+    text,
+    { draft_id: draft.id, thing_id: draft.thing_id, version: draft.version },
+    draftKeyboard(draft.nonce ?? '', draft.version),
+  );
+  // Without the message id a tap cannot be bound to this message, so the
+  // buttons would refuse every tap. Record it before anything else arrives.
+  if (sent.messageId) await patchDraft(env, draft.id, { telegram_message_id: sent.messageId });
+}
+
+/** Replaces a draft's text and/or state and offers it again under a new
+ *  version, a new token and a fresh expiry. Conditional on the draft not being
+ *  terminal, so a re-offer cannot resurrect something already posted or
+ *  skipped. Returns false when the condition did not hold. */
+async function reoffer(
+  env: Env,
+  draft: DraftRow,
+  opts: { text?: string; status: string; note: string; nowMs: number },
+): Promise<boolean> {
+  const nonce = newNonce();
+  const [updated] = await patchDraft(
+    env,
+    draft.id,
+    {
+      ...(opts.text === undefined ? {} : { draft_text: opts.text }),
+      status: opts.status,
+      version: draft.version + 1,
+      nonce,
+      nonce_used_at: null,
+      expires_at: new Date(opts.nowMs + DRAFT_TTL_MS).toISOString(),
+    },
+    `&status=not.in.(posted,skipped)`,
+  );
+  if (!updated) return false;
+  // The message that carried the old buttons is settled first, so there is
+  // exactly one live offer even if the founder is looking at both.
+  await editDraftMessage(
+    env,
+    draft.telegram_message_id,
+    `${draftMessageText(draft)}\n\n${opts.note}`,
+  );
+  await sendOffer(env, updated, '');
+  return true;
+}
+
+/** Writes the draft row and sends its first message. Never throws — the digest
+ *  has already gone out, and one failed offer must not take the batch with it. */
 export async function offerDraft(
   env: Env,
   offer: { source_url: string; thing_id: string; subreddit: string; draft_text: string },
+  nowMs: number = Date.now(),
 ): Promise<void> {
   try {
-    const row = await createDraft(env, offer);
-    if (!row) return;
-    const sent = await sendTelegramMessage(
-      env,
-      'radar',
-      'onetap-offer',
-      draftMessageText(row),
-      { draft_id: row.id, thing_id: row.thing_id },
-      draftKeyboard(row.id),
-    );
-    // Without the message id a later reply cannot be traced back to this draft,
-    // so record it before anything else can arrive.
-    if (sent.messageId) await patchDraft(env, row.id, { telegram_message_id: sent.messageId });
+    const row = await createDraft(env, {
+      ...offer,
+      nonce: newNonce(),
+      expires_at: new Date(nowMs + DRAFT_TTL_MS).toISOString(),
+    });
+    if (row) await sendOffer(env, row, '');
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[onetap] could not offer a draft:', (err as Error).message);
@@ -1893,140 +2128,314 @@ export async function offerDraft(
 // ---------------------------------------------------------------------------
 // The webhook.
 
+interface TelegramFrom {
+  id?: number;
+}
+interface TelegramChat {
+  id?: number | string;
+}
 interface TelegramCallbackQuery {
   id: string;
   data?: string;
-  message?: { message_id: number };
+  from?: TelegramFrom;
+  message?: { message_id: number; chat?: TelegramChat };
 }
-
 interface TelegramMessage {
   message_id: number;
   text?: string;
+  from?: TelegramFrom;
+  chat?: TelegramChat;
   reply_to_message?: { message_id: number };
 }
-
 export interface TelegramUpdate {
   callback_query?: TelegramCallbackQuery;
   message?: TelegramMessage;
 }
 
-async function handleSkip(env: Env, cb: TelegramCallbackQuery, draft: DraftRow): Promise<void> {
-  const messageId = cb.message?.message_id ?? draft.telegram_message_id;
-  if (draft.status === 'posted') {
-    await editDraftMessage(
+/** The founder, in his own chat, and nobody else. A shared webhook secret
+ *  proves the caller holds a value; it cannot prove a human tapped a button.
+ *  Telegram states the sender and the chat on every update so they can be
+ *  checked, and an update that fails this is dropped in silence — answering it
+ *  would confirm to whoever sent it that the endpoint is real. */
+function fromFounder(env: Env, from?: TelegramFrom, chat?: TelegramChat): boolean {
+  if (!env.TELEGRAM_FOUNDER_USER_ID || !env.TELEGRAM_CHAT_ID) return false;
+  return (
+    String(from?.id ?? '') === String(env.TELEGRAM_FOUNDER_USER_ID) &&
+    String(chat?.id ?? '') === String(env.TELEGRAM_CHAT_ID)
+  );
+}
+
+/** Why a tap was refused, in one sentence, without touching anything. Returns
+ *  null when nothing is obviously wrong and the atomic gate should decide. */
+function staleReason(
+  draft: DraftRow | null,
+  version: number,
+  messageId: number,
+  nowMs: number,
+): string | null {
+  if (!draft) return 'That button is no longer valid.';
+  if (draft.status === 'posted') return 'That one is already posted.';
+  if (draft.status === 'skipped') return 'That one was skipped.';
+  if (draft.status === 'posting') return 'That one is being posted right now.';
+  if (draft.nonce_used_at) return 'That button has already been used.';
+  if (draft.version !== version) return 'That button is for an older version of the reply.';
+  if (draft.telegram_message_id !== messageId)
+    return 'That message has been replaced — use the newest one.';
+  if (Date.parse(draft.expires_at) <= nowMs) return 'That draft has expired. Nothing was posted.';
+  return null;
+}
+
+async function handleSkip(
+  env: Env,
+  cb: TelegramCallbackQuery,
+  nonce: string,
+  version: number,
+  messageId: number,
+  nowMs: number,
+): Promise<void> {
+  const claimed = await consumeNonce(env, nonce, version, messageId, 'skipped', nowMs);
+  if (!claimed) {
+    await answerCallback(
       env,
-      messageId,
-      `${draftMessageText(draft)}\n\nPosted: ${draft.permalink ?? 'on Reddit'}`,
+      cb.id,
+      staleReason(await readDraftByNonce(env, nonce), version, messageId, nowMs) ??
+        'Nothing to skip.',
     );
-    await answerCallback(env, cb.id, 'Already posted.');
     return;
   }
-  await patchDraft(env, draft.id, { status: 'skipped' });
-  await editDraftMessage(env, messageId, `${draftMessageText(draft)}\n\nSkipped.`);
+  await editDraftMessage(env, messageId, `${draftMessageText(claimed)}\n\nSkipped.`);
   await answerCallback(env, cb.id, 'Skipped.');
 }
 
 async function handlePost(
   env: Env,
   cb: TelegramCallbackQuery,
-  draft: DraftRow,
+  nonce: string,
+  version: number,
+  messageId: number,
   nowMs: number,
 ): Promise<void> {
-  const messageId = cb.message?.message_id ?? draft.telegram_message_id;
-  const body = draftMessageText(draft);
-
-  // Rail 1: already done. A second tap re-shows the permalink and posts nothing.
-  if (draft.status === 'posted') {
-    await editDraftMessage(env, messageId, `${body}\n\nPosted: ${draft.permalink ?? 'on Reddit'}`);
-    await answerCallback(env, cb.id, 'Already posted.');
-    return;
-  }
-  if (draft.status === 'skipped') {
-    await answerCallback(env, cb.id, 'You skipped this one.');
-    return;
-  }
   if (!oneTapReady(env)) {
-    await editDraftMessage(
-      env,
-      messageId,
-      `${body}\n\nNot posted: the Reddit account is not connected yet.`,
-      draftKeyboard(draft.id),
-    );
     await answerCallback(env, cb.id, 'Reddit is not connected.');
     return;
   }
 
-  // Rail 2: one comment per thread, ever.
-  const existing = await threadAlreadyPosted(env, draft.thing_id);
-  if (existing) {
-    await editDraftMessage(
+  // Read first, only to explain a refusal in words and to remember whether this
+  // draft is coming back from an unknown outcome. The guarantee is the
+  // conditional update below, never this read.
+  const before = await readDraftByNonce(env, nonce);
+  const early = staleReason(before, version, messageId, nowMs);
+  if (early) {
+    await answerCallback(env, cb.id, early);
+    return;
+  }
+  const priorStatus = before?.status ?? 'pending';
+
+  // Pre-flight the cap before the tap is spent, so hitting the limit leaves the
+  // button usable tomorrow instead of burning it.
+  if ((await reservedInWindow(env, nowMs)) >= REDDIT_DAILY_CAP) {
+    await answerCallback(
       env,
-      messageId,
-      `${body}\n\nNot posted: you already commented on this thread — ${existing}`,
+      cb.id,
+      `That would be more than ${REDDIT_DAILY_CAP} in 24 hours. The button still works tomorrow.`,
     );
-    await answerCallback(env, cb.id, 'Already commented on that thread.');
     return;
   }
 
-  // Rail 3: five a day.
-  if ((await postedInWindow(env, nowMs)) >= REDDIT_DAILY_CAP) {
-    await editDraftMessage(
+  // The gate: one conditional update spends the nonce and moves the draft to
+  // `posting`. Everything a replayed, stale, expired or already-settled tap
+  // could be fails here, in the database, rather than in a sequence of checks
+  // another request can interleave with.
+  const draft = await consumeNonce(env, nonce, version, messageId, 'posting', nowMs);
+  if (!draft) {
+    await answerCallback(
       env,
-      messageId,
-      `${body}\n\nNot posted: that would be more than ${REDDIT_DAILY_CAP} comments in 24 hours. ` +
-        'The button still works tomorrow.',
-      draftKeyboard(draft.id),
+      cb.id,
+      staleReason(await readDraftByNonce(env, nonce), version, messageId, nowMs) ??
+        'That tap was already handled.',
     );
-    await answerCallback(env, cb.id, `Daily cap of ${REDDIT_DAILY_CAP} reached.`);
     return;
   }
-
-  // Rail 1 again, against the delivery Telegram retried: only the winner of the
-  // swap goes on to call Reddit.
-  const nowIso = new Date(nowMs).toISOString();
-  if (!(await claimDraft(env, draft.id, nowIso))) {
-    await answerCallback(env, cb.id, 'That one is already being posted.');
-    return;
-  }
-
-  const text = draftBody(draft.draft_text);
-  try {
-    const permalink = await postRedditComment(env, draft.thing_id, text);
-    await patchDraft(env, draft.id, { permalink, error: null });
+  const body = draftMessageText(draft);
+  const settle = async (patch: Record<string, unknown>, note: string, toast: string) => {
+    await patchDraft(env, draft.id, patch);
+    await editDraftMessage(env, messageId, `${body}\n\n${note}`);
+    await answerCallback(env, cb.id, toast);
+  };
+  const markPosted = async (permalink: string) => {
+    await patchDraft(env, draft.id, {
+      status: 'posted',
+      permalink,
+      posted_at: new Date(nowMs).toISOString(),
+      posted_version: draft.version,
+      error: null,
+    });
     await editDraftMessage(env, messageId, `${body}\n\nPosted: ${permalink}`);
     await answerCallback(env, cb.id, 'Posted.');
     await recordOutbox(env, {
       kind: 'radar',
       source: 'onetap-post',
-      message: text,
+      message: draftBody(draft.draft_text),
       telegram_ok: null,
-      meta: { draft_id: draft.id, thing_id: draft.thing_id, permalink },
+      meta: { draft_id: draft.id, thing_id: draft.thing_id, permalink, version: draft.version },
     });
+  };
+
+  let token: string;
+  let who: RedditIdentity;
+  try {
+    token = await redditAccessToken(env);
+    who = await redditIdentity(env, token);
   } catch (err) {
-    // Releasing the claim on failure is deliberate: the thread has no comment
-    // on it, so it must not stay marked as though it had.
-    const reason = (err as Error).message;
-    await patchDraft(env, draft.id, { status: 'failed', posted_at: null, error: reason });
-    await editDraftMessage(
-      env,
-      messageId,
-      `${body}\n\nNot posted. ${reason}`,
-      draftKeyboard(draft.id),
+    const msg = (err as Error).message;
+    await settle({ status: 'failed', error: msg }, `Not posted. ${msg}`, 'Not posted.');
+    return;
+  }
+
+  // The authorised account must be the one we think it is. A token minted while
+  // signed in as somebody else would otherwise post under that name, and the
+  // whole design rests on the name being his.
+  if (who.name.toLowerCase() !== (env.REDDIT_USERNAME ?? '').toLowerCase()) {
+    const msg =
+      'The saved Reddit login belongs to a different account than REDDIT_USERNAME. ' +
+      'Re-run ops/scripts/reddit_auth.py signed in as the right one.';
+    await settle({ status: 'failed', error: msg }, `Not posted. ${msg}`, 'Wrong Reddit account.');
+    return;
+  }
+  // Reddit publishes its remaining quota on every response, so backing off
+  // costs nothing: the identity call above had to happen anyway.
+  if (who.remaining !== null && who.remaining < REDDIT_RATELIMIT_FLOOR) {
+    const secs = who.resetSec === null ? 'shortly' : `in about ${Math.ceil(who.resetSec)} seconds`;
+    const msg = `Reddit's quota for this account is nearly used up; it resets ${secs}.`;
+    await settle(
+      { status: 'failed', error: msg },
+      `Not posted. ${msg}`,
+      'Backing off — quota low.',
     );
-    await answerCallback(env, cb.id, 'Reddit refused — see the message.');
+    return;
+  }
+  const identity = { reddit_identity: who.name, verified_at: new Date(nowMs).toISOString() };
+
+  // Coming back from an unknown outcome: look before sending anything. This is
+  // the only thing allowed to unblock a retry, and it runs BEFORE the second
+  // request rather than after it.
+  if (priorStatus === 'reconcile') {
+    let found: string | null = null;
+    let checkFailed = false;
+    try {
+      found = await reconcileRedditComment(env, token, draft.thing_id);
+    } catch {
+      checkFailed = true;
+    }
+    if (found) {
+      await markPosted(found);
+      return;
+    }
+    if (checkFailed) {
+      // Not knowing is not licence to send again. The draft stays blocked and
+      // comes back with a button that will try the check once more.
+      const msg = 'Could not check Reddit for the earlier reply, so nothing was sent again.';
+      await patchDraft(env, draft.id, { status: 'reconcile', error: msg, meta: identity });
+      await reoffer(
+        env,
+        { ...draft, status: 'reconcile' },
+        { status: 'reconcile', note: msg, nowMs },
+      );
+      await answerCallback(env, cb.id, 'Check failed — nothing sent.');
+      return;
+    }
+    // Checked, and it is genuinely not there. Falling through re-sends, and
+    // reserve_radar_post returns 'ok' because this draft already owns the
+    // reservation — the thread stays closed to every other draft.
+  }
+
+  // The reservation, atomic with the daily cap, written before Reddit is asked
+  // and never removed.
+  let reserved: string;
+  try {
+    reserved = await reservePost(env, draft.id, draft.thing_id);
+  } catch {
+    const msg = 'Could not record the reservation, so nothing was sent.';
+    await settle(
+      { status: 'failed', error: msg, meta: identity },
+      `Not posted. ${msg}`,
+      'Not posted.',
+    );
+    return;
+  }
+  if (reserved === 'thread_taken') {
+    const msg = 'This account has already replied on that thread.';
+    await settle(
+      { status: 'failed', error: msg, meta: identity },
+      `Not posted: ${msg}`,
+      'Already replied there.',
+    );
+    return;
+  }
+  if (reserved === 'cap_reached') {
+    const msg = `that would be more than ${REDDIT_DAILY_CAP} replies in 24 hours`;
+    await settle(
+      { status: 'failed', error: msg, meta: identity },
+      `Not posted: ${msg}.`,
+      'Daily cap reached.',
+    );
+    return;
+  }
+
+  try {
+    const permalink = await postRedditComment(
+      env,
+      token,
+      draft.thing_id,
+      draftBody(draft.draft_text),
+    );
+    await markPosted(permalink);
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (!(err instanceof RedditAmbiguous)) {
+      await settle(
+        { status: 'failed', error: msg, meta: identity },
+        `Not posted. ${msg}`,
+        'Reddit refused.',
+      );
+      return;
+    }
+    // The request may have landed. Check the account's own comments now; if
+    // that is inconclusive the draft stays blocked in `reconcile` and comes
+    // back with a button that will re-check before it re-sends.
+    let found: string | null = null;
+    try {
+      found = await reconcileRedditComment(env, token, draft.thing_id);
+    } catch {
+      found = null;
+    }
+    if (found) {
+      await markPosted(found);
+      return;
+    }
+    await patchDraft(env, draft.id, { status: 'reconcile', error: msg, meta: identity });
+    await reoffer(
+      env,
+      { ...draft, status: 'reconcile' },
+      {
+        status: 'reconcile',
+        note: `${msg} Tapping again re-checks Reddit before sending anything.`,
+        nowMs,
+      },
+    );
+    await answerCallback(env, cb.id, 'Outcome unknown — re-check sent.');
   }
 }
 
 /** A reply in Telegram is the founder rewording a draft. It replaces the text
- *  and comes back as a NEW message with its own buttons; the old message loses
- *  its buttons so there is exactly one live offer per draft. Nothing posts. */
-async function handleEdit(env: Env, msg: TelegramMessage): Promise<void> {
+ *  and comes back as a NEW message under a new version with a new token, so
+ *  the old button is inert and the edit still waits for its own tap. */
+async function handleEdit(env: Env, msg: TelegramMessage, nowMs: number): Promise<void> {
   const parentId = msg.reply_to_message?.message_id;
   const text = (msg.text ?? '').trim();
   if (!parentId || !text) return;
   const draft = await readDraftByMessage(env, parentId);
-  // A reply to anything else in the chat is not our business.
-  if (!draft) return;
+  if (!draft) return; // a reply to anything else in the chat is not our business
   if (draft.status === 'posted') {
     await sendTelegram(
       env,
@@ -2037,26 +2446,27 @@ async function handleEdit(env: Env, msg: TelegramMessage): Promise<void> {
     );
     return;
   }
-  await patchDraft(env, draft.id, { draft_text: text, status: 'edited' });
-  await editDraftMessage(
-    env,
-    parentId,
-    `${draftMessageText(draft)}\n\nReplaced by your edit below.`,
-  );
-  const edited = { ...draft, draft_text: text };
-  const sent = await sendTelegramMessage(
-    env,
-    'radar',
-    'onetap-edit',
-    draftMessageText(edited),
-    { draft_id: draft.id, thing_id: draft.thing_id, edited: true },
-    draftKeyboard(draft.id),
-  );
-  if (sent.messageId) await patchDraft(env, draft.id, { telegram_message_id: sent.messageId });
+  const ok = await reoffer(env, draft, {
+    text,
+    status: 'edited',
+    note: 'Replaced by your edit below.',
+    nowMs,
+  });
+  if (!ok) {
+    await sendTelegram(
+      env,
+      'radar',
+      'onetap-edit',
+      'That draft is already settled; the edit changed nothing.',
+      {
+        draft_id: draft.id,
+      },
+    );
+  }
 }
 
-/** Routes one Telegram update. nowMs is a parameter so the daily cap's window
- *  is reproducible under test. */
+/** Routes one Telegram update. nowMs is a parameter so expiry and the cap
+ *  window are reproducible under test. */
 export async function handleTelegramUpdate(
   env: Env,
   update: TelegramUpdate,
@@ -2064,21 +2474,37 @@ export async function handleTelegramUpdate(
 ): Promise<void> {
   const cb = update.callback_query;
   if (cb) {
-    const [action, id] = (cb.data ?? '').split(':');
-    if ((action !== 'post' && action !== 'skip') || !id) {
+    // Silent drop: an update that is not the founder's, in his chat, gets no
+    // answer at all. Answering tells the sender the endpoint is real.
+    if (!fromFounder(env, cb.from, cb.message?.chat)) {
+      // eslint-disable-next-line no-console
+      console.error('[onetap] callback rejected: not the founder or not his chat');
+      return;
+    }
+    const messageId = cb.message?.message_id;
+    const [action, nonce, rawVersion] = (cb.data ?? '').split(':');
+    const version = Number(rawVersion);
+    if (
+      (action !== 'post' && action !== 'skip') ||
+      !nonce ||
+      !Number.isInteger(version) ||
+      !messageId
+    ) {
       await answerCallback(env, cb.id, 'That button means nothing to me.');
       return;
     }
-    const draft = await readDraft(env, id);
-    if (!draft) {
-      await answerCallback(env, cb.id, 'That draft is gone.');
-      return;
-    }
-    if (action === 'skip') await handleSkip(env, cb, draft);
-    else await handlePost(env, cb, draft, nowMs);
+    if (action === 'skip') await handleSkip(env, cb, nonce, version, messageId, nowMs);
+    else await handlePost(env, cb, nonce, version, messageId, nowMs);
     return;
   }
-  if (update.message?.reply_to_message) await handleEdit(env, update.message);
+  if (update.message?.reply_to_message) {
+    if (!fromFounder(env, update.message.from, update.message.chat)) {
+      // eslint-disable-next-line no-console
+      console.error('[onetap] reply rejected: not the founder or not his chat');
+      return;
+    }
+    await handleEdit(env, update.message, nowMs);
+  }
 }
 
 /** The webhook. Everything that is not an authenticated POST to the one path is
@@ -2087,8 +2513,9 @@ export async function handleTelegramUpdate(
  *
  *  It answers 200 to every authenticated delivery, even one that threw, because
  *  Telegram redelivers anything else and a redelivery loop over a handler that
- *  posts to Reddit is the last thing this wants. The compare-and-swap in
- *  handlePost is what makes that safe. */
+ *  posts to Reddit is the last thing this wants. The single-use nonce is what
+ *  makes that safe. The address is public (workers.dev), so the body is size-
+ *  capped before it is parsed. */
 export async function handleWebhookRequest(request: Request, env: Env): Promise<Response> {
   const notFound = new Response('Not found', { status: 404 });
   if (request.method !== 'POST') return notFound;
@@ -2096,9 +2523,17 @@ export async function handleWebhookRequest(request: Request, env: Env): Promise<
   if (!env.TELEGRAM_WEBHOOK_SECRET) return notFound;
   if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.TELEGRAM_WEBHOOK_SECRET)
     return notFound;
+
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (Number.isFinite(declared) && declared > MAX_WEBHOOK_BYTES)
+    return new Response('Payload too large', { status: 413 });
+  const raw = await request.text();
+  // A missing or lying Content-Length is why this is checked twice.
+  if (raw.length > MAX_WEBHOOK_BYTES) return new Response('Payload too large', { status: 413 });
+
   let update: TelegramUpdate;
   try {
-    update = (await request.json()) as TelegramUpdate;
+    update = JSON.parse(raw) as TelegramUpdate;
   } catch {
     return new Response('Bad request', { status: 400 });
   }

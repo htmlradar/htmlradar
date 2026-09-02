@@ -44,6 +44,10 @@ crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *", "0 5 * * *"]
 #                         X-Telegram-Bot-Api-Secret-Token on every webhook
 #                         delivery; unset = the webhook path 404s and one-tap
 #                         posting is off
+#   TELEGRAM_FOUNDER_USER_ID  the founder's numeric Telegram user id. The
+#                         webhook secret proves a caller holds a value; only
+#                         this proves the tap was his. Every callback and reply
+#                         must carry it, in TELEGRAM_CHAT_ID, or it is dropped
 #   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET   the "script" app at
 #                         reddit.com/prefs/apps
 #   REDDIT_REFRESH_TOKEN  the permanent token ops/scripts/reddit_auth.py

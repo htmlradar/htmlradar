@@ -230,11 +230,17 @@ async function exchangeHandle(env: Env, tx: string, code: string): Promise<Excha
   // a Worker request open until the platform kills it; without a size cap the
   // answer is whatever the other end feels like sending, and it is about to be
   // parsed and put inside an OAuth grant.
+  //
+  // The deadline covers the body, not only the headers. A `fetch` promise
+  // settles as soon as the response head arrives, so a timer cancelled there
+  // leaves an origin free to dribble the body out forever — which is the same
+  // hung request the deadline exists to prevent, one step later. The clock
+  // stops when the body has been read or refused, and not before.
   const stop = new AbortController();
   const timer = setTimeout(() => stop.abort(), EXCHANGE_TIMEOUT_MS);
-  let response: Response;
+  let body: Partial<ExchangeResult>;
   try {
-    response = await fetch(new URL('/api/v1/connect/exchange', env.API_BASE_URL).toString(), {
+    const response = await fetch(new URL('/api/v1/connect/exchange', env.API_BASE_URL).toString(), {
       method: 'POST',
       headers: {
         authorization: `Bearer ${env.CONNECT_EXCHANGE_SECRET}`,
@@ -243,18 +249,17 @@ async function exchangeHandle(env: Env, tx: string, code: string): Promise<Excha
       body: JSON.stringify({ tx, code }),
       signal: stop.signal,
     });
+    if (!response.ok) {
+      throw new Error(`HTMLRadar refused the consent handle (HTTP ${response.status}).`);
+    }
+    const text = await readCapped(response, EXCHANGE_MAX_BYTES, stop.signal);
+    try {
+      body = JSON.parse(text) as Partial<ExchangeResult>;
+    } catch {
+      throw new Error('HTMLRadar returned something that is not JSON.');
+    }
   } finally {
     clearTimeout(timer);
-  }
-  if (!response.ok) {
-    throw new Error(`HTMLRadar refused the consent handle (HTTP ${response.status}).`);
-  }
-  const text = await readCapped(response, EXCHANGE_MAX_BYTES);
-  let body: Partial<ExchangeResult>;
-  try {
-    body = JSON.parse(text) as Partial<ExchangeResult>;
-  } catch {
-    throw new Error('HTMLRadar returned something that is not JSON.');
   }
   if (!body.user_id || !body.api_key || !body.api_key_id || !body.scope) {
     throw new Error('HTMLRadar returned an incomplete consent answer.');
@@ -276,22 +281,38 @@ async function exchangeHandle(env: Env, tx: string, code: string): Promise<Excha
 const EXCHANGE_TIMEOUT_MS = 10_000;
 const EXCHANGE_MAX_BYTES = 4096;
 
-/** The body, refused rather than buffered once it passes the cap. */
-async function readCapped(response: Response, maxBytes: number): Promise<string> {
+/**
+ * The body, refused rather than buffered once it passes the cap, and abandoned
+ * the moment the deadline that covers this whole exchange fires.
+ *
+ * The signal is checked between chunks as well as being the abort signal on the
+ * request: an origin that sends one byte a second stays under any per-chunk
+ * timeout while never finishing, and this is where that ends.
+ */
+export async function readCapped(
+  response: Response,
+  maxBytes: number,
+  deadline: AbortSignal,
+): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) return '';
   const decoder = new TextDecoder();
   let text = '';
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new Error(`HTMLRadar's answer was larger than ${maxBytes} bytes.`);
+  try {
+    for (;;) {
+      if (deadline.aborted) throw new Error('HTMLRadar took too long to answer.');
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        throw new Error(`HTMLRadar's answer was larger than ${maxBytes} bytes.`);
+      }
+      text += decoder.decode(value, { stream: true });
     }
-    text += decoder.decode(value, { stream: true });
+  } catch (failure) {
+    await reader.cancel().catch(() => {});
+    throw failure;
   }
   return text + decoder.decode();
 }

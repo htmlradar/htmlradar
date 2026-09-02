@@ -6,7 +6,7 @@ import { loadConfig } from './api.js';
 import { createServer } from './server.js';
 
 async function main(): Promise<void> {
-  const config = loadConfig();
+  const config = loadConfig(process.env);
   // Said once here so somebody running the command by hand sees it at once,
   // and again from every tool call so the assistant can relay it.
   if (config.keyProblem) console.error(`htmlradar-mcp: ${config.keyProblem}`);

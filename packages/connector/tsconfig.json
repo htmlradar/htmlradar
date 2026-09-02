@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["@cloudflare/workers-types"],
+    "lib": ["ES2022"],
+    "noEmit": true
+  },
+  // packages/mcp's sources are checked transitively through the imports in
+  // src/mcp.ts, which is what we want. Naming the directory here instead would
+  // also pull in its stdio entry point, whose `process.env` has no meaning on a
+  // Worker and is not part of this build.
+  "include": ["src/**/*", "tests/**/*"]
+}

@@ -145,7 +145,11 @@ function keyProblem(apiKey: string): string | null {
   return null;
 }
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
+// The environment is passed in rather than read from `process.env` here: this
+// module is bundled into the connector Worker too, where `process` does not
+// exist. The stdio entry point hands it over, and stays the only file that
+// knows what a process is.
+export function loadConfig(env: Record<string, string | undefined>): Config {
   const apiKey = env['HTMLRADAR_API_KEY']?.trim() ?? '';
   // Trailing slashes make every request path double-slashed, which some
   // edge routers 301 to a URL that drops the Authorization header.

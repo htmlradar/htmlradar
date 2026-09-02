@@ -235,9 +235,16 @@ export function configurationProblem(env: Env): string | null {
     } catch {
       return `${name} is not a URL`;
     }
-    // The exchange secret and a live API key travel to API_BASE_URL, so plain
-    // HTTP is only ever acceptable against a loopback address on a dev machine.
-    if (parsed.protocol !== 'https:' && !isLoopbackHost(parsed.host)) {
+    // The exchange secret and a live API key travel to API_BASE_URL, and
+    // APP_BASE_URL is where a browser mid-consent is sent, so plain HTTP is
+    // only ever acceptable against a loopback address on a dev machine.
+    //
+    // SERVER_URL is exempt: it is an identifier, not an address anything is
+    // sent to, and it has to match the scheme the request actually arrives on
+    // or the token audience will not match. A local `wrangler dev` run answers
+    // on http for a host that is https in production, so requiring https here
+    // would make the connector untestable locally and buy nothing.
+    if (name !== 'SERVER_URL' && parsed.protocol !== 'https:' && !isLoopbackHost(parsed.host)) {
       return `${name} is not an https address`;
     }
   }

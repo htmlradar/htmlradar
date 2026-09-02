@@ -122,4 +122,12 @@ describe('an environment that is not configured', () => {
   it('is satisfied by a loopback API base, which is what a local run uses', () => {
     expect(configurationProblem(makeEnv({ API_BASE_URL: 'http://127.0.0.1:8788' }))).toBeNull();
   });
+
+  it('lets SERVER_URL be plain http, because a local run answers on http', () => {
+    // It is an identifier, not an address anything is sent to, and it has to
+    // match the scheme the request arrives on or the audience will not match.
+    expect(
+      configurationProblem(makeEnv({ SERVER_URL: 'http://mcp.htmlradar.com/mcp' })),
+    ).toBeNull();
+  });
 });

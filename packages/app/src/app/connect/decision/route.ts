@@ -140,6 +140,34 @@ export async function POST(req: NextRequest): Promise<Response> {
     return redirectTo(req, connectPath(request, 'create_failed'));
   }
 
+  // Contract §3b: the connection and the event that created it. Neither is the
+  // off switch — the key is — so a failure here is logged and the connection
+  // still completes. A customer left unable to connect because a bookkeeping
+  // row would not write is the worse outcome of the two.
+  const { error: grantError } = await supabase.from('connector_grants').insert({
+    user_id: user.id,
+    api_key_id: keyRow.id,
+    client_id: request.clientId,
+    client_host: request.clientHost,
+    scope: grantedScope,
+  });
+  if (grantError) {
+    await logServerError({
+      source: 'connect.grant_record',
+      level: 'warn',
+      message: 'Connector grant row insert failed; the connection went ahead',
+      userId: user.id,
+      route: '/connect',
+    });
+  } else {
+    await supabase.from('connector_events').insert({
+      user_id: user.id,
+      api_key_id: keyRow.id,
+      kind: 'grant_created',
+      detail: { client_host: request.clientHost, scope: grantedScope },
+    });
+  }
+
   const sig = await hmacSign(`${request.tx}\n${code}\n${grantedScope}\n${issueExp}`, secret);
   return callback({ tx: request.tx, code, scope: grantedScope, exp: issueExp, sig });
 }

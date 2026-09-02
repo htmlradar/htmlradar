@@ -2,7 +2,13 @@ name = "htmlradar-monitor"
 main = "src/index.ts"
 compatibility_date = "2026-05-18"
 compatibility_flags = []
-workers_dev = false  # cron-only worker, no HTTP entrypoint exposed
+# The worker is no longer cron-only: it answers exactly one HTTP path,
+# POST /telegram/webhook, which is how a "Post as me" tap reaches it (see
+# handleWebhookRequest in src/index.ts). A workers.dev address is the cheapest
+# way to give Telegram somewhere to deliver to — no zone, no route, no DNS. The
+# endpoint's protection is the TELEGRAM_WEBHOOK_SECRET header check, not the
+# obscurity of the address: without that secret set, every request is a 404.
+workers_dev = true
 
 # Every 5 minutes. Cheapest possible cadence that still catches a
 # 15-min-or-less regression before the founder checks email.
@@ -34,6 +40,22 @@ crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *", "0 5 * * *"]
 #                         it; unset = radar reads Hacker News and Reddit only
 #   RADAR_DRAFTS          reply-draft feature flag; '1'/'true'/'on' turns on the
 #                         drafted replies in the digest; unset = log-and-mine only
+#   TELEGRAM_WEBHOOK_SECRET   the shared secret Telegram sends back in
+#                         X-Telegram-Bot-Api-Secret-Token on every webhook
+#                         delivery; unset = the webhook path 404s and one-tap
+#                         posting is off
+#   TELEGRAM_FOUNDER_USER_ID  the founder's numeric Telegram user id. The
+#                         webhook secret proves a caller holds a value; only
+#                         this proves the tap was his. Every callback and reply
+#                         must carry it, in TELEGRAM_CHAT_ID, or it is dropped
+#   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET   the "script" app at
+#                         reddit.com/prefs/apps
+#   REDDIT_REFRESH_TOKEN  the permanent token ops/scripts/reddit_auth.py
+#                         obtains once; exchanged for a short-lived access
+#                         token on each post and never written down
+#   REDDIT_USERNAME       the founder's Reddit handle, for the descriptive
+#                         User-Agent Reddit's API rules ask for; secret only
+#                         because it is personal and this repository is public
 [vars]
 SUPABASE_URL = "https://ewennjnxuqjzsgawbzur.supabase.co"
 RESEND_FROM = "HTMLRadar <hello@htmlradar.com>"

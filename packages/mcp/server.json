@@ -9,6 +9,12 @@
     "source": "github",
     "subfolder": "packages/mcp"
   },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.htmlradar.com/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",

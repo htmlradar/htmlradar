@@ -1065,7 +1065,7 @@ describe('what a backend refusal tells the user', () => {
 
   it('sends a remote user to the consent page for a read-only refusal', async () => {
     mockFetch(403, { error: 'read_only_key' });
-    const text = body(await shareHtml(remote, { html: '<p>hi</p>' }));
+    const text = body(await shareHtml(remote, { html: '<p>hi</p>', require_email: false }));
     expect(text).not.toContain('create a full-access key');
     expect(text).toContain('reconnect HTMLRadar in this client');
   });

@@ -353,6 +353,46 @@ jobs:
           command: deploy
           vars: GIT_SHA
 
+      # First deploy of the Worker (above) has to happen before secrets can
+      # be pushed — `wrangler secret put` fails against a Worker that has
+      # never existed. Same gate as the deploy step: skipped until the four
+      # CONNECTOR_DEPLOY_ENABLED prerequisites are met.
+      - name: Provision connector Worker secrets (packages/connector)
+        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CONNECT_SIGNING_SECRET: ${{ secrets.CONNECT_SIGNING_SECRET }}
+          CONNECT_EXCHANGE_SECRET: ${{ secrets.CONNECT_EXCHANGE_SECRET }}
+          RATE_LIMIT_SECRET: ${{ secrets.RATE_LIMIT_SECRET }}
+        run: |
+          set -e
+          for NAME in CONNECT_SIGNING_SECRET CONNECT_EXCHANGE_SECRET RATE_LIMIT_SECRET; do
+            VALUE="${!NAME}"
+            echo "Setting Worker secret $NAME..."
+            printf '%s' "$VALUE" | npx --yes "wrangler@${WRANGLER_VERSION}" secret put "$NAME" --name htmlradar-connector
+          done
+
+      # The app's /connect consent page and the connector Worker verify the
+      # same HMACs, so the app needs the same two values (not RATE_LIMIT_SECRET
+      # — Worker-only). `wrangler pages secret put` creates a fresh Pages
+      # deployment from the existing build output with the new secret bound,
+      # so no separate re-deploy step is needed for it to take effect.
+      - name: Provision Pages secrets for the connector (shared HMACs)
+        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CONNECT_SIGNING_SECRET: ${{ secrets.CONNECT_SIGNING_SECRET }}
+          CONNECT_EXCHANGE_SECRET: ${{ secrets.CONNECT_EXCHANGE_SECRET }}
+        run: |
+          set -e
+          for NAME in CONNECT_SIGNING_SECRET CONNECT_EXCHANGE_SECRET; do
+            VALUE="${!NAME}"
+            echo "Setting Pages secret $NAME on project htmlradar..."
+            printf '%s' "$VALUE" | npx --yes "wrangler@${WRANGLER_VERSION}" pages secret put "$NAME" --project-name=htmlradar
+          done
+
       # The proxy stamps every response with X-HTMLRadar-Version = GIT_SHA
       # (see withNoIndex in packages/proxy/src/index.ts). Reading it from
       # the live route proves the new version is what the edge serves.

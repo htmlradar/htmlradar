@@ -129,3 +129,9 @@ export function randomHex(bytes: number): string {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
+
+/** The same token identifier the OAuth library computes: SHA-256, lowercase hex. */
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}

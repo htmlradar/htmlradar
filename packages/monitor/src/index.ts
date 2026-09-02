@@ -1281,6 +1281,26 @@ async function readRecentRadarItems(env: Env, nowMs: number): Promise<RadarRow[]
   return rows.filter((r) => r.intent_score >= REPLY_THRESHOLD).slice(0, DIGEST_MAX_ITEMS);
 }
 
+/** The most recent mining run's counts, read back for the zero-item marker's
+ *  "N scanned, M stored" — the same total_items/items_stored scanThreads
+ *  already writes into its scan_run row, not recomputed here. */
+async function readLatestScanCounts(
+  env: Env,
+  nowMs: number,
+): Promise<{ scanned: number; stored: number }> {
+  const since = encodeURIComponent(new Date(nowMs - SCAN_WINDOW_MS).toISOString());
+  const res = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+      `?kind=eq.scan_run&created_at=gte.${since}&order=created_at.desc&limit=1&select=meta`,
+    { headers: radarHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`telegram_outbox scan_run read HTTP ${res.status}`);
+  const row = (
+    (await res.json()) as { meta: { total_items?: number; items_stored?: number } | null }[]
+  )[0];
+  return { scanned: row?.meta?.total_items ?? 0, stored: row?.meta?.items_stored ?? 0 };
+}
+
 /** The weekly pattern summary: what recurred, not a raw dump. Monday only. */
 export async function weeklyInsight(env: Env, nowMs: number): Promise<string> {
   const since = encodeURIComponent(new Date(nowMs - WEEKLY_WINDOW_MS).toISOString());
@@ -1326,9 +1346,18 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
   const isMonday = new Date(nowMs).getUTCDay() === 1;
   const items = await readRecentRadarItems(env, nowMs);
 
-  // Non-Monday with nothing above the noise floor: stay silent. A daily "found
+  // Non-Monday with nothing above the noise floor: record a marker row (so
+  // the sentinel's radar_digest check can tell "checked and found nothing"
+  // from "the digest never ran") and stay silent on Telegram — a daily "found
   // nothing" is how a channel gets muted. Monday always speaks — see below.
   if (items.length === 0 && !isMonday) {
+    const { scanned, stored } = await readLatestScanCounts(env, nowMs);
+    await recordOutbox(env, {
+      kind: 'radar',
+      source: 'daily-digest',
+      message: `no high-fit items today (${scanned} scanned, ${stored} stored)`,
+      telegram_ok: null,
+    });
     // eslint-disable-next-line no-console
     console.log('[digest] nothing above the noise floor — staying silent');
     return;
@@ -1488,6 +1517,30 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
       : null;
   });
 
+  // Unverified notification sends — handoff from schema/044. A 'queued' row
+  // older than 30 minutes with no matching net._http_response becomes
+  // 'unverified': nobody knows if it sent. A handful is expected (the
+  // reconciler's own 10-minute cadence keeps them rare, not zero); a count
+  // that keeps climbing is the signal that the reconciler cron stopped
+  // firing or pg_net itself is down, which today would look identical to
+  // "everything is fine" because nothing ever left 'queued'.
+  await run('notifications_unverified', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/notifications_log` +
+        `?status=eq.unverified&created_at=gte.${since(SENTINEL_WINDOW_MS)}&select=count`,
+      { headers: { ...headers, Prefer: 'count=exact' } },
+    );
+    if (!res.ok) throw new Error(`notifications_log read HTTP ${res.status}`);
+    const unverified = parseInt(
+      (res.headers.get('content-range') ?? '0-0/0').split('/')[1] ?? '0',
+      10,
+    );
+    meta['notifications_unverified'] = unverified;
+    return unverified > 0
+      ? `notifications: ${unverified} unverified in 24h — reconciler cron or pg_net may be down`
+      : null;
+  });
+
   // Yesterday's thread scan. A missing scan_run row is the finding schema/038
   // was written for: it is what a cron that never fired looks like.
   await run('scan_run', async () => {
@@ -1515,6 +1568,25 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
       `thread scan: ${items} item(s), ${bad.length} of ${fetches.length} fetch(es) failed — ` +
       detail.slice(0, SENTINEL_DETAIL_CHARS)
     );
+  });
+
+  // Yesterday's radar digest. Every run now writes a kind='radar' row — the
+  // real digest, or on a silent day the no-send marker (see dailyDigest) — so
+  // a missing row means the 05:00 UTC digest did not run at all, which before
+  // the marker existed looked identical to "correctly found nothing today".
+  await run('radar_digest', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+        `?kind=eq.radar&created_at=gte.${since(SENTINEL_SCAN_WINDOW_MS)}` +
+        `&order=created_at.desc&limit=1&select=created_at`,
+      { headers },
+    );
+    if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
+    const row = ((await res.json()) as { created_at: string }[])[0];
+    meta['radar_digest'] = row ? row.created_at : null;
+    return row
+      ? null
+      : 'radar: no radar row in the last 26h — the 05:00 UTC digest did not run, or could not write its row';
   });
 
   // The human half. Infinity when there is no heartbeat row at all, which

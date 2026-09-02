@@ -428,6 +428,8 @@ describe('scanThreads mines every source into radar_items and stays silent', () 
 interface DigestWorld {
   recent?: unknown[];
   weekly?: unknown[];
+  /** The scan_run row readLatestScanCounts reads back for the zero-item marker. */
+  scanRun?: unknown[];
 }
 
 function stubDigestWorld(world: DigestWorld) {
@@ -445,6 +447,7 @@ function stubDigestWorld(world: DigestWorld) {
         outbox.push(body as OutboxWrite);
         return new Response('', { status: 201 });
       }
+      if (url.startsWith(OUTBOX_URL)) return json(world.scanRun ?? []);
       // readRecentRadarItems asks for non-noise, score >= REPLY_THRESHOLD;
       // weeklyInsight asks for limit=500.
       if (url.startsWith(RADAR_URL) && url.includes('limit=500')) return json(world.weekly ?? []);
@@ -540,24 +543,52 @@ describe('dailyDigest is a strict opportunity filter: <=3 items, only above REPL
     expect(text.match(/DRAFT \(personal account/g)).toHaveLength(2);
   });
 
-  it('sends nothing on a day where every item is below the threshold', async () => {
+  it('stays silent on Telegram but records a marker row when every item is below the threshold', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { telegram, outbox } = stubDigestWorld({ recent: [lowScoreItem] });
+    const { telegram, outbox } = stubDigestWorld({
+      recent: [lowScoreItem],
+      scanRun: [
+        {
+          created_at: new Date(TUESDAY - 3_600_000).toISOString(),
+          meta: { total_items: 1, items_stored: 1 },
+        },
+      ],
+    });
 
     await dailyDigest(env, TUESDAY);
 
     expect(telegram).toHaveLength(0);
-    expect(outbox).toHaveLength(0);
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      kind: 'radar',
+      source: 'daily-digest',
+      message: 'no high-fit items today (1 scanned, 1 stored)',
+      telegram_ok: null,
+    });
   });
 
-  it('says nothing on a quiet weekday with no items at all', async () => {
+  it('stays silent on Telegram but records a marker row on a quiet weekday with no items at all', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { telegram, outbox } = stubDigestWorld({ recent: [] });
+    const { telegram, outbox } = stubDigestWorld({
+      recent: [],
+      scanRun: [
+        {
+          created_at: new Date(TUESDAY - 3_600_000).toISOString(),
+          meta: { total_items: 0, items_stored: 0 },
+        },
+      ],
+    });
 
     await dailyDigest(env, TUESDAY);
 
     expect(telegram).toHaveLength(0);
-    expect(outbox).toHaveLength(0);
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      kind: 'radar',
+      source: 'daily-digest',
+      message: 'no high-fit items today (0 scanned, 0 stored)',
+      telegram_ok: null,
+    });
   });
 
   it('still sends the weekly insight on a quiet Monday, unaffected by the daily filter', async () => {

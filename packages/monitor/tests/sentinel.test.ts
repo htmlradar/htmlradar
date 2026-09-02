@@ -53,7 +53,10 @@ interface World {
   abuse?: Answer;
   /** Content-Range total for the failed-notification count. */
   notificationsFailed?: number | Error;
+  /** Content-Range total for the unverified-notification count. */
+  notificationsUnverified?: number | Error;
   scanRun?: Answer;
+  radarDigest?: Answer;
   heartbeat?: Answer;
 }
 
@@ -91,15 +94,18 @@ function stubWorld(world: World) {
       }
       if (url.includes('/abuse_reports')) return reply(world.abuse);
       if (url.includes('/notifications_log')) {
-        if (world.notificationsFailed instanceof Error) throw world.notificationsFailed;
+        const unverified = url.includes('status=eq.unverified');
+        const answer = unverified ? world.notificationsUnverified : world.notificationsFailed;
+        if (answer instanceof Error) throw answer;
         // Null body on purpose: the count travels in the header, and the
         // check never reads the body, so an unread stream would just linger.
         return new Response(null, {
           status: 200,
-          headers: { 'content-range': `0-0/${world.notificationsFailed ?? 0}` },
+          headers: { 'content-range': `0-0/${answer ?? 0}` },
         });
       }
       if (url.includes('kind=eq.scan_run')) return reply(world.scanRun);
+      if (url.includes('kind=eq.radar')) return reply(world.radarDigest);
       if (url.includes('kind=eq.heartbeat')) return reply(world.heartbeat);
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -120,6 +126,12 @@ function healthyScanRun(nowMs: number, extra: Record<string, unknown> = {}) {
   ];
 }
 
+/** A radar row like the one dailyDigest writes — the real digest, or its
+ *  zero-item marker — 22.5h before the sentinel's 03:30 run. */
+const healthyRadarDigest = (nowMs: number) => [
+  { created_at: new Date(nowMs - 22.5 * 3_600_000).toISOString() },
+];
+
 const freshHeartbeat = (nowMs: number, hoursAgo: number) => [
   { created_at: new Date(nowMs - hoursAgo * 3_600_000).toISOString() },
 ];
@@ -128,7 +140,9 @@ const freshHeartbeat = (nowMs: number, hoursAgo: number) => [
 const allClear = (nowMs: number): World => ({
   abuse: [],
   notificationsFailed: 0,
+  notificationsUnverified: 0,
   scanRun: healthyScanRun(nowMs),
+  radarDigest: healthyRadarDigest(nowMs),
   heartbeat: freshHeartbeat(nowMs, 2),
 });
 
@@ -143,7 +157,9 @@ describe('findings arrive as one message', () => {
         { reason: 'malware', document_id: 'doc-2' },
       ],
       notificationsFailed: 4,
+      notificationsUnverified: 0,
       scanRun: [],
+      radarDigest: healthyRadarDigest(TUESDAY),
       heartbeat: freshHeartbeat(TUESDAY, 70),
     });
 
@@ -192,6 +208,26 @@ describe('findings arrive as one message', () => {
     expect(telegram).toHaveLength(1);
     expect(telegram[0]!.text).toContain('thread scan: 2 item(s), 1 of 2 fetch(es) failed');
     expect(telegram[0]!.text).toContain('Reddit refused this address');
+  });
+
+  it('flags a climbing unverified-notification count — the reconciler handoff from schema/044', async () => {
+    const { telegram } = stubWorld({ ...allClear(TUESDAY), notificationsUnverified: 5 });
+
+    await sentinel(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).toContain(
+      'notifications: 5 unverified in 24h — reconciler cron or pg_net may be down',
+    );
+  });
+
+  it('flags a missing radar row as the shape of a digest that never ran', async () => {
+    const { telegram } = stubWorld({ ...allClear(TUESDAY), radarDigest: [] });
+
+    await sentinel(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).toContain('radar: no radar row in the last 26h');
   });
 });
 

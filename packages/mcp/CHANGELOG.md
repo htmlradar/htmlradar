@@ -31,10 +31,13 @@ picks these up on its next start.
   gone on purpose. Anything reading that output by line number breaks.
 - **The advertised input-schema dialect moves from JSON Schema draft-07 to draft 2020-12**, which
   version 2 of the kit hard-codes and does not let a server choose. Every field, required field,
-  default and constraint is unchanged — the two schema sets are identical apart from the `$schema`
-  string — and the MCP Inspector's strict portability lint is clean on both. Gemini CLI strips
-  `$schema` before building its declarations, so it cannot be affected; no client is known to
-  reject the newer dialect, and none has been observed accepting only the older one.
+  default and constraint is unchanged: compared against the published 0.2.0 schemas, the two sets
+  are structurally identical, and the only text that differs is the `$schema` string plus the
+  wording of two parameter descriptions (`share_html.html` and `get_share_activity.include_detail`,
+  both rewritten to stop directing the model). The MCP Inspector's strict portability lint is clean
+  on both. Gemini CLI strips `$schema` before building its declarations, so it cannot be affected;
+  no client is known to reject the newer dialect, and none has been observed accepting only the
+  older one.
 
 Tool names, `HTMLRADAR_API_KEY` and `HTMLRADAR_API_URL` are unchanged, and every tool takes exactly
 the arguments it took in 0.2.0.

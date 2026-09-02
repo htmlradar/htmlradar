@@ -28,7 +28,7 @@ const FAQ = [
   },
   {
     q: 'Do I need an API key?',
-    a: 'Yes. Sign in at htmlradar.com, open Settings, and create a key under API keys. Pass it to the server as the HTMLRADAR_API_KEY environment variable rather than as a literal command-line argument, so it stays out of your shell history. The server reads nothing else and sends no telemetry.',
+    a: 'For the package, yes. Sign in at htmlradar.com, open Settings, and create a key under API keys. Pass it to the server as the HTMLRADAR_API_KEY environment variable rather than as a literal command-line argument, so it stays out of your shell history. The server reads nothing else and sends no telemetry. If you add HTMLRadar to Claude Desktop or claude.ai as a custom connector instead, there is no key to make: you sign in when Claude first uses a tool and the key is minted for that connection.',
   },
   {
     q: 'What does the recipient see?',
@@ -42,6 +42,27 @@ const FAQ = [
     q: 'Can I point it at my own instance?',
     a: 'Yes. HTMLRadar is AGPL-3.0 end to end. Set HTMLRADAR_API_URL to your own deployment and the server talks to that instead of htmlradar.com.',
   },
+];
+
+// The remote connector's address, from CONNECTOR-CONTRACT-2026-09-02.md §7
+// (SERVER_URL). Claude Desktop and claude.ai take this in "Add custom
+// connector"; every other client runs the npm package below.
+const CONNECTOR_URL = 'https://mcp.htmlradar.com/mcp';
+
+const CONNECTOR_STEPS: [string, string][] = [
+  ['Settings, then Connectors', 'In Claude Desktop or at claude.ai, both in the same place.'],
+  [
+    'Add custom connector',
+    'Paste the address above and save. It appears in the list straight away.',
+  ],
+  [
+    'Sign in',
+    'The first time Claude reaches for a tool it shows a Connect card. Click it and sign in to HTMLRadar.',
+  ],
+  [
+    'Allow',
+    'Choose what Claude may do, click Allow, and the conversation carries on from where it stopped.',
+  ],
 ];
 
 // Cursor's install link, as built by cursor.com/install-mcp:
@@ -263,8 +284,58 @@ export default function McpPage() {
             </div>
           </section>
 
+          <section className="mt-14" id="connector">
+            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+              Add to Claude with one link
+            </h2>
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              Claude Desktop and claude.ai take a web address where the other clients take a
+              command. Nothing to install, no Node.js, and no API key to make first — you sign in to
+              HTMLRadar the first time Claude actually reaches for a tool, and the key is minted for
+              you then.
+            </p>
+            <CodeBlock label="add custom connector" code={CONNECTOR_URL} />
+            <ol className="mt-6 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
+              {CONNECTOR_STEPS.map(([step, detail], i) => (
+                <li key={step} className="flex gap-4 px-5 py-4">
+                  <span className="mt-1 shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[14.5px] text-ink">{step}</span>
+                    <span className="mt-1 block text-[14px] leading-relaxed text-ink-soft">
+                      {detail}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+
+            <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+              How permissions work
+            </h3>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-soft">
+              The consent page offers two levels and read-only is pre-selected: read-only lets
+              Claude list your links and read who opened them, while read and publish adds creating
+              a link, replacing a document and switching a link off. Every connection is listed
+              under <span className="font-mono text-[13px]">Connected apps</span> in{' '}
+              <Link href="/settings" className="text-signal-dark hover:underline">
+                htmlradar.com/settings
+              </Link>
+              , and revoking one there ends its access on the very next tool call.
+            </p>
+          </section>
+
           <section className="mt-14" id="install">
-            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">Install</h2>
+            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+              Install the package
+            </h2>
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              The other route, and the only one for Claude Code, Cursor, Codex CLI, Gemini CLI and
+              every client below: run the published npm package yourself with a key you made. It
+              also works in Claude Desktop, if you would rather hold the key than hand out a
+              connection.
+            </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               First create an API key at{' '}
               <Link href="/settings" className="text-signal-dark hover:underline">

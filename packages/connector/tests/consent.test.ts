@@ -187,6 +187,25 @@ describe('the consent answer', () => {
   });
 });
 
+describe('the shared HMAC vector', () => {
+  // Fixed secret, fixed fields, fixed expected signature. The same vector is
+  // asserted in packages/app/src/lib/connect.test.ts against that package's
+  // own hmacSign() — if the two ever compute a different signature for these
+  // inputs, one of these two tests catches it before the app and the Worker
+  // do.
+  it('signs the consent leg the same way the app does', async () => {
+    const tx = 'f'.repeat(32);
+    const clientId = 'https://claude.ai/.well-known/oauth-client';
+    const clientHost = 'claude.ai';
+    const scope = 'shares:read shares:write';
+    const exp = '1893456000';
+    const secret = 'connector-contract-fixture-secret';
+    const expected = 'O6khTth_bVYGR8vqxQ6vErAJYar-Cm1vt9DNqUNG-wc';
+
+    expect(await sign(secret, [tx, clientId, clientHost, scope, exp])).toBe(expected);
+  });
+});
+
 describe('/connect/revoke', () => {
   it('answers 405 to anything but a POST', async () => {
     const response = await call(makeEnv(), new Request(`${ORIGIN}/connect/revoke`));

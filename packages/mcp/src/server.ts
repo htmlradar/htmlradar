@@ -455,6 +455,12 @@ export function createServer(config: Config): McpServer {
   const server = new McpServer(
     { name: 'htmlradar', version: '0.2.0' },
     {
+      // The one consent sentence lives here and nowhere else. It is a routing
+      // hint the client may or may not act on, not a security control: the
+      // controls are the API key's scope and what the user allows in the
+      // client. Tool descriptions state consequences instead of behaviour,
+      // because a description that tells a model how to behave is a review
+      // risk and buys nothing the client is not already doing.
       instructions:
         'HTMLRadar turns an HTML document into a tracked link. Use share_html once you have ' +
         'produced an HTML deck, proposal or report that the user intends to send to someone ' +
@@ -479,8 +485,7 @@ export function createServer(config: Config): McpServer {
         'wants to know whether it was read. Pass the markup itself in `html`; this tool does ' +
         'not read files, so if the document is already on disk, read it with your own file ' +
         'tools first — that way the permissions the user set on those tools still apply. ' +
-        'Never call this tool unless the user explicitly asked you to publish or create a ' +
-        'tracked link.',
+        'The link is live the moment it is returned.',
       inputSchema: shareHtmlShape,
       annotations: {
         title: 'Share HTML as a tracked link',
@@ -503,8 +508,7 @@ export function createServer(config: Config): McpServer {
         'document goes to more than one person: one link per recipient is what separates their ' +
         'reading reports. It uploads nothing and creates no second copy — pass the document id ' +
         'from list_shares, or the one share_html returned. To publish new HTML, use share_html. ' +
-        'Never call this tool unless the user explicitly asked you to publish or create a ' +
-        'tracked link.',
+        'The link is live the moment it is returned.',
       inputSchema: createShareShape,
       annotations: {
         title: 'Make another tracked link for an existing document',
@@ -587,10 +591,9 @@ export function createServer(config: Config): McpServer {
       description:
         'Switch off a tracked link that has already been sent. Anyone who opens it afterwards ' +
         'sees that it is no longer available, and the sender is emailed that somebody tried. ' +
-        'This changes what a recipient can see, so confirm with the user which link you are ' +
-        'about to switch off before calling it, and name the recipient and the document in the ' +
-        'confirmation. It is reversible: call it again with revoked set to false. It never ' +
-        'deletes anything — deleting a link is deliberately only possible on the website.',
+        'This changes what a recipient can see. It is reversible: call it again with revoked ' +
+        'set to false. It never deletes anything — deleting a link is deliberately only ' +
+        'possible on the website.',
       inputSchema: {
         share_id: z
           .string()
@@ -606,9 +609,11 @@ export function createServer(config: Config): McpServer {
       annotations: {
         title: 'Switch a tracked link off',
         readOnlyHint: false,
-        // Reversible, and it destroys nothing: the link, its settings and
-        // every reading record survive a revoke and come back on un-revoke.
-        destructiveHint: false,
+        // Reversible for us — the link, its settings and every reading record
+        // survive a revoke — but not for the recipient, who loses a document
+        // they had. That is the reading of the hint clients act on, so it is
+        // true here.
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
@@ -627,12 +632,14 @@ export function createServer(config: Config): McpServer {
         'second link. Use it after reading where people stopped and rewriting that part. The ' +
         'new HTML is screened for phishing signals as every upload is, and the previous ' +
         "version is kept in the document's history. Recipients may already have read the old " +
-        'contents, so confirm with the user before replacing.',
+        'contents.',
       inputSchema: replaceDocumentShape,
       annotations: {
         title: 'Replace a document, keeping every link',
         readOnlyHint: false,
-        destructiveHint: false,
+        // It overwrites what every existing link serves, to people who may
+        // already have read the old contents.
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },

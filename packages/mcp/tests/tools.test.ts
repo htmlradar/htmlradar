@@ -688,25 +688,39 @@ describe('the tools the server publishes', () => {
     expect(names.some((name) => name.includes('delete'))).toBe(false);
   });
 
-  // The description is the only place an assistant learns that this changes
-  // what a recipient can see, so it has to ask for confirmation there.
-  it('tells the assistant to confirm before switching a link off', async () => {
+  // The description states what switching a link off does in the world. It
+  // does not tell the model how to behave: consent is the client's job, and a
+  // description that directs behaviour is a review risk that buys nothing.
+  it('states the consequences of switching a link off, without directing behaviour', async () => {
     const tool = (await listTools()).find((t) => t.name === 'revoke_share');
-    expect(tool?.description).toMatch(/confirm with the user/i);
+    expect(tool?.description).toMatch(/the sender is emailed that somebody tried/i);
+    expect(tool?.description).toMatch(/changes what a recipient can see/i);
     expect(tool?.description).toMatch(/reversible/i);
     expect(tool?.description).toMatch(/never deletes anything/i);
   });
 
-  // No "unless you just wrote it" exception: the assistant having produced the
-  // document is not the user having asked for it to be published.
-  it('forbids publishing that the user did not ask for, in both publishing tools', async () => {
-    const sentence =
-      'Never call this tool unless the user explicitly asked you to publish or create a tracked link.';
+  // Removed from every tool description in 0.3.0. The one consent sentence
+  // lives in the server's instructions, where a client reads it once.
+  it('leaves behavioural instructions out of every tool description', async () => {
+    for (const tool of await listTools()) {
+      expect(tool.description, tool.name).not.toMatch(/never call this tool/i);
+      expect(tool.description, tool.name).not.toMatch(/confirm with the user/i);
+    }
+  });
+
+  it('marks replacing and revoking destructive, and gives every tool a title', async () => {
     const tools = await listTools();
-    for (const name of ['share_html', 'create_share']) {
-      const tool = tools.find((t) => t.name === name);
-      expect(tool?.description, name).toContain(sentence);
-      expect(tool?.description, name).not.toMatch(/did not just write/);
+    const destructive = tools
+      .filter((tool) => tool.annotations?.destructiveHint === true)
+      .map((tool) => tool.name)
+      .sort();
+    expect(destructive).toEqual(['replace_document', 'revoke_share']);
+    for (const tool of tools) {
+      expect(tool.annotations?.title, tool.name).toBeTruthy();
+      const hints = tool.annotations ?? {};
+      expect(hints.readOnlyHint === true || hints.destructiveHint !== undefined, tool.name).toBe(
+        true,
+      );
     }
   });
 

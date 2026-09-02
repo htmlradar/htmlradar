@@ -15,6 +15,10 @@ export HTMLRADAR_API_KEY=hr_live_xxx
 
 Keys are created at [htmlradar.com/settings](https://htmlradar.com/settings) under **API keys**.
 
+Using Claude Desktop or claude.ai rather than Claude Code? You do not need this plugin or a key.
+Open Settings, then Connectors, then **Add custom connector**, and paste
+`https://mcp.htmlradar.com/mcp`. You sign in to HTMLRadar the first time Claude reaches for a tool.
+
 ## What you get
 
 - The seven HTMLRadar MCP tools: `share_html` publishes HTML as a tracked link, `create_share`

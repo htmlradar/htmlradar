@@ -92,4 +92,16 @@ the proxy and the monitor, then reads `X-HTMLRadar-Version` off a live `POST /mc
 running Worker is that commit. The three connector steps are gated on the repository variable
 `CONNECTOR_DEPLOY_ENABLED`, so a connector that is not provisioned cannot fail a production deploy
 of everything else. What must exist before that variable is set to `true` is listed in
-`docs/workstreams/mcp-product/CONNECTOR-INFRA-RUNBOOK-2026-09-02.md`, under "Before the gate opens".
+`docs/workstreams/mcp-product/CONNECTOR-INFRA-RUNBOOK-2026-09-02.md`, under "Before the gate opens" —
+including migrations `045` and `046`, in that order.
+
+## Turning it off
+
+**Rollback is removing the custom-domain route.** Unsetting `CONNECTOR_DEPLOY_ENABLED` stops future
+deploys and nothing else: the Worker already deployed keeps serving every request. So either remove
+the `[[routes]]` block below and redeploy, or delete the domain through the API, and confirm
+`POST https://mcp.htmlradar.com/mcp` no longer answers. Deleting the Worker afterwards is optional.
+
+`OAUTH_KV` and the Supabase rows are inert without the route and can be left. Connector API keys
+already minted stay live until revoked in Settings — they are ordinary keys, and the route going
+away does not revoke them.

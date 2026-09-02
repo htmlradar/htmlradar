@@ -326,6 +326,33 @@ jobs:
           command: deploy
           vars: GIT_SHA
 
+      # Connector Worker (packages/connector) — Phase B, task B1, per
+      # CONNECTOR-CONTRACT-2026-09-02.md. Same pattern as the proxy and
+      # monitor steps above: `wrangler deploy` syncs [[routes]]
+      # (custom_domain = true for mcp.htmlradar.com — see
+      # CONNECTOR-INFRA-RUNBOOK-2026-09-02.md) and GIT_SHA is bound as a
+      # plain var so the verify step below can prove this commit is live.
+      #
+      # Gated on the repository variable CONNECTOR_DEPLOY_ENABLED, which is set
+      # to "true" by hand only once all four prerequisites exist: the OAUTH_KV
+      # namespace id in wrangler.toml, the two Worker secrets, the two Pages
+      # secrets, and the mcp.htmlradar.com custom domain. Until then these three
+      # steps are skipped, so a connector that is not ready cannot fail a
+      # production deploy of the app, the proxy or the monitor. See
+      # CONNECTOR-INFRA-RUNBOOK-2026-09-02.md, "Before the gate opens".
+      - name: Deploy connector worker (packages/connector)
+        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
+        env:
+          GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
+          workingDirectory: packages/connector
+          command: deploy
+          vars: GIT_SHA
+
       # The proxy stamps every response with X-HTMLRadar-Version = GIT_SHA
       # (see withNoIndex in packages/proxy/src/index.ts). Reading it from
       # the live route proves the new version is what the edge serves.
@@ -367,6 +394,69 @@ jobs:
             exit 1
           fi
           echo "Monitor verified — deployed GIT_SHA matches $HEAD_SHA."
+
+      # mcp.htmlradar.com has an HTTP route (unlike the monitor), so verify
+      # the same way the proxy is verified: read X-HTMLRadar-Version off a
+      # live response. POST /mcp with no Authorization header always answers
+      # 401 (contract §2 — GET/DELETE on /mcp answer 405 instead, so this
+      # must be a POST), so that response is what's checked — it never
+      # depends on OAuth state and needs no test credentials.
+      - name: Verify connector worker serves this commit
+        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -e
+          for attempt in 1 2 3 4 5; do
+            live=$(curl -sS -X POST -o /dev/null -w '%header{x-htmlradar-version}' "https://mcp.htmlradar.com/mcp")
+            if [ "$live" = "$HEAD_SHA" ]; then
+              echo "Connector verified — X-HTMLRadar-Version matches $HEAD_SHA."
+              exit 0
+            fi
+            echo "Connector reports '$live' (attempt $attempt), expected $HEAD_SHA — retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::Connector is not serving commit $HEAD_SHA."
+          exit 1
+
+      # Two contract checks any OAuth-aware MCP client relies on to add the
+      # connector at all: the metadata document Claude fetches when it sees
+      # a 401 (RFC 8414 discovery, must be 200 + JSON), and the fact that
+      # calling a tool with no token is refused rather than silently
+      # allowed. Neither needs a real grant or the QA account.
+      - name: Smoke test connector discovery and auth
+        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        run: |
+          set -e
+          fail=0
+
+          echo "Checking https://mcp.htmlradar.com/.well-known/oauth-authorization-server"
+          code=$(curl -sS -o /tmp/oauth-metadata.json -w '%{http_code}' \
+            "https://mcp.htmlradar.com/.well-known/oauth-authorization-server")
+          if [ "$code" != "200" ]; then
+            echo "::error::oauth-authorization-server returned HTTP ${code}, expected 200"
+            fail=$((fail + 1))
+          elif ! jq -e . >/dev/null 2>&1 < /tmp/oauth-metadata.json; then
+            echo "::error::oauth-authorization-server did not return valid JSON"
+            fail=$((fail + 1))
+          else
+            echo "  ✓ 200 JSON"
+          fi
+
+          echo "Checking POST https://mcp.htmlradar.com/mcp with no Authorization header"
+          code=$(curl -sS -X POST -o /dev/null -w '%{http_code}' "https://mcp.htmlradar.com/mcp")
+          if [ "$code" != "401" ]; then
+            echo "::error::POST /mcp with no token returned HTTP ${code}, expected 401"
+            fail=$((fail + 1))
+          else
+            echo "  ✓ 401"
+          fi
+
+          if [ $fail -gt 0 ]; then
+            echo "::error::$fail connector smoke check(s) failed."
+            exit 1
+          fi
+          echo "Connector smoke checks passed."
 
       # Purge Cloudflare edge cache after every successful deploy, on both
       # zones, and fail the deploy if either purge does not succeed.

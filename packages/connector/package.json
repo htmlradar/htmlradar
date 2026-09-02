@@ -1,0 +1,23 @@
+{
+  "name": "@htmlradar/connector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker that serves the remote MCP connector at mcp.htmlradar.com — OAuth, consent hand-off, and the seven tools.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "@cloudflare/workers-types": "^4.20240314.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0",
+    "wrangler": "^3.40.0",
+    "zod": "4.5.4"
+  }
+}

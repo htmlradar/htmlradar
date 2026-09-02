@@ -319,6 +319,27 @@ async function refuse(
   return wait > 0 ? rateLimited(wait) : INVALID_KEY;
 }
 
+/**
+ * Seconds this address must wait before spending `name` again, or 0.
+ *
+ * For the routes that have no API key to count against — the connector consent
+ * hand-off and its exchange — where the address is the only thing a caller
+ * brings. Same counter, same window, same fail-open behaviour as every other
+ * budget in this file; see `retryAfter` for why failing open is right here.
+ */
+export async function addressRetryAfter(req: Request, name: string, max: number): Promise<number> {
+  return addressRetryAfterFor(callerIp(req), name, max);
+}
+
+/** The same budget, for a server component that has headers but no Request. */
+export async function addressRetryAfterFor(
+  address: string,
+  name: string,
+  max: number,
+): Promise<number> {
+  return retryAfter(serviceClient(), `api:${name}:${address || 'unknown'}`, max);
+}
+
 export type ApiAuth = { caller: ApiCaller } | { error: ApiErrorResponse };
 
 /**

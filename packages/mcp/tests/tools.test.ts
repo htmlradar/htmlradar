@@ -31,11 +31,13 @@ function body(result: { content: unknown[] }): string {
   return (result.content as { text: string }[]).map((part) => part.text).join('\n');
 }
 
-function mockFetch(status: number, payload: unknown) {
+function mockFetch(status: number, payload: unknown, headers: Record<string, string> = {}) {
   const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
     Promise.resolve({
       ok: status >= 200 && status < 300,
       status,
+      // A real Response always has these, and the 429 handling reads them.
+      headers: new Headers(headers),
       json: async () => payload,
     } as unknown as Response),
   );
@@ -1024,5 +1026,47 @@ describe('the tools the server publishes', () => {
     const detail = tool?.inputSchema.properties?.['include_detail'] as { description?: string };
     expect(detail.description).toMatch(/Off by default/);
     expect(tool?.inputSchema.required ?? []).not.toContain('include_detail');
+  });
+});
+
+describe('what a backend refusal tells the user', () => {
+  const remote: Config = { ...config, remote: true };
+
+  it('keeps the wait from a 429, from the body or from the header', async () => {
+    mockFetch(429, { error: 'rate_limited', retry_after_seconds: 42 });
+    expect(body(await whoami(config))).toContain('Wait 42 seconds');
+
+    // Same answer when only the header carries it.
+    mockFetch(429, { error: 'rate_limited' }, { 'retry-after': '7' });
+    const fromHeader = body(await whoami(config));
+    expect(fromHeader).toContain('Wait 7 seconds');
+    expect(fromHeader).toContain('Do not retry immediately');
+  });
+
+  it('says so plainly when a 429 carries no wait at all', async () => {
+    mockFetch(429, { error: 'rate_limited' });
+    const text = body(await whoami(config));
+    expect(text).toContain('rate limiting this account');
+    expect(text).not.toContain('Wait ');
+  });
+
+  it('tells a local user to check the environment variable', async () => {
+    mockFetch(401, { error: 'invalid_api_key' });
+    expect(body(await whoami(config))).toContain('HTMLRADAR_API_KEY');
+  });
+
+  it('tells a remote user to reconnect, and never names a variable they lack', async () => {
+    mockFetch(401, { error: 'invalid_api_key' });
+    const text = body(await whoami(remote));
+    expect(text).not.toContain('HTMLRADAR_API_KEY');
+    expect(text).toContain('Connected apps');
+    expect(text).toContain('Reconnect');
+  });
+
+  it('sends a remote user to the consent page for a read-only refusal', async () => {
+    mockFetch(403, { error: 'read_only_key' });
+    const text = body(await shareHtml(remote, { html: '<p>hi</p>', require_email: false }));
+    expect(text).not.toContain('create a full-access key');
+    expect(text).toContain('reconnect HTMLRadar in this client');
   });
 });

@@ -14,8 +14,11 @@ import { SectionMark } from '@/components/SectionMark';
 import { UpgradePending } from '@/components/UpgradePending';
 import { SubscriptionControls } from '@/components/SubscriptionControls';
 import { apiKeyPrefix, generateApiKey, hashApiKey } from '@/lib/api-auth';
+import { CONNECTOR_LABEL_PREFIX } from '@/lib/connect';
+import { reconcileConnectorRevocation } from '@/lib/connector-revoke';
 import { AnnualSwitch } from './AnnualSwitch';
 import { ApiKeys, type ApiKeyRow } from './ApiKeys';
+import { ConnectedApps } from './ConnectedApps';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -398,9 +401,10 @@ async function createApiKeyAction(
 async function revokeApiKeyAction(id: string): Promise<{ ok: boolean; error?: string }> {
   'use server';
   const user = await requireUser();
+  const supabase = serverClient();
   // RLS scopes this to the caller's own keys, so an id belonging to somebody
   // else updates nothing rather than revoking their key.
-  const { error } = await serverClient()
+  const { error } = await supabase
     .from('api_keys')
     .update({ revoked_at: new Date().toISOString() })
     .eq('id', id)
@@ -420,6 +424,10 @@ async function revokeApiKeyAction(id: string): Promise<{ ok: boolean; error?: st
     userId: user.id,
     properties: { api_key_id: id },
   });
+  // Contract §5, steps 2 and 3. Access is already closed by the line above;
+  // this tidies the OAuth grant and records the attempt either way, so the
+  // answer to the customer never depends on the connector being reachable.
+  await reconcileConnectorRevocation(supabase as never, user.id, id);
   return { ok: true };
 }
 
@@ -457,6 +465,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     .from('api_keys')
     .select('id, label, key_prefix, created_at, last_used_at, revoked_at')
     .order('created_at', { ascending: false });
+  const keyRows = (apiKeys ?? []) as ApiKeyRow[];
+  const connectorKeys = keyRows.filter((key) => key.label.startsWith(CONNECTOR_LABEL_PREFIX));
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
   let subState: ActiveSubscription | null = null;
@@ -563,10 +573,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
       </div>
 
       <ApiKeys
-        keys={(apiKeys ?? []) as ApiKeyRow[]}
+        keys={keyRows.filter((key) => !key.label.startsWith(CONNECTOR_LABEL_PREFIX))}
         createAction={createApiKeyAction}
         revokeAction={revokeApiKeyAction}
       />
+
+      <ConnectedApps keys={connectorKeys} revokeAction={revokeApiKeyAction} />
 
       <form action={signOut} className="mt-12 border-t border-line pt-8">
         <button

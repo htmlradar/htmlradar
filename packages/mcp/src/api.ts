@@ -12,6 +12,15 @@ export interface Config {
   apiKey: string;
   baseUrl: string;
   /**
+   * True when these tools are being served over the remote connector rather
+   * than from a local process. It changes exactly one thing: what a rejected
+   * key tells the user to do. A remote user has no `HTMLRADAR_API_KEY` to
+   * check — their key was minted by the consent page and lives inside the
+   * connection — so telling them to set an environment variable sends them
+   * somewhere they cannot act.
+   */
+  remote?: boolean;
+  /**
    * Why `apiKey` is empty, as one sentence naming the next step. Absent when
    * the key is usable. Every tool returns this instead of calling the API.
    */
@@ -145,7 +154,11 @@ function keyProblem(apiKey: string): string | null {
   return null;
 }
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
+// The environment is passed in rather than read from `process.env` here: this
+// module is bundled into the connector Worker too, where `process` does not
+// exist. The stdio entry point hands it over, and stays the only file that
+// knows what a process is.
+export function loadConfig(env: Record<string, string | undefined>): Config {
   const apiKey = env['HTMLRADAR_API_KEY']?.trim() ?? '';
   // Trailing slashes make every request path double-slashed, which some
   // edge routers 301 to a URL that drops the Authorization header.
@@ -193,23 +206,48 @@ export async function apiFetch<T>(
 
   const payload: unknown = await response.json().catch(() => null);
   if (response.ok) return { ok: true, data: payload as T };
-  return { ok: false, message: errorMessage(response.status, payload) };
+  return { ok: false, message: errorMessage(response.status, payload, response, config) };
 }
 
-function errorMessage(status: number, payload: unknown): string {
+function errorMessage(
+  status: number,
+  payload: unknown,
+  response: Response,
+  config: Config,
+): string {
   const body = (payload ?? {}) as {
     error?: string;
     message?: string;
     upgrade_url?: string;
     max_bytes?: number;
+    retry_after_seconds?: number;
   };
 
   switch (body.error) {
     case 'invalid_api_key':
-      return (
-        'HTMLRadar rejected the API key. Check HTMLRADAR_API_KEY — keys start with ' +
-        '"hr_live_" and are created at https://htmlradar.com/settings under "API keys".'
-      );
+      // Two different people, two different next steps. A local user has an
+      // environment variable to fix; a remote user has a connection to remake,
+      // and the usual reason they are here is that they revoked it.
+      return config.remote
+        ? "HTMLRadar rejected this connection's access. It was most likely switched off under " +
+            '"Connected apps" at https://htmlradar.com/settings. Reconnect HTMLRadar in this ' +
+            'client to get a new one. Do not retry this call.'
+        : 'HTMLRadar rejected the API key. Check HTMLRADAR_API_KEY — keys start with ' +
+            '"hr_live_" and are created at https://htmlradar.com/settings under "API keys".';
+    case 'rate_limited': {
+      // The wait is the whole content of a 429. Dropping it leaves an agent
+      // guessing, and an agent that guesses retries immediately.
+      const wait = body.retry_after_seconds ?? Number(response.headers.get('retry-after') ?? '');
+      const seconds = Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : null;
+      return [
+        seconds === null
+          ? 'HTMLRadar is rate limiting this account.'
+          : `HTMLRadar is rate limiting this account. Wait ${seconds} second${
+              seconds === 1 ? '' : 's'
+            } before trying again.`,
+        'Do not retry immediately — tell the user how long the wait is.',
+      ].join('\n');
+    }
     case 'free_limit_reached':
       // Relayed verbatim on purpose: this is a billing decision for the user
       // to make, not a transient failure. Retrying will fail identically.
@@ -230,12 +268,15 @@ function errorMessage(status: number, payload: unknown): string {
     case 'read_only_key':
       // Also relayed rather than retried: the key is fine, it simply does not
       // have this power, and only the user can decide to hand over one that
-      // does.
+      // does. Where they do that differs by how they connected.
       return [
         body.message ??
-          'This HTMLRadar API key is read-only and cannot create, revoke or replace anything.',
-        'Do not retry this call — tell the user, who can create a full-access key at ' +
-          'https://htmlradar.com/settings.',
+          'This HTMLRadar connection is read-only and cannot create, revoke or replace anything.',
+        config.remote
+          ? 'Do not retry this call — tell the user, who can reconnect HTMLRadar in this client ' +
+            'and choose read and publish.'
+          : 'Do not retry this call — tell the user, who can create a full-access key at ' +
+            'https://htmlradar.com/settings.',
       ].join('\n');
     case 'too_large':
       return `That HTML is too large for HTMLRadar. Maximum accepted size is ${

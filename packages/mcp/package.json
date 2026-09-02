@@ -34,7 +34,7 @@
     "cursor"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "node esbuild.config.mjs",
@@ -46,11 +46,12 @@
     "build:mcpb": "node esbuild.config.mjs && node scripts/build-mcpb.mjs"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@types/node": "^20.11.0",
     "esbuild": "^0.20.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0",
-    "zod": "4.1.11"
+    "zod": "4.5.4"
   }
 }

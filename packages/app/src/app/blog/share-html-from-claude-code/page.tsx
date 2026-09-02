@@ -282,7 +282,7 @@ export default function Post() {
             <section className="!mt-14">
               <h2 className={H2}>Before you start</h2>
               <ul className={LIST}>
-                <li>Node.js 18 or newer.</li>
+                <li>Node.js 20 or newer.</li>
                 <li>
                   An HTMLRadar account. Sign in at{' '}
                   <Link href="/sign-in" className="text-signal-dark hover:underline">

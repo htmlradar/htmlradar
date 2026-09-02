@@ -1,7 +1,7 @@
 // stdio entry point. Nothing may be written to stdout except JSON-RPC frames —
 // diagnostics go to stderr.
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { loadConfig, NO_API_KEY_MESSAGE } from './api.js';
 import { createServer } from './server.js';
 

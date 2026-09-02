@@ -8,8 +8,8 @@
 import { spawnSync } from 'node:child_process';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const stage = 'dist/mcpb';
@@ -118,7 +118,7 @@ const manifest = {
   keywords: ['html', 'tracked-link', 'read-tracking', 'docsend', 'deck', 'proposal'],
   license: pkg.license,
   privacy_policies: ['https://htmlradar.com/privacy'],
-  compatibility: { platforms: ['darwin', 'win32', 'linux'], runtimes: { node: '>=18' } },
+  compatibility: { platforms: ['darwin', 'win32', 'linux'], runtimes: { node: '>=20' } },
   user_config: {
     api_key: {
       type: 'string',

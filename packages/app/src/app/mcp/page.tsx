@@ -136,7 +136,7 @@ Free tracked links used: 1 of 2`;
 const TROUBLESHOOTING: [string, string][] = [
   [
     'npx: command not found',
-    'The server runs on Node.js 18 or newer. Install it from nodejs.org, open a new terminal, and check with node --version. Claude Desktop ships its own Node, so this only applies to the other clients.',
+    'The server runs on Node.js 20 or newer. Install it from nodejs.org, open a new terminal, and check with node --version. Claude Desktop ships its own Node, so this only applies to the other clients.',
   ],
   [
     'HTMLRadar rejected the API key',
@@ -275,7 +275,7 @@ export default function McpPage() {
               that moment the settings page hands you the commands below with your own key already
               filled in, so there is nothing to substitute by hand. Every client below runs the same
               command, <span className="font-mono text-[14px]">npx -y htmlradar-mcp</span>, and
-              needs Node.js 18 or newer, except Claude Desktop, which brings its own.
+              needs Node.js 20 or newer, except Claude Desktop, which brings its own.
             </p>
 
             <h3 className="mt-8 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
@@ -719,7 +719,7 @@ did anyone read the proposal I shared yesterday?`}
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               Current: <span className="font-mono text-[14px]">htmlradar-mcp@0.2.0</span> on npm,
-              Node.js 18 or newer. Every install line above runs{' '}
+              Node.js 20 or newer. Every install line above runs{' '}
               <span className="font-mono text-[14px]">npx -y htmlradar-mcp</span>, which fetches the
               latest version. The Claude Code plugin is different: its{' '}
               <span className="font-mono text-[14px]">.mcp.json</span> pins{' '}

@@ -3,9 +3,8 @@
 // Handlers are exported separately from `createServer` so the tests can call
 // them with a mocked `fetch` and no transport.
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod/v4';
+import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
+import { z } from 'zod';
 import {
   apiFetch,
   type ActivityResponse,
@@ -111,7 +110,7 @@ export async function shareHtml(config: Config, args: ShareHtmlArgs): Promise<Ca
     return failure('`html` is required — pass the HTML markup to publish.');
   }
 
-  const bytes = Buffer.byteLength(html, 'utf8');
+  const bytes = new TextEncoder().encode(html).byteLength;
   if (bytes > MAX_HTML_BYTES) {
     return failure(
       `That document is ${formatBytes(bytes)}; the limit is ${formatBytes(MAX_HTML_BYTES)}.`,
@@ -236,7 +235,7 @@ export async function replaceDocument(
     return failure('`html` is required — pass the full replacement markup.');
   }
 
-  const bytes = Buffer.byteLength(html, 'utf8');
+  const bytes = new TextEncoder().encode(html).byteLength;
   if (bytes > MAX_HTML_BYTES) {
     return failure(
       `That document is ${formatBytes(bytes)}; the limit is ${formatBytes(MAX_HTML_BYTES)}.`,

@@ -33,7 +33,7 @@ exited at startup, so if a tool call fails, run the command by hand and read wha
 
 ## Install
 
-The package is on npm. Every client below runs the same command, and needs Node.js 18 or newer
+The package is on npm. Every client below runs the same command, and needs Node.js 20 or newer
 (Claude Desktop brings its own):
 
 ```
@@ -466,7 +466,7 @@ Free tracked links used: 1 of 2
 
 ## Troubleshooting
 
-**`npx: command not found`.** The server runs on Node.js 18 or newer. Install it from
+**`npx: command not found`.** The server runs on Node.js 20 or newer. Install it from
 [nodejs.org](https://nodejs.org), open a new terminal, and check with `node --version`.
 
 **`HTMLRadar rejected the API key`.** Three usual causes. A character came along with the paste:
@@ -505,7 +505,7 @@ running.
 
 ## Versions
 
-Current: `htmlradar-mcp@0.2.0`, Node.js 18 or newer. Every install line above runs
+Current: `htmlradar-mcp@0.2.0`, Node.js 20 or newer. Every install line above runs
 `npx -y htmlradar-mcp`, which fetches the latest version. The Claude Code plugin is different: its
 `.mcp.json` pins `htmlradar-mcp@0.2.0`, and plugin users move to a newer server when the plugin
 itself is updated (`/plugin marketplace update htmlradar` picks up a new pin; third-party

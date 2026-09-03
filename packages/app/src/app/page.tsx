@@ -331,10 +331,14 @@ export default function LandingV2() {
                 </span>
               </span>
             </h1>
+            {/* The canonical one-sentence definition of HTMLRadar. The same
+             * wording appears on /about, /mcp, the README and llms.txt so a
+             * reader — or a model summarising us — meets one definition, not
+             * five paraphrases. Change it in all five places or in none. */}
             <p className="lede">
-              HTML tracker for decks, briefs, and proposals. Share any HTML document as a tracked
-              link. See who opened it, how long they stayed, and where they dwelled — down to the
-              section and the second.
+              HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal as a
+              tracked link, and seeing who opened it, which sections they read, and for how long.
+              Not one &ldquo;opened&rdquo; flag — dwell time, section by section.
             </p>
 
             <div className="cta-row">

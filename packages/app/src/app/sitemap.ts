@@ -23,6 +23,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes: MetadataRoute.Sitemap = [
     { url: `${baseUrl}/`, lastModified: connectorUpdate, changeFrequency: 'weekly', priority: 1 },
     { url: `${baseUrl}/why`, changeFrequency: 'monthly', priority: 0.8 },
+    // The entity page: what HTMLRadar is, who builds it, licence, source, package.
+    {
+      url: `${baseUrl}/about`,
+      lastModified: '2026-09-04',
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
     { url: `${baseUrl}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
     // /sign-in, /feedback and /connect are utility pages, not search results.
     // Their page metadata sets noindex, so they are deliberately omitted.

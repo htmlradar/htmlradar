@@ -22,6 +22,9 @@ export const runtime = 'edge';
 const TITLE = 'Share an HTML page from Claude Code, then ask who read it';
 const PATH = '/blog/share-html-from-claude-code';
 const PUBLISHED = '2026-08-31';
+// Last real content change: the remote-connector rewrite, 3 Sep 2026. Bump this
+// only when the words change - a cosmetic date bump is worth nothing.
+const UPDATED = '2026-09-03';
 
 export const metadata = pageMeta({
   title: 'Share HTML from Claude Code, See Who Read It | HTMLRadar',
@@ -228,7 +231,7 @@ export default function Post() {
       <NavBar />
       <main className="relative">
         <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
-          <ArticleLd headline={TITLE} datePublished={PUBLISHED} url={PATH} />
+          <ArticleLd headline={TITLE} datePublished={PUBLISHED} dateModified={UPDATED} url={PATH} />
           <BreadcrumbLd
             items={[
               { name: 'Home', url: '/' },
@@ -241,7 +244,8 @@ export default function Post() {
             Share an HTML page from Claude Code, then ask who read it
           </h1>
           <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-            {PUBLISHED} &nbsp;·&nbsp; 4 min read &nbsp;·&nbsp; Tutorial
+            Published {PUBLISHED} &nbsp;·&nbsp; Updated {UPDATED} &nbsp;·&nbsp; 4 min read
+            &nbsp;·&nbsp; Tutorial
           </p>
 
           <div className="mt-12 space-y-10 text-[16.5px] leading-[1.7] text-ink-soft">

@@ -71,6 +71,7 @@ export function V2Footer() {
         </FooterGroup>
 
         <FooterGroup title="Company">
+          <Link href="/about">About</Link>
           <Link href="/feedback">Feedback</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>

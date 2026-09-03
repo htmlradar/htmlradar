@@ -1,16 +1,32 @@
 # HTMLRadar
 
-HTMLRadar is read tracking for HTML documents. Upload an HTML file or paste
-a public URL, send the tracked link instead of the original file, and see
-who opened it, which sections they read, and how long they spent on each
-one. Built for decks, briefs, and proposals shared as HTML rather than PDF.
+HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal
+as a tracked link, and seeing who opened it, which sections they read, and for
+how long.
+
+Upload an HTML file or paste a public URL, send the tracked link instead of the
+original file, and see who opened it, which sections they read, and how long
+they spent on each one. Built for documents shared as HTML rather than PDF.
 
 Open source (AGPL-3.0), self-hostable on your own Cloudflare and Supabase
 accounts. Free for two tracked links; paid plans start at $15/month.
 
+## The facts
+
+- Licence: AGPL-3.0-or-later, for the whole product. A commercial licence exists.
+- Source: https://github.com/htmlradar/htmlradar
+- MCP server: npm package `htmlradar-mcp`; registry id `com.htmlradar/share`
+- Built by: the HTMLRadar team, hello@htmlradar.com. First commit 13 May 2026.
+- Price: free for two tracked links, then $15/month or $150/year. Self-hosting
+  is free.
+- Tracked links are served from a second domain, htmlradar.page, which carries
+  none of the application's cookies. Recipient documents are never indexed.
+- Full page text for the pages below: https://htmlradar.com/llms-full.txt
+
 ## Key pages
 
 - https://htmlradar.com/ — product overview and how it works
+- https://htmlradar.com/about — what HTMLRadar is, who builds it, licence, source
 - https://htmlradar.com/why — why HTMLRadar exists
 - https://htmlradar.com/pricing — plans and pricing
 - https://htmlradar.com/mcp — MCP server for Claude Code, Cursor, and Codex

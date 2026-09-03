@@ -15,7 +15,8 @@
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "qa:smoke": "playwright test e2e/smoke.spec.ts",
-    "gen:og": "node scripts/generate-og-card.mjs"
+    "gen:og": "node scripts/generate-og-card.mjs",
+    "gen:llms": "node scripts/gen-llms-full.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",

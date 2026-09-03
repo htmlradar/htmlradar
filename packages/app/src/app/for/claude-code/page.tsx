@@ -82,16 +82,16 @@ export default function ForClaudeCodePage() {
           <DirectAnswer updated="September 2026">
             When Claude Code writes a document for someone else — a deck, proposal or report —
             HTMLRadar turns it into a tracked link and reports back who opened it and which parts
-            held them. It can also send the same document to more people one link at a time, switch
-            a link off, and rewrite the document behind links that have already gone out. Install
-            the plugin, generate as usual, and the whole loop stays in the terminal. Free for two
-            links, then $15 a month.
+            held them. Install the plugin, generate as usual, and the whole loop stays in the
+            terminal. Free for two links, then $15 a month.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Claude Code is very good at producing a finished HTML document — a board update, a
             client proposal, a project brief with charts in it. The awkward part has always been
             what happens next. You copy the file somewhere, attach it to an email, and then it goes
-            quiet.
+            quiet. From here Claude can also send the same document to more people one link at a
+            time, switch a link off, and rewrite the document behind links that have already gone
+            out.
           </p>
 
           <figure className="mt-10">

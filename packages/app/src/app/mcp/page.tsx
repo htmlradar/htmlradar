@@ -14,7 +14,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'MCP Server — Share HTML as a Tracked Link | HTMLRadar',
   description:
-    'Turn the document your agent just wrote into a tracked link, then ask who opened it and which parts held them. One address for Claude Desktop and claude.ai; an npm package for every other MCP client.',
+    'Turn the document your agent just wrote into a tracked link, then ask who opened it and which parts held them. One address for Claude, a package for other clients.',
   path: '/mcp',
 });
 
@@ -50,39 +50,51 @@ const FAQ = [
 // are the real ones from packages/mcp/src/server.ts and the results say what
 // that tool actually returns, compressed to one line for a card; the ids,
 // links, viewers and timings are examples.
-const USE_CASES: { where: string; title: string; body: string; exchange: Exchange }[] = [
+const USE_CASES: { where: string; title: string; body: string; exchanges: Exchange[] }[] = [
   {
     where: 'In Claude Code',
     title: 'The client report, sent the moment it is written.',
     body: 'Claude Code finishes the report and publishes it in the same turn, so you paste one link into the email instead of attaching a file that then goes quiet. One link per client, each with its own reading report.',
-    exchange: {
-      prompt: 'share ./acme-report.html with Acme as a tracked link, email gate on',
-      tool: 'share_html',
-      result: 'htmlradar.page/r/acme-report',
-      note: 'the dashboard address and the share id come back with it',
-    },
+    exchanges: [
+      {
+        prompt: 'share ./acme-report.html with Acme as a tracked link, email gate on',
+        tool: 'share_html',
+        result: 'Tracked link: https://htmlradar.page/r/acme-report',
+        note: 'the dashboard address and the share id come back on the next two lines',
+      },
+    ],
   },
   {
     where: 'In Claude Desktop or at claude.ai',
     title: 'The deck built in the conversation, sent with tracking on.',
-    body: 'A consultant writes the deck with Claude and never downloads it: the connector publishes the markup Claude just produced. The client gets a link, and the first-open email arrives before the follow-up call.',
-    exchange: {
-      prompt: 'publish this deck as a tracked link for the Northwind team, put a password on it',
-      tool: 'share_html',
-      result: 'htmlradar.page/r/northwind-review',
-      note: 'password gate · save and print locked',
-    },
+    body: 'A consultant writes the deck with Claude and never downloads it: the connector publishes the markup Claude just produced. Northwind gets a link, and HTMLRadar emails you when somebody first reads it.',
+    exchanges: [
+      {
+        prompt: 'publish this deck as a tracked link for the Northwind team, put a password on it',
+        tool: 'share_html',
+        result: 'Tracked link: https://htmlradar.page/r/northwind-review',
+        note: 'the password, and the lock on saving and printing, were set in the same call',
+      },
+    ],
   },
   {
     where: 'In an agent workflow',
     title: 'The dashboard that publishes itself, then reports who looked.',
-    body: 'An agent running on a schedule publishes this week’s dashboard and, on the next run, reads back who opened last week’s. Because it can list what it already sent, the follow-up needs no ids from you.',
-    exchange: {
-      prompt: "publish this week's ops dashboard, then tell me who opened last week's",
-      tool: 'list_shares → get_share_activity',
-      result: 'ops-week-34 — opened · 2 viewers',
-      note: 'sam@ops active 6m 02s · scrolled 91% · priya@ops 41s',
-    },
+    body: 'An agent running on a schedule publishes this week’s dashboard, and on its next run finds last week’s in your list and reads its activity. Because it can list what it already sent, the follow-up needs no ids from you.',
+    exchanges: [
+      {
+        prompt: "publish this week's ops dashboard for the team",
+        tool: 'share_html',
+        result: 'Tracked link: https://htmlradar.page/r/ops-week-35',
+      },
+      {
+        when: 'the next run, a week later',
+        prompt: 'who opened last week’s dashboard?',
+        tool: 'list_shares, then get_share_activity',
+        result: 'Opened: yes — 2 viewers',
+        note: 'sam@ops · active 6m 02s · scrolled 91%',
+      },
+    ],
   },
 ];
 
@@ -92,7 +104,10 @@ const USE_CASES: { where: string; title: string; body: string; exchange: Exchang
 const CONNECTOR_URL = 'https://mcp.htmlradar.com/mcp';
 
 const CONNECTOR_STEPS: [string, string][] = [
-  ['Settings, then Connectors', 'In Claude Desktop or at claude.ai, both in the same place.'],
+  [
+    'Find Connectors in your Claude settings',
+    'In Claude Desktop and at claude.ai. On a Team or Enterprise plan an owner adds it for the organisation instead.',
+  ],
   [
     'Add custom connector',
     'Paste the address above and save. It appears in the list straight away.',
@@ -238,13 +253,13 @@ export default function McpPage() {
           <DirectAnswer updated="September 2026">
             When an agent writes a document for someone else, HTMLRadar turns it into a tracked link
             and reports back who opened it and which parts held them. Add it to Claude Desktop or
-            claude.ai by pasting one web address; Claude Code, Cursor and every other MCP client run
-            the npm package. Free for two links, then $15 a month. AGPL-3.0.
+            claude.ai by pasting one web address; Claude Code, Cursor and other MCP clients run the
+            npm package. Free for two links, then $15 a month. AGPL-3.0.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Plenty of MCP servers will put a file on the internet and hand back a URL. That is the
             easy half. The half that matters is the next morning, when you want to know whether the
-            person you sent it to actually read it — and this is the one where the agent can ask.
+            person you sent it to actually read it. That is the half this one keeps.
           </p>
 
           <figure className="mt-10">
@@ -273,8 +288,9 @@ export default function McpPage() {
               What people do with it
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              Three shapes of the same loop. You say it in words; the agent calls one tool; a link
-              or a reading report comes back.
+              Three shapes of the same loop. You say it in words, the agent reaches for a tool, and
+              a link or a reading report comes back. The lines below are the tools&rsquo; own
+              wording, shortened to fit &mdash; each one really prints a few lines more.
             </p>
             <div className="mt-8 space-y-10">
               {USE_CASES.map((c) => (
@@ -292,7 +308,7 @@ export default function McpPage() {
                     {c.body}
                   </p>
                   <div className="mt-5">
-                    <AgentExchange exchanges={[c.exchange]} />
+                    <AgentExchange exchanges={c.exchanges} />
                   </div>
                 </div>
               ))}
@@ -621,8 +637,8 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
               Both routes offer the same two levels, and read-only is what the connector&rsquo;s
               consent page pre-selects. Read-only lets Claude list your links and read who opened
               them. Read and publish adds creating a link, replacing a document and switching a link
-              off. Ask a read-only connection to publish and the answer is a refusal that names the
-              level you would have to grant, rather than a silent failure.
+              off. Ask a read-only connection to publish and it is refused by name &mdash; the
+              answer says which permission is missing &mdash; rather than failing silently.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               Neither level can delete a link or a document, change an account setting, or see
@@ -641,11 +657,15 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
               revoking are each capped at 120 calls an hour per account.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The only data that leaves your machine is the HTML the agent passes in and the
-              parameters of the call, sent to htmlradar.com or to the address in{' '}
-              <span className="font-mono text-[14px]">HTMLRADAR_API_URL</span> if you self-host. The
-              server reads no files and sends no telemetry. The activity report does include the
-              email addresses recipients typed at the gate, so the agent sees those.
+              What we receive is the same either way: the HTML the agent passes in, the parameters
+              of the call, and the key or connection it authenticated with. The two routes differ in
+              where the call starts. The package runs on your own machine and talks to
+              htmlradar.com, or to the address in{' '}
+              <span className="font-mono text-[14px]">HTMLRADAR_API_URL</span> if you self-host; it
+              reads no files of its own and sends no telemetry. The connector is called by Claude
+              from Anthropic&rsquo;s servers, so the markup reaches us through them. Either way the
+              activity report includes the email addresses recipients typed at the gate, so the
+              agent sees those.
             </p>
           </section>
 

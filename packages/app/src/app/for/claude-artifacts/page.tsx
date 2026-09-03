@@ -41,16 +41,27 @@ export default function ClaudeArtifactsPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             The workflow for tracking a Claude artifact you keep revising.
           </h1>
-          <DirectAnswer updated="August 2026">
-            Export a Claude artifact once, upload it to HTMLRadar, and send the tracked link instead
-            of the artifact URL. When the artifact changes, replace the uploaded file and the same
-            link serves the new version, so recipients never get a stale copy. Each recipient&apos;s
-            open, section-level read time, and optional email gate, password, or expiry come from
-            that one link. Free for two tracked links, open source.
+          <DirectAnswer updated="September 2026">
+            When Claude writes a document for someone else, HTMLRadar turns it into a tracked link
+            and reports back who opened it and which parts held them. Ask Claude to publish the
+            artifact and it does that in the conversation; or export it and upload it yourself.
+            Either way, replacing the file keeps the link you already sent. Free for two links.
           </DirectAnswer>
 
           <section className="mt-10">
             <p className="max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              There are two ways in, and the shorter one is worth knowing first. Add HTMLRadar to
+              Claude as a connector &mdash; Settings, Connectors, then paste{' '}
+              <span className="font-mono text-[14px]">https://mcp.htmlradar.com/mcp</span> &mdash;
+              and you can ask Claude to publish the artifact it just wrote without downloading
+              anything.{' '}
+              <Link href="/mcp#connector" className="text-signal-dark hover:underline">
+                The four steps in full
+              </Link>
+              . The export-and-upload route below is the fallback, and the one to use when the
+              artifact is not something Claude can hand over as one HTML file.
+            </p>
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               A published artifact gives you a URL. Here is what an HTMLRadar link adds on top of
               the same HTML.
             </p>

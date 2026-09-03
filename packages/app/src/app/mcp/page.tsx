@@ -6,6 +6,7 @@ import { Faq } from '@/components/Faq';
 import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { CodeBlock } from '@/components/CodeBlock';
+import { AgentExchange, type Exchange } from '@/components/mocks/AgentExchange';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
@@ -13,14 +14,14 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'MCP Server — Share HTML as a Tracked Link | HTMLRadar',
   description:
-    'An MCP server that publishes the HTML your agent just wrote as a tracked link, and reports back who opened it and which sections they read. Claude Code, Cursor, Codex and any MCP client.',
+    'Turn the document your agent just wrote into a tracked link, then ask who opened it and which parts held them. One address for Claude, a package for other clients.',
   path: '/mcp',
 });
 
 const FAQ = [
   {
     q: 'What does the HTMLRadar MCP server do?',
-    a: 'It lets your agent publish an HTML document as a tracked link, make more links for a document it has already published, list what you have sent, read back who opened a link and which sections held them, switch a link off, and replace a document while every link you have already sent keeps working. It is a stdio MCP server that works with Claude Code, Cursor, Codex CLI, and any other MCP client.',
+    a: 'It lets your agent publish an HTML document as a tracked link, make more links for a document it has already published, list what you have sent, read back who opened a link and which sections held them, switch a link off, and replace a document while every link you have already sent keeps working. There are two routes to it: a custom connector you add to Claude Desktop or claude.ai by pasting one web address, and a stdio npm package for Claude Code, Cursor, Codex CLI and any other MCP client.',
   },
   {
     q: 'How is this different from other publish-from-an-agent MCP servers?',
@@ -28,7 +29,7 @@ const FAQ = [
   },
   {
     q: 'Do I need an API key?',
-    a: 'Yes. Sign in at htmlradar.com, open Settings, and create a key under API keys. Pass it to the server as the HTMLRADAR_API_KEY environment variable rather than as a literal command-line argument, so it stays out of your shell history. The server reads nothing else and sends no telemetry.',
+    a: 'For the package, yes. Sign in at htmlradar.com, open Settings, and create a key under API keys. Pass it to the server as the HTMLRADAR_API_KEY environment variable rather than as a literal command-line argument, so it stays out of your shell history. The server reads nothing else and sends no telemetry. If you add HTMLRadar to Claude Desktop or claude.ai as a custom connector instead, there is no key to make: you sign in when Claude first uses a tool and the key is minted for that connection.',
   },
   {
     q: 'What does the recipient see?',
@@ -42,6 +43,83 @@ const FAQ = [
     q: 'Can I point it at my own instance?',
     a: 'Yes. HTMLRadar is AGPL-3.0 end to end. Set HTMLRADAR_API_URL to your own deployment and the server talks to that instead of htmlradar.com.',
   },
+];
+
+// The three shapes the loop takes, each drawn as one exchange so the page
+// shows what using it feels like rather than listing prompts. The tool names
+// are the real ones from packages/mcp/src/server.ts and the results say what
+// that tool actually returns, compressed to one line for a card; the ids,
+// links, viewers and timings are examples.
+const USE_CASES: { where: string; title: string; body: string; exchanges: Exchange[] }[] = [
+  {
+    where: 'In Claude Code',
+    title: 'The client report, sent the moment it is written.',
+    body: 'Claude Code finishes the report and publishes it in the same turn, so you paste one link into the email instead of attaching a file that then goes quiet. One link per client, each with its own reading report.',
+    exchanges: [
+      {
+        prompt: 'share ./acme-report.html with Acme as a tracked link, email gate on',
+        tool: 'share_html',
+        result: 'Tracked link: https://htmlradar.page/r/acme-report',
+        note: 'the dashboard address and the share id come back on the next two lines',
+      },
+    ],
+  },
+  {
+    where: 'In Claude Desktop or at claude.ai',
+    title: 'The deck built in the conversation, sent with tracking on.',
+    body: 'A consultant writes the deck with Claude and never downloads it: the connector publishes the markup Claude just produced. Northwind gets a link, and HTMLRadar emails you when somebody first reads it.',
+    exchanges: [
+      {
+        prompt: 'publish this deck as a tracked link for the Northwind team, put a password on it',
+        tool: 'share_html',
+        result: 'Tracked link: https://htmlradar.page/r/northwind-review',
+        note: 'the password, and the lock on saving and printing, were set in the same call',
+      },
+    ],
+  },
+  {
+    where: 'In an agent workflow',
+    title: 'The dashboard that publishes itself, then reports who looked.',
+    body: 'An agent running on a schedule publishes this week’s dashboard, and on its next run finds last week’s in your list and reads its activity. Because it can list what it already sent, the follow-up needs no ids from you.',
+    exchanges: [
+      {
+        prompt: "publish this week's ops dashboard for the team",
+        tool: 'share_html',
+        result: 'Tracked link: https://htmlradar.page/r/ops-week-35',
+      },
+      {
+        when: 'the next run, a week later',
+        prompt: 'who opened last week’s dashboard?',
+        tool: 'list_shares, then get_share_activity',
+        result: 'Opened: yes — 2 viewers',
+        note: 'sam@ops · active 6m 02s · scrolled 91%',
+      },
+    ],
+  },
+];
+
+// The remote connector's address, from CONNECTOR-CONTRACT-2026-09-02.md §7
+// (SERVER_URL). Claude Desktop and claude.ai take this in "Add custom
+// connector"; every other client runs the npm package below.
+const CONNECTOR_URL = 'https://mcp.htmlradar.com/mcp';
+
+const CONNECTOR_STEPS: [string, string][] = [
+  [
+    'Find Connectors in your Claude settings',
+    'In Claude Desktop and at claude.ai. On a Team or Enterprise plan an owner adds it for the organisation instead.',
+  ],
+  [
+    'Add custom connector',
+    'Paste the address above and save. It appears in the list straight away.',
+  ],
+  [
+    'Sign in',
+    'The first time Claude reaches for a tool it shows a Connect card. Click it and sign in to HTMLRadar.',
+  ],
+  [
+    'Allow',
+    'Choose what Claude may do, click Allow, and the conversation carries on from where it stopped.',
+  ],
 ];
 
 // Cursor's install link, as built by cursor.com/install-mcp:
@@ -172,15 +250,16 @@ export default function McpPage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Publish the HTML your agent just wrote as a tracked link.
           </h1>
-          <DirectAnswer updated="August 2026">
-            The HTMLRadar MCP server gives Claude Code, Cursor, Codex and any MCP client one tool
-            that turns an HTML deck, proposal or report into a tracked link, and a second tool that
-            reports who opened it, how long they read, and which sections held them. Free for two
-            links, then $15 a month. AGPL-3.0.
+          <DirectAnswer updated="September 2026">
+            When an agent writes a document for someone else, HTMLRadar turns it into a tracked link
+            and reports back who opened it and which parts held them. Add it to Claude Desktop or
+            claude.ai by pasting one web address; Claude Code, Cursor and other MCP clients run the
+            npm package. Free for two links, then $15 a month. AGPL-3.0.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-            Your agent writes an HTML deck. You send it. Then nothing — you have no idea whether it
-            was opened. This closes that loop without leaving the terminal.
+            Plenty of MCP servers will put a file on the internet and hand back a URL. That is the
+            easy half. The half that matters is the next morning, when you want to know whether the
+            person you sent it to actually read it. That is the half this one keeps.
           </p>
 
           <figure className="mt-10">
@@ -204,67 +283,91 @@ export default function McpPage() {
             </figcaption>
           </figure>
 
-          <section className="mt-14">
+          <section className="mt-14" id="use-cases">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              The one thing other publish-from-agent servers do not do
+              What people do with it
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              There are plenty of MCP servers that will put a file on the internet and hand back a
-              URL. That is the easy half. The half that matters is the next morning, when you want
-              to know whether the person you sent it to actually read it.
+              Three shapes of the same loop. You say it in words, the agent reaches for a tool, and
+              a link or a reading report comes back. The lines below are the tools&rsquo; own
+              wording, shortened to fit &mdash; each one really prints a few lines more.
             </p>
-            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              HTMLRadar is the one where the agent can ask. &ldquo;Did anyone read the proposal I
-              shared yesterday?&rdquo; returns a real answer: opened at 14:02, four minutes of
-              active reading, 87% scroll depth, two minutes forty on The Ask, skipped Market sizing.
+            <div className="mt-8 space-y-10">
+              {USE_CASES.map((c) => (
+                <div
+                  key={c.title}
+                  className="border-t border-line pt-8 first:border-t-0 first:pt-0"
+                >
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+                    {c.where}
+                  </p>
+                  <h3 className="mt-3 font-serif text-[21px] leading-snug text-ink md:text-[23px]">
+                    {c.title}
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-soft">
+                    {c.body}
+                  </p>
+                  <div className="mt-5">
+                    <AgentExchange exchanges={c.exchanges} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-8 text-[15px] leading-relaxed text-ink-soft">
+              The Claude Code version of the first one, command by command, is in the{' '}
+              <Link href="/for/claude-code" className="text-signal-dark hover:underline">
+                Claude Code walkthrough
+              </Link>
+              .
             </p>
           </section>
 
-          <section className="mt-14">
+          <section className="mt-14" id="connector">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              What people use it for
+              Add to Claude with one link
             </h2>
-            <div className="mt-6 space-y-7">
-              <div>
-                <p className="text-[15px] leading-relaxed text-ink-soft">
-                  Claude just finished the board update, and you want a link for the email plus to
-                  know tomorrow who opened it.{' '}
-                  <Link href="/for/claude-code" className="text-signal-dark hover:underline">
-                    Full walkthrough.
-                  </Link>
-                </p>
-                <CodeBlock
-                  code={`share q3-board-update.html with the board as a tracked link, email gate on`}
-                />
-              </div>
-              <div>
-                <p className="text-[15px] leading-relaxed text-ink-soft">
-                  A client proposal that should not float around for weeks, gated by email and dead
-                  in three days.{' '}
-                  <Link href="/for/claude-code" className="text-signal-dark hover:underline">
-                    Full walkthrough.
-                  </Link>
-                </p>
-                <CodeBlock
-                  code={`read ./proposal.html and turn it into a tracked link for hello@acme.com, expiring in 72 hours`}
-                />
-              </div>
-              <div>
-                <p className="text-[15px] leading-relaxed text-ink-soft">
-                  The next morning, checking whether it was read and which sections held them.{' '}
-                  <Link href="/for/claude-code" className="text-signal-dark hover:underline">
-                    Full walkthrough.
-                  </Link>
-                </p>
-                <CodeBlock
-                  code={`did anyone read the Acme proposal? which sections did they spend time on?`}
-                />
-              </div>
-            </div>
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              Claude Desktop and claude.ai take a web address where the other clients take a
+              command. Nothing to install, no Node.js, and no API key to make first — you sign in to
+              HTMLRadar the first time Claude actually reaches for a tool, and the key is minted for
+              you then.
+            </p>
+            <CodeBlock label="add custom connector" code={CONNECTOR_URL} />
+            <ol className="mt-6 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
+              {CONNECTOR_STEPS.map(([step, detail], i) => (
+                <li key={step} className="flex gap-4 px-5 py-4">
+                  <span className="mt-1 shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-signal-dark">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[14.5px] text-ink">{step}</span>
+                    <span className="mt-1 block text-[14px] leading-relaxed text-ink-soft">
+                      {detail}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+
+            <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-ink-soft">
+              What Claude is then allowed to do is your choice on the consent page, and it is{' '}
+              <a href="#permissions" className="text-signal-dark hover:underline">
+                spelled out below
+              </a>
+              .
+            </p>
           </section>
 
           <section className="mt-14" id="install">
-            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">Install</h2>
+            <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
+              Install the package
+            </h2>
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              The other route, and the only one for Claude Code, Cursor, Codex CLI, Gemini CLI and
+              every client below: run the published npm package yourself with a key you made. It
+              also works in Claude Desktop, if you would rather hold the key than hand out a
+              connection.
+            </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               First create an API key at{' '}
               <Link href="/settings" className="text-signal-dark hover:underline">
@@ -526,34 +629,43 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
             <CodeBlock label="json" code={GENERIC_JSON} />
           </section>
 
-          <section className="mt-14" id="key">
+          <section className="mt-14" id="permissions">
             <h2 className="font-serif text-[28px] leading-snug text-ink md:text-[32px]">
-              What the key can do
+              What Claude is allowed to do
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              You are about to hand a key to an agent, so here is exactly what it opens. A
-              full-access key can create tracked links, switch one off and back on, replace a
-              document, and read activity and the plan. A read-only key can only list and read: it
-              gets a 403 back for creating, revoking, or replacing anything. Neither key can delete
-              a link or a document, change an account setting, or see another account: a share id
-              that belongs to someone else comes back as not found.
+              Both routes offer the same two levels, and read-only is what the connector&rsquo;s
+              consent page pre-selects. Read-only lets Claude list your links and read who opened
+              them. Read and publish adds creating a link, replacing a document and switching a link
+              off. Ask a read-only connection to publish and it is refused by name &mdash; the
+              answer says which permission is missing &mdash; rather than failing silently.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              A key is shown once, and only a hash of it is stored. Revoke it at{' '}
+              Neither level can delete a link or a document, change an account setting, or see
+              another account: a share id that belongs to someone else comes back as not found.
+            </p>
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+              Turning it off is in one place either way. A connection is listed under{' '}
+              <span className="font-mono text-[13px]">Connected apps</span> in{' '}
               <Link href="/settings" className="text-signal-dark hover:underline">
                 htmlradar.com/settings
-              </Link>
-              ; revocation is immediate. Every route is rate-limited: creating and replacing share
-              one account budget of 75 calls an hour on Pro and 30 on free, plus 120 calls an hour
-              from one address, while listing and revoking are each capped at 120 calls an hour per
-              account.
+              </Link>{' '}
+              and revoking it there ends its access on the very next tool call. A key is shown once,
+              only a hash of it is stored, and revoking it in the same place is immediate. Every
+              route is rate-limited: creating and replacing share one account budget of 75 calls an
+              hour on Pro and 30 on free, plus 120 calls an hour from one address, while listing and
+              revoking are each capped at 120 calls an hour per account.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The only data that leaves your machine is the HTML the agent passes in and the
-              parameters of the call, sent to htmlradar.com or to the address in{' '}
-              <span className="font-mono text-[14px]">HTMLRADAR_API_URL</span> if you self-host. The
-              server reads no files and sends no telemetry. The activity report does include the
-              email addresses recipients typed at the gate, so the agent sees those.
+              What we receive is the same either way: the HTML the agent passes in, the parameters
+              of the call, and the key or connection it authenticated with. The two routes differ in
+              where the call starts. The package runs on your own machine and talks to
+              htmlradar.com, or to the address in{' '}
+              <span className="font-mono text-[14px]">HTMLRADAR_API_URL</span> if you self-host; it
+              reads no files of its own and sends no telemetry. The connector is called by Claude
+              from Anthropic&rsquo;s servers, so the markup reaches us through them. Either way the
+              activity report includes the email addresses recipients typed at the gate, so the
+              agent sees those.
             </p>
           </section>
 

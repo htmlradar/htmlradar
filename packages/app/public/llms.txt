@@ -14,6 +14,10 @@ accounts. Free for two tracked links; paid plans start at $15/month.
 - https://htmlradar.com/why — why HTMLRadar exists
 - https://htmlradar.com/pricing — plans and pricing
 - https://htmlradar.com/mcp — MCP server for Claude Code, Cursor, and Codex
+- https://mcp.htmlradar.com/mcp — the remote connector: paste this address into
+  Claude Desktop or claude.ai under Settings, Connectors, Add custom connector,
+  and the agent can publish tracked links and read back who opened them. No
+  install and no API key; you sign in when Claude first uses a tool.
 - https://htmlradar.com/tools/html-to-link — free tool: share an HTML file as a tracked link
 - https://htmlradar.com/compare/docsend — HTMLRadar vs DocSend
 - https://htmlradar.com/blog — engineering and product writing

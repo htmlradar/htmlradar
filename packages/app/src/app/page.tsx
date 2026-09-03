@@ -21,6 +21,7 @@ import type { ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
 import { V2Footer } from '@/components/V2Footer';
 import { SoftwareApplicationLd } from '@/components/JsonLd';
+import { AgentExchange } from '@/components/mocks/AgentExchange';
 import { pageMeta } from '@/lib/seo';
 import { LandingEffects } from './LandingEffects';
 import { AuthLink, AuthText } from './AuthCta';
@@ -902,6 +903,56 @@ export default function LandingV2() {
               <span className="name">jen@firm.co</span>
               <span className="stat">3m 04s · 78%</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────── FROM CLAUDE ─────────────────────── */}
+      {/* Placed straight after the workflow: the workflow is the manual
+       * route (drop a file, send a link, watch the reads), and this is the
+       * same three steps without the upload. It comes before Controls so
+       * the per-share settings read as applying to both routes. Deliberately
+       * one section, one visual, one link — the hero is untouched. */}
+      <section className="v2-agent py-24 md:py-28" id="from-claude">
+        <div className="mx-auto grid max-w-[1080px] gap-10 px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:items-center lg:gap-14">
+          <div>
+            <div className="v2-kicker v2-reveal">Works with Claude</div>
+            <h2 className="v2-reveal d1 font-serif text-[clamp(24px,3vw,40px)] font-bold leading-[1.05] tracking-[-0.025em] text-ink">
+              Share straight from{' '}
+              <em className="font-semibold italic text-[color:var(--brand)]">Claude</em>.
+            </h2>
+            <p className="v2-reveal d2 mt-5 max-w-[46ch] text-[16px] leading-relaxed text-ink-soft">
+              When Claude writes a document for someone else, HTMLRadar turns it into a tracked link
+              without leaving the conversation. The next morning you ask the same Claude who opened
+              it and which parts held them.
+            </p>
+            <Link
+              href="/mcp"
+              className="v2-reveal d3 mt-6 inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.14em] text-signal-dark hover:underline"
+            >
+              Add it to Claude
+              <span aria-hidden>&rarr;</span>
+            </Link>
+          </div>
+          <div className="v2-reveal d2">
+            <AgentExchange
+              exchanges={[
+                {
+                  prompt:
+                    'share the Acme proposal as a tracked link for jane@acme.com, expiring in 72 hours',
+                  tool: 'share_html',
+                  result: 'htmlradar.page/r/acme-proposal',
+                  note: 'email gate on · expires in 72 hours',
+                },
+                {
+                  when: 'the next morning',
+                  prompt: 'did anyone read the Acme proposal?',
+                  tool: 'get_share_activity',
+                  result: 'jane@acme.com — opened 14:02 · active 4m 12s · scrolled 87%',
+                  note: 'read most: The Ask 2m 41s, Problem 48s',
+                },
+              ]}
+            />
           </div>
         </div>
       </section>

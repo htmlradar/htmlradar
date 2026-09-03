@@ -253,7 +253,9 @@ export default function Post() {
 
             <p>
               Closing that gap takes one MCP server and about two minutes, without leaving the
-              terminal. I built HTMLRadar, so weigh the enthusiasm accordingly.
+              terminal. By the end of this post the document your agent wrote is a tracked link, and
+              the same agent can tell you who opened it and which parts held them. I built
+              HTMLRadar, so weigh the enthusiasm accordingly.
             </p>
 
             {/* The whole post in one glance. */}
@@ -334,6 +336,17 @@ export default function Post() {
               <p className="mt-6">
                 Check it with <C>claude mcp list</C>, or <C>/mcp</C> in a session. Then ask
                 something harmless — how many free links are left — which calls <C>whoami</C>.
+              </p>
+              <p className="mt-6">
+                This whole page is about Claude Code, so it is a terminal and a key. If you are in
+                Claude Desktop or at claude.ai instead, there is no command and no key: open
+                Settings, then Connectors, then Add custom connector, and paste{' '}
+                <C>https://mcp.htmlradar.com/mcp</C> — you sign in to HTMLRadar the first time
+                Claude uses a tool. The four steps are on the{' '}
+                <Link href="/mcp#connector" className="text-signal-dark hover:underline">
+                  MCP page
+                </Link>
+                .
               </p>
               <Transcript title="claude · htmlradar">
                 <Out code={WHOAMI} />

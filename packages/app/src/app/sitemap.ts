@@ -16,8 +16,12 @@ const SITE_URL = 'https://htmlradar.com';
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = SITE_URL;
 
+  // Bumped when a page's content actually changed, so IndexNow and Search
+  // Console see a real signal rather than a build timestamp on every route.
+  const connectorUpdate = '2026-09-03'; // the connector's route and its messaging landed on these five pages
+
   const routes: MetadataRoute.Sitemap = [
-    { url: `${baseUrl}/`, changeFrequency: 'weekly', priority: 1 },
+    { url: `${baseUrl}/`, lastModified: connectorUpdate, changeFrequency: 'weekly', priority: 1 },
     { url: `${baseUrl}/why`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
     // /sign-in, /feedback and /connect are utility pages, not search results.
@@ -56,13 +60,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${baseUrl}/for/claude-artifacts`,
+      lastModified: connectorUpdate,
       changeFrequency: 'monthly',
       priority: 0.7,
     },
     { url: `${baseUrl}/for/reveal-js`, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${baseUrl}/mcp`, changeFrequency: 'monthly', priority: 0.6 },
+    {
+      url: `${baseUrl}/mcp`,
+      lastModified: connectorUpdate,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
     {
       url: `${baseUrl}/for/claude-code`,
+      lastModified: connectorUpdate,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
@@ -98,6 +109,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Published 2026-08-31.
     {
       url: `${baseUrl}/blog/share-html-from-claude-code`,
+      lastModified: connectorUpdate,
       changeFrequency: 'monthly',
       priority: 0.6,
     },

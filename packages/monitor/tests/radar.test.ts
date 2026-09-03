@@ -358,9 +358,9 @@ function stubMiningWorld(opts: {
       if (url.startsWith('https://hn.algolia.com')) {
         return (opts.hn ?? json({ hits: [] })).clone();
       }
-      if (url.startsWith('https://www.reddit.com')) return (opts.reddit ?? emptyReddit).clone();
-      if (url.startsWith('https://old.reddit.com'))
+      if (url.startsWith('https://www.reddit.com/r/all/search.rss'))
         return (opts.redditFallback ?? emptyReddit).clone();
+      if (url.startsWith('https://www.reddit.com')) return (opts.reddit ?? emptyReddit).clone();
       throw new Error(`unexpected fetch: ${url}`);
     },
   );
@@ -445,8 +445,8 @@ describe('scanThreads mines every source into radar_items and stays silent', () 
   });
 });
 
-describe('scanReddit retries a 429 against old.reddit.com before giving up', () => {
-  it('falls back to old.reddit.com and still mines the item it returns', async () => {
+describe('scanReddit retries a 429 against r/all/search.rss before giving up', () => {
+  it('falls back to r/all/search.rss and still mines the item it returns', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { upserts, outbox } = stubMiningWorld({
       reddit: new Response('', { status: 429 }),
@@ -471,9 +471,47 @@ describe('scanReddit retries a 429 against old.reddit.com before giving up', () 
     const redditFetches = (
       run.meta!['fetches'] as { source: string; status: number | null }[]
     ).filter((f) => f.source === 'Reddit');
-    // Every Reddit fetch got a 429 first and a 200 on the old.reddit.com retry —
-    // the recorded status is the retry's, since that's what the query landed on.
+    // Every Reddit fetch got a 429 first and a 200 on the r/all/search.rss
+    // retry — the recorded status is the retry's, since that's what the
+    // query landed on.
     expect(redditFetches.every((f) => f.status === 200)).toBe(true);
+  });
+});
+
+describe('scanReddit retries a 200 non-XML block page before giving up', () => {
+  it('falls back to r/all/search.rss when the primary search.rss returns an HTML body', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { upserts, outbox } = stubMiningWorld({
+      // The interstitial Reddit sometimes serves instead of a 429: a 200 with
+      // no xml content-type. This is exactly what 3 Sep's "claude artifact"
+      // share and "send proposal" queries hit on www.reddit.com/search.rss,
+      // and it used to be a dead end — no retry fired for it at all.
+      reddit: new Response('<html>blocked</html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }),
+      redditFallback: new Response(
+        redditXml(
+          'Claude artifact share thread',
+          'https://reddit.com/r/test/2',
+          new Date(TUESDAY).toISOString(),
+        ),
+        { status: 200, headers: { 'content-type': 'application/atom+xml' } },
+      ),
+    });
+
+    await scanThreads(env, 0, TUESDAY, 5);
+
+    const rows = upserts[0]!;
+    const item = rows.find(
+      (r) => (r as { source_url: string }).source_url === 'https://reddit.com/r/test/2',
+    );
+    expect(item).toBeTruthy();
+    const run = outbox.find((r) => r.kind === 'scan_run')!;
+    const redditFetches = (
+      run.meta!['fetches'] as { source: string; status: number | null; error?: string }[]
+    ).filter((f) => f.source === 'Reddit');
+    expect(redditFetches.every((f) => f.status === 200 && !f.error)).toBe(true);
   });
 });
 

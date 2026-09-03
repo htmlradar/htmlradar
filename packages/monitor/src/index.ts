@@ -517,9 +517,11 @@ const SCAN_QUERY_GAP_MS = 45_000;
 // than one that says plainly what it is. Kept close to the endpoints that use
 // it rather than up with the other scan constants.
 const REDDIT_USER_AGENT = 'htmlradar-radar/1.0 (+https://htmlradar.com)';
-// One retry, one host swap: www.reddit.com and old.reddit.com don't share a
-// rate-limit bucket, so a 429 or a stalled request against one is worth one
-// more try against the other before the query counts as failed.
+// One retry against a different search path. old.reddit.com's search.rss
+// used to be that second path, but it now redirects every anonymous request
+// to a login wall regardless of query or User-Agent (checked 4 Sep 2026), so
+// a 429 or a 200-with-non-XML block page instead gets one retry against
+// r/all's search.rss on www.reddit.com before the query counts as failed.
 const REDDIT_RETRY_DELAY_MS = 5_000;
 
 const ENTITIES: Record<string, string> = {
@@ -619,21 +621,37 @@ async function scanHN(query: string, sinceSec: number): Promise<ScanResult> {
   return { status: res.status, items };
 }
 
-function redditRssUrl(host: string, query: string): string {
-  return `https://${host}/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`;
+function redditRssUrl(query: string): string {
+  return `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`;
 }
 
-function fetchRedditRss(host: string, query: string): Promise<Response> {
-  return fetch(redditRssUrl(host, query), {
+// old.reddit.com's search.rss is the fallback path this used to hit, but it
+// now redirects every anonymous request to a login wall — confirmed 4 Sep
+// 2026 across queries and User-Agents, so it's a host-wide dead end, not
+// something worth retrying into. r/all's search.rss on www.reddit.com still
+// serves XML anonymously and is a different path than the plain search
+// endpoint, which is what clears Reddit's transient block page.
+function redditFallbackUrl(query: string): string {
+  return `https://www.reddit.com/r/all/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week&restrict_sr=0`;
+}
+
+function fetchRedditUrl(url: string): Promise<Response> {
+  return fetch(url, {
     headers: { 'User-Agent': REDDIT_USER_AGENT },
     signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
   });
 }
 
+function isXml(res: Response): boolean {
+  return (res.headers.get('content-type') ?? '').includes('xml');
+}
+
 // Reddit blocks datacentre IPs often enough that treating a refusal as an
 // error would take the HN half of the scan down with it. Anything that isn't
-// a 200 of XML is a silent skip for that query — except a 429 or a timeout,
-// which get one retry against old.reddit.com's search.rss before giving up.
+// a 200 of XML is a silent skip for that query — except a 429, a timeout, or
+// a 200 whose body isn't XML (Reddit's block page, sometimes served with a
+// 200 instead of a 429), which get one retry against r/all's search.rss
+// before giving up.
 async function scanReddit(
   query: string,
   sinceMs: number,
@@ -641,17 +659,17 @@ async function scanReddit(
 ): Promise<ScanResult> {
   let res: Response;
   try {
-    res = await fetchRedditRss('www.reddit.com', query);
-    if (res.status === 429) {
+    res = await fetchRedditUrl(redditRssUrl(query));
+    if (res.status === 429 || (res.ok && !isXml(res))) {
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-      res = await fetchRedditRss('old.reddit.com', query);
+      res = await fetchRedditUrl(redditFallbackUrl(query));
     }
   } catch {
     // A hung request (AbortSignal.timeout) or any other network throw is
-    // worth the same one retry against the other host.
+    // worth the same one retry against the fallback path.
     await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     try {
-      res = await fetchRedditRss('old.reddit.com', query);
+      res = await fetchRedditUrl(redditFallbackUrl(query));
     } catch (err2) {
       return { status: 0, items: [], error: `fetch threw: ${(err2 as Error).message}` };
     }
@@ -659,7 +677,7 @@ async function scanReddit(
   if (!res.ok) return { status: res.status, items: [] };
   // A 200 whose body is not XML is Reddit's block page, which used to be
   // indistinguishable from a 200 with no matching threads. Say which it was.
-  if (!(res.headers.get('content-type') ?? '').includes('xml')) {
+  if (!isXml(res)) {
     return {
       status: res.status,
       items: [],

@@ -88,8 +88,8 @@ export default function Post() {
           <div className="mt-12 space-y-10 break-words text-[16.5px] leading-[1.7] text-ink-soft">
             <p className="italic">
               Disclosure: HTMLRadar is our own product, and it is the seventh of the seven tested
-              here. Every comparison in this piece is one we have an interest in, and it is marked
-              as ours in each place where the comparison is made.
+              here. Every comparison in this piece is one we have a stake in, and we&apos;ve marked
+              it as ours everywhere it appears.
             </p>
 
             <section>
@@ -134,7 +134,7 @@ export default function Post() {
                 top and the bottom of the page rather than the whole text.
               </p>
               <p className="mt-4">
-                One thing to carry through the whole piece:{' '}
+                One note that applies throughout:{' '}
                 <code className="font-mono text-[14px] text-signal-dark">document.cookie</code>{' '}
                 cannot see HttpOnly cookies, and it reads only the top-level origin. Every cookie
                 count here is therefore a lower bound, and is written as &quot;visible to{' '}
@@ -221,7 +221,7 @@ export default function Post() {
                 and changed nothing else. It is the only link in this set that we control. The other
                 six were opened the way any recipient opens one.
               </p>
-              <p className="mt-4">The limits, stated plainly because they are real:</p>
+              <p className="mt-4">The limits:</p>
               <ol className="mt-4 ml-5 list-decimal space-y-4 marker:text-signal-dark">
                 <li>
                   <strong className="font-semibold text-ink">One link each.</strong> On DocSend and
@@ -386,8 +386,8 @@ export default function Post() {
               </p>
               <p className="mt-4 italic">
                 DocSend&apos;s owner, Dropbox, acknowledged the note through its privacy support
-                desk on 30 August. No substantive response had arrived by 4 September 2026, the day
-                this piece went up on the HTMLRadar blog.
+                desk on 30 August. We had not received a response addressing the finding by 4
+                September 2026, the day this piece went up on the HTMLRadar blog.
               </p>
 
               <h3 className="mt-8 font-serif text-[20px] leading-snug text-ink">Papermark</h3>
@@ -414,7 +414,8 @@ export default function Post() {
                 after the scroll moved the counter from 1 to 10.
               </p>
               <p className="mt-4 italic">
-                No response by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+                No reply had reached us by 4 September 2026, the day this piece went up on the
+                HTMLRadar blog.
               </p>
 
               <h3 className="mt-8 font-serif text-[20px] leading-snug text-ink">Peony</h3>
@@ -466,7 +467,8 @@ export default function Post() {
                 <code className="font-mono text-[14px] text-signal-dark">$user_id</code>.
               </p>
               <p className="mt-4 italic">
-                No response by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+                We had not heard back by 4 September 2026, the day this piece went up on the
+                HTMLRadar blog.
               </p>
 
               <h3 className="mt-8 font-serif text-[20px] leading-snug text-ink">Stacktree</h3>
@@ -484,7 +486,8 @@ export default function Post() {
                 third-party surface I recorded on this link: one blocked request.
               </p>
               <p className="mt-4 italic">
-                No response by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+                Nothing had come back by 4 September 2026, the day this piece went up on the
+                HTMLRadar blog.
               </p>
 
               <h3 className="mt-8 font-serif text-[20px] leading-snug text-ink">Tiiny.host</h3>
@@ -525,8 +528,8 @@ export default function Post() {
 
               <h3 className="mt-8 font-serif text-[20px] leading-snug text-ink">HummingDeck</h3>
               <p className="mt-4">
-                24 non-first-party hosts is the largest count in the table, and the structure behind
-                it needs stating first. The room contains exactly one iframe:
+                24 non-first-party hosts is the largest count in the table, and here&apos;s why. The
+                room contains exactly one iframe:
               </p>
               <div className="mt-6">
                 <CodeBlock file="hummingdeck · iframe" code={HUMMINGDECK_IFRAME} />
@@ -609,9 +612,9 @@ export default function Post() {
               </h2>
               <p className="mt-4">
                 HTMLRadar is ours, which is why the test covers seven links and not six. Same link
-                type, same method. The fifteen-second window below is directly comparable with the
-                six products above. The heartbeat lines come from the separate 55-second run and are
-                labelled as such.
+                type. The fifteen-second window below is directly comparable with the six products
+                above. The heartbeat lines come from the separate 55-second run and are labelled as
+                such.
               </p>
               <p className="mt-4">
                 <strong className="font-semibold text-ink">
@@ -639,8 +642,8 @@ export default function Post() {
                   ewennjnxuqjzsgawbzur.supabase.co
                 </code>
                 . In the 55-second run, three more, all to the same host. No other destination
-                appeared in either log: no third endpoint, no image beacon, no separate event
-                collector, no non-HTMLRadar host.
+                appeared in either log for our tracker: no third endpoint, no image beacon, no
+                separate event collector, no non-HTMLRadar host.
               </p>
               <div className="mt-6">
                 <CodeBlock file="htmlradar · rpc payloads" code={HTMLRADAR_RPC} />
@@ -752,9 +755,9 @@ export default function Post() {
                 </code>
                 : it stops the running session, then sends the reader to a confirmation page, and
                 the button there records the choice in a cookie the proxy sets and checks on every
-                request. None of the other six tools in this set offers a way to opt out of its own
-                read tracking - DocSend&apos;s cookie banner controls third-party advertising and
-                analytics cookies, not DocSend&apos;s own page-view tracking.
+                request. We did not find a way to opt out of a tool&apos;s own read tracking on any
+                of the other six links - DocSend&apos;s cookie banner controls third-party
+                advertising and analytics cookies, not DocSend&apos;s own page-view tracking.
               </p>
               <p className="mt-4">
                 <strong className="font-semibold text-ink">

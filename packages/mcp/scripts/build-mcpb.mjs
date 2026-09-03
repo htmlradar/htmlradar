@@ -60,8 +60,9 @@ const manifest = {
   long_description:
     'Turns an HTML deck, proposal or report into a tracked HTMLRadar link, and reports back who ' +
     'opened it, how long they read, how far they scrolled and which sections held their ' +
-    'attention. Needs an HTMLRadar API key from https://htmlradar.com/settings. Free for two ' +
-    'tracked links.',
+    'attention. Two ways in: add it to Claude Desktop or claude.ai as a custom connector at ' +
+    'https://mcp.htmlradar.com/mcp, with no install and no API key, or run this package with a ' +
+    'key from https://htmlradar.com/settings. Free for two tracked links.',
   // The directories that read this expect the author URL to be the place the
   // source lives, not the product's marketing page.
   author: { name: 'HTMLRadar', email: 'hello@htmlradar.com', url: 'https://github.com/htmlradar' },

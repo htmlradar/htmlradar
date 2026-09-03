@@ -237,8 +237,8 @@ export default function McpPage() {
           <DirectAnswer updated="September 2026">
             When an agent writes a document for someone else, HTMLRadar turns it into a tracked link
             and reports back who opened it and which parts held them. Add it to Claude Desktop or
-            claude.ai by pasting one web address, or run the npm package in Claude Code, Cursor,
-            Codex and other MCP clients. Free for two links, then $15 a month. AGPL-3.0.
+            claude.ai by pasting one web address; Claude Code, Cursor and every other MCP client run
+            the npm package. Free for two links, then $15 a month. AGPL-3.0.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Plenty of MCP servers will put a file on the internet and hand back a URL. That is the

@@ -794,32 +794,32 @@ describe('an edit is a new version awaiting its own tap, never a post', () => {
   });
 });
 
-describe('the daily cap is five reservations in twenty-four hours', () => {
+describe('the daily cap is two reservations in twenty-four hours', () => {
   const reservation = (n: number, hoursAgo: number) => ({
     thing_id: `t3_old${n}`,
     draft_id: `posted-${n}`,
     created_at: new Date(NOW - hoursAgo * 3_600_000).toISOString(),
   });
 
-  it('refuses the sixth before the tap is even spent, so the button survives', async () => {
+  it('refuses the third before the tap is even spent, so the button survives', async () => {
     const world: World = {
       drafts: [draftRecord()],
-      reservations: [1, 2, 3, 4, 5].map((n) => reservation(n, n)),
+      reservations: [1, 2].map((n) => reservation(n, n)),
     };
     const { telegram, reddit } = stub(world);
 
     await handleTelegramUpdate(env, tap('post'), NOW);
 
     expect(reddit).toHaveLength(0);
-    expect(toast(telegram)).toContain('more than 5 in 24 hours');
+    expect(toast(telegram)).toContain('more than 2 in 24 hours');
     // Not consumed: the same button works tomorrow.
     expect(world.drafts[0]).toMatchObject({ status: 'pending', nonce_used_at: null });
   });
 
-  it('lets the sixth through once one has aged out of the window', async () => {
+  it('lets the third through once one has aged out of the window', async () => {
     const world: World = {
       drafts: [draftRecord()],
-      reservations: [...[1, 2, 3, 4].map((n) => reservation(n, n)), reservation(5, 25)],
+      reservations: [reservation(1, 1), reservation(2, 25)],
     };
     const { reddit } = stub(world);
 

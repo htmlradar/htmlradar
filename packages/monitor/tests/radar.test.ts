@@ -584,7 +584,7 @@ describe('dailyDigest is a strict opportunity filter: <=3 items, only above REPL
       source: 'Reddit',
       // An allow-listed subreddit: r/test would now be filtered out before the
       // draft step, which is a different rule's test.
-      source_url: 'https://www.reddit.com/r/SaaS/comments/2/docsend_alternative/',
+      source_url: 'https://www.reddit.com/r/ppc/comments/2/docsend_alternative/',
       title: 'Any good DocSend alternative that is actually open source?',
       snippet: null,
       category: 'competitor_mention',
@@ -700,7 +700,7 @@ describe('weeklyInsight summarises the pattern, not a raw dump', () => {
 describe('subredditOf reads the subreddit out of a thread URL', () => {
   it('reads it from www, old and bare reddit hosts, case-folded', () => {
     expect(subredditOf('https://www.reddit.com/r/ClaudeAI/comments/abc/title/')).toBe('claudeai');
-    expect(subredditOf('https://old.reddit.com/r/webdev/comments/abc/title/')).toBe('webdev');
+    expect(subredditOf('https://old.reddit.com/r/nocode/comments/abc/title/')).toBe('nocode');
     expect(subredditOf('https://reddit.com/r/SaaS/comments/abc/')).toBe('saas');
   });
 
@@ -733,12 +733,37 @@ describe('redditReplyBlocked enforces the allow list and the age limit', () => {
     );
   });
 
-  it('blocks an allow-listed thread once it is older than seven days', () => {
-    const eightDaysOld = new Date(TUESDAY - 8 * 24 * 3_600_000).toISOString();
+  it('blocks the subreddits Sol found forbid the comment outright', () => {
+    for (const sub of [
+      'Entrepreneur',
+      'marketing',
+      'sales',
+      'freelance',
+      'webdev',
+      'startups',
+      'SaaS',
+    ])
+      expect(redditReplyBlocked({ source_url: url(sub) })).toContain('not on the allow list');
+  });
+
+  it('blocks a Reddit link whose subreddit cannot be read, rather than waving it through', () => {
+    expect(redditReplyBlocked({ source_url: 'https://redd.it/abc123' })).toContain(
+      'cannot be read',
+    );
+    expect(redditReplyBlocked({ source_url: 'https://www.reddit.com/user/somebody/' })).toContain(
+      'cannot be read',
+    );
     expect(
-      redditReplyBlocked({ source_url: url('ClaudeAI'), published_at: eightDaysOld }, TUESDAY),
-    ).toContain('older than seven days');
-    const twoDaysOld = new Date(TUESDAY - 2 * 24 * 3_600_000).toISOString();
+      redditReplyBlocked({ source_url: 'https://www.reddit.com/search/?q=docsend' }),
+    ).toContain('cannot be read');
+  });
+
+  it('blocks an allow-listed thread once it is older than a fortnight', () => {
+    const sixteenDaysOld = new Date(TUESDAY - 16 * 24 * 3_600_000).toISOString();
+    expect(
+      redditReplyBlocked({ source_url: url('ClaudeAI'), published_at: sixteenDaysOld }, TUESDAY),
+    ).toContain('older than fourteen days');
+    const twoDaysOld = new Date(TUESDAY - 9 * 24 * 3_600_000).toISOString();
     expect(
       redditReplyBlocked({ source_url: url('ClaudeAI'), published_at: twoDaysOld }, TUESDAY),
     ).toBeNull();
@@ -776,7 +801,7 @@ describe('draftReply refuses a subreddit we may not speak in, and always leaves 
   it('drafts for an allow-listed subreddit, opening with the slot the founder must replace', () => {
     const draft = draftReply({
       ...item,
-      source_url: 'https://www.reddit.com/r/SaaS/comments/abc/x/',
+      source_url: 'https://www.reddit.com/r/nocode/comments/abc/x/',
     });
     expect(draft).toBeTruthy();
     expect(draft).toContain(DRAFT_ANSWER_SLOT);
@@ -837,7 +862,7 @@ describe('the digest never surfaces a thread we may not reply to', () => {
 
   it('drops an allow-listed thread that has gone cold', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const stale = new Date(TUESDAY - 9 * 24 * 3_600_000).toISOString();
+    const stale = new Date(TUESDAY - 20 * 24 * 3_600_000).toISOString();
     const { telegram, outbox } = stubDigestWorld({
       recent: [redditItem('ClaudeAI', 95, stale)],
       scanRun: [

@@ -1229,6 +1229,12 @@ const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60_000;
 // readRecentRadarItems for the score floor that keeps this a real cap, not
 // just "all we happened to find").
 const DIGEST_MAX_ITEMS = 3;
+// How many rows the digest reads before filtering out the subreddits we may not
+// speak in and the threads that have gone cold. Well above the cap on purpose:
+// filtering after a read of exactly three would let three blocked rows empty a
+// digest that had good items behind them. A hundred is far more than a day
+// produces, so this is one query, not a pager.
+const DIGEST_CANDIDATE_LIMIT = 100;
 // Telegram hard-caps at 4096; stop well short so the appended weekly section
 // and a draft can't push the last item past the cliff.
 const DIGEST_MAX_CHARS = 3_800;
@@ -1271,27 +1277,31 @@ interface RadarRow {
 //
 // Membership here means only "a disclosed founder comment is permitted at all".
 // The per-subreddit conditions that follow from that (comments only, never a
-// post; the weekly megathread; karma and age gates) are in the document, because
-// the founder does the posting by hand and the code cannot check them.
+// post; the weekly megathread; karma, age and flair gates) are in the document,
+// because the founder does the posting by hand and the code cannot check them.
+//
+// Seven subreddits that looked obvious came off this list after Sol's review of
+// 3 September read their live rules: r/Entrepreneur, r/marketing, r/sales,
+// r/freelance and r/webdev forbid the comment outright (r/sales bans a seller
+// recommending their own product even when asked, on pain of a permanent ban);
+// r/startups requires a linked page to be one the commenter has no affiliation
+// with; r/SaaS allows one product mention per sixty days and rejects text that
+// reads as machine-written even when a human pasted it. The founder may still
+// answer in all seven in his own words with no mention — that is participation,
+// and the point is that no machine drafts it for him.
 const REDDIT_ALLOWED_SUBREDDITS = new Set([
   'alexhormozi',
   'askmarketing',
   'claudeai',
   'claudecode',
   'consulting',
-  'entrepreneur',
-  'freelance',
   'indiehackers',
-  'marketing',
+  'leanstartup',
   'nocode',
   'ppc',
-  'saas',
-  'sales',
   'selfhosted',
   'sideproject',
   'smallbusiness',
-  'startups',
-  'webdev',
 ]);
 
 // Named separately from "merely not on the allow list" so the reason we skipped
@@ -1308,9 +1318,11 @@ const REDDIT_NEVER_SUBREDDITS = new Set([
 ]);
 
 // A thread older than this is cold: the asker has moved on, and a reply arriving
-// a week late reads as somebody working a keyword list rather than answering a
-// person. Seven days also matches the widest window any source gives us.
-const THREAD_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+// a fortnight late reads as somebody working a keyword list rather than
+// answering a person. This is our own rule, not Reddit's — no Reddit or
+// subreddit rule sets any deadline. Fourteen days rather than seven after Sol's
+// review pointed out that the shorter window costs real reach for no safety.
+const THREAD_MAX_AGE_MS = 14 * 24 * 60 * 60_000;
 
 /** The subreddit in a Reddit thread URL, lowercased, or null for any other URL. */
 export function subredditOf(url: string | null | undefined): string | null {
@@ -1319,6 +1331,12 @@ export function subredditOf(url: string | null | undefined): string | null {
       .exec(url ?? '')?.[1]
       ?.toLowerCase() ?? null
   );
+}
+
+/** True for any address on Reddit's own hosts, including the redd.it share
+ *  shortener, whether or not a subreddit can be read out of it. */
+function isRedditUrl(url: string | null | undefined): boolean {
+  return /^https?:\/\/(?:[a-z0-9-]+\.)?(?:reddit\.com|redd\.it)(?:[/?#]|$)/i.test(url ?? '');
 }
 
 /** Why this item must not receive a drafted reply, or null when it may.
@@ -1331,13 +1349,20 @@ export function redditReplyBlocked(
   nowMs?: number,
 ): string | null {
   const sub = subredditOf(item.source_url);
-  if (sub === null) return null;
+  // A Reddit address we cannot read a subreddit out of — a redd.it share link,
+  // a user page, a search result — is blocked rather than waved through. The
+  // allow list is only a defence if an unreadable Reddit URL fails closed.
+  if (sub === null)
+    return isRedditUrl(item.source_url)
+      ? 'the subreddit cannot be read from this Reddit link'
+      : null;
   if (REDDIT_NEVER_SUBREDDITS.has(sub))
     return `r/${sub} is a competitor-owned or promotional subreddit`;
   if (!REDDIT_ALLOWED_SUBREDDITS.has(sub)) return `r/${sub} is not on the allow list`;
   if (nowMs !== undefined && item.published_at) {
     const age = nowMs - Date.parse(item.published_at);
-    if (Number.isFinite(age) && age > THREAD_MAX_AGE_MS) return `thread is older than seven days`;
+    if (Number.isFinite(age) && age > THREAD_MAX_AGE_MS)
+      return 'thread is older than fourteen days';
   }
   return null;
 }
@@ -1492,7 +1517,7 @@ async function readRecentRadarItems(env: Env, nowMs: number): Promise<RadarRow[]
     `${env.SUPABASE_URL}/rest/v1/radar_items` +
       `?first_seen_at=gte.${since}&category=neq.noise&intent_score=gte.${REPLY_THRESHOLD}` +
       `&acted=is.false` +
-      `&order=intent_score.desc,first_seen_at.desc&limit=${DIGEST_MAX_ITEMS * 5}` +
+      `&order=intent_score.desc,first_seen_at.desc&limit=${DIGEST_CANDIDATE_LIMIT}` +
       `&select=source,source_url,title,snippet,category,intent_score,published_at`,
     { headers: radarHeaders(env) },
   );
@@ -1700,10 +1725,17 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
 // short-lived access token per post, and no code path here writes any of them
 // to a row, a log line, or a message.
 
-/** The worker's pre-flight copy of the cap, for a friendlier message before a
- *  tap is spent. reserve_radar_post() in schema/046 is the authority; these two
- *  disagreeing costs a nicer sentence, never a sixth comment. */
-const REDDIT_DAILY_CAP = 5;
+/** The cap on comments in a rolling 24 hours. The worker checks it before a tap
+ *  is spent, for a friendlier message, and passes the same number to
+ *  reserve_radar_post(), which decides it under a lock and is the authority — so
+ *  there is one number rather than two that can drift apart.
+ *
+ *  Two, not the five the function defaults to, because the engagement standard
+ *  says at most two comments a day and a written rule the code contradicts is
+ *  not a rule. The standard's other two limits, five a week and one per
+ *  subreddit per week, are the founder's discipline until a migration can count
+ *  them in the same locked function. */
+const REDDIT_DAILY_CAP = 2;
 const ONETAP_WINDOW_MS = 24 * 60 * 60_000;
 /** How long a button stays tappable. Long enough for a weekend. */
 const DRAFT_TTL_MS = 72 * 60 * 60_000;
@@ -1873,7 +1905,7 @@ async function reservePost(env: Env, draftId: string, thingId: string): Promise<
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/reserve_radar_post`, {
     method: 'POST',
     headers: { ...radarHeaders(env), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_draft_id: draftId, p_thing_id: thingId }),
+    body: JSON.stringify({ p_draft_id: draftId, p_thing_id: thingId, p_cap: REDDIT_DAILY_CAP }),
   });
   if (!res.ok) throw new Error(`reserve_radar_post HTTP ${res.status}`);
   return String(await res.json());

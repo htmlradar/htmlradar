@@ -13,12 +13,21 @@ import {
 } from './harness.js';
 import type { Env } from '../src/common.js';
 
+// The limiter's window is real wall-clock seconds (`nowSeconds()` in
+// src/common.ts). Left alone, a slow CI runner can carry a loop across a
+// 60-second window boundary mid-test, resetting the count and making the
+// assertion below flake. Freezing the clock removes that: every request in a
+// test lands in the same window no matter how long the runner actually takes.
+const FIXED_NOW = new Date('2026-01-01T00:00:00Z');
+
 beforeEach(() => {
   withCompatibilityFlag(true);
   stubNetwork();
+  vi.setSystemTime(FIXED_NOW);
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 const FROM = { 'cf-connecting-ip': '198.51.100.7' };
@@ -80,6 +89,13 @@ describe('the /token budget', () => {
   });
 });
 
+// These three tests each drive 240+ requests through the real worker (crypto,
+// KV) sequentially or concurrently. That's genuine CPU/IO work, not
+// clock-dependent — the frozen clock above only stops the window from rolling
+// over mid-test, it doesn't make the loop itself faster — so a slow CI runner
+// still needs more than vitest's 5s default.
+const MANY_REQUESTS_TIMEOUT_MS = 20_000;
+
 describe('the /mcp budget', () => {
   /** One protocol call from a chosen address, with a chosen bearer token. */
   function mcp(env: Env, token: string, address: string): Promise<Response> {
@@ -98,40 +114,54 @@ describe('the /mcp budget', () => {
     );
   }
 
-  it('cannot be escaped by choosing a different token each time', async () => {
-    const env = makeEnv();
-    // Every request carries a token nobody issued, and a fresh one each time.
-    // If the budget were keyed on anything out of the token, this would buy an
-    // unlimited number of buckets and never be refused.
-    for (let i = 0; i < 240; i += 1) {
-      expect((await mcp(env, `user-${i}:grant-${i}:secret`, '198.51.100.9')).status).not.toBe(429);
-    }
-    expect((await mcp(env, 'user-999:grant-999:secret', '198.51.100.9')).status).toBe(429);
-  });
+  it(
+    'cannot be escaped by choosing a different token each time',
+    async () => {
+      const env = makeEnv();
+      // Every request carries a token nobody issued, and a fresh one each time.
+      // If the budget were keyed on anything out of the token, this would buy an
+      // unlimited number of buckets and never be refused.
+      for (let i = 0; i < 240; i += 1) {
+        expect((await mcp(env, `user-${i}:grant-${i}:secret`, '198.51.100.9')).status).not.toBe(
+          429,
+        );
+      }
+      expect((await mcp(env, 'user-999:grant-999:secret', '198.51.100.9')).status).toBe(429);
+    },
+    MANY_REQUESTS_TIMEOUT_MS,
+  );
 
-  it('cannot be spent on somebody else, because the token is not the identity', async () => {
-    const env = makeEnv();
-    const victim = await completeGrant(env);
+  it(
+    'cannot be spent on somebody else, because the token is not the identity',
+    async () => {
+      const env = makeEnv();
+      const victim = await completeGrant(env);
 
-    // An attacker at their own address, naming the victim's connection in the
-    // bearer token, exhausts their own budget and nobody else's.
-    for (let i = 0; i < 241; i += 1) await mcp(env, victim.accessToken, '203.0.113.99');
-    expect((await mcp(env, victim.accessToken, '203.0.113.99')).status).toBe(429);
+      // An attacker at their own address, naming the victim's connection in the
+      // bearer token, exhausts their own budget and nobody else's.
+      for (let i = 0; i < 241; i += 1) await mcp(env, victim.accessToken, '203.0.113.99');
+      expect((await mcp(env, victim.accessToken, '203.0.113.99')).status).toBe(429);
 
-    // The victim, at their own address, is unaffected.
-    expect((await mcp(env, victim.accessToken, '198.51.100.1')).status).toBe(200);
-  });
+      // The victim, at their own address, is unaffected.
+      expect((await mcp(env, victim.accessToken, '198.51.100.1')).status).toBe(200);
+    },
+    MANY_REQUESTS_TIMEOUT_MS,
+  );
 
-  it('does not lose parallel requests, so a concurrent caller cannot hold it still', async () => {
-    const env = makeEnv();
-    // All at once. A read-then-write counter loses these: every request reads
-    // the same value and writes the same value back, so the budget never moves
-    // and the ceiling is never reached.
-    await Promise.all(
-      Array.from({ length: 241 }, () => mcp(env, 'user-x:grant-x:secret', '192.0.2.50')),
-    );
-    expect((await mcp(env, 'user-x:grant-x:secret', '192.0.2.50')).status).toBe(429);
-  });
+  it(
+    'does not lose parallel requests, so a concurrent caller cannot hold it still',
+    async () => {
+      const env = makeEnv();
+      // All at once. A read-then-write counter loses these: every request reads
+      // the same value and writes the same value back, so the budget never moves
+      // and the ceiling is never reached.
+      await Promise.all(
+        Array.from({ length: 241 }, () => mcp(env, 'user-x:grant-x:secret', '192.0.2.50')),
+      );
+      expect((await mcp(env, 'user-x:grant-x:secret', '192.0.2.50')).status).toBe(429);
+    },
+    MANY_REQUESTS_TIMEOUT_MS,
+  );
 });
 
 describe('a counter that cannot be read', () => {

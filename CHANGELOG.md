@@ -28,6 +28,7 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 
 - **Share expiry timezone** — the live share form now converts the `datetime-local` value to ISO in the browser before submit, so an expiry set as local time is stored at the intended instant.
 - **Copy-link button** — falls back to a hidden-textarea copy when the async clipboard API is unavailable, instead of silently doing nothing.
+- **Flaky connector rate-limit tests** — `packages/connector/tests/ratelimit.test.ts` now freezes the clock with `vi.setSystemTime` so a slow CI runner can't carry a test across a 60-second window boundary, and the three heavy-iteration cases get a 20s timeout instead of vitest's 5s default.
 
 ---
 

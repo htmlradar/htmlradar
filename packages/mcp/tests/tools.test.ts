@@ -534,9 +534,14 @@ describe('whoami', () => {
     expect(text).not.toContain('jane@acme.com');
   });
 
-  it('shows an absent cap as unlimited', async () => {
+  // 0.3.0 printed "7 of unlimited" for a paid plan — a counter against a
+  // denominator that is not a number. A null cap means no free-link limit,
+  // so say that and stop counting.
+  it('reports an absent cap as unlimited, with no counter', async () => {
     mockFetch(200, { user_id: 'u_1', tier: 'pro', free_links_used: 7, free_links_cap: null });
-    expect(body(await whoami(config))).toContain('7 of unlimited');
+    const text = body(await whoami(config));
+    expect(text).toBe('Plan: pro\nTracked links: unlimited');
+    expect(text).not.toContain('7');
   });
 
   // Two lines, exactly. 0.2.0 printed three, the first being the account's

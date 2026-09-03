@@ -419,10 +419,15 @@ export function formatShareList(list: ShareListResponse): string {
 // need either. The plan and the budget are the whole answer to "which account
 // am I on and what can it still do".
 export function formatMe(me: MeResponse): string {
-  const cap = me.free_links_cap === null ? 'unlimited' : String(me.free_links_cap);
-  return [`Plan: ${me.tier}`, `Free tracked links used: ${me.free_links_used} of ${cap}`].join(
-    '\n',
-  );
+  // A null cap means no free-link limit applies — say so plainly rather than
+  // printing a counter against "unlimited", which is not a fraction.
+  if (me.free_links_cap === null) {
+    return [`Plan: ${me.tier}`, 'Tracked links: unlimited'].join('\n');
+  }
+  return [
+    `Plan: ${me.tier}`,
+    `Free tracked links used: ${me.free_links_used} of ${me.free_links_cap}`,
+  ].join('\n');
 }
 
 // Rounding rule for every number in the readable summary: FLOOR, applied

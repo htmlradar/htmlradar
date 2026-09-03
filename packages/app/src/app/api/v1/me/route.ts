@@ -15,11 +15,17 @@ export async function GET(req: NextRequest) {
   if ('error' in auth) return errorResponse(auth.error);
   const { caller } = auth;
 
+  // Pro has no free-link cap to report — null means unlimited (see
+  // MeResponse in packages/mcp/src/api.ts). A free account's used count is
+  // capped at its own allowance before it leaves this endpoint: a legacy or
+  // comped account can have more shares than the free cap allows, and "12 of
+  // 2 used" is not a sentence anything downstream can parse.
   const quota = await readQuota(serviceClient(), caller.userId);
+  const isPro = quota.tier === 'pro';
   return jsonResponse(200, {
     user_id: caller.userId,
     tier: quota.tier,
-    free_links_used: quota.used,
-    free_links_cap: quota.cap,
+    free_links_used: isPro ? quota.used : Math.min(quota.used, quota.cap),
+    free_links_cap: isPro ? null : quota.cap,
   });
 }

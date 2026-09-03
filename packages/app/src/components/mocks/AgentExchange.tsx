@@ -27,7 +27,7 @@ export function AgentExchange({ exchanges }: { exchanges: Exchange[] }) {
         <div key={x.prompt} className={i > 0 ? 'border-t border-line' : undefined}>
           <div className="px-4 py-4 sm:px-5">
             {x.when ? (
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-graphite">
+              <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.16em] text-graphite">
                 {x.when}
               </p>
             ) : null}
@@ -46,7 +46,7 @@ export function AgentExchange({ exchanges }: { exchanges: Exchange[] }) {
               {x.result}
             </p>
             {x.note ? (
-              <p className="mt-1.5 font-mono text-[11.5px] leading-relaxed text-graphite [overflow-wrap:anywhere]">
+              <p className="mt-1.5 font-mono text-[12.5px] leading-relaxed text-graphite [overflow-wrap:anywhere]">
                 {x.note}
               </p>
             ) : null}

@@ -43,7 +43,7 @@ const FACTS: { k: string; v: React.ReactNode }[] = [
   },
   {
     k: 'Since',
-    v: 'The first commit landed on 13 May 2026. The hosted service has run since then.',
+    v: 'The first commit landed on 13 May 2026.',
   },
   {
     k: 'Licence',
@@ -103,6 +103,16 @@ const FACTS: { k: string; v: React.ReactNode }[] = [
     ),
   },
   {
+    k: 'How the sender learns who read it',
+    v: (
+      <>
+        A tracked link asks the reader for an email address before it opens the document. That gate
+        is on by default and can be switched off per link; with it off, a read is recorded as a
+        visit rather than a named person.
+      </>
+    ),
+  },
+  {
     k: 'Where documents are served',
     v: (
       <>
@@ -134,8 +144,8 @@ const FACTS: { k: string; v: React.ReactNode }[] = [
     k: 'What it costs',
     v: (
       <>
-        Free for two tracked links, then $15 a month or $150 a year for unlimited links.
-        Self-hosting is free and always will be.{' '}
+        Free for two tracked links, then $15 a month or $150 a year for unlimited links. The
+        software is free to self-host; you pay your own infrastructure providers directly.{' '}
         <Link href="/pricing" className={LINK}>
           Full pricing
         </Link>
@@ -191,15 +201,9 @@ export default function AboutPage() {
               Why it exists
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The documents that matter stopped being PDFs. A spec, a report, a design mock, a deck
-              — more of them are HTML now, because that is what an LLM hands you. But the tools for
-              sending a document and learning whether it was read were all built around uploading a
-              file, so an HTML document goes out as an attachment or a bare link and then goes
-              silent. HTMLRadar is the missing half of that: send the link, and get back who opened
-              it and which sections held them.
-            </p>
-            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The longer version is on{' '}
+              More of the documents that matter are HTML now, because that is what an LLM hands you,
+              but the tools for learning whether one was read were all built around uploading a
+              file. The argument in full is on{' '}
               <Link href="/why" className={LINK}>
                 the why page
               </Link>
@@ -216,13 +220,11 @@ export default function AboutPage() {
               Corrections
             </h2>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              If anything on this site is wrong — a claim about a competitor, a number, a licence
-              term — tell us at{' '}
+              If anything on this page is wrong or has gone out of date, tell us at{' '}
               <a href="mailto:hello@htmlradar.com" className={LINK}>
                 hello@htmlradar.com
               </a>{' '}
-              and we will correct it and say what changed. Comparison pages name our own product as
-              ours wherever a comparison is made.
+              and we will correct it and say what changed.
             </p>
           </section>
         </article>

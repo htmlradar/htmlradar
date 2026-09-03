@@ -7,6 +7,13 @@
 
 const SITE_URL = 'https://htmlradar.com';
 const GITHUB_URL = 'https://github.com/htmlradar/htmlradar';
+// Trustpilot was removed on 4 Sep 2026: Sol's review found the listing's
+// categories and country wrong, and a directory entry that misdescribes us is
+// negative entity evidence, not positive. It goes back only once corrected.
+//
+// Standing rule from the same review: an HTTP 200 from a directory proves a
+// page answered, not that it carries a correct HTMLRadar listing. Check the
+// rendered entry before adding or keeping any URL below.
 const SAME_AS = [
   GITHUB_URL,
   'https://www.npmjs.com/package/htmlradar-mcp',
@@ -19,7 +26,6 @@ const SAME_AS = [
   // no honest URL to add for it here.
   'https://smithery.ai/servers/htmlradar/share',
   'https://www.crunchbase.com/organization/htmlradar',
-  'https://www.trustpilot.com/review/htmlradar.com',
   'https://stackshare.io/htmlradar',
 ];
 
@@ -63,11 +69,17 @@ export function SoftwareApplicationLd() {
         url: SITE_URL,
         description:
           'HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal as a tracked link, and seeing who opened it, which sections they read, and for how long.',
-        license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+        license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html',
         // The free tier is real (two tracked links), so a 0-price Offer is
         // honest. Paid plans are named too rather than hidden behind it.
         offers: [
-          { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free — 2 tracked links' },
+          {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD',
+            name: 'Free',
+            description: 'Two tracked links. Not an unlimited free tier.',
+          },
           { '@type': 'Offer', price: '15', priceCurrency: 'USD', name: 'Pro — monthly' },
           { '@type': 'Offer', price: '150', priceCurrency: 'USD', name: 'Pro — yearly' },
         ],

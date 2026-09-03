@@ -33,7 +33,7 @@ const UPDATED = '2026-09-04';
 const FAQ = [
   {
     q: 'Does a shared deck link track the person who opens it?',
-    a: 'Every one of the seven tools tested loads something beyond the document itself, and all seven send at least one request to their own servers recording that the link was opened. The differences are in how much else loads: advertising networks, session replay, third-party fonts and logo services.',
+    a: 'These captures show what one ungated link from each product loaded, not whether the product identified the person opening it. Several sent an explicit view event to their own servers; the Stacktree capture did not establish one. An ungated link records a visit rather than a name.',
   },
   {
     q: 'Do deck-sharing tools record session replay of the recipient?',
@@ -44,12 +44,12 @@ const FAQ = [
     a: 'On the link tested, yes. DocSend made 174 requests, the busiest page in the set, including Google advertising and DoubleClick conversion calls, and wrote a consent cookie with all five categories set to true and userInteracted false while the consent banner sat untouched.',
   },
   {
-    q: 'What does HTMLRadar itself send from the recipient page?',
-    a: 'One remote procedure call to our own Supabase project inside the fifteen-second window, and three heartbeat calls in a separate 55-second run, all to the same host. No other destination appeared in either log: no third-party endpoint, no image beacon, no separate event collector.',
+    q: 'What did the HTMLRadar tracker send from the recipient page?',
+    a: 'One remote procedure call to our own Supabase project inside the fifteen-second window, and three heartbeat calls in a separate 55-second run, all to the same host. The tracker made no request to any other destination: no image beacon, and no separate event collector.',
   },
   {
     q: 'How can I check what a shared document link loads in my own browser?',
-    a: 'Open the link in a private window, open your browser developer tools, and read the Network tab and document.cookie before interacting with anything. That is the method used here: Playwright Chromium at 1512x982, one public link per product, load, wait fifteen seconds, capture, then scroll.',
+    a: 'Open the link and read your browser Network and Application tabs. That is a weaker version of the method used here, and it has a limit worth knowing: reading document.cookie misses HttpOnly cookies and anything set inside a cross-origin frame, so it undercounts what was written.',
   },
 ];
 

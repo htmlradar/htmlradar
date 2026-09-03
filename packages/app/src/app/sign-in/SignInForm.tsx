@@ -121,19 +121,26 @@ export function SignInForm({
       setBusy(false);
       return;
     }
-    const supabase = browserClient();
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
+    // Posted to our own route rather than calling supabase.auth.signInWithOtp
+    // directly — it applies a per-address and per-IP budget before the
+    // request ever reaches Supabase's own (shared, project-wide) email
+    // limit. See packages/app/src/app/api/auth/magic-link/route.ts.
+    const res = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, next }),
     });
-    if (err) {
-      void captureClientEvent('auth.magic_link_failed', {
-        reason: 'otp_error',
-        message: err.message,
-      });
-      setError(err.message);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+      const reason = res.status === 429 ? 'rate_limited' : 'otp_error';
+      const message =
+        res.status === 429
+          ? 'Too many sign-in requests. Wait a bit and try again.'
+          : typeof data['message'] === 'string'
+            ? (data['message'] as string)
+            : 'Something went wrong sending the link.';
+      void captureClientEvent('auth.magic_link_failed', { reason, message });
+      setError(message);
     } else {
       void captureClientEvent('auth.magic_link_requested');
       setSent(true);

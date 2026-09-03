@@ -257,6 +257,11 @@ export default function McpPage() {
             npm package. Free for two links, then $15 a month. AGPL-3.0.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
+            HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal as a
+            tracked link, and seeing who opened it, which sections they read, and for how long. The
+            MCP server is how an agent does that without you leaving the conversation.
+          </p>
+          <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Plenty of MCP servers will put a file on the internet and hand back a URL. That is the
             easy half. The half that matters is the next morning, when you want to know whether the
             person you sent it to actually read it. That is the half this one keeps.

@@ -9,9 +9,9 @@ Read tracking for the HTML your LLM just generated.
 [![Self-hostable](https://img.shields.io/badge/self--hostable-yes-7A1F2E)](#quick-start--self-host)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-7A1F2E)](https://github.com/htmlradar/htmlradar/issues)
 
-**Send an HTML deck, brief, or proposal as a tracked link. See who opened it,
-which sections they actually read, and how long they stayed — not just that it
-was opened.**
+**HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal
+as a tracked link, and seeing who opened it, which sections they read, and for
+how long.** Not just that it was opened — dwell time, section by section.
 
 [htmlradar.com](https://htmlradar.com) · free for 2 tracked links, $15/mo or
 $150/yr for unlimited · or self-host the whole thing.

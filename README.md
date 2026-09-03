@@ -16,6 +16,10 @@ was opened.**
 [htmlradar.com](https://htmlradar.com) · free for 2 tracked links, $15/mo or
 $150/yr for unlimited · or self-host the whole thing.
 
+Using Claude? Add HTMLRadar as a connector by pasting one address —
+`https://mcp.htmlradar.com/mcp`. Nothing to install and no API key to make first;
+[how it works](#use-it-from-your-agent).
+
 [Issues and PRs](https://github.com/htmlradar/htmlradar/issues) · [roadmap](https://github.com/htmlradar/htmlradar/issues?q=is%3Aissue+label%3Aroadmap) · [changelog](./CHANGELOG.md) documents v1.2; latest published tag is v1.1.2.
 
 ![HTMLRadar dashboard walkthrough using synthetic sample data](./docs/assets/htmlradar-dashboard-demo.gif)
@@ -64,16 +68,18 @@ A sender-side analytics tool for one document at a time. **Not** a CMS, deck bui
 
 ## Architecture
 
-Five packages, two storage backends.
+Six packages, two storage backends. Three of the six are Cloudflare Workers, one is the Next.js app
+on Cloudflare Pages, and two are libraries that ship as bundles.
 
 ```
 htmlradar/
 ├── packages/
-│   ├── tracker/      # ~8 KB gzipped browser IIFE — embedded in the recipient's view
+│   ├── tracker/      # 8.5 KB gzipped browser IIFE — embedded in the recipient's view
 │   ├── proxy/        # Cloudflare Worker at htmlradar.page/r/{slug} — gates + HTML fetch + tracker inject + attachment serving
 │   ├── app/          # Next.js 14 on Cloudflare Pages — sender's dashboard
-│   ├── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min and pages the founder on regressions
-│   └── mcp/          # stdio MCP server — lets an agent publish HTML and read back who opened it
+│   ├── monitor/      # Cloudflare cron Worker — checks Supabase every 5 min, pages the founder on regressions, and answers the Telegram webhook
+│   ├── connector/    # Cloudflare Worker at mcp.htmlradar.com — the remote MCP server, so Claude can be connected by pasting one address
+│   └── mcp/          # stdio MCP server on npm — lets an agent publish HTML and read back who opened it
 ├── schema/           # Ordered idempotent SQL migrations — tables, RLS, SECURITY DEFINER RPCs, triggers
 ├── examples/         # Demo HTML for trying it locally
 └── docs/             # Architecture, privacy, quickstart, self-hosting
@@ -90,6 +96,7 @@ The architecture decisions — why a Cloudflare Worker proxy, why hand-rolled Po
 - **Frontend**: Next.js 14 (App Router, Server Components), Tailwind CSS, Newsreader + Geist (self-hosted via `next/font`)
 - **Backend**: Supabase Postgres — RLS + SECURITY DEFINER RPCs + `pg_net` triggers for email
 - **Proxy**: Cloudflare Worker, HTMLRewriter for tracker injection
+- **Remote MCP connector**: Cloudflare Worker on `mcp.htmlradar.com`, OAuth on top of ordinary API keys, one KV namespace for grants and tokens
 - **Storage**: Cloudflare R2 for uploaded HTML
 - **Auth**: Supabase Auth (Google OAuth + magic-link)
 - **Email**: Resend, invoked from Postgres via `pg_net`
@@ -125,19 +132,44 @@ Then:
 git clone https://github.com/htmlradar/htmlradar
 cd htmlradar
 pnpm install
-cp .env.example .env.local           # fill in keys (Supabase, R2, Resend)
+cp .env.example .env.local           # then fill it in, see the note below
 pnpm typecheck && pnpm test          # sanity check
-pnpm build                           # build app, tracker, mcp (the only packages with a build script)
+pnpm build                           # builds app, tracker and mcp — the three packages that have a build script
 ```
 
-Schema setup: apply every numbered SQL file directly under `schema/`, in order, `001` through `035`, via the Supabase SQL editor — and nothing in `schema/tests/`. The files in `schema/tests/` are destructive test programs for a scratch database (they create auth users and sample rows) and must never run against a real install. Each migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running is safe. The most recent migrations:
+**`pnpm build` needs two variables filled in before it will finish.** Copying `.env.example` is not
+enough on its own: several marketing pages are pre-rendered at build time and they create a Supabase
+client while doing it, so `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` have to hold
+real values in `.env.local` first. Leave them blank and the build stops on `/`, `/pricing`,
+`/privacy`, `/terms` and `/why` with `Your project's URL and Key are required to create a Supabase
+client!`, which does not say which file it wanted. Everything else in `.env.example` can wait until
+you deploy.
 
-- `030_notification_email_utm.sql` — UTM parameters on the dashboard links inside notification emails.
-- `031_notify_email_tell_a_friend.sql` — one "tell a friend" line in the first-read notification email.
-- `032_comped_accounts.sql` — `profiles.comped` for internal / lifetime-Pro accounts (never billed, exempt from the expiry sweep) plus column-level lockdown of `profiles` updates. Put your own addresses in its placeholder list before running it.
-- `033_custom_share_slug.sql` — Pro customers may choose a tracked link's address; the rules are enforced in the database.
-- `034_api_keys.sql` — `api_keys` table (hash only) and the `create_share_as` RPC for the public API.
-- `035_api_rate_limits.sql` — rate limits for the public API and a daily ceiling on API-key creation.
+Schema setup: apply every numbered SQL file directly under `schema/`, in order, via the Supabase SQL
+editor — and nothing in `schema/tests/`. There is no last file to stop at; the folder grows, so apply
+whatever is in it, from `001` upwards, and add each new one as you pull it. The files in
+`schema/tests/` are destructive test programs for a scratch database (they create auth users and
+sample rows) and must never run against a real install. Each migration is idempotent
+(`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so
+re-running any of them is safe, and so is re-running the whole chain.
+
+Two Postgres extensions have to be available, and both are on every Supabase tier: `pgcrypto`, for
+`gen_random_uuid` and the hashing the schema does, and `pg_net`, for the asynchronous HTTP call the
+notification triggers make. `001_init.sql` creates both itself. A third, `pg_cron`, is optional:
+migrations `044` and `045` use it to schedule the notification reconciler and the expired-handle
+sweep, and where it is missing they log a notice, skip the scheduling and carry on, leaving both
+functions callable by hand or by any scheduler you already run.
+
+The five most recent migrations, as of this commit:
+
+- `043_trust_layer_foundation.sql` — per-customer handles, the permanent registry of claimed names behind them, the per-share hostname the proxy routes on, and the private `share_lookup` view the proxy reads instead of three separate tables.
+- `044_notification_reconciler.sql` — `reconcile_notification_sends()`, which finally moves a notification row off `queued` by joining it against `pg_net`'s own response table; scheduled every ten minutes where `pg_cron` exists.
+- `045_connect_handles.sql` — the short-lived, single-use handoff from the signed-in consent page to the remote MCP connector. The table stores only a hash of the handle. Run it after `040`.
+- `046_connector_grants.sql` — what the application knows about each remote-connector connection and what became of it, so a revocation whose OAuth clean-up failed is a row somebody can find.
+- `047_radar_drafts.sql` — the drafted-reply queue and the reservation ledger that makes "one comment per thread, five a day" an enforced fact rather than an intention.
+
+One migration wants editing before you run it: `032_comped_accounts.sql` carries a placeholder list
+of internal addresses that are never billed. Put your own addresses in it, or none.
 
 Resend secrets go in Supabase Vault (works on free tier — no `ALTER DATABASE SET` required):
 
@@ -216,8 +248,11 @@ installs the server with a placeholder key, which you then replace with your own
 codex mcp add htmlradar --env HTMLRADAR_API_KEY=$HTMLRADAR_API_KEY -- npx -y htmlradar-mcp
 ```
 
-Three tools: `share_html`, `get_share_activity`, `whoami`. Every option, the self-hosting variable
-and the privacy notes are in [`packages/mcp/README.md`](./packages/mcp/README.md).
+Seven tools: `whoami`, `list_shares` and `get_share_activity` read; `share_html`, `create_share`,
+`replace_document` and `revoke_share` write. Every option, the self-hosting variable and the privacy
+notes are in [`packages/mcp/README.md`](./packages/mcp/README.md). The connector at
+`mcp.htmlradar.com` serves the same seven, imported from this package rather than copied — see
+[`packages/connector/README.md`](./packages/connector/README.md).
 
 If you modify the source and run a network service from it, AGPL-3.0 requires you to make your modifications available. See [`LICENSE`](./LICENSE).
 
@@ -226,10 +261,10 @@ If you modify the source and run a network service from it, AGPL-3.0 requires yo
 ## Development
 
 ```bash
-pnpm dev                              # runs app, monitor, proxy, tracker in parallel (mcp has no dev script)
-pnpm typecheck                        # tsc --noEmit across packages
+pnpm dev                              # runs app, monitor, proxy, connector, tracker in parallel (mcp has no dev script)
+pnpm typecheck                        # tsc --noEmit across all six packages
 pnpm lint                             # eslint + prettier
-pnpm test                             # vitest across app + proxy + tracker + mcp
+pnpm test                             # vitest across app, mcp, monitor, proxy, connector, tracker
 ```
 
 Local URLs after `pnpm dev`:

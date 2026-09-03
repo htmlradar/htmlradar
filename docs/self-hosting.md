@@ -2,10 +2,10 @@
 
 HTMLRadar runs on two vendors. Both offer free tiers that comfortably cover personal use.
 
-| Service    | What it does                                                      | Free tier               |
-| ---------- | ----------------------------------------------------------------- | ----------------------- |
-| Supabase   | Postgres database, auth, vault for secrets                        | 500 MB DB, 50 K MAU     |
-| Cloudflare | Workers (proxy + monitor cron), R2 (storage), Pages (Next.js app) | 100 K req/day, 10 GB R2 |
+| Service    | What it does                                                                    | Free tier               |
+| ---------- | ------------------------------------------------------------------------------- | ----------------------- |
+| Supabase   | Postgres database, auth, vault for secrets                                      | 500 MB DB, 50 K MAU     |
+| Cloudflare | Workers (proxy, monitor cron, MCP connector), R2 (storage), Pages (Next.js app) | 100 K req/day, 10 GB R2 |
 
 You also need a domain (any) and a [Resend](https://resend.com) account (free 100 emails/day) for view notifications. Email notifications are optional — without Resend the `notify_on_first_open` trigger writes a `skipped` row to `notifications_log` and everything else works.
 
@@ -17,22 +17,33 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
    - **anon public key** → `SUPABASE_ANON_KEY`
    - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret — never put in client code)
 3. From `Project Settings → Database`, note your DB password.
-4. In `SQL Editor`, copy/paste every numbered file directly under `schema/`, in order, `001` through `036` — and nothing in `schema/tests/`. The files in `schema/tests/` are destructive test programs for a scratch database and must never run against a real install. Each migration is idempotent; re-running is safe. The most recent migrations:
-   - `030_notification_email_utm.sql` — UTM parameters on the dashboard links inside notification emails.
-   - `031_notify_email_tell_a_friend.sql` — one "tell a friend" line in the first-read notification email.
-   - `032_comped_accounts.sql` — `profiles.comped` for internal / lifetime-Pro accounts (never billed, exempt from the expiry sweep) plus column-level lockdown of `profiles` updates. Put your own addresses in its placeholder list before running it.
-   - `033_custom_share_slug.sql` — Pro customers may choose a tracked link's address; the rules are enforced in the database.
-   - `034_api_keys.sql` — `api_keys` table (hash only) and the `create_share_as` RPC for the public API.
-   - `035_api_rate_limits.sql` — rate limits for the public API and a daily ceiling on API-key creation.
-   - `036_internal_viewers_owner_only.sql` — only the link owner's own address is flagged as an internal viewer. Before this, every reader whose address was on the `htmlradar.com` domain was hidden from the sender's activity and from the notification email.
-5. Resend secrets via Supabase Vault (not `ALTER DATABASE SET` — that needs superuser, which Supabase free doesn't grant). In `SQL Editor`:
+4. In `SQL Editor`, run every numbered file directly under `schema/`, in ascending numeric order, starting at `001` — and nothing in `schema/tests/`. There is deliberately no last file named here. The folder grows with the product, and a number written into this page goes stale the next time it does; the rule is "everything in the folder, in order", and it stays true. As of this commit the chain runs `001_init.sql` to `047_radar_drafts.sql`, forty-seven files. Order matters: several migrations alter what an earlier one created, and `045_connect_handles.sql` in particular has to run after `040_api_key_scopes.sql`. Every migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running one, or the whole chain, is safe — this is verified by applying all forty-seven twice against an empty database.
+
+   The files in `schema/tests/` are destructive test programs for a scratch database and must never run against a real install.
+
+   One file wants editing before you run it: `032_comped_accounts.sql` carries a placeholder list of internal addresses that are never billed and are exempt from the expiry sweep. Put your own addresses in it, or leave it empty.
+
+   The five most recent migrations, so you can see where the chain currently ends:
+   - `043_trust_layer_foundation.sql` — per-customer handles, the permanent registry of claimed names behind them, the per-share hostname the proxy routes on, and the private `share_lookup` view the proxy reads instead of three separate tables.
+   - `044_notification_reconciler.sql` — `reconcile_notification_sends()`, which moves a notification row off `queued` by joining it against `pg_net`'s own response table.
+   - `045_connect_handles.sql` — the short-lived, single-use handoff from the signed-in consent page to the remote MCP connector; only a hash of the handle is stored.
+   - `046_connector_grants.sql` — what the application knows about each remote-connector connection and what became of it.
+   - `047_radar_drafts.sql` — the drafted-reply queue and the reservation ledger behind "one comment per thread, five a day".
+
+5. Extensions. Two are required and both exist on every Supabase tier, so there is nothing to install:
+   - `pgcrypto` — `gen_random_uuid`, `digest` and `hmac`, used throughout.
+   - `pg_net` — the asynchronous HTTP call the notification triggers make.
+
+   `001_init.sql` runs `create extension if not exists` for both, so a Supabase project needs no preparation. A third extension, `pg_cron`, is **optional**: `044_notification_reconciler.sql` uses it to run the notification reconciler every ten minutes and `045_connect_handles.sql` uses it to sweep unclaimed consent handles every five. Where `pg_cron` is absent — a plain self-hosted Postgres, a scratch test database — both migrations log a notice, skip the scheduling and carry on. Nothing fails, and both functions stay callable by hand or from any scheduler you already run. If you skip `pg_cron`, schedule `reconcile_notification_sends()` and `purge_connect_handles()` yourself, or accept that notification rows stay at `queued` and unclaimed handles expire without being deleted.
+
+6. Resend secrets via Supabase Vault (not `ALTER DATABASE SET` — that needs superuser, which Supabase free doesn't grant). In `SQL Editor`:
    ```sql
    select vault.create_secret('re_your_resend_api_key', 'resend_api_key');
    select vault.create_secret('hello@yourdomain.com',  'resend_from');
    ```
    Vault is a native Supabase feature (built on pgsodium) available on every tier. `notify_on_first_open` reads decrypted secrets at trigger time.
-6. Session auth uses per-session bearer tokens stored on the `sessions.token` column — no app-level secret needed for the session layer. The proxy gate (email + password cookies) does use an HMAC secret; set it as a worker secret in step 3 below.
-7. In `Authentication → Providers`, enable **Google** (use your own OAuth credentials) or rely on the magic-link fallback. The site URL must include your domain plus `http://localhost:3000` if you also want local dev to authenticate.
+7. Session auth uses per-session bearer tokens stored on the `sessions.token` column — no app-level secret needed for the session layer. The proxy gate (email + password cookies) does use an HMAC secret; set it as a worker secret in step 3 below.
+8. In `Authentication → Providers`, enable **Google** (use your own OAuth credentials) or rely on the magic-link fallback. The site URL must include your domain plus `http://localhost:3000` if you also want local dev to authenticate.
 
 ## 2. Cloudflare
 
@@ -40,43 +51,111 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
 2. From `Manage R2 API tokens`, create a token with read+write on this bucket. Copy the access key ID + secret.
 3. Create an API token from `My Profile → API Tokens → Custom Token` with these permissions (account-scoped + zone-scoped):
    - Account: Workers Scripts (Edit), Workers R2 Storage (Edit), Cloudflare Pages (Edit), Account Settings (Read)
-   - Zone: Zone (Read), DNS (Edit), Cache Purge (Purge), Zone Settings (Edit)
+   - Zone: Zone (Read), DNS (Edit), Cache Purge (Purge), Zone Settings (Edit), Workers Routes (Edit)
+   - Add Account: Workers KV Storage (Edit) only if you are deploying the MCP connector.
+   - Workers Routes must be Edit on **both** zones if you run the application and the content domain on two domains: `wrangler deploy` syncs the proxy's route block, and it has an entry on each.
 4. Note your `Account ID` (top-right of any Cloudflare dashboard page).
+5. Only if you are deploying the MCP connector: create a Workers KV namespace and put its id in `packages/connector/wrangler.toml`. It holds the OAuth clients, grants and tokens, and nothing a person typed.
 
 ## 3. Deploy
 
-The reference deploy is fully automated by `.github/workflows/deploy.yml` (preview → smoke → prod, plus proxy + monitor workers, plus a cache purge). If you want to deploy from your laptop, the manual sequence is:
+### What gets deployed where
+
+Four things run on Cloudflare. Two of them are optional and the install works without either.
+
+| Package              | Deployed as   | Address               | Needed?                                                        |
+| -------------------- | ------------- | --------------------- | -------------------------------------------------------------- |
+| `packages/app`       | Pages project | your application host | Required — the sender's dashboard and the marketing site       |
+| `packages/proxy`     | Worker        | your content host     | Required — every recipient link is served by it                |
+| `packages/monitor`   | Worker (cron) | a `workers.dev` URL   | Optional — health checks, alert email, analytics replay        |
+| `packages/connector` | Worker        | `mcp.<your-domain>`   | Optional — only if you want Claude to connect by pasting a URL |
+
+`packages/tracker` and `packages/mcp` are not deployed. The tracker is a bundle the Pages app serves
+and the proxy injects; the MCP server is an npm package people run on their own machines.
+
+The reference deploy is fully automated by `.github/workflows/deploy.yml` — preview, smoke test,
+production, then the proxy, monitor and connector Workers, then a cache purge. If you want to deploy
+from your laptop, the manual sequence is:
 
 ```bash
-# Tracker bundle — proxy injects this on every recipient view.
+# Tracker bundle — the Pages app serves it and the proxy injects it on every
+# recipient view. Build it FIRST: the copy committed at
+# packages/app/public/v1/tracker.js is overwritten here, and deploying without
+# this step ships whatever that stale file happens to hold.
 cd packages/tracker && pnpm build
 cp dist/tracker.js ../app/public/v1/tracker.js
 
-# Proxy worker
+# Proxy worker — required
 cd ../proxy
 wrangler secret put SUPABASE_URL
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-wrangler secret put SUPABASE_ANON_KEY
+wrangler secret put SUPABASE_ANON_KEY          # passed to the tracker as data-supabase-anon-key
 wrangler secret put SESSION_SECRET             # openssl rand -hex 32
 wrangler secret put CLOUDFLARE_R2_ACCESS_KEY_ID
 wrangler secret put CLOUDFLARE_R2_SECRET_ACCESS_KEY
 wrangler deploy
 
-# Monitor cron worker (full list of secrets in packages/monitor/README.md)
+# Monitor cron worker — optional. Two secrets make it useful; the rest are
+# features you may not want. Full list and what each one turns on:
+# packages/monitor/README.md.
 cd ../monitor
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-wrangler secret put RESEND_API_KEY
+wrangler secret put RESEND_API_KEY             # alert email
 wrangler secret put POSTHOG_PROJECT_KEY        # optional: app_events replay into PostHog
 wrangler secret put QA_BOT_USER_ID             # optional: QA account excluded from the replay
+wrangler secret put TELEGRAM_BOT_TOKEN         # optional: daily digest destination
+wrangler secret put TELEGRAM_CHAT_ID           # optional: daily digest destination
+wrangler deploy
+
+# Remote MCP connector worker — optional. Skip the whole block unless you want
+# a paste-one-address connector. Set APP_BASE_URL, API_BASE_URL and SERVER_URL
+# in packages/connector/wrangler.toml to your own hosts first, and create your
+# own KV namespace and put its id there. The same two secrets must also be set
+# on the Pages project (below): the two sides share them.
+cd ../connector
+wrangler secret put CONNECT_SIGNING_SECRET     # openssl rand -hex 32
+wrangler secret put CONNECT_EXCHANGE_SECRET    # openssl rand -hex 32, a different value
 wrangler deploy
 
 # Web app (Cloudflare Pages — NOT Vercel)
 cd ../app
 pnpm exec next-on-pages
 wrangler pages deploy .vercel/output/static --project-name=htmlradar --branch=main
+
+# Pages secrets, only if you deployed the connector. Same values as above.
+wrangler pages secret put CONNECT_SIGNING_SECRET --project-name=htmlradar
+wrangler pages secret put CONNECT_EXCHANGE_SECRET --project-name=htmlradar
 ```
 
-Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and any other public env vars in `.env.production` (written at build time — the workflow does this from GitHub secrets). NEVER commit `.env.production` itself; only `.env.example`.
+### Environment variables
+
+Every variable is documented inline in [`.env.example`](../.env.example), which is the list of
+record; this is the shape of it. Copy it to `.env.local` and fill it in.
+
+Three are read by Next.js **at build time** and are baked into the bundle, so they must be set before
+`pnpm build` or `next-on-pages`, not afterwards:
+
+| Variable                        | What it is                                                                                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Your project URL. Blank means the build fails while pre-rendering `/`, `/pricing`, `/privacy`, `/terms` and `/why`, with `Your project's URL and Key are required to create a Supabase client!` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | The anon key. Public by design; RLS is what gates writes. Same failure if blank                                                                                                                 |
+| `NEXT_PUBLIC_SHARE_BASE`        | The base of every recipient link the app prints. Must be `https://` plus `SHARE_HOST`                                                                                                           |
+
+The rest are runtime configuration for the app and the Workers, grouped the way `.env.example` groups
+them: core self-hosting (`SUPABASE_*`, `CLOUDFLARE_*`, `SESSION_SECRET`, `SHARE_HOST`,
+`LEGACY_HOSTS`, `RESEND_API_KEY`, `RESEND_FROM`, `ADMIN_EMAILS`); optional billing through Polar
+(`POLAR_*`), which you can leave blank entirely if you are not selling hosting; the monitor Worker's
+own settings (`ALERT_TO`, `POSTHOG_*`, `TELEGRAM_*`); the Playwright smoke tests (`PLAYWRIGHT_*`,
+`QA_*`, `HR_FIXTURE_DIR`, `PROXY_BASE`); and publishing (`INDEXNOW_KEY`, `HTMLRADAR_API_KEY`,
+`HTMLRADAR_API_URL`, `CONNECT_SIGNING_SECRET`, `CONNECT_EXCHANGE_SECRET`,
+`NEXT_PUBLIC_CONNECTOR_ORIGIN`).
+
+In production none of the secret values live in a file. Worker secrets are set with
+`wrangler secret put`, Pages secrets with `wrangler pages secret put`, and the deploy workflow reads
+both from GitHub repository secrets. `.env.production` is written at build time by the workflow and
+holds only four values — the three above plus `NEXT_PUBLIC_TRUST_HANDLES`, which the workflow reads
+out of `packages/proxy/wrangler.toml` so the Worker and the application cannot disagree about it.
+Never commit `.env.production`. `.env.example` is the only environment file that belongs in git.
 
 ## Two domains, and why
 

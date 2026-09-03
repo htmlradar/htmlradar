@@ -1,6 +1,10 @@
 # Schema
 
-Apply every numbered file directly in this folder, in order, `001` through `044`, via the Supabase SQL Editor (or `psql`). Never apply anything in `tests/` — those are destructive test programs for a scratch database only. The chain at v1.2:
+Apply every numbered file directly in this folder, in ascending numeric order, starting at `001`, via the Supabase SQL Editor (or `psql`). No last file is named here on purpose — the folder grows, and a number written down goes stale the next time it does. As of this commit it ends at `047_radar_drafts.sql`. Never apply anything in `tests/` — those are destructive test programs for a scratch database only.
+
+Two extensions are required and `001_init.sql` creates both: `pgcrypto` and `pg_net`. A third, `pg_cron`, is optional; `044` and `045` use it for scheduling and skip that step with a notice where it is absent.
+
+The first nineteen files, as an illustration of the shape:
 
 1. `001_init.sql` — tables, indexes, RLS, REVOKEs
 2. `002_rpcs.sql` — SECURITY DEFINER RPCs (`start_session`, `update_session`, `create_share`, `verify_share_password`)
@@ -44,7 +48,12 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - **Session bearer tokens** stored on the `sessions.token` column (replaces the HMAC-with-shared-secret scheme entirely — no app secret needed).
 - **Vault** for Resend secrets (decrypted at trigger execution time).
 
-## Tables (20)
+## Tables (29)
+
+Twenty of them carry a note below. The other nine are single-purpose and named by their migration:
+`analytics_replay_cursor` (029), `app_error_log` (024), `cancellation_feedback` (023),
+`webhook_events_log` (022), `connect_handles` (045), `connector_grants` and `connector_events` (046),
+`radar_drafts` and `radar_post_reservations` (047).
 
 - `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`). `handle` (043) is the account's subdomain label — links are served from `{handle}.htmlradar.page`. Nullable and null on every row until a later lane allocates one; immutable once set; three to twenty-four lowercase letters, digits and hyphens with no two hyphens in a row, which is also what bans a Punycode `xn--` prefix. It is a routing and reputation boundary, **not** an identity claim about the sender.
 - `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, `last_viewed_by_owner_at`, and the upload-time phishing screen's `screen_score` / `screen_signals` (039; null on every URL-source document and on everything predating the migration).
@@ -99,11 +108,19 @@ Server-side only (service role, SECURITY DEFINER, invoked by the proxy worker an
 Verify the tables exist:
 
 ```sql
+select count(*) from pg_tables where schemaname = 'public';
+-- 29 after the full chain through 047. Applying the chain a second time
+-- leaves the count unchanged; that is what "idempotent" is being claimed to
+-- mean here, and it is checked rather than asserted.
+
 select tablename from pg_tables where schemaname = 'public' order by tablename;
--- Expect 15 rows: app_events, attachment_downloads, document_attachments,
--- document_shares, document_versions, documents, error_log, feedback,
--- notifications_log, profiles, rate_limits, section_events, sessions,
--- viewers, waitlist
+-- abuse_reports, analytics_replay_cursor, api_keys, app_error_log, app_events,
+-- attachment_downloads, cancellation_feedback, connect_handles,
+-- connector_events, connector_grants, document_attachments, document_shares,
+-- document_versions, documents, error_log, feedback, handle_registry,
+-- notifications_log, profiles, radar_drafts, radar_items,
+-- radar_post_reservations, rate_limits, section_events, sessions,
+-- telegram_outbox, viewers, waitlist, webhook_events_log
 ```
 
 Manually invoke an RPC:

@@ -47,8 +47,9 @@ const FAQ = [
 
 // The three shapes the loop takes, each drawn as one exchange so the page
 // shows what using it feels like rather than listing prompts. The tool names
-// and the returned wording are the real ones from packages/mcp/src/server.ts;
-// the ids, links and viewers are examples.
+// are the real ones from packages/mcp/src/server.ts and the results say what
+// that tool actually returns, compressed to one line for a card; the ids,
+// links, viewers and timings are examples.
 const USE_CASES: { where: string; title: string; body: string; exchange: Exchange }[] = [
   {
     where: 'In Claude Code',

@@ -38,6 +38,7 @@ export function V2Footer() {
         <FooterGroup title="Use cases">
           <Link href="/use-case/pitch-deck-tracking">Pitch deck tracking</Link>
           <Link href="/use-case/proposal-tracking">Proposal tracking</Link>
+          <Link href="/use-case/client-report-tracking">Client report tracking</Link>
           <Link href="/use-case/track-html-deck">Track HTML decks</Link>
         </FooterGroup>
 

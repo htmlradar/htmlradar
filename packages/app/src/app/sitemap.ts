@@ -58,6 +58,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    // Published 2026-09-04.
+    {
+      url: `${baseUrl}/use-case/client-report-tracking`,
+      lastModified: '2026-09-04',
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
     {
       url: `${baseUrl}/for/claude-artifacts`,
       lastModified: connectorUpdate,

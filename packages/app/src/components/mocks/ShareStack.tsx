@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
 
-interface ShareCard {
+export interface ShareCard {
   initial: string;
   name: string;
   org: string;
@@ -40,7 +40,9 @@ const SHARES: ShareCard[] = [
   },
 ];
 
-export function ShareStack() {
+// Optional override so a page about client reports can show client names
+// instead of the seed round's investors. Same drawing either way.
+export function ShareStack({ shares = SHARES }: { shares?: ShareCard[] } = {}) {
   const [hovered, setHovered] = useState(false);
   // Resting spacing was 14px until 2026-08-31, which stacked the three cards
   // almost exactly on top of each other: on a phone, where there is no hover,
@@ -56,7 +58,7 @@ export function ShareStack() {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {SHARES.map((s, i) => (
+      {shares.map((s, i) => (
         <div
           key={s.slug}
           className={cn(

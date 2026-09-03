@@ -7,9 +7,17 @@ import { Radio } from 'lucide-react';
 
 interface EmailNotificationMockProps {
   variant?: 'inbox' | 'card';
+  /** Optional overrides so a page about client reports can show a client
+   *  read instead of an investor's, without a second copy of this drawing. */
+  subject?: string;
+  detail?: string;
 }
 
-export function EmailNotificationMock({ variant = 'inbox' }: EmailNotificationMockProps) {
+export function EmailNotificationMock({
+  variant = 'inbox',
+  subject = 'Marc just opened Seed Deck, Q2.',
+  detail = 'Halbrook Capital · 2m 41s on §03 The Ask · still active',
+}: EmailNotificationMockProps) {
   const isCard = variant === 'card';
 
   return (
@@ -28,12 +36,8 @@ export function EmailNotificationMock({ variant = 'inbox' }: EmailNotificationMo
           </span>
           <span className="shrink-0 font-mono text-[10px] text-graphite">4m ago</span>
         </div>
-        <p className="mt-1 truncate text-[14px] font-medium text-ink">
-          Marc just opened Seed Deck, Q2.
-        </p>
-        <p className="mt-1 text-[12.5px] leading-snug text-ink-soft sm:truncate">
-          Halbrook Capital · 2m 41s on §03 The Ask · still active
-        </p>
+        <p className="mt-1 truncate text-[14px] font-medium text-ink">{subject}</p>
+        <p className="mt-1 text-[12.5px] leading-snug text-ink-soft sm:truncate">{detail}</p>
         {isCard && (
           <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">

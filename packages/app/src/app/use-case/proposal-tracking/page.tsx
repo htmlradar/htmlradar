@@ -173,6 +173,13 @@ export default function ProposalTrackingPage() {
               <Link href="/compare/docsend" className="text-signal-dark hover:underline">
                 the open-source DocSend alternative
               </Link>
+              ,{' '}
+              <Link
+                href="/use-case/client-report-tracking"
+                className="text-signal-dark hover:underline"
+              >
+                tracking a recurring client report
+              </Link>
               , and{' '}
               <Link href="/use-case/track-html-deck" className="text-signal-dark hover:underline">
                 track any HTML document

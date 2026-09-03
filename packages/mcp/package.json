@@ -1,6 +1,6 @@
 {
   "name": "htmlradar-mcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MCP server for HTMLRadar — publish the HTML your agent just wrote as a tracked link, then ask whether the recipient read it.",
   "license": "AGPL-3.0-or-later",
   "author": "HTMLRadar <hello@htmlradar.com>",

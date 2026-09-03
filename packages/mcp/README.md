@@ -527,9 +527,9 @@ tool call as well.
 
 ## Versions
 
-Current: `htmlradar-mcp@0.3.0`, Node.js 20 or newer. Every install line above runs
+Current: `htmlradar-mcp@0.3.1`, Node.js 20 or newer. Every install line above runs
 `npx -y htmlradar-mcp`, which fetches the latest version. The Claude Code plugin is different: its
-`.mcp.json` pins `htmlradar-mcp@0.3.0`, and plugin users move to a newer server when the plugin
+`.mcp.json` pins `htmlradar-mcp@0.3.1`, and plugin users move to a newer server when the plugin
 itself is updated (`/plugin marketplace update htmlradar` picks up a new pin; third-party
 marketplaces do not auto-update by default). What changed in each release is in
 [CHANGELOG.md](https://github.com/htmlradar/htmlradar/blob/main/packages/mcp/CHANGELOG.md).

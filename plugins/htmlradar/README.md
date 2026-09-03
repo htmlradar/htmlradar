@@ -30,7 +30,7 @@ Open Settings, then Connectors, then **Add custom connector**, and paste
 
 ## How it runs
 
-`.mcp.json` launches the published package with `npx -y htmlradar-mcp@0.3.0` and passes
+`.mcp.json` launches the published package with `npx -y htmlradar-mcp@0.3.1` and passes
 `HTMLRADAR_API_KEY` through from your environment. Nothing is bundled into the plugin, so a plugin
 update and a server update are separate things: bump the pinned version here when you want the
 newer server.

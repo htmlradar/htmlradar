@@ -278,7 +278,7 @@ export default function ForClaudeCodePage() {
               key, restart Claude Code, and it connects.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
-              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.3.0</span> and
+              The plugin pins <span className="font-mono text-[14px]">htmlradar-mcp@0.3.1</span> and
               needs Node.js 20 or newer. Everything else you only need once — the seven tools and
               their arguments, install lines for the other clients, rate limits, release history,
               and every other startup failure — is on the MCP page:{' '}

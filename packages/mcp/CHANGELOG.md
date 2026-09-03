@@ -3,6 +3,11 @@
 All notable changes to `htmlradar-mcp`. The plugin at `plugins/htmlradar` pins one of these versions
 in its `.mcp.json`; direct installs (`npx -y htmlradar-mcp`) always run the latest.
 
+## 0.3.1 — 2026-09-03
+
+The registry entry carries the remote connector endpoint. `whoami` states links truthfully on paid
+plans.
+
 ## 0.3.0 — 2026-09-03
 
 Nothing new to call, and a better server in every client it is already installed in. Results say

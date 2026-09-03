@@ -1,6 +1,6 @@
 {
   "name": "htmlradar",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Publish the HTML Gemini just wrote as a tracked link, then ask who opened it and which sections they read.",
   "mcpServers": {
     "htmlradar": {

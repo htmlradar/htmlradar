@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  DRAFT_ANSWER_SLOT,
   type Env,
   type TelegramUpdate,
   handleTelegramUpdate,
@@ -846,5 +847,29 @@ describe('the daily cap is five reservations in twenty-four hours', () => {
     expect(comments(reddit)).toHaveLength(0);
     expect(world.drafts[0]!.status).toBe('failed');
     expect(lastEdit(telegram)).toContain('already replied on that thread');
+  });
+});
+
+describe('an unedited draft is never posted', () => {
+  it('refuses while the placeholder line is still there, and takes no reservation', async () => {
+    const world: World = {
+      drafts: [
+        draftRecord({
+          draft_text:
+            `DRAFT (personal account, edit before posting): ${DRAFT_ANSWER_SLOT}\n\n` +
+            'You can send it as a link.',
+        }),
+      ],
+    };
+    const { telegram, reddit } = stub(world);
+
+    await handleTelegramUpdate(env, tap('post'), NOW);
+
+    expect(comments(reddit)).toHaveLength(0);
+    // The reservation is never released, so it must never be taken for a draft
+    // that was never going to be sent.
+    expect(world.reservations ?? []).toHaveLength(0);
+    expect(world.drafts[0]).toMatchObject({ status: 'failed' });
+    expect(lastEdit(telegram)).toContain('placeholder first line');
   });
 });

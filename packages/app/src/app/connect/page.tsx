@@ -152,7 +152,7 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
                   type="radio"
                   name="granted_scope"
                   value={READ_SCOPE}
-                  defaultChecked
+                  defaultChecked={!canWrite}
                   className="mt-1 accent-signal"
                 />
                 <span>
@@ -173,7 +173,7 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
                   type="radio"
                   name="granted_scope"
                   value={FULL_SCOPE}
-                  defaultChecked={!canRead}
+                  defaultChecked={canWrite}
                   className="mt-1 accent-signal"
                 />
                 <span>
@@ -191,6 +191,12 @@ export default async function ConnectPage({ searchParams }: { searchParams?: Sea
               </label>
             ) : null}
           </fieldset>
+
+          {canWrite ? (
+            <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+              Claude asked for read and publish access for this action.
+            </p>
+          ) : null}
 
           <div className="mt-6 flex flex-wrap gap-3">
             <button

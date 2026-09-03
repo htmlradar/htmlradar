@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   DISCLOSURE,
+  DRAFT_ANSWER_SLOT,
   type Env,
   type RadarCategory,
   REPLY_THRESHOLD,
@@ -9,6 +10,8 @@ import {
   dailyDigest,
   draftReply,
   parseAlertFeeds,
+  redditReplyBlocked,
+  subredditOf,
   scanThreads,
   scoreIntent,
   unwrapGoogleUrl,
@@ -579,7 +582,9 @@ describe('dailyDigest is a strict opportunity filter: <=3 items, only above REPL
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const secondHighScoreItem = {
       source: 'Reddit',
-      source_url: 'https://reddit.com/r/test/2',
+      // An allow-listed subreddit: r/test would now be filtered out before the
+      // draft step, which is a different rule's test.
+      source_url: 'https://www.reddit.com/r/ppc/comments/2/docsend_alternative/',
       title: 'Any good DocSend alternative that is actually open source?',
       snippet: null,
       category: 'competitor_mention',
@@ -683,5 +688,208 @@ describe('weeklyInsight summarises the pattern, not a raw dump', () => {
     expect(text).toContain('Recurring buyer questions:');
     expect(text).toContain('How do I share an html file?');
     expect(text).toContain('Competitor-pain moments:');
+  });
+});
+
+// The Reddit engagement rules, per
+// docs/workstreams/seo-and-indexing/REDDIT-ENGAGEMENT-STANDARD-2026-09-03.md.
+// The two Reddit items the radar has actually produced so far were both in
+// places the standard says we must never post, so these tests exist to stop the
+// most likely real failure, not a hypothetical one.
+
+describe('subredditOf reads the subreddit out of a thread URL', () => {
+  it('reads it from www, old and bare reddit hosts, case-folded', () => {
+    expect(subredditOf('https://www.reddit.com/r/ClaudeAI/comments/abc/title/')).toBe('claudeai');
+    expect(subredditOf('https://old.reddit.com/r/nocode/comments/abc/title/')).toBe('nocode');
+    expect(subredditOf('https://reddit.com/r/SaaS/comments/abc/')).toBe('saas');
+  });
+
+  it('is null for anything that is not a Reddit thread', () => {
+    expect(subredditOf('https://news.ycombinator.com/item?id=1')).toBeNull();
+    expect(subredditOf('https://blog.test/roundup')).toBeNull();
+    expect(subredditOf(null)).toBeNull();
+    // A lookalike host must not pass as Reddit.
+    expect(subredditOf('https://reddit.com.evil.test/r/saas/comments/abc/')).toBeNull();
+  });
+});
+
+describe('redditReplyBlocked enforces the allow list and the age limit', () => {
+  const url = (sub: string) => `https://www.reddit.com/r/${sub}/comments/abc/title/`;
+
+  it('allows an allow-listed subreddit', () => {
+    expect(redditReplyBlocked({ source_url: url('ClaudeCode') })).toBeNull();
+  });
+
+  it('names a competitor-owned subreddit as its own reason', () => {
+    expect(redditReplyBlocked({ source_url: url('papermark') })).toContain('competitor-owned');
+    expect(redditReplyBlocked({ source_url: url('DigitalEscapeTools') })).toContain(
+      'competitor-owned',
+    );
+  });
+
+  it('blocks any subreddit that is not on the allow list', () => {
+    expect(redditReplyBlocked({ source_url: url('someRandomSub') })).toContain(
+      'not on the allow list',
+    );
+  });
+
+  it('blocks the subreddits Sol found forbid the comment outright', () => {
+    for (const sub of [
+      'Entrepreneur',
+      'marketing',
+      'sales',
+      'freelance',
+      'webdev',
+      'startups',
+      'SaaS',
+    ])
+      expect(redditReplyBlocked({ source_url: url(sub) })).toContain('not on the allow list');
+  });
+
+  it('blocks a Reddit link whose subreddit cannot be read, rather than waving it through', () => {
+    expect(redditReplyBlocked({ source_url: 'https://redd.it/abc123' })).toContain(
+      'cannot be read',
+    );
+    expect(redditReplyBlocked({ source_url: 'https://www.reddit.com/user/somebody/' })).toContain(
+      'cannot be read',
+    );
+    expect(
+      redditReplyBlocked({ source_url: 'https://www.reddit.com/search/?q=docsend' }),
+    ).toContain('cannot be read');
+  });
+
+  it('blocks an allow-listed thread once it is older than a fortnight', () => {
+    const sixteenDaysOld = new Date(TUESDAY - 16 * 24 * 3_600_000).toISOString();
+    expect(
+      redditReplyBlocked({ source_url: url('ClaudeAI'), published_at: sixteenDaysOld }, TUESDAY),
+    ).toContain('older than fourteen days');
+    const twoDaysOld = new Date(TUESDAY - 9 * 24 * 3_600_000).toISOString();
+    expect(
+      redditReplyBlocked({ source_url: url('ClaudeAI'), published_at: twoDaysOld }, TUESDAY),
+    ).toBeNull();
+  });
+
+  it('never blocks a non-Reddit item, however old', () => {
+    const ancient = new Date(TUESDAY - 400 * 24 * 3_600_000).toISOString();
+    expect(
+      redditReplyBlocked(
+        { source_url: 'https://news.ycombinator.com/item?id=1', published_at: ancient },
+        TUESDAY,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe('draftReply refuses a subreddit we may not speak in, and always leaves a slot to edit', () => {
+  const item = {
+    category: 'competitor_mention' as const,
+    title: 'Papermark is too expensive, any cheaper alternative for sharing a deck?',
+  };
+
+  it('drafts nothing for a competitor-owned subreddit', () => {
+    expect(
+      draftReply({ ...item, source_url: 'https://www.reddit.com/r/papermark/comments/abc/x/' }),
+    ).toBeFalsy();
+  });
+
+  it('drafts nothing for a subreddit that is not on the allow list', () => {
+    expect(
+      draftReply({ ...item, source_url: 'https://www.reddit.com/r/randomplace/comments/abc/x/' }),
+    ).toBeFalsy();
+  });
+
+  it('drafts for an allow-listed subreddit, opening with the slot the founder must replace', () => {
+    const draft = draftReply({
+      ...item,
+      source_url: 'https://www.reddit.com/r/nocode/comments/abc/x/',
+    });
+    expect(draft).toBeTruthy();
+    expect(draft).toContain(DRAFT_ANSWER_SLOT);
+    expect(draft).toContain('I built HTMLRadar');
+  });
+
+  it('every draft carries the slot, so no draft is postable without an edit', () => {
+    const drafted: [RadarCategory, string][] = [
+      ['buyer_question', 'How do I share an html file and see who opened it?'],
+      ['competitor_mention', 'DocSend is too expensive, any cheaper alternative?'],
+      ['product_feedback', 'I wish there was a tool to track who reads my shared deck'],
+      ['reputation', 'Tried HTMLRadar this week, here are my thoughts'],
+    ];
+    for (const [category, title] of drafted) {
+      expect(draftReply({ category, title })).toContain(DRAFT_ANSWER_SLOT);
+    }
+  });
+
+  it('carries no exclamation mark and no link in any category', () => {
+    const drafted: [RadarCategory, string][] = [
+      ['buyer_question', 'How do I share an html file and see who opened it?'],
+      ['competitor_mention', 'DocSend is too expensive, any cheaper alternative?'],
+      ['product_feedback', 'I wish there was a tool to track who reads my shared deck'],
+      ['reputation', 'Tried HTMLRadar this week, here are my thoughts'],
+    ];
+    for (const [category, title] of drafted) {
+      const draft = draftReply({ category, title })!;
+      expect(draft).not.toContain('!');
+      expect(draft).not.toMatch(/https?:\/\//);
+    }
+  });
+});
+
+describe('the digest never surfaces a thread we may not reply to', () => {
+  const redditItem = (sub: string, score: number, publishedAt: string | null) => ({
+    source: 'Reddit',
+    source_url: `https://www.reddit.com/r/${sub}/comments/${sub}/how_do_i_share_an_html_file/`,
+    title: `In r/${sub}: how do I share an html file and see who opened it?`,
+    snippet: null,
+    category: 'buyer_question' as const,
+    intent_score: score,
+    published_at: publishedAt,
+  });
+  const fresh = new Date(TUESDAY - 3_600_000).toISOString();
+
+  it('drops a competitor-owned subreddit and promotes the allowed item behind it', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { telegram } = stubDigestWorld({
+      recent: [redditItem('papermark', 95, fresh), redditItem('ClaudeCode', 80, fresh)],
+    });
+
+    await dailyDigest(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).not.toContain('r/papermark');
+    expect(telegram[0]!.text).toContain('r/ClaudeCode');
+  });
+
+  it('drops an allow-listed thread that has gone cold', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stale = new Date(TUESDAY - 20 * 24 * 3_600_000).toISOString();
+    const { telegram, outbox } = stubDigestWorld({
+      recent: [redditItem('ClaudeAI', 95, stale)],
+      scanRun: [
+        {
+          created_at: new Date(TUESDAY - 3_600_000).toISOString(),
+          meta: { total_items: 1, items_stored: 1 },
+        },
+      ],
+    });
+
+    await dailyDigest(env, TUESDAY);
+
+    expect(telegram).toHaveLength(0);
+    expect(outbox[0]).toMatchObject({ kind: 'radar', telegram_ok: null });
+  });
+
+  it('asks the database only for items nobody has acted on', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const urls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return json([]);
+    });
+
+    await dailyDigest(env, TUESDAY);
+
+    const read = urls.find((u) => u.includes('radar_items') && u.includes('first_seen_at'))!;
+    expect(read).toContain('acted=is.false');
   });
 });

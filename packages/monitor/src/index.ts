@@ -1229,6 +1229,12 @@ const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60_000;
 // readRecentRadarItems for the score floor that keeps this a real cap, not
 // just "all we happened to find").
 const DIGEST_MAX_ITEMS = 3;
+// How many rows the digest reads before filtering out the subreddits we may not
+// speak in and the threads that have gone cold. Well above the cap on purpose:
+// filtering after a read of exactly three would let three blocked rows empty a
+// digest that had good items behind them. A hundred is far more than a day
+// produces, so this is one query, not a pager.
+const DIGEST_CANDIDATE_LIMIT = 100;
 // Telegram hard-caps at 4096; stop well short so the appended weekly section
 // and a draft can't push the last item past the cliff.
 const DIGEST_MAX_CHARS = 3_800;
@@ -1249,10 +1255,138 @@ interface RadarRow {
   published_at: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Where we are allowed to speak on Reddit.
+//
+// The rules, their sources and the reasoning are in
+// docs/workstreams/seo-and-indexing/REDDIT-ENGAGEMENT-STANDARD-2026-09-03.md.
+// This is the machine-readable half of that document and nothing more.
+//
+// It is a constant, not a `radar_rules` table, on purpose. A row in a table can
+// change what we say in public with no diff, no test, no review and no history,
+// and this list is the last thing standing between a drafted reply and a
+// permanent ban in somebody else's community. It changes about once a month, in
+// a commit, with the document. That is the right amount of friction.
+//
+// The list is allow-first: a subreddit that is not named here gets no draft and
+// never reaches the digest. That is deliberately the safe default, because
+// Reddit's search returns every corner of the site and the two Reddit items the
+// radar has produced so far were BOTH in places we must never post — a
+// competitor's own community (r/papermark) and a promotional dumping ground
+// (r/DigitalEscapeTools).
+//
+// Membership here means only "a disclosed founder comment is permitted at all".
+// The per-subreddit conditions that follow from that (comments only, never a
+// post; the weekly megathread; karma, age and flair gates) are in the document,
+// because the founder does the posting by hand and the code cannot check them.
+//
+// Seven subreddits that looked obvious came off this list after Sol's review of
+// 3 September read their live rules: r/Entrepreneur, r/marketing, r/sales,
+// r/freelance and r/webdev forbid the comment outright (r/sales bans a seller
+// recommending their own product even when asked, on pain of a permanent ban);
+// r/startups requires a linked page to be one the commenter has no affiliation
+// with; r/SaaS allows one product mention per sixty days and rejects text that
+// reads as machine-written even when a human pasted it. The founder may still
+// answer in all seven in his own words with no mention — that is participation,
+// and the point is that no machine drafts it for him.
+const REDDIT_ALLOWED_SUBREDDITS = new Set([
+  'alexhormozi',
+  'askmarketing',
+  'claudeai',
+  'claudecode',
+  'consulting',
+  'indiehackers',
+  'leanstartup',
+  'nocode',
+  'ppc',
+  'selfhosted',
+  'sideproject',
+  'smallbusiness',
+]);
+
+// Named separately from "merely not on the allow list" so the reason we skipped
+// is honest in a log line. These are the ones a future reader is most likely to
+// add by mistake, because the radar's own scoring rates them highly: they are
+// full of our exact keywords. They are also the fastest way to be seen as a
+// competitor astroturfing a rival's community.
+const REDDIT_NEVER_SUBREDDITS = new Set([
+  'datarooms',
+  'digitalescapetools',
+  'docsend',
+  'pandadoc',
+  'papermark',
+]);
+
+// A thread older than this is cold: the asker has moved on, and a reply arriving
+// a fortnight late reads as somebody working a keyword list rather than
+// answering a person. This is our own rule, not Reddit's — no Reddit or
+// subreddit rule sets any deadline. Fourteen days rather than seven after Sol's
+// review pointed out that the shorter window costs real reach for no safety.
+const THREAD_MAX_AGE_MS = 14 * 24 * 60 * 60_000;
+
+/** The subreddit in a Reddit thread URL, lowercased, or null for any other URL. */
+export function subredditOf(url: string | null | undefined): string | null {
+  return (
+    /^https?:\/\/(?:[a-z0-9-]+\.)?reddit\.com\/r\/([A-Za-z0-9_]+)\b/
+      .exec(url ?? '')?.[1]
+      ?.toLowerCase() ?? null
+  );
+}
+
+/** True for any address on Reddit's own hosts, including the redd.it share
+ *  shortener, whether or not a subreddit can be read out of it. */
+function isRedditUrl(url: string | null | undefined): boolean {
+  return /^https?:\/\/(?:[a-z0-9-]+\.)?(?:reddit\.com|redd\.it)(?:[/?#]|$)/i.test(url ?? '');
+}
+
+/** Why this item must not receive a drafted reply, or null when it may.
+ *  Non-Reddit items (Hacker News, Google Alerts) are never blocked here — they
+ *  have no subreddit and no comment box we post into. `nowMs` is optional
+ *  because draftReply has no clock; the digest passes one and applies the age
+ *  rule, and both callers apply the subreddit rule. */
+export function redditReplyBlocked(
+  item: { source_url?: string | null; published_at?: string | null },
+  nowMs?: number,
+): string | null {
+  const sub = subredditOf(item.source_url);
+  // A Reddit address we cannot read a subreddit out of — a redd.it share link,
+  // a user page, a search result — is blocked rather than waved through. The
+  // allow list is only a defence if an unreadable Reddit URL fails closed.
+  if (sub === null)
+    return isRedditUrl(item.source_url)
+      ? 'the subreddit cannot be read from this Reddit link'
+      : null;
+  if (REDDIT_NEVER_SUBREDDITS.has(sub))
+    return `r/${sub} is a competitor-owned or promotional subreddit`;
+  if (!REDDIT_ALLOWED_SUBREDDITS.has(sub)) return `r/${sub} is not on the allow list`;
+  if (nowMs !== undefined && item.published_at) {
+    const age = nowMs - Date.parse(item.published_at);
+    if (Number.isFinite(age) && age > THREAD_MAX_AGE_MS)
+      return 'thread is older than fourteen days';
+  }
+  return null;
+}
+
 // The disclosure that MUST appear in every drafted reply — the "I built this"
 // line the platforms and honesty both require. draftReply guarantees it; a test
 // holds the guarantee. This is the guardrail Sol reviews before drafts go live.
 export const DISCLOSURE = 'Full disclosure: I built HTMLRadar.';
+
+// The first line of every draft, and the one line the founder must replace.
+//
+// Reddit's Responsible Builder Policy forbids apps posting "identical or
+// substantially similar content across subreddits", and a moderator reading two
+// of our comments a week apart would see exactly that: the same five sentences
+// under a different question. A template cannot answer a stranger's actual
+// question, so it stops pretending to. What ships is a scaffold with a hole in
+// it, and the hole is the part that makes the comment a reply rather than an ad.
+//
+// Exported because the one-tap path must refuse to post any text that still
+// contains it: an unedited draft is, by construction, the boilerplate the policy
+// names.
+export const DRAFT_ANSWER_SLOT =
+  '[[ replace this line with your own answer to their question, in your own words, ' +
+  'referring to something specific in their thread ]]';
 
 // The Telegram framing, not part of the reply. It exists so the founder can
 // never mistake a draft for something already said — and it is a named export
@@ -1298,18 +1432,22 @@ const SHARE_EVIDENCE_TERMS = [
 const PRICING_PAIN_TERMS = ['pricing', 'too expensive', 'expensive', 'cheaper', 'cost'];
 
 /** A founder-voice reply DRAFT for one item, or null when no honest reply
- *  exists — noise, an unexpected category, or a buyer_question/product_feedback
- *  item that never mentions sharing or tracking a document. Where it does
- *  draft, it is plain first-person, carries the mandatory disclosure, keeps
- *  product claims conditional, and names Papermark only where the item's own
- *  pricing complaint makes that the honest answer. Takes no web content into
- *  the body — title and snippet are read only to check for evidence, never
- *  interpolated. Pure. */
+ *  exists — noise, an unexpected category, a buyer_question/product_feedback
+ *  item that never mentions sharing or tracking a document, or a Reddit thread
+ *  in a subreddit we may not speak in (see redditReplyBlocked). Where it does
+ *  draft, it opens with the slot the founder must replace, then two or three
+ *  plain first-person sentences carrying the mandatory disclosure, no
+ *  superlatives, no exclamation marks, no list, and no link. It names Papermark
+ *  only where the item's own pricing complaint makes that the honest answer.
+ *  Takes no web content into the body — title and snippet are read only to
+ *  check for evidence, never interpolated. Pure. */
 export function draftReply(item: {
   category: RadarCategory;
   title: string;
   snippet?: string | null;
+  source_url?: string | null;
 }): string | null {
+  if (redditReplyBlocked(item) !== null) return null;
   const t = `${item.title} ${item.snippet ?? ''}`.toLowerCase();
   const hasShareEvidence = containsAny(t, SHARE_EVIDENCE_TERMS);
   const hasPricingPain = containsAny(t, PRICING_PAIN_TERMS);
@@ -1318,28 +1456,29 @@ export function draftReply(item: {
   switch (item.category) {
     case 'competitor_mention':
       body = hasPricingPain
-        ? 'On price specifically, Papermark is a usual free/open-source pick if what you are sending is a PDF. ' +
-          'If it is HTML instead, that is the gap I built HTMLRadar for — a link that stays a live page and shows who opened it and which sections they read. ' +
-          `${DISCLOSURE} It is AGPL, self-hostable, free for two tracked links.`
-        : 'If what you are sharing is HTML rather than a file you upload, that is the gap I built HTMLRadar for — a link that stays a live page and shows who opened it and which sections they read. ' +
-          `${DISCLOSURE} It is AGPL, self-hostable, free for two tracked links.`;
+        ? 'On price, Papermark is the usual open-source pick if what you are sending is a PDF. ' +
+          'For HTML I built HTMLRadar: the link stays a live page, and it shows who opened it and which sections they read. ' +
+          `${DISCLOSURE} AGPL, self-hostable, free for two links.`
+        : 'If what you are sharing is HTML rather than a file you upload, I built HTMLRadar for that case: ' +
+          'the link stays a live page, and it shows who opened it and which sections they read. ' +
+          `${DISCLOSURE} AGPL, self-hostable, free for two links.`;
       break;
     case 'product_feedback':
       if (!hasShareEvidence) return null;
       body =
-        'That exists: paste or upload the HTML and you get a link that stays a live page, and if you also want to know it was read, it reports who opened it and which sections they read. ' +
-        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links.`;
+        'That exists. You paste or upload the HTML, get a link that stays a live page, and see who opened it and which sections they read. ' +
+        `${DISCLOSURE} Open source (AGPL), free for two links.`;
       break;
     case 'reputation':
       body =
-        'Happy to answer anything here — ask away. ' +
+        'Happy to answer anything here. ' +
         `${DISCLOSURE} Take this as the maker talking, not a neutral review.`;
       break;
     case 'buyer_question':
       if (!hasShareEvidence) return null;
       body =
-        'You can send it as a link instead of an attachment, and if you also want to know it was opened and which sections were read, that is what I built HTMLRadar for. ' +
-        `${DISCLOSURE} It is open source (AGPL) and free for two tracked links.`;
+        'You can send it as a link rather than an attachment, and see whether it was opened and which sections were read. That is what I built HTMLRadar for. ' +
+        `${DISCLOSURE} Open source (AGPL), free for two links.`;
       break;
     default:
       // noise, and any category this switch does not otherwise know about:
@@ -1348,7 +1487,7 @@ export function draftReply(item: {
   }
   // Belt to the braces above: no draft ever ships without the disclosure.
   if (!body.includes(DISCLOSURE)) body = `${DISCLOSURE} ${body}`;
-  return `${DRAFT_PREFIX}${body}`;
+  return `${DRAFT_PREFIX}${DRAFT_ANSWER_SLOT}\n\n${body}`;
 }
 
 function draftsEnabled(env: Env): boolean {
@@ -1361,22 +1500,32 @@ const radarHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
 });
 
-/** The digest's candidate list: non-noise items from the last 24h, at or above
- *  REPLY_THRESHOLD, highest intent first, capped at DIGEST_MAX_ITEMS. The
- *  score floor and the cap are also applied here in code (not left to the
- *  query alone), so the guarantee holds even if the query changes underneath. */
+/** The digest's candidate list: unacted, non-noise items from the last 24h, at
+ *  or above REPLY_THRESHOLD, in a subreddit we may speak in and still warm,
+ *  highest intent first, capped at DIGEST_MAX_ITEMS. The score floor and the cap
+ *  are also applied here in code (not left to the query alone), so the guarantee
+ *  holds even if the query changes underneath.
+ *
+ *  It over-fetches before filtering: a blocked subreddit that came back inside
+ *  the first three rows would otherwise eat a slot and leave the digest shorter
+ *  than the day deserved. Mining is untouched — every blocked item is still
+ *  stored in radar_items and still counts in the Monday summary. The only thing
+ *  that changes is what we are asked to reply to. */
 async function readRecentRadarItems(env: Env, nowMs: number): Promise<RadarRow[]> {
   const since = encodeURIComponent(new Date(nowMs - DIGEST_WINDOW_MS).toISOString());
   const res = await fetch(
     `${env.SUPABASE_URL}/rest/v1/radar_items` +
       `?first_seen_at=gte.${since}&category=neq.noise&intent_score=gte.${REPLY_THRESHOLD}` +
-      `&order=intent_score.desc,first_seen_at.desc&limit=${DIGEST_MAX_ITEMS}` +
+      `&acted=is.false` +
+      `&order=intent_score.desc,first_seen_at.desc&limit=${DIGEST_CANDIDATE_LIMIT}` +
       `&select=source,source_url,title,snippet,category,intent_score,published_at`,
     { headers: radarHeaders(env) },
   );
   if (!res.ok) throw new Error(`radar_items read HTTP ${res.status}`);
   const rows = (await res.json()) as RadarRow[];
-  return rows.filter((r) => r.intent_score >= REPLY_THRESHOLD).slice(0, DIGEST_MAX_ITEMS);
+  return rows
+    .filter((r) => r.intent_score >= REPLY_THRESHOLD && redditReplyBlocked(r, nowMs) === null)
+    .slice(0, DIGEST_MAX_ITEMS);
 }
 
 /** The most recent mining run's counts, read back for the zero-item marker's
@@ -1576,10 +1725,17 @@ export async function dailyDigest(env: Env, nowMs: number = Date.now()): Promise
 // short-lived access token per post, and no code path here writes any of them
 // to a row, a log line, or a message.
 
-/** The worker's pre-flight copy of the cap, for a friendlier message before a
- *  tap is spent. reserve_radar_post() in schema/046 is the authority; these two
- *  disagreeing costs a nicer sentence, never a sixth comment. */
-const REDDIT_DAILY_CAP = 5;
+/** The cap on comments in a rolling 24 hours. The worker checks it before a tap
+ *  is spent, for a friendlier message, and passes the same number to
+ *  reserve_radar_post(), which decides it under a lock and is the authority — so
+ *  there is one number rather than two that can drift apart.
+ *
+ *  Two, not the five the function defaults to, because the engagement standard
+ *  says at most two comments a day and a written rule the code contradicts is
+ *  not a rule. The standard's other two limits, five a week and one per
+ *  subreddit per week, are the founder's discipline until a migration can count
+ *  them in the same locked function. */
+const REDDIT_DAILY_CAP = 2;
 const ONETAP_WINDOW_MS = 24 * 60 * 60_000;
 /** How long a button stays tappable. Long enough for a weekend. */
 const DRAFT_TTL_MS = 72 * 60 * 60_000;
@@ -1749,7 +1905,7 @@ async function reservePost(env: Env, draftId: string, thingId: string): Promise<
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/reserve_radar_post`, {
     method: 'POST',
     headers: { ...radarHeaders(env), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_draft_id: draftId, p_thing_id: thingId }),
+    body: JSON.stringify({ p_draft_id: draftId, p_thing_id: thingId, p_cap: REDDIT_DAILY_CAP }),
   });
   if (!res.ok) throw new Error(`reserve_radar_post HTTP ${res.status}`);
   return String(await res.json());
@@ -2280,6 +2436,22 @@ async function handlePost(
       meta: { draft_id: draft.id, thing_id: draft.thing_id, permalink, version: draft.version },
     });
   };
+
+  // An unedited draft still carries DRAFT_ANSWER_SLOT, which means the first
+  // line is a note to himself and the rest is the same boilerplate every other
+  // draft in that category carries. Reddit's Responsible Builder Policy names
+  // exactly that ("identical or substantially similar content across
+  // subreddits"), and no reader forgives it either. Refuse before the token, the
+  // identity call and above all the reservation, because a reservation is never
+  // released: burning one on a draft we were never going to post would close the
+  // thread to the real reply.
+  if (draftBody(draft.draft_text).includes(DRAFT_ANSWER_SLOT)) {
+    const msg =
+      'This draft still has the placeholder first line. Reply with your own answer to their ' +
+      'question and the edited version comes back with its own button.';
+    await settle({ status: 'failed', error: msg }, `Not posted. ${msg}`, 'Needs your own words.');
+    return;
+  }
 
   let token: string;
   let who: RedditIdentity;

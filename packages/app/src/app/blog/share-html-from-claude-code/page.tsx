@@ -253,7 +253,9 @@ export default function Post() {
 
             <p>
               Closing that gap takes one MCP server and about two minutes, without leaving the
-              terminal. I built HTMLRadar, so weigh the enthusiasm accordingly.
+              terminal: when your agent writes a document for someone else, HTMLRadar turns it into
+              a tracked link and reports back who opened it and which parts held them. I built
+              HTMLRadar, so weigh the enthusiasm accordingly.
             </p>
 
             {/* The whole post in one glance. */}

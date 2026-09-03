@@ -79,12 +79,13 @@ export default function ForClaudeCodePage() {
           <h1 className="text-letterpress mt-6 font-serif text-[40px] font-normal leading-[1.05] tracking-tightest text-ink md:text-[56px]">
             Claude Code wrote the deck. Find out if they read it.
           </h1>
-          <DirectAnswer updated="August 2026">
-            HTMLRadar lets Claude Code share an HTML file it generated — a deck, proposal or report
-            — as a tracked link, ask afterwards who opened it and which sections they read, send the
-            same document to more people one link at a time, switch a link off, and rewrite the
-            document behind links that have already gone out. Install the plugin, generate as usual,
-            and the whole loop stays in the terminal. Free for two links, then $15 a month.
+          <DirectAnswer updated="September 2026">
+            When Claude Code writes a document for someone else — a deck, proposal or report —
+            HTMLRadar turns it into a tracked link and reports back who opened it and which parts
+            held them. It can also send the same document to more people one link at a time, switch
+            a link off, and rewrite the document behind links that have already gone out. Install
+            the plugin, generate as usual, and the whole loop stays in the terminal. Free for two
+            links, then $15 a month.
           </DirectAnswer>
           <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
             Claude Code is very good at producing a finished HTML document — a board update, a
@@ -257,7 +258,7 @@ export default function ForClaudeCodePage() {
               </Link>
               . The only data that leaves your machine is the HTML Claude passes in and the call
               parameters, to htmlradar.com or your own instance. The per-tool detail is on the{' '}
-              <Link href="/mcp#key" className="text-signal-dark hover:underline">
+              <Link href="/mcp#permissions" className="text-signal-dark hover:underline">
                 MCP page
               </Link>
               .

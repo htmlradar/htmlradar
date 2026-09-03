@@ -113,6 +113,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    // Published 2026-09-04.
+    {
+      url: `${baseUrl}/blog/what-deck-sharing-tools-record`,
+      lastModified: '2026-09-04',
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
   ];
 
   return routes;

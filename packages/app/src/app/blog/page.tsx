@@ -25,6 +25,14 @@ interface Post {
 
 const POSTS: Post[] = [
   {
+    slug: 'what-deck-sharing-tools-record',
+    title: "What seven deck-sharing tools actually load in your recipient's browser",
+    description:
+      'A recipient-side test of seven deck-sharing tools: every network request, cookie and script that loads when someone opens a shared link. DocSend, Papermark, Peony, Stacktree, Tiiny.host, HummingDeck and HTMLRadar.',
+    date: '2026-09-04',
+    readingTime: '16 min',
+  },
+  {
     slug: 'share-html-from-claude-code',
     title: 'Share an HTML page from Claude Code, then ask who read it',
     description:

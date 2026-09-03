@@ -620,8 +620,8 @@ env_vars = ["HTMLRADAR_API_KEY"]`}
               Both routes offer the same two levels, and read-only is what the connector&rsquo;s
               consent page pre-selects. Read-only lets Claude list your links and read who opened
               them. Read and publish adds creating a link, replacing a document and switching a link
-              off. Ask a read-only connection to publish and it gets a 403, which is what makes
-              Claude offer you the upgrade rather than fail quietly.
+              off. Ask a read-only connection to publish and the answer is a refusal that names the
+              level you would have to grant, rather than a silent failure.
             </p>
             <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
               Neither level can delete a link or a document, change an account setting, or see

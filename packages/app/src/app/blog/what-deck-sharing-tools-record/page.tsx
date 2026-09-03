@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { NavBar } from '@/components/NavBar';
 import { SectionMark } from '@/components/SectionMark';
 import { ArticleLd, BreadcrumbLd } from '@/components/JsonLd';
+import { Faq } from '@/components/Faq';
 import { pageMeta } from '@/lib/seo';
 
 export const runtime = 'edge';
@@ -17,6 +18,41 @@ export const metadata = pageMeta({
   path: '/blog/what-deck-sharing-tools-record',
 });
 
+const PUBLISHED = '2026-09-04';
+// Bump UPDATED only when the words on the page actually change. An "Updated"
+// line that matches the publication date is date padding, and answer engines
+// reward real revisions, not cosmetic bumps - so the line below renders only
+// once the two differ.
+const UPDATED = '2026-09-04';
+
+// Questions taken from what people actually type around this subject
+// (Search Console's "docsend alternative" family, plus the recipient-side
+// worry the piece is about). Every answer is 40-60 words and states only a
+// finding recorded above, so the FAQPage markup can never claim more than
+// the article proves.
+const FAQ = [
+  {
+    q: 'Does a shared deck link track the person who opens it?',
+    a: 'Every one of the seven tools tested loads something beyond the document itself, and all seven send at least one request to their own servers recording that the link was opened. The differences are in how much else loads: advertising networks, session replay, third-party fonts and logo services.',
+  },
+  {
+    q: 'Do deck-sharing tools record session replay of the recipient?',
+    a: 'One did. On 30 and 31 August 2026 Peony attempted a Mixpanel Session Replay upload from the recipient page; the request was refused with a 402 on both dates, and went through with a 200 when re-checked on 2 September. No session replay was observed on the other six.',
+  },
+  {
+    q: 'Does DocSend load advertising trackers when someone opens a link?',
+    a: 'On the link tested, yes. DocSend made 174 requests, the busiest page in the set, including Google advertising and DoubleClick conversion calls, and wrote a consent cookie with all five categories set to true and userInteracted false while the consent banner sat untouched.',
+  },
+  {
+    q: 'What does HTMLRadar itself send from the recipient page?',
+    a: 'One remote procedure call to our own Supabase project inside the fifteen-second window, and three heartbeat calls in a separate 55-second run, all to the same host. No other destination appeared in either log: no third-party endpoint, no image beacon, no separate event collector.',
+  },
+  {
+    q: 'How can I check what a shared document link loads in my own browser?',
+    a: 'Open the link in a private window, open your browser developer tools, and read the Network tab and document.cookie before interacting with anything. That is the method used here: Playwright Chromium at 1512x982, one public link per product, load, wait fifteen seconds, capture, then scroll.',
+  },
+];
+
 export default function Post() {
   return (
     <>
@@ -25,7 +61,8 @@ export default function Post() {
         <article className="mx-auto max-w-2xl px-6 py-20 md:py-28">
           <ArticleLd
             headline="What seven deck-sharing tools actually load in your recipient's browser"
-            datePublished="2026-09-04"
+            datePublished={PUBLISHED}
+            dateModified={UPDATED}
             url="/blog/what-deck-sharing-tools-record"
           />
           <BreadcrumbLd
@@ -43,7 +80,9 @@ export default function Post() {
             What seven deck-sharing tools actually load in your recipient&apos;s browser
           </h1>
           <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-graphite">
-            2026-09-04 &nbsp;·&nbsp; 16 min read &nbsp;·&nbsp; Research
+            Published {PUBLISHED}
+            {UPDATED !== PUBLISHED && <> &nbsp;·&nbsp; Updated {UPDATED}</>} &nbsp;·&nbsp; 16 min
+            read &nbsp;·&nbsp; Research
           </p>
 
           <div className="mt-12 space-y-10 break-words text-[16.5px] leading-[1.7] text-ink-soft">
@@ -790,6 +829,8 @@ export default function Post() {
               </p>
             </section>
           </div>
+
+          <Faq items={FAQ} title="Questions people ask about this" />
 
           <div className="mt-20 border-t border-line pt-10">
             <p className="text-[14px] leading-relaxed text-ink-soft">

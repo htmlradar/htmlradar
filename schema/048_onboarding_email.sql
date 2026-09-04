@@ -28,7 +28,12 @@
 -- overlapping runs cannot pick the same row (FOR UPDATE SKIP LOCKED), and a
 -- row whose pg_net post fails is NOT retried — a duplicate onboarding
 -- e-mail is worse than a missing one, and notifications_log records the
--- failure for a human to look at.
+-- failure for a human to look at. To be exact about which failure that is:
+-- pg_net's post is asynchronous, so an HTTP error arrives long after this
+-- function has committed and the claim stands. An exception raised INSIDE
+-- this function, before commit, rolls the claim back with everything else,
+-- and the row is picked up again on the next run — which is what should
+-- happen, because nothing was queued either.
 --
 -- WHO IS EXCLUDED
 --
@@ -177,15 +182,15 @@ begin
         <p style="margin:0;font-size:15.5px;line-height:1.6;color:#1F1108;">Hello,</p>
       </td></tr>
       <tr><td class="pad" style="padding:0 24px 26px 24px;">
-        <p style="margin:0 0 14px 0;font-size:15.5px;line-height:1.65;color:#3A2818;">The documents that matter are becoming HTML because an HTML page can be interactive, reflows to whatever screen opens it, and can be changed after it has been sent - none of which a PDF you have already sent can do. Sending one is where it breaks: a PDF loses what made it good, and hosting it yourself tells you nothing.</p>
+        <p style="margin:0 0 14px 0;font-size:15.5px;line-height:1.65;color:#3A2818;">You made an account, so here is what HTMLRadar does and the four ways to use it.</p>
+        <p style="margin:0 0 14px 0;font-size:15.5px;line-height:1.65;color:#3A2818;">The documents that matter are becoming HTML because an HTML page can be interactive, reflows to whatever screen opens it, and can be changed after it has been sent - none of which a PDF you have already sent can do. Sending one is where it breaks: a PDF loses what made it good, and hosting it yourself tells you nothing about who read it.</p>
         <p style="margin:0;font-size:15.5px;line-height:1.65;color:#3A2818;">HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal as a tracked link, and seeing who opened it, which sections they read, and for how long.</p>
       </td></tr>
 
       <!-- four doors -->
       <tr><td class="pad" style="padding:8px 24px 18px 24px;border-top:1px solid #E8D5BD;">
         <p class="h1" style="margin:22px 0 0 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1F1108;letter-spacing:-0.01em;">Four ways in.</p>
-        <p style="margin:8px 0 0 0;font-size:15.5px;line-height:1.6;color:#876959;">All end at the same report.</p>
-      </td></tr>
+        </td></tr>
 
       <tr><td class="pad" style="padding:0 24px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -210,7 +215,7 @@ begin
             <td class="col" width="264" valign="top" style="width:264px;">
               <img src="https://htmlradar.com/brand/email/door-api.png" width="264" alt="A curl call to htmlradar.com/api/v1/shares/ID/activity with a bearer key, returning JSON: opened true, viewers with email jane@acme.com, active_seconds 374, max_scroll 87." style="display:block;width:100%;max-width:264px;height:auto;border:0;border-radius:10px;">
               <p style="margin:12px 0 0 0;font-size:15px;font-weight:600;line-height:1.4;color:#1F1108;">3. Call the API.</p>
-              <p style="margin:6px 0 0 0;font-size:14.5px;line-height:1.55;color:#3A2818;">Key-authenticated endpoints at <span style="font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;font-size:13px;color:#5A1521;">/api/v1</span>: create a document, make a share, read its activity as JSON.</p>
+              <p style="margin:6px 0 0 0;font-size:14.5px;line-height:1.55;color:#3A2818;">Key-authenticated endpoints at <span style="font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;font-size:13px;color:#5A1521;">/api/v1</span>: create a document, make a share, read its activity.</p>
               <p style="margin:8px 0 0 0;font-size:14px;line-height:1.5;"><a href="https://htmlradar.com/docs/api?utm_source=email&amp;utm_medium=onboarding&amp;utm_campaign=door_api" style="color:#5A1521;text-decoration:underline;">The API reference</a></p>
             </td>
             <td class="gut" width="24" style="width:24px;">&nbsp;</td>
@@ -228,7 +233,7 @@ begin
       <!-- the read report -->
       <tr><td class="pad" style="padding:36px 24px 18px 24px;">
         <p class="h1" style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1F1108;letter-spacing:-0.01em;">What comes back.</p>
-        <p style="margin:12px 0 0 0;font-size:15.5px;line-height:1.65;color:#3A2818;">Opens, active reading time, scroll depth and time per section, per recipient - sections taken from your own markup, with a three-second floor so a scroll-past never counts as a read. An e-mail lands on the first real read.</p>
+        <p style="margin:12px 0 0 0;font-size:15.5px;line-height:1.65;color:#3A2818;">Sections come from your own markup, so nothing needs tagging, and a three-second floor stops a scroll-past counting as a read. An e-mail lands the first time a recipient opens the link.</p>
       </td></tr>
       <tr><td class="pad" style="padding:0 24px;">
         <img src="https://htmlradar.com/brand/email/read-report.png" width="552" alt="A read report for Q3 Brief, Acme: recipient Jane, 3 opens, 6m 14s active read, 87 per cent scrolled, and time per section - The Ask 2m 41s, Scope and timeline 1m 58s, Team 1m 35s, Pricing 12s, Appendix none." style="display:block;width:100%;max-width:552px;height:auto;border:0;border-radius:12px;">
@@ -243,7 +248,7 @@ begin
 
       <!-- plan + close -->
       <tr><td class="pad" style="padding:30px 24px 0 24px;">
-        <p style="margin:0;font-size:15.5px;line-height:1.65;color:#3A2818;">Two tracked links are free; Pro is $15 a month or $150 a year; AGPL-3.0 if you self-host.</p>
+        <p style="margin:0;font-size:15.5px;line-height:1.65;color:#3A2818;">Two tracked links are free; the source is AGPL-3.0 if you self-host.</p>
         <p style="margin:16px 0 0 0;font-size:15.5px;line-height:1.65;color:#1F1108;">Reply to this and it reaches me.</p>
         <p style="margin:20px 0 0 0;font-size:15.5px;line-height:1.65;color:#1F1108;">Cheers,<br>Abhinandan</p>
       </td></tr>
@@ -269,11 +274,13 @@ $html$;
   -- readable letter rather than a transcript of a layout.
   v_text := $txt$Hello,
 
-The documents that matter are becoming HTML because an HTML page can be interactive, reflows to whatever screen opens it, and can be changed after it has been sent - none of which a PDF you have already sent can do. Sending one is where it breaks: a PDF loses what made it good, and hosting it yourself tells you nothing.
+You made an account, so here is what HTMLRadar does and the four ways to use it.
+
+The documents that matter are becoming HTML because an HTML page can be interactive, reflows to whatever screen opens it, and can be changed after it has been sent - none of which a PDF you have already sent can do. Sending one is where it breaks: a PDF loses what made it good, and hosting it yourself tells you nothing about who read it.
 
 HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal as a tracked link, and seeing who opened it, which sections they read, and for how long.
 
-FOUR WAYS IN. All end at the same report.
+FOUR WAYS IN
 
 1. Upload it in the dashboard.
    One HTML file, up to 30 MB. PDFs and spreadsheets ride along as downloads.
@@ -284,7 +291,7 @@ FOUR WAYS IN. All end at the same report.
    https://htmlradar.com/new?mode=url
 
 3. Call the API.
-   Key-authenticated endpoints at /api/v1: create a document, make a share, read its activity as JSON.
+   Key-authenticated endpoints at /api/v1: create a document, make a share, read its activity.
    https://htmlradar.com/docs/api
 
 4. Let your agent do it.
@@ -293,7 +300,7 @@ FOUR WAYS IN. All end at the same report.
 
 WHAT COMES BACK
 
-Opens, active reading time, scroll depth and time per section, per recipient - sections taken from your own markup, with a three-second floor so a scroll-past never counts as a read. An e-mail lands on the first real read.
+Sections come from your own markup, so nothing needs tagging, and a three-second floor stops a scroll-past counting as a read. An e-mail lands the first time a recipient opens the link.
 
 WHAT WE RECORD
 
@@ -301,7 +308,7 @@ When a recipient opens a share we record the email they enter at the gate if the
 
 https://htmlradar.com/privacy
 
-Two tracked links are free; Pro is $15 a month or $150 a year; AGPL-3.0 if you self-host.
+Two tracked links are free; the source is AGPL-3.0 if you self-host.
 
 Reply to this and it reaches me.
 
@@ -320,9 +327,13 @@ $txt$;
   -- it is picked, not after the network call.
   --
   -- p_only_email is the test hatch: pass an address and the sweep considers
-  -- that account only, ignoring the internal-domain exclusion so the
-  -- founder's own inbox can receive the real thing through the real path.
-  -- It still claims the row, so a test send is not repeated either.
+  -- that ONE account and no other, ignoring every selection rule - the
+  -- domain exclusion, the comped flag, and both ends of the age window.
+  -- All four have to go, not just the domain one: the founder's own account
+  -- is months old and on an excluded domain, and a test send that could not
+  -- reach it would not be testing the path anyone will actually receive.
+  -- The narrowing is the address itself, and it still claims the row, so
+  -- even a test cannot be sent twice.
   -- ------------------------------------------------------------
   for v_row in
     with candidates as (
@@ -381,7 +392,7 @@ $txt$;
     values (null, v_row.email, v_request_id, 'queued', 'onboarding');
 
     insert into app_events (distinct_id, event, properties, user_id)
-    values (v_row.id::text, 'onboarding.email_sent', '{}'::jsonb, v_row.id);
+    values (v_row.id::text, 'onboarding.email_queued', '{}'::jsonb, v_row.id);
 
     v_sent := v_sent + 1;
   end loop;
@@ -391,7 +402,7 @@ end;
 $fn$;
 
 comment on function public.send_onboarding_emails(text) is
-  'Sends the one-time onboarding e-mail to accounts created between 15 minutes and 24 hours ago that have not had one, excluding comped accounts and the draconic.ai / htmlradar.com domains. Claims each row by stamping profiles.onboarding_sent_at inside the same statement that selects it, so it is idempotent and never re-sends. Logs to notifications_log with kind=''onboarding''. Pass an address to send to exactly that account (the test hatch). Returns the number queued.';
+  'Sends the one-time onboarding e-mail to accounts created between 15 minutes and 24 hours ago that have not had one, excluding comped accounts and the draconic.ai / htmlradar.com domains. Claims each row by stamping profiles.onboarding_sent_at inside the same statement that selects it, so it is idempotent and never re-sends. Logs to notifications_log with kind=''onboarding''. Pass an address to send to exactly that one account, bypassing every selection rule including the age window and the comped flag (the test hatch). Returns the number queued.';
 
 revoke all on function public.send_onboarding_emails(text) from public, anon, authenticated;
 grant execute on function public.send_onboarding_emails(text) to service_role;

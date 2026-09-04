@@ -173,9 +173,9 @@ begin
   raise notice 'PASS  C6-C8 one notifications_log row, queued, kind=onboarding, with a request id';
 
   select count(*) into v_events from app_events
-   where event = 'onboarding.email_sent';
+   where event = 'onboarding.email_queued';
   if v_events <> 1 then
-    raise exception 'FAIL C9: expected 1 onboarding.email_sent event, got %', v_events;
+    raise exception 'FAIL C9: expected 1 onboarding.email_queued event, got %', v_events;
   end if;
   raise notice 'PASS  C9 one analytics event per send';
 end;
@@ -198,6 +198,29 @@ begin
     raise exception 'FAIL D2: the test hatch re-sent to an already-mailed account';
   end if;
   raise notice 'PASS  D1-D2 the named-address hatch overrides the domain exclusion, once only';
+end;
+$$;
+
+do $$
+declare v_sent int; v_others int;
+begin
+  -- The hatch ignores the domain exclusion, the comped flag AND both ends of
+  -- the age window on purpose (the founder's own account is months old and on
+  -- an excluded domain). So the property worth proving is not that those rules
+  -- still apply — they deliberately do not — but that the address is the whole
+  -- of the narrowing: naming one account must never touch a second one.
+  select public.send_onboarding_emails('founder@draconic.ai') into v_sent;
+  if v_sent <> 1 then
+    raise exception 'FAIL D3: the hatch did not reach the named internal account, got %', v_sent;
+  end if;
+  select count(*) into v_others from profiles
+   where onboarding_sent_at is not null
+     and email not in ('eligible@example.test', 'already@example.test',
+                       'qa-bot@htmlradar.com', 'founder@draconic.ai');
+  if v_others <> 0 then
+    raise exception 'FAIL D4: the hatch mailed % account(s) it was not given', v_others;
+  end if;
+  raise notice 'PASS  D3-D4 the hatch reaches exactly the named account and no other';
 end;
 $$;
 

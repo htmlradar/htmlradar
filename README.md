@@ -205,8 +205,10 @@ for that connection. Revoke it any time under **Connected apps** in
 
 **Every other client — run the package**
 
-Create an API key at [htmlradar.com/settings](https://htmlradar.com/settings) under **API keys**,
-then export it, so the key never becomes a command-line argument that lands in your shell history:
+Create an API key at [htmlradar.com/settings](https://htmlradar.com/settings) under **API keys** —
+the same key also calls the [HTTP API](https://htmlradar.com/docs/api) directly, if you would
+rather script it than run an agent — then export it, so the key never becomes a command-line
+argument that lands in your shell history:
 
 ```bash
 export HTMLRADAR_API_KEY=hr_live_xxx

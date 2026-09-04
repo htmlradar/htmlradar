@@ -85,6 +85,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    // Published 2026-09-04: the HTTP API reference, the fourth door named
+    // in MESSAGE-ARCHITECTURE-2026-09-04.md that had no documentation page.
+    {
+      url: `${baseUrl}/docs/api`,
+      lastModified: '2026-09-04',
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
     {
       url: `${baseUrl}/for/claude-code`,
       lastModified: connectorUpdate,

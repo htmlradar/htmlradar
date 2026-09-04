@@ -44,6 +44,7 @@ export function V2Footer() {
 
         <FooterGroup title="Developers">
           <Link href="/mcp">MCP server</Link>
+          <Link href="/docs/api">API reference</Link>
           <Link href="/for/claude-code">For Claude Code</Link>
           <Link href="/for/claude-artifacts">For Claude artifacts</Link>
           <Link href="/for/reveal-js">For reveal.js</Link>

@@ -894,14 +894,18 @@ did anyone read the proposal I shared yesterday?`}
               <Link href="/self-hosted" className="text-signal-dark hover:underline">
                 self-hosted document tracking
               </Link>
-              , and{' '}
+              ,{' '}
               <Link
                 href="/blog/share-html-from-claude-code"
                 className="text-signal-dark hover:underline"
               >
                 Tutorial: share a page from Claude Code, then ask who read it
               </Link>
-              .
+              , and the{' '}
+              <Link href="/docs/api" className="text-signal-dark hover:underline">
+                HTTP API reference
+              </Link>{' '}
+              this server calls on your behalf.
             </p>
           </div>
         </article>

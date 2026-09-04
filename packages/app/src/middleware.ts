@@ -16,6 +16,12 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 // and Next handles the route resolution (real page or not-found.tsx).
 const PROTECTED_PREFIXES = ['/docs', '/dashboard', '/new', '/settings', '/upgrade'];
 
+// Public despite falling under /docs: the API reference page, not a
+// customer's document. Next's own router prefers this static route over
+// (app)/docs/[id], but the auth gate runs first and would otherwise redirect
+// every signed-out visitor — including search crawlers — to /sign-in.
+const PUBLIC_EXCEPTIONS = new Set(['/docs/api']);
+
 export async function middleware(req: NextRequest) {
   // www → apex, permanent. Both hosts are attached to the Pages project,
   // so Search Console indexed them as two competing sites and split
@@ -30,9 +36,9 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next();
   const pathname = req.nextUrl.pathname;
-  const requiresAuth = PROTECTED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  const requiresAuth =
+    !PUBLIC_EXCEPTIONS.has(pathname) &&
+    PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   // Public path — skip the Supabase round-trip entirely. Saves ~100ms
   // on cold edge requests for the landing page.

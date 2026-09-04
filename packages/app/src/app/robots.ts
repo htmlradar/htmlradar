@@ -15,7 +15,10 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
+        // /docs/api is the one public page under the disallowed /docs
+        // prefix — the API reference, not a customer's document. The more
+        // specific Allow below wins over the shorter Disallow.
+        allow: ['/', '/docs/api'],
         disallow: [
           '/r/', // proxy share URLs — viewer-specific, not indexable
           '/auth/', // OAuth callback

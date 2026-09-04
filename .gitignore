@@ -73,3 +73,6 @@ graphify-out/
 # Tokens and keys never reach the index
 .npmrc
 *.pem
+
+# generated onboarding e-mail previews (pnpm gen:email-preview)
+packages/app/.email-preview/

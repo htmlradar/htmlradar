@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HTMLRadar onboarding e-mail cards</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Source for the five images in the onboarding e-mail (schema/048).
+      Rendered to PNG by scripts/generate-onboarding-cards.mjs, which clips
+      one region per .card and writes public/brand/email/<id>.png.
+
+      Same font pair and tokens as scripts/og-card.html, and display=block
+      for the same reason: the render waits on document.fonts.ready, and
+      display=swap would let Chromium paint a fallback first.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #fbf1e8;
+        --paper-2: #f4e1cb;
+        --card: #fdf7f0;
+        --ink: #1f1108;
+        --ink-soft: #3a2818;
+        --graphite: #876959;
+        --signal: #7a1f2e;
+        --signal-dark: #5a1521;
+        --line: #e8d5bd;
+        --terminal: #16110d;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        width: 1300px;
+        background: #ffffff;
+        font:
+          400 16px/1.5 'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          system-ui,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      /* Each card is a fixed-size box the render script clips exactly.
+         All four door cards share one height so the 2x2 grid in the
+         e-mail lines up: 528x396, shown at 264x198. The report card is
+         1104x688, shown full width at 552x344. */
+      .card {
+        position: relative;
+        overflow: hidden;
+        background: var(--paper);
+        background-image: radial-gradient(rgba(31, 17, 8, 0.05) 1px, transparent 1px);
+        background-size: 22px 22px;
+        margin-bottom: 24px;
+      }
+      .door {
+        width: 528px;
+        height: 396px;
+        padding: 28px 30px;
+      }
+      .kicker {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--signal);
+      }
+      .shell {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .label {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 500;
+        font-size: 13px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--graphite);
+      }
+      .field {
+        margin-top: 10px;
+        background: #fffdfa;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px 16px;
+        font-size: 19px;
+        color: var(--ink-soft);
+      }
+      .field.muted {
+        color: #b39a86;
+      }
+      /* Segmented Upload / URL control, straight off the /new form. */
+      .seg {
+        display: flex;
+        margin-top: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--paper-2);
+      }
+      .seg > div {
+        flex: 1;
+        text-align: center;
+        padding: 14px 0;
+        font-size: 19px;
+        font-weight: 500;
+        color: var(--graphite);
+      }
+      .seg > div.on {
+        background: var(--card);
+        color: var(--ink);
+        box-shadow: 0 1px 0 rgba(31, 17, 8, 0.06);
+      }
+      .drop {
+        margin-top: 16px;
+        border: 1.5px dashed #dcc3a6;
+        border-radius: 10px;
+        background: var(--paper-2);
+        text-align: center;
+        padding: 30px 20px;
+      }
+      .drop .big {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .drop .small {
+        margin-top: 8px;
+        font-size: 16px;
+        color: var(--graphite);
+      }
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+      }
+      /* Terminal card for the agent door. */
+      .term {
+        margin-top: 16px;
+        background: var(--terminal);
+        border-radius: 10px;
+        padding: 18px 20px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 16px;
+        line-height: 1.65;
+        color: #e8d9c9;
+      }
+      .term .p {
+        color: #8fb8e8;
+      }
+      .term .dim {
+        color: #8a7b6c;
+      }
+      .term .ok {
+        color: #e2b7a0;
+      }
+      /* ---- read report card ---- */
+      .report {
+        width: 1104px;
+        height: 688px;
+        padding: 40px;
+      }
+      .rshell {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 34px 38px;
+        height: 100%;
+      }
+      .rtop {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--graphite);
+      }
+      .rtop .live {
+        color: var(--signal);
+      }
+      .rtitle {
+        margin-top: 14px;
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 400;
+        font-size: 46px;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+        font-variation-settings: 'opsz' 48;
+      }
+      .rrule {
+        margin: 22px 0;
+        height: 1px;
+        background: var(--line);
+      }
+      .rrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .rwho {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .ravatar {
+        width: 46px;
+        height: 46px;
+        border-radius: 999px;
+        background: var(--paper-2);
+        color: var(--signal-dark);
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .rstat {
+        text-align: right;
+        margin-left: 44px;
+      }
+      .rstat .n {
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 30px;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+      .bars {
+        margin-top: 26px;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 15px;
+      }
+      .bar .nm {
+        width: 210px;
+        font-size: 19px;
+        color: var(--ink-soft);
+      }
+      .bar .track {
+        flex: 1;
+        height: 9px;
+        border-radius: 99px;
+        background: var(--paper-2);
+        overflow: hidden;
+      }
+      .bar .fill {
+        height: 100%;
+        border-radius: 99px;
+        background: var(--signal-dark);
+      }
+      .bar .t {
+        width: 92px;
+        text-align: right;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 16px;
+        color: var(--graphite);
+      }
+      .rfoot {
+        margin-top: 26px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--graphite);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 1. Upload in the dashboard -->
+    <div class="card door" id="door-upload">
+      <div class="kicker">Upload</div>
+      <div class="shell" style="margin-top: 18px">
+        <div class="label">Source</div>
+        <div class="seg">
+          <div class="on">Upload HTML</div>
+          <div>Use a URL</div>
+        </div>
+        <div class="drop">
+          <div class="big">Click to browse for an HTML file</div>
+          <div class="small">Or drag and drop here. Single-file HTML, up to 30 MB.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. A URL you already host -->
+    <div class="card door" id="door-url">
+      <div class="kicker">A URL you host</div>
+      <div class="shell" style="margin-top: 18px">
+        <div class="label">Source</div>
+        <div class="seg">
+          <div>Upload HTML</div>
+          <div class="on">Use a URL</div>
+        </div>
+        <div class="label" style="margin-top: 22px">Page URL</div>
+        <div class="field mono" style="font-size: 17px">https://acme.com/q3-brief.html</div>
+      </div>
+    </div>
+
+    <!-- 3. The agent publishes it -->
+    <div class="card door" id="door-agent">
+      <div class="kicker">Your agent</div>
+      <div class="term">
+        <div><span class="p">&gt;</span> share the Q3 brief with jane@acme.com</div>
+        <div class="dim" style="margin-top: 10px">htmlradar &mdash; share_html</div>
+        <div class="ok">htmlradar.page/r/q3-brief</div>
+        <div class="dim">email gate on &middot; expires in 72 hours</div>
+        <div style="margin-top: 12px"><span class="p">&gt;</span> did anyone read it?</div>
+        <div class="dim" style="margin-top: 10px">htmlradar &mdash; get_share_activity</div>
+        <div class="ok">jane@acme.com &middot; 4m 12s &middot; scrolled 87%</div>
+      </div>
+    </div>
+
+    <!-- 4. The public API -->
+    <div class="card door" id="door-api">
+      <div class="kicker">The API</div>
+      <div class="term" style="font-size: 14px; line-height: 1.6">
+        <div>
+          <span class="p">$</span> curl -H "Authorization: Bearer YOUR_KEY" \<br />&nbsp;&nbsp;&nbsp;&nbsp;
+          htmlradar.com/api/v1/shares/<span class="dim">ID</span>/activity
+        </div>
+        <div style="margin-top: 12px">
+          <span class="dim">{</span><br />
+          &nbsp;&nbsp;<span class="ok">"opened"</span><span class="dim">: true,</span><br />
+          &nbsp;&nbsp;<span class="ok">"viewers"</span><span class="dim">: [{ </span
+          ><span class="ok">"email"</span><span class="dim">: "jane@acme.com",</span><br />
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">"active_seconds"</span
+          ><span class="dim">: 374,</span> <span class="ok">"max_scroll"</span
+          ><span class="dim">: 87 }]</span><br />
+          <span class="dim">}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. The read report -->
+    <div class="card report" id="read-report">
+      <div class="rshell">
+        <div class="rtop">
+          <span>htmlradar.page / r / q3-brief</span>
+          <span class="live">&#9679; Last open &middot; 4h ago</span>
+        </div>
+        <div class="rtitle">Q3 Brief. Acme.</div>
+        <div class="rrule"></div>
+        <div class="rrow">
+          <div class="rwho">
+            <div class="ravatar">J</div>
+            <div>
+              <div class="label">Recipient</div>
+              <div style="font-size: 21px; font-weight: 600; color: var(--ink); margin-top: 3px">
+                Jane &middot; Acme
+              </div>
+            </div>
+          </div>
+          <div style="display: flex">
+            <div class="rstat">
+              <div class="label">Opens</div>
+              <div class="n">3</div>
+            </div>
+            <div class="rstat">
+              <div class="label">Active read</div>
+              <div class="n">6m 14s</div>
+            </div>
+            <div class="rstat">
+              <div class="label">Scrolled</div>
+              <div class="n">87%</div>
+            </div>
+          </div>
+        </div>
+        <div class="bars">
+          <div class="label" style="margin-bottom: 16px">Time spent per section</div>
+          <div class="bar">
+            <div class="nm">The Ask</div>
+            <div class="track"><div class="fill" style="width: 100%"></div></div>
+            <div class="t">2m 41s</div>
+          </div>
+          <div class="bar">
+            <div class="nm">Scope and timeline</div>
+            <div class="track"><div class="fill" style="width: 73%"></div></div>
+            <div class="t">1m 58s</div>
+          </div>
+          <div class="bar">
+            <div class="nm">Team</div>
+            <div class="track"><div class="fill" style="width: 59%"></div></div>
+            <div class="t">1m 35s</div>
+          </div>
+          <div class="bar">
+            <div class="nm">Pricing</div>
+            <div class="track"><div class="fill" style="width: 8%"></div></div>
+            <div class="t">12s</div>
+          </div>
+          <div class="bar">
+            <div class="nm">Appendix</div>
+            <div class="track"><div class="fill" style="width: 0"></div></div>
+            <div class="t">&ndash;</div>
+          </div>
+        </div>
+        <div class="rfoot">
+          Sample data &middot; your dashboard replaces it after the first read
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

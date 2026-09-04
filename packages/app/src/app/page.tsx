@@ -556,11 +556,11 @@ export default function LandingV2() {
         <div className="head">
           <span className="kicker">The shift</span>
           <p className="v2-reveal">
-            The documents that matter increasingly end in <em>.html</em>. Live where you want them
-            live, responsive on every screen, readable by both the people you sent them to and the
-            AI tools they bring with them. PDF served the print era. HTML fits how decks actually
-            get read now: on phones, in inboxes, with an AI tool open in the next tab. HTMLRadar is
-            the tracking layer for the new medium.
+            The documents that matter are becoming <em>HTML</em>: decks, briefs, client reports. A
+            live page says more than a PDF &mdash; it is interactive, it fits a phone, and it can
+            change after it has been sent. More of them are written with AI tools now, but the
+            format is the point, not who typed it. What never followed is the part that tells you
+            whether the thing was read.
           </p>
         </div>
         <div className="v2-shift-visual v2-reveal d2">

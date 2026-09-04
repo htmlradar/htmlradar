@@ -12,9 +12,10 @@ tracking that file, and does not keep an HTML document alive.
 
 Upload an HTML file or paste a public URL, send the tracked link instead of the
 original file, and see who opened it, which sections they read, and how long
-they spent on each one. Four ways in, one product: upload a file in the
-dashboard, paste a URL you already host, run the MCP server so the agent that
-wrote the document publishes it, or add HTMLRadar to Claude as a connector.
+they spent on each one. There are four ways in and one product behind them:
+upload a file in the dashboard, paste a URL you already host, run the MCP
+server so the agent that wrote the document publishes it, or add HTMLRadar to
+Claude as a connector.
 
 Open source (AGPL-3.0), self-hostable on your own Cloudflare and Supabase
 accounts. Free for two tracked links; paid plans start at $15/month.

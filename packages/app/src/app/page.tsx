@@ -556,11 +556,12 @@ export default function LandingV2() {
         <div className="head">
           <span className="kicker">The shift</span>
           <p className="v2-reveal">
-            The documents that matter are becoming <em>HTML</em>: decks, briefs, client reports. A
-            live page says more than a PDF &mdash; it is interactive, it fits a phone, and it can
-            change after it has been sent. More of them are written with AI tools now, but the
-            format is the point, not who typed it. What never followed is the part that tells you
-            whether the thing was read.
+            The documents that matter are becoming <em>HTML</em>: decks, briefs, client reports. An
+            HTML page can be interactive, it reflows to whatever screen opens it, and it can be
+            changed after it has been sent. PDF was built for the printer, and a PDF you have sent
+            is fixed. More of these are written with AI tools now, but the format is what makes them
+            better, not the author. What never followed is the part that tells you whether anyone
+            read it.
           </p>
         </div>
         <div className="v2-shift-visual v2-reveal d2">
@@ -713,9 +714,9 @@ export default function LandingV2() {
               Traction sections. Skipped Market sizing.&rdquo;
             </blockquote>
             <p className="v2-kicker-text v2-reveal d3">
-              Most analytics tell you someone opened it. HTMLRadar tells you which sentence
-              convinced them — with a three-second dwell floor so scroll-pasts don&apos;t count as
-              reads.
+              Most analytics tell you someone opened it. HTMLRadar tells you which section they
+              stayed in, and for how long — with a three-second dwell floor so scroll-pasts
+              don&apos;t count as reads.
             </p>
           </div>
         </div>
@@ -1104,8 +1105,8 @@ export default function LandingV2() {
                   color: 'var(--ink-2)',
                 }}
               >
-                Every share is its own gated channel. The dashboard updates the moment a recipient
-                opens the link.
+                Every share is its own gated channel. A new read reaches the dashboard within thirty
+                seconds.
               </p>
             </div>
           </div>

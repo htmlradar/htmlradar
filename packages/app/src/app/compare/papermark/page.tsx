@@ -48,8 +48,8 @@ export default function ComparePapermarkPage() {
             The Papermark alternative for HTML decks.
           </h1>
           <DirectAnswer updated="August 2026">
-            HTMLRadar is a Papermark alternative for people who send HTML rather than uploaded
-            files. It keeps the deck as a live page, gives each recipient their own link, and
+            HTMLRadar is a Papermark alternative for people whose documents are HTML rather than
+            office files. It keeps the deck as a live page, gives each recipient their own link, and
             reports which headings or slides were read. Both are open source; HTMLRadar is AGPL-3.0,
             free for two tracked links, then $15 a month.
           </DirectAnswer>

@@ -34,8 +34,8 @@ The documents that matter â€” decks, client reports, proposals, board updates â€
 are becoming HTML, because a live page says more than a PDF: it is interactive,
 it fits a phone, and it can change after it has been sent. More of them are
 written with AI tools now, and ChatGPT, Claude, v0, Lovable and Anthropic
-Artifacts all produce HTML by default. The format is the point, not who typed
-it.
+Artifacts all produce HTML. The format is what makes these documents better;
+who typed them is beside the point.
 
 The tracking tooling never followed. DocSend and everything like it is built
 around uploading a file and tracking that file. PDF was the print-era container.

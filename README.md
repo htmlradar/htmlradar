@@ -2,7 +2,7 @@
 
 ### The open-source DocSend alternative for HTML files.
 
-Read tracking for the HTML your LLM just generated.
+Read tracking for the decks, reports and proposals you now send as HTML.
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPLv3-7A1F2E)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/htmlradar/htmlradar?style=flat&color=7A1F2E)](https://github.com/htmlradar/htmlradar/stargazers)
@@ -30,9 +30,12 @@ Using Claude? Add HTMLRadar as a connector by pasting one address —
 
 ## Why this exists
 
-Teams that use LLMs heavily ship more and more of their work as HTML — specs,
-reports, dashboards, design mocks, decks. ChatGPT, Claude, v0, Lovable and
-Anthropic Artifacts all produce HTML for the things that matter.
+The documents that matter — decks, client reports, proposals, board updates —
+are becoming HTML, because a live page says more than a PDF: it is interactive,
+it fits a phone, and it can change after it has been sent. More of them are
+written with AI tools now, and ChatGPT, Claude, v0, Lovable and Anthropic
+Artifacts all produce HTML by default. The format is the point, not who typed
+it.
 
 The tracking tooling never followed. DocSend and everything like it is built
 around uploading a file and tracking that file. PDF was the print-era container.

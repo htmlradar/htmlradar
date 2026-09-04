@@ -4,9 +4,17 @@ HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal
 as a tracked link, and seeing who opened it, which sections they read, and for
 how long.
 
+Why HTML: the documents that matter - decks, briefs, client reports, proposals -
+are increasingly written and sent as HTML rather than PDF, because a live page
+is interactive, fits a phone, and can be changed after it has been sent.
+HTMLRadar exists because document tracking grew up around uploading a file and
+tracking that file, and does not keep an HTML document alive.
+
 Upload an HTML file or paste a public URL, send the tracked link instead of the
 original file, and see who opened it, which sections they read, and how long
-they spent on each one. Built for documents shared as HTML rather than PDF.
+they spent on each one. Four ways in, one product: upload a file in the
+dashboard, paste a URL you already host, run the MCP server so the agent that
+wrote the document publishes it, or add HTMLRadar to Claude as a connector.
 
 Open source (AGPL-3.0), self-hostable on your own Cloudflare and Supabase
 accounts. Free for two tracked links; paid plans start at $15/month.

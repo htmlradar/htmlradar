@@ -55,7 +55,7 @@ Active read · sec / opener +186%
 
 htmlradar.com / r / memo Confidential
 
-The shift The documents that matter increasingly end in .html . Live where you want them live, responsive on every screen, readable by both the people you sent them to and the AI tools they bring with them. PDF served the print era. HTML fits how decks actually get read now: on phones, in inboxes, with an AI tool open in the next tab. HTMLRadar is the tracking layer for the new medium.
+The shift The documents that matter are becoming HTML : decks, briefs, client reports. An HTML page can be interactive, it reflows to whatever screen opens it, and it can be changed after it has been sent. PDF was built for the printer, and a PDF you have sent is fixed. More of these are written with AI tools now, but the format is what makes them better, not the author. What never followed is the part that tells you whether anyone read it.
 
 deck.pdf deck.html
 
@@ -86,7 +86,7 @@ Marc just opened Seed Deck, Q2.
 
 View analytics
 
-“Marc opened it three times. Spent 6m 14s . Read the Ask, Team, and Traction sections. Skipped Market sizing.” Most analytics tell you someone opened it. HTMLRadar tells you which sentence convinced them — with a three-second dwell floor so scroll-pasts don't count as reads.
+“Marc opened it three times. Spent 6m 14s . Read the Ask, Team, and Traction sections. Skipped Market sizing.” Most analytics tell you someone opened it. HTMLRadar tells you which section they stayed in, and for how long — with a three-second dwell floor so scroll-pasts don't count as reads.
 
 Use cases
 One link, every kind of deliverable .
@@ -212,7 +212,7 @@ One toggle kills a link instantly. Past read history stays in the dashboard.
 
 Share · [email protected] ● Saved
 htmlradar.page/r/swift-falcon-a3f2
-Every share is its own gated channel. The dashboard updates the moment a recipient opens the link.
+Every share is its own gated channel. A new read reaches the dashboard within thirty seconds.
 
 Built in the open
 Open source under AGPL-3.0 .
@@ -282,9 +282,9 @@ For two decades, the documents that mattered ended in .pdf. Investor decks. Brie
 
 Founders started writing investor decks as one-page HTML files — styled documents typed into Claude or ChatGPT and dropped into a WhatsApp thread. Designers replaced static mocks with interactive prototypes. Researchers published reports that rendered on phones, scaled to a screenshot, and adapted to whichever browser opened them. Engineers wrote planning documents with embedded diffs and call-graphs no markdown table could carry.
 
-PDFs were built to be printed. HTML was built to render. That difference was ignored for years, because PDFs were "the document format."
+PDFs were built to be printed. HTML was built to render — and a page that renders can be interactive, reflows to whatever screen opens it, and can be changed after it has been sent. That difference was ignored for years, because PDFs were "the document format." More of these documents are written with AI tools now, which is a fact about the typing rather than the reason the format is better.
 
-DocSend, PandaDoc, Brevo. The tools that grew up around document analytics were built when PDFs were the answer, and stayed loyal to it. None of them tells you who opened your HTML deck, which section your investor read, or whether the brief you sent to a client landed at all.
+DocSend, PandaDoc, Brevo. The tools that grew up around document analytics were built when PDFs were the answer, and stayed loyal to it. Every one of them is built around uploading a file and tracking that file, which is a different job from serving a live HTML page and reporting which section your investor read.
 
 The piece that always sat missing was the one that tells you what happened after the link went out. Who opened it. From which city. On a phone or a laptop. Whether they stayed on the page you cared about, or skipped past it. Whether they came back the next morning.
 
@@ -904,7 +904,7 @@ Related: HTMLRadar vs Papermark , DocSend vs Papermark compared , HTMLRadar vs P
 What seven deck-sharing tools actually load in your recipient's browser HTMLRadar · Research
 What seven deck-sharing tools actually load in your recipient's browser
 Published 2026-09-04  ·  16 min read  ·  Research
-Disclosure: HTMLRadar is our own product, and it is the seventh of the seven tested here. Every comparison in this piece is one we have an interest in, and it is marked as ours in each place where the comparison is made.
+Disclosure: HTMLRadar is our own product, and it is the seventh of the seven tested here. Every comparison in this piece is one we have a stake in, and we've marked it as ours everywhere it appears.
 Why we looked
 We sell read tracking. Our tracker sends section titles and per-section seconds to our own servers, and the payload it sends is listed later in this piece. The person who opens a shared link did not sign up for anything, so what runs in their browser is worth writing down. I looked for a published answer to that and did not find one, so on 30 August 2026 I opened one public link from each of six other products and recorded the network requests, cookies, storage, scripts and frames listed below.
 We ran the same test on our own share link, and this piece publishes what came back, including the two findings we are acting on.
@@ -912,7 +912,7 @@ We ran the same test on our own share link, and this piece publishes what came b
 How each link was captured
 Common to every capture: one public, ungated share link per product. Playwright Chromium, viewport 1512x982. Load, wait ten seconds, capture, scroll to the bottom, wait five more seconds, capture - a fifteen-second window. Nothing was typed, clicked or submitted: no e-mail, no consent button, no page-advance control. All timestamps are UTC.
 What each capture recorded: every network request and its host, document.cookie , localStorage keys, every script src in the DOM, and the page's visible text. sessionStorage was checked on five of the seven links - DocSend, Papermark, Peony, HummingDeck and HTMLRadar - and the Stacktree and Tiiny.host files do not record it. Iframes were counted on those same five. For Stacktree and Tiiny.host the capture transcribes the top and the bottom of the page rather than the whole text.
-One thing to carry through the whole piece: document.cookie cannot see HttpOnly cookies, and it reads only the top-level origin. Every cookie count here is therefore a lower bound, and is written as "visible to document.cookie " rather than "set".
+One note that applies throughout: document.cookie cannot see HttpOnly cookies, and it reads only the top-level origin. Every cookie count here is therefore a lower bound, and is written as "visible to document.cookie " rather than "set".
 How each one was captured, from its own evidence file:
 DocSend - https://docsend.com/view/58em2uebezhisqvy (published on nextgencodingcompany.com), 2026-08-30T06:59:08Z. A browser launched fresh for this subject, a brand-new context with no profile and no cookies carried in, a normal desktop Chrome user-agent string. Fifteen-second window.
 Papermark - https://www.papermark.com/view/cmkz9p9de0014js04sf4ex5u8 (publicly posted by its sender), 2026-08-30T06:56:48Z. A browser launched fresh for this subject, a brand-new context with no profile and no cookies carried in, a normal desktop Chrome user-agent string. Fifteen-second window.
@@ -922,7 +922,7 @@ Tiiny.host - https://ai-agents-guide.tiiny.site/ (a real user-published site), 2
 HummingDeck - https://hummingdeck.com/r/mt3uu5qwv7kpxb3g (vendor's own demo room), 2026-08-30T06:36:41Z. The evidence file records the browser and viewport only: no separate context, no user-agent override. Fifteen-second window.
 HTMLRadar - https://htmlradar.com/r/lumenforge-demo (our public demo), 2026-08-30T07:11:08Z. A browser launched fresh for this subject, a brand-new context with no profile and no cookies carried in, a normal desktop Chrome user-agent string, driven by a standalone script rather than the shared browser. Two runs: the fifteen-second window used for comparison with the six above, and a separate 55-second run from 07:12:27Z to 07:13:23Z made only to observe the heartbeat, which falls outside the comparison window. Every heartbeat line in this piece is labelled as coming from that longer run.
 One disclosure about our own link. htmlradar.com/r/lumenforge-demo had been revoked on 23 July 2026, and we un-revoked it ourselves immediately before measuring, with one database update that set revoked_at to null and changed nothing else. It is the only link in this set that we control. The other six were opened the way any recipient opens one.
-The limits, stated plainly because they are real:
+The limits:
 One link each. On DocSend and on Papermark we opened gated links before finding an ungated one, and both attempts are recorded in the evidence files, so gated and ungated links of the same product plainly differ. A demo link and a customer's configured link can differ too. Nothing here describes any other link.
 We record what loaded, not why. No claim about who chose a given script, what any vendor intends, or what a product does on any other page.
 Vendors change things. This is one fifteen-second window per product, on one day.
@@ -968,10 +968,10 @@ __Secure-dbx_consent = {"consentType":1,
 "userInteracted":false,"numDots":1}
 
 Every category recorded as true , userInteracted recorded as false , and the advertising requests above already sent, while the banner was still on screen and untouched.
-DocSend's owner, Dropbox, acknowledged the note through its privacy support desk on 30 August. No substantive response had arrived by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+DocSend's owner, Dropbox, acknowledged the note through its privacy support desk on 30 August. We had not received a response addressing the finding by 4 September 2026, the day this piece went up on the HTMLRadar blog.
 Papermark
 One non-first-party host across 70 requests, serving the document's own page images from CloudFront on signed URLs. That is the smallest recorded count among the products here that ship analytics. PostHog is present, loaded through a first-party proxy path on app.papermark.com/ingest ; no request went to a posthog.com host. One cookie visible to page scripts, the PostHog one. Papermark's own view tracking fired: POST /api/views and POST /api/record_view on load, and four POST /api/views/pages after the scroll moved the counter from 1 to 10.
-No response by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+No reply had reached us by 4 September 2026, the day this piece went up on the HTMLRadar blog.
 Peony
 Two Mixpanel Session Replay uploads were attempted, both through the first-party proxy path app.peony.ink/mp/record . The query strings carry the numbers:
 peony · mixpanel session replay
@@ -981,20 +981,20 @@ peony · mixpanel session replay
 
 replay_start_time=1788072088.388 is 2026-08-30T06:41:28Z, one second after load. replay_length_ms=5020 is a 5.02-second segment, so the upload went out around 06:41:33Z, about five seconds before the ten-second wait finished and well before the scroll. A second upload followed with replay_length_ms=2092 . Both were answered 402 Payment Required and did not complete.
 Also observed: Hotjar ( static.hotjar.com/c/hotjar-5115897.js ), Sentry, Crisp live chat, thirteen POST /api/track_page_view_time calls, and one POST /api/viewer/authenticate issued without any e-mail being entered. The Mixpanel cookie carries distinct_id , $device_id and $user_id .
-No response by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+We had not heard back by 4 September 2026, the day this piece went up on the HTMLRadar blog.
 Stacktree
 No cookies visible to document.cookie , no localStorage keys, one script tag, and one non-first-party request that did not complete:
 stacktree · network log
 2. [GET] https://static.cloudflareinsights.com/beacon.min.js/v3d52b479… => [FAILED] csp
 
 The page's own Content-Security-Policy blocked it. That is the whole third-party surface I recorded on this link: one blocked request.
-No response by 4 September 2026, the day this piece went up on the HTMLRadar blog.
+Nothing had come back by 4 September 2026, the day this piece went up on the HTMLRadar blog.
 Tiiny.host
 Nine requests in total. Analytics is Plausible, served from the vendor's own analytics.tiiny.site , not plausible.io , with one POST to /api/event answered 202 . No cookies were visible to document.cookie and no localStorage keys were written. The only non-first-party hosts are Google Fonts, for the three typefaces in the publisher's own page. Two further first-party resources loaded from tiiny.host itself: /ad-script.js and /assets/img/ad.png .
 Tiiny.host's response (30 August 2026, from their support channel):
 Thank you for sharing the test results. Your observation is consistent with Tiiny Host's analytics design: we do not use cookies or persistent identifiers, so visitors are not tracked across sites. The analytics are intended to provide aggregate metrics such as visits, page views, referrers, locations, browsers, devices, and operating systems. Accordingly, the absence of document.cookie values and localStorage entries is expected. The analytics script is included on projects to measure usage and plan limits; analytics dashboards are available on paid plans. We cannot independently confirm the exact nine-request count or the specific behavior of the page at the timestamp provided, but we have no correction to the privacy-related findings described above.
 HummingDeck
-24 non-first-party hosts is the largest count in the table, and the structure behind it needs stating first. The room contains exactly one iframe:
+24 non-first-party hosts is the largest count in the table, and here's why. The room contains exactly one iframe:
 hummingdeck · iframe
 https://calendly.com/ilya-hummingdeck/30min
 
@@ -1010,9 +1010,9 @@ HummingDeck's response (Ilya, founder, 30 August 2026, 08:58 UTC):
 Some context for accuracy: HummingDeck's own analytics and advertising scripts are disabled on /r and /view paths. The tracker requests you mentioned were initiated inside the Calendly iframe included in this demo room, rather than by HummingDeck's analytics stack. It is third-party content configured in the room (scheduling embed is preloaded). I'd appreciate it if the piece made that distinction clear. The tested URL is an open example room, not a recipient-specific link. northstarlg.com is fixed buyer-branding metadata configured for the room and is identical for every visitor; it is not inferred from the person opening the link. That said, the Logo.dev finding is useful. We should fetch and cache the logo once when the room is configured, rather than request it at view time.
 
 HTMLRadar, held to the same standard
-HTMLRadar is ours, which is why the test covers seven links and not six. Same link type, same method. The fifteen-second window below is directly comparable with the six products above. The heartbeat lines come from the separate 55-second run and are labelled as such.
+HTMLRadar is ours, which is why the test covers seven links and not six. Same link type. The fifteen-second window below is directly comparable with the six products above. The heartbeat lines come from the separate 55-second run and are labelled as such.
 Where the document is served from. On 30 August the link was htmlradar.com/r/lumenforge-demo . Recipient documents have since moved to their own domain: that address now answers 301 to htmlradar.page/r/lumenforge-demo , and htmlradar.page carries none of the application's cookies.
-What our tracker sends, and where. In the fifteen-second window, one remote procedure call to our own Supabase project at ewennjnxuqjzsgawbzur.supabase.co . In the 55-second run, three more, all to the same host. No other destination appeared in either log: no third endpoint, no image beacon, no separate event collector, no non-HTMLRadar host.
+What our tracker sends, and where. In the fifteen-second window, one remote procedure call to our own Supabase project at ewennjnxuqjzsgawbzur.supabase.co . In the 55-second run, three more, all to the same host. No other destination appeared in either log for our tracker: no third endpoint, no image beacon, no separate event collector, no non-HTMLRadar host.
 htmlradar · rpc payloads
 Fifteen-second window
 POST /rest/v1/rpc/start_session => 200
@@ -1039,7 +1039,7 @@ A second policy rides alongside that one: frame-ancestors 'none'; base-uri 'none
 Google Fonts. Four requests went to Google on this page, from the sender's own document: that stylesheet line (Fraunces plus Inter) is in the uploaded source file. Our own injection asks for a different Fonts URL, and only on the gate and error pages. On a document page it adds no Google Fonts request.
 Two findings about HTMLRadar, treated the same way.
 One. A Cloudflare Web Analytics beacon loaded on our recipient pages. At the time of testing, static.cloudflareinsights.com/beacon.min.js returned 200 and ran on this document page, and on the gate and not-found pages measured in an earlier pass. It came from a zone setting covering the whole htmlradar.com domain, which we read from our own Cloudflare account rather than from the browser. A setting rather than our code is an explanation and not an excuse, because it is our zone. Its data POST to htmlradar.com/cdn-cgi/rum was recorded as FAILED net::ERR_FAILED , blocked by our sandbox header, so the payload (page timings, memory figures, the page URL) never left the browser - a side effect of a security control, not a decision. We switched the setting off on 30 August 2026, and the re-check on 31 August recorded no request to cloudflareinsights at all.
-Two. We show the reader nothing on the document itself. A search of the served HTML for "we record", "is tracked", "being tracked", "this data will be shared", "opt out" and "do not track" returns nothing, on both test dates. The only HTMLRadar chrome on the document is a "Powered by HTMLRadar" badge in the corner, on the free tier, and it says nothing about tracking. A gated link shows more: the e-mail gate says reading activity on the document is shared with the sender and links to our privacy page, and both gates carry a "Report this document" link to an anonymous form that reaches us, not the sender. An ungated document like this one shows neither. The opt-out is window.HTMLRadar.optOut() : it stops the running session, then sends the reader to a confirmation page, and the button there records the choice in a cookie the proxy sets and checks on every request. None of the other six tools in this set offers a way to opt out of its own read tracking - DocSend's cookie banner controls third-party advertising and analytics cookies, not DocSend's own page-view tracking.
+Two. We show the reader nothing on the document itself. A search of the served HTML for "we record", "is tracked", "being tracked", "this data will be shared", "opt out" and "do not track" returns nothing, on both test dates. The only HTMLRadar chrome on the document is a "Powered by HTMLRadar" badge in the corner, on the free tier, and it says nothing about tracking. A gated link shows more: the e-mail gate says reading activity on the document is shared with the sender and links to our privacy page, and both gates carry a "Report this document" link to an anonymous form that reaches us, not the sender. An ungated document like this one shows neither. The opt-out is window.HTMLRadar.optOut() : it stops the running session, then sends the reader to a confirmation page, and the button there records the choice in a cookie the proxy sets and checks on every request. We did not find a way to opt out of a tool's own read tracking on any of the other six links - DocSend's cookie banner controls third-party advertising and analytics cookies, not DocSend's own page-view tracking.
 What we changed, and what we decided not to.
 Cloudflare Web Analytics auto-install on the htmlradar.com zone is off, so the beacon no longer loads on recipient pages - done 30 August 2026, confirmed by the re-test on 31 August.
 We decided not to put a notice or a visible opt-out link on the document. Every tool in this set treats read tracking as the sender's setting, and we're not changing that. What we did instead is make the documented opt-out survive a reload, behind a confirmation the reader presses, so that neither a mailed link nor a document's own script can flip the setting for them.

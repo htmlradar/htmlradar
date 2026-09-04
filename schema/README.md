@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in ascending numeric order, starting at `001`, via the Supabase SQL Editor (or `psql`). No last file is named here on purpose — the folder grows, and a number written down goes stale the next time it does. As of this commit it ends at `047_radar_drafts.sql`. Never apply anything in `tests/` — those are destructive test programs for a scratch database only.
+Apply every numbered file directly in this folder, in ascending numeric order, starting at `001`, via the Supabase SQL Editor (or `psql`). No last file is named here on purpose — the folder grows, and a number written down goes stale the next time it does. As of this commit it ends at `048_onboarding_email.sql`. Never apply anything in `tests/` — those are destructive test programs for a scratch database only.
 
 Two extensions are required and `001_init.sql` creates both: `pgcrypto` and `pg_net`. A third, `pg_cron`, is optional; `044` and `045` use it for scheduling and skip that step with a notice where it is absent.
 
@@ -64,7 +64,7 @@ Twenty of them carry a note below. The other nine are single-purpose and named b
 - `viewers` — recipient identities (email or anonymous fingerprint), scoped per share; `is_internal` flag (012) hides owner-self test reads — narrowed in `036_internal_viewers_owner_only.sql` to the owner's own address, so colleagues on the sender's own email domain are ordinary, visible recipients.
 - `sessions` — one row per page-open; `token` is the per-session bearer credential returned to the tracker. `document_version` records which version this session saw.
 - `section_events` — section-level dwell records, deduped via `unique (session_id, section_id)`.
-- `notifications_log` (003) — observability for the `notify_on_first_open` trigger; status enum `queued / delivered / failed / skipped / sent / unverified` (the last two added in 044). Nothing used to move a row off `queued` — 044's `reconcile_notification_sends()` closes that: joined against `net._http_response` by `request_id`, a 2xx becomes `sent`, anything else becomes `failed` with the code in `error_message`, and a `queued` row older than 30 minutes with no response row left at all (pg_net's own retention already dropped it) becomes `unverified` rather than a guess either way.
+- `notifications_log` (003) — observability for the `notify_on_first_open` trigger; status enum `queued / delivered / failed / skipped / sent / unverified` (the last two added in 044). Nothing used to move a row off `queued` — 044's `reconcile_notification_sends()` closes that: joined against `net._http_response` by `request_id`, a 2xx becomes `sent`, anything else becomes `failed` with the code in `error_message`, and a `queued` row older than 30 minutes with no response row left at all (pg_net's own retention already dropped it) becomes `unverified` rather than a guess either way. `kind` (048) names the sender: `onboarding` on rows written by `send_onboarding_emails()`, null on every row written before 048 (the first-open / feedback / disabled-link path).
 - `app_events` (006) — PostHog-shaped product events (`distinct_id`, `event`, `properties`, `user_id`).
 - `error_log` (006) — client/server/worker JS error sink.
 - `feedback` (006) — user-submitted feedback from `/feedback`.
@@ -95,6 +95,7 @@ Owner-side (authenticated, SECURITY DEFINER, invoked from server actions):
 
 Server-side only (service role, SECURITY DEFINER, invoked by the proxy worker and the public API):
 
+- `send_onboarding_emails` (048) — the one-time onboarding e-mail, sent to accounts created between 15 minutes and 24 hours ago that have not had one, excluding comped accounts and the internal domains. Claims each row by stamping `profiles.onboarding_sent_at` inside the same statement that selects it, so re-running it never re-sends. **The migration deliberately does not schedule it**; the one statement that switches it on is in section 3 of the file, and `docs/workstreams/product-and-engineering/ONBOARDING-EMAIL-2026-09-04.md` is the operator's guide.
 - `create_share_as` (034), `notify_disabled_attempt` (028), `report_abuse` (037), `reconcile_notification_sends` (044) — scheduled every 10 minutes via `pg_cron` (`select cron.schedule('reconcile_notification_sends', '*/10 * * * *', ...)`); on a Postgres without `pg_cron` (a self-hosted install, a scratch test database) the migration logs a notice and skips scheduling instead of failing, so the function still exists and can be called by hand or by an external scheduler.
 
 ## RLS posture

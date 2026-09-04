@@ -5,10 +5,12 @@ as a tracked link, and seeing who opened it, which sections they read, and for
 how long.
 
 Why HTML: the documents that matter - decks, briefs, client reports, proposals -
-are increasingly written and sent as HTML rather than PDF, because a live page
-is interactive, fits a phone, and can be changed after it has been sent.
+are increasingly written and sent as HTML rather than PDF, because an HTML page
+can be interactive, reflows to whatever screen opens it, and can be changed
+after it has been sent, none of which a PDF you have already sent can do.
 HTMLRadar exists because document tracking grew up around uploading a file and
-tracking that file, and does not keep an HTML document alive.
+tracking that file, which is a different job from serving a live HTML page and
+reporting which sections were read.
 
 Upload an HTML file or paste a public URL, send the tracked link instead of the
 original file, and see who opened it, which sections they read, and how long

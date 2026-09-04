@@ -64,17 +64,20 @@ export default function WhyPage() {
 
             <Reveal delay={0.24}>
               <p>
-                PDFs were built to be printed. HTML was built to render. That difference was ignored
-                for years, because PDFs were "the document format."
+                PDFs were built to be printed. HTML was built to render &mdash; and a page that
+                renders is interactive, fits a phone, and can change after it has been sent. That
+                difference was ignored for years, because PDFs were "the document format." More of
+                these documents are written with AI tools now, but the format is the point, not who
+                typed it.
               </p>
             </Reveal>
 
             <Reveal delay={0.32}>
               <p>
                 DocSend, PandaDoc, Brevo. The tools that grew up around document analytics were
-                built when PDFs were the answer, and stayed loyal to it. None of them tells you who
-                opened your HTML deck, which section your investor read, or whether the brief you
-                sent to a client landed at all.
+                built when PDFs were the answer, and stayed loyal to it. Every one of them is built
+                around uploading a file and tracking that file, which is a different job from
+                keeping an HTML document alive and reporting which section your investor read.
               </p>
             </Reveal>
 

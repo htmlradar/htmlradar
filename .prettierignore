@@ -3,3 +3,7 @@
 # Prettier reformatting a minified file only bloats it (it did once:
 # 22 KB -> 29 KB) without changing behavior.
 packages/app/public/v1/tracker.js
+
+# Published evidence: raw capture output and the script that produced it, kept
+# byte-for-byte as run so a re-run can be diffed against it.
+docs/evidence/

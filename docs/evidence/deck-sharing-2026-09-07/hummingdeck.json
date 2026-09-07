@@ -1,0 +1,699 @@
+{
+ "name": "hummingdeck",
+ "url": "https://hummingdeck.com/r/mt3uu5qwv7kpxb3g",
+ "started": "2026-09-07T06:05:31.294Z",
+ "finished": "2026-09-07T06:05:48.464Z",
+ "nav": 200,
+ "hosts": {
+  "hummingdeck.com": 25,
+  "img.logo.dev": 1,
+  "storage.googleapis.com": 8,
+  "calendly.com": 10,
+  "assets.calendly.com": 5,
+  "js.stripe.com": 3,
+  "www.recaptcha.net": 3,
+  "notifier-configs.airbrake.io": 1,
+  "accounts.google.com": 1,
+  "dfp.calendly.com": 1,
+  "www.gstatic.com": 4,
+  "m.stripe.network": 2,
+  "m.stripe.com": 2,
+  "cdn.cookielaw.org": 10,
+  "d3v0px0pttie1i.cloudfront.net": 1,
+  "geolocation.onetrust.com": 1,
+  "cdn.segment.io": 11,
+  "www.google-analytics.com": 1,
+  "connect.facebook.net": 1,
+  "www.googletagmanager.com": 1,
+  "js.appboycdn.com": 1,
+  "cdn.sprig.com": 2,
+  "api.sprig.com": 1,
+  "featureassets.org": 2,
+  "prodregistryv2.org": 2
+ },
+ "total": 100,
+ "reqs": [
+  {
+   "n": 1,
+   "m": "GET",
+   "u": "https://hummingdeck.com/r/mt3uu5qwv7kpxb3g",
+   "s": 200
+  },
+  {
+   "n": 2,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/media/03bda585a99c6450-s.p.ad37b9d9.woff2",
+   "s": 200
+  },
+  {
+   "n": 3,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/media/f06bf9da926bae75-s.p.c68a79fb.woff2",
+   "s": 200
+  },
+  {
+   "n": 4,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/bdf79d0c03ba95cc.css",
+   "s": 200
+  },
+  {
+   "n": 5,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/12fbd8a7b38b6130.css",
+   "s": 200
+  },
+  {
+   "n": 6,
+   "m": "GET",
+   "u": "https://img.logo.dev/northstarlg.com?token=%5Bredacted%5D&size=128",
+   "s": 200
+  },
+  {
+   "n": 7,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/branding/organization/1783602426193-6249e6bc-logo.png?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 8,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1771862354330-velora-proposal.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 9,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1771861810063-velora-pricing.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 10,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1779738520175-Velora-Deliverability-ROI.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 11,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1771861784115-velora-case-study.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 12,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1771143391495-Email_Deliverability_Playbook_2026.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 13,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1771861852147-velora-security.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 14,
+   "m": "GET",
+   "u": "https://storage.googleapis.com/hummingdeck/teams/6982cf59-fbf0-48e8-a09b-bb173af05d03/thumbnails/1770926431390-HummingDeck___Pitch_Deck.jpg?GoogleAccessId=%5Bredacted%5D&Expires=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 15,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/93bc14e32b083d85.js",
+   "s": 200
+  },
+  {
+   "n": 16,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/05b59a5db9c2e1df.js",
+   "s": 200
+  },
+  {
+   "n": 17,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/49d6f9dedfde8d1c.js",
+   "s": 200
+  },
+  {
+   "n": 18,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/7d717c39c92678e0.js",
+   "s": 200
+  },
+  {
+   "n": 19,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/67f08d286d761f4c.js",
+   "s": 200
+  },
+  {
+   "n": 20,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/turbopack-b884f0b5483e5303.js",
+   "s": 200
+  },
+  {
+   "n": 21,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/734d57db25def93f.js",
+   "s": 200
+  },
+  {
+   "n": 22,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/45a8309c9f3759bb.js",
+   "s": 200
+  },
+  {
+   "n": 23,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/f50726f54a894de8.js",
+   "s": 200
+  },
+  {
+   "n": 24,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/5f41a41a69c42041.js",
+   "s": 200
+  },
+  {
+   "n": 25,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/638d3b1f581b2bad.js",
+   "s": 200
+  },
+  {
+   "n": 26,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/bed7aae31954e407.js",
+   "s": 200
+  },
+  {
+   "n": 27,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/ad327709d78594e9.js",
+   "s": 200
+  },
+  {
+   "n": 28,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/180a7f84c1eeb236.js",
+   "s": 200
+  },
+  {
+   "n": 29,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/60c744ebbcdaff53.js",
+   "s": 200
+  },
+  {
+   "n": 30,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/e6061da869e46ac7.js",
+   "s": 200
+  },
+  {
+   "n": 31,
+   "m": "GET",
+   "u": "https://hummingdeck.com/_next/static/chunks/fc31f25eae30b039.js",
+   "s": 200
+  },
+  {
+   "n": 32,
+   "m": "GET",
+   "u": "https://hummingdeck.com/api/room-shares/b0c3f880-4b6b-40f1-aeb2-4862b0fdf049/discussions",
+   "s": 200
+  },
+  {
+   "n": 33,
+   "m": "POST",
+   "u": "https://hummingdeck.com/api/room-views",
+   "s": 200
+  },
+  {
+   "n": 34,
+   "m": "GET",
+   "u": "https://hummingdeck.com/favicon.ico?favicon.7127e2db.ico",
+   "s": 200
+  },
+  {
+   "n": 35,
+   "m": "GET",
+   "u": "https://calendly.com/ilya-hummingdeck/30min",
+   "s": 200
+  },
+  {
+   "n": 36,
+   "m": "GET",
+   "u": "https://assets.calendly.com/assets/booking/css/booking-edea3dcb5.css",
+   "s": 200
+  },
+  {
+   "n": 37,
+   "m": "GET",
+   "u": "https://assets.calendly.com/pxwebj3qd.js",
+   "s": 200
+  },
+  {
+   "n": 38,
+   "m": "GET",
+   "u": "https://assets.calendly.com/assets/booking/js/booking-61636edb6.js",
+   "s": 200
+  },
+  {
+   "n": 39,
+   "m": "GET",
+   "u": "https://assets.calendly.com/assets/booking/js/284-90448283d.chunk.js",
+   "s": 200
+  },
+  {
+   "n": 40,
+   "m": "GET",
+   "u": "https://assets.calendly.com/assets/booking/js/246-3627b8b36.chunk.js",
+   "s": 200
+  },
+  {
+   "n": 41,
+   "m": "GET",
+   "u": "https://js.stripe.com/v3",
+   "s": 200
+  },
+  {
+   "n": 42,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/initial_settings",
+   "s": 200
+  },
+  {
+   "n": 43,
+   "m": "GET",
+   "u": "https://www.recaptcha.net/recaptcha/enterprise.js?render=6LeAb4QUAAAAAOM9CNYSsvbnzWTByRAgm3GA5D4n",
+   "s": 200
+  },
+  {
+   "n": 44,
+   "m": "GET",
+   "u": "https://notifier-configs.airbrake.io/2020-06-18/config/648967/config.json?&notifier_name=airbrake-js%2Fbrowser&notifier_version=2.1.9&os=Mozilla%2F5.0%20(Macintosh%3B%20Intel%20Mac%20OS%20X%2010_15_7)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F140.0.0.0%20Safari%2F537.36&language=JavaScript",
+   "s": 200
+  },
+  {
+   "n": 45,
+   "m": "GET",
+   "u": "https://accounts.google.com/gsi/client",
+   "s": 200
+  },
+  {
+   "n": 46,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/event_types/lookup?event_type_slug=30min&profile_slug=ilya-hummingdeck",
+   "s": 200
+  },
+  {
+   "n": 47,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/experiments",
+   "s": 200
+  },
+  {
+   "n": 48,
+   "m": "POST",
+   "u": "https://dfp.calendly.com/submit",
+   "s": 200
+  },
+  {
+   "n": 49,
+   "m": "GET",
+   "u": "https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html",
+   "s": 200
+  },
+  {
+   "n": 50,
+   "m": "GET",
+   "u": "https://www.gstatic.com/recaptcha/releases/8x-4t2pegToiW8KmThtO4AQt/recaptcha__en.js",
+   "s": 200
+  },
+  {
+   "n": 51,
+   "m": "GET",
+   "u": "https://js.stripe.com/v3/fingerprinted/js/m-outer-15a2b40a058ddff1cffdb63779fe3de1.js",
+   "s": 200
+  },
+  {
+   "n": 52,
+   "m": "GET",
+   "u": "https://m.stripe.network/inner.html",
+   "s": 200
+  },
+  {
+   "n": 53,
+   "m": "GET",
+   "u": "https://m.stripe.network/out-4.5.45.js",
+   "s": 200
+  },
+  {
+   "n": 54,
+   "m": "POST",
+   "u": "https://m.stripe.com/6",
+   "s": 200
+  },
+  {
+   "n": 55,
+   "m": "GET",
+   "u": "https://www.recaptcha.net/recaptcha/enterprise/anchor?ar=1&k=6LeAb4QUAAAAAOM9CNYSsvbnzWTByRAgm3GA5D4n&co=aHR0cHM6Ly9jYWxlbmRseS5jb206NDQz&hl=en&v=8x-4t2pegToiW8KmThtO4AQt&size=invisible&anchor-ms=20000&execute-ms=30000&cb=idgwt3l9y0on",
+   "s": 200
+  },
+  {
+   "n": 56,
+   "m": "GET",
+   "u": "https://www.gstatic.com/recaptcha/releases/8x-4t2pegToiW8KmThtO4AQt/styles__ltr.css",
+   "s": 200
+  },
+  {
+   "n": 57,
+   "m": "GET",
+   "u": "https://www.gstatic.com/recaptcha/releases/8x-4t2pegToiW8KmThtO4AQt/recaptcha__en.js",
+   "s": 200
+  },
+  {
+   "n": 58,
+   "m": "GET",
+   "u": "https://www.recaptcha.net/recaptcha/enterprise/webworker.js?hl=en&v=8x-4t2pegToiW8KmThtO4AQt",
+   "s": 200
+  },
+  {
+   "n": 59,
+   "m": "GET",
+   "u": "https://www.gstatic.com/recaptcha/releases/8x-4t2pegToiW8KmThtO4AQt/recaptcha__en.js",
+   "s": 200
+  },
+  {
+   "n": 60,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/features/f6c8e80e-fff2-45f7-a4e5-e87e4c8a90a9",
+   "s": 200
+  },
+  {
+   "n": 61,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/experiments?organization_uuid=%5Bredacted%5D&locale=en",
+   "s": 200
+  },
+  {
+   "n": 62,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/scripttemplates/otSDKStub.js",
+   "s": 200
+  },
+  {
+   "n": 63,
+   "m": "GET",
+   "u": "https://d3v0px0pttie1i.cloudfront.net/uploads/branding/logo/594a67ae-e828-4a3b-b45d-86905ca2d73e/77262af7.png",
+   "s": 200
+  },
+  {
+   "n": 64,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/event_types/704f6446-1628-44b8-8742-4ab10371fbdf/calendar/range?timezone=Asia%2FCalcutta&diagnostics=false&range_start=2026-09-07&range_end=2026-09-30&scheduling_link_uuid=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 65,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/consent/a838c8e4-e3ce-442e-8f96-c88d0af98990/a838c8e4-e3ce-442e-8f96-c88d0af98990.json",
+   "s": 200
+  },
+  {
+   "n": 66,
+   "m": "GET",
+   "u": "https://geolocation.onetrust.com/cookieconsentpub/v1/geo/location",
+   "s": 200
+  },
+  {
+   "n": 67,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/scripttemplates/202508.2.0/otBannerSdk.js",
+   "s": 200
+  },
+  {
+   "n": 68,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/consent/a838c8e4-e3ce-442e-8f96-c88d0af98990/0194ae47-f7d7-764f-8080-2e32516a0e3b/en.json",
+   "s": 200
+  },
+  {
+   "n": 69,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/scripttemplates/202508.2.0/assets/otFloatingRounded.json",
+   "s": 200
+  },
+  {
+   "n": 70,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/scripttemplates/202508.2.0/assets/v2/otPcPanel.json",
+   "s": 200
+  },
+  {
+   "n": 71,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/scripttemplates/202508.2.0/assets/otCommonStyles.css",
+   "s": 200
+  },
+  {
+   "n": 72,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/logos/static/ot_guard_logo.svg",
+   "s": 200
+  },
+  {
+   "n": 73,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/logos/122ecfc3-4694-42f1-863f-2db42d1b1e68/019f7009-89f7-73ec-81ab-81fc523ab197/48d0fd8e-517d-4d17-8dae-d4e38e33dd36/calendly-logo.png",
+   "s": 200
+  },
+  {
+   "n": 74,
+   "m": "GET",
+   "u": "https://cdn.cookielaw.org/logos/static/powered_by_logo.svg",
+   "s": 200
+  },
+  {
+   "n": 75,
+   "m": "GET",
+   "u": "https://cdn.segment.io/analytics.js/v1/rfvnxd6wnn/analytics.min.js",
+   "s": 200
+  },
+  {
+   "n": 76,
+   "m": "GET",
+   "u": "https://www.google-analytics.com/analytics.js",
+   "s": 200
+  },
+  {
+   "n": 77,
+   "m": "GET",
+   "u": "https://connect.facebook.net/en_US/fbevents.js",
+   "s": 200
+  },
+  {
+   "n": 78,
+   "m": "GET",
+   "u": "https://www.googletagmanager.com/gtag/js",
+   "s": 200
+  },
+  {
+   "n": 79,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/experiments?organization_uuid=%5Bredacted%5D&locale=en&anonymous_id=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 80,
+   "m": "POST",
+   "u": "https://calendly.com/api/booking/analytics/track",
+   "s": 201
+  },
+  {
+   "n": 81,
+   "m": "GET",
+   "u": "https://cdn.segment.io/v1/projects/rfvnxd6wnn/settings",
+   "s": 200
+  },
+  {
+   "n": 82,
+   "m": "GET",
+   "u": "https://cdn.segment.io/analytics-next/bundles/tsub-middleware.bundle.d94be5c4b3baf7f16aa2.js",
+   "s": 200
+  },
+  {
+   "n": 83,
+   "m": "GET",
+   "u": "https://cdn.segment.io/analytics-next/bundles/ajs-destination.bundle.8e6b895db75187c55313.js",
+   "s": 200
+  },
+  {
+   "n": 84,
+   "m": "GET",
+   "u": "https://cdn.segment.io/analytics-next/bundles/schemaFilter.bundle.1b218d13fed021531d4e.js",
+   "s": 200
+  },
+  {
+   "n": 85,
+   "m": "GET",
+   "u": "https://cdn.segment.io/next-integrations/actions/amplitude-plugins/f12a4347e1080fb88155.js",
+   "s": 200
+  },
+  {
+   "n": 86,
+   "m": "GET",
+   "u": "https://cdn.segment.io/next-integrations/actions/braze/1625c39259e73e42cf8d.js",
+   "s": 200
+  },
+  {
+   "n": 87,
+   "m": "GET",
+   "u": "https://cdn.segment.io/next-integrations/actions/sprig-web/bc50dbdbed39d7f52643.js",
+   "s": 200
+  },
+  {
+   "n": 88,
+   "m": "GET",
+   "u": "https://cdn.segment.io/next-integrations/actions/3962/1faa179dfb20d0a3f5a0.js",
+   "s": 200
+  },
+  {
+   "n": 89,
+   "m": "GET",
+   "u": "https://js.appboycdn.com/web-sdk/5.9/braze.no-module.min.js",
+   "s": 200
+  },
+  {
+   "n": 90,
+   "m": "GET",
+   "u": "https://cdn.sprig.com/shim.js?id=mJsBxzyJ95ws",
+   "s": 200
+  },
+  {
+   "n": 91,
+   "m": "GET",
+   "u": "https://cdn.segment.io/analytics-next/bundles/remoteMiddleware.bundle.017f06aa227008ba8df2.js",
+   "s": 200
+  },
+  {
+   "n": 92,
+   "m": "GET",
+   "u": "https://cdn.segment.io/next-integrations/middleware/analytics.js-middleware-braze-deduplicate/latest/analytics.js-middleware-braze-deduplicate.js.gz",
+   "s": 200
+  },
+  {
+   "n": 93,
+   "m": "GET",
+   "u": "https://api.sprig.com/sdk/1/environments/mJsBxzyJ95ws/config",
+   "s": 200
+  },
+  {
+   "n": 94,
+   "m": "POST",
+   "u": "https://m.stripe.com/6",
+   "s": 200
+  },
+  {
+   "n": 95,
+   "m": "POST",
+   "u": "https://featureassets.org/v1/initialize?k=client-hjQatfUsJ4NPDE7IGIGrzKUCk5kXfhrboXZpLg09ivs&st=javascript-client&sv=3.29.1&t=1788761143621&sid=%5Bredacted%5D&se=1",
+   "s": 200
+  },
+  {
+   "n": 96,
+   "m": "POST",
+   "u": "https://featureassets.org/v1/initialize?k=client-hjQatfUsJ4NPDE7IGIGrzKUCk5kXfhrboXZpLg09ivs&st=javascript-client-react&sv=3.29.1&t=1788761143638&sid=%5Bredacted%5D&se=1",
+   "s": 200
+  },
+  {
+   "n": 97,
+   "m": "POST",
+   "u": "https://prodregistryv2.org/v1/rgstr?k=client-hjQatfUsJ4NPDE7IGIGrzKUCk5kXfhrboXZpLg09ivs&st=javascript-client-react&sv=3.29.1&t=1788761143638&sid=%5Bredacted%5D&ec=1&gz=1",
+   "s": 202
+  },
+  {
+   "n": 98,
+   "m": "GET",
+   "u": "https://calendly.com/api/booking/experiments?organization_uuid=%5Bredacted%5D&locale=en&anonymous_id=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 99,
+   "m": "GET",
+   "u": "https://cdn.sprig.com/dependencies/record.min.js",
+   "s": 200
+  },
+  {
+   "n": 100,
+   "m": "POST",
+   "u": "https://prodregistryv2.org/v1/rgstr?k=client-hjQatfUsJ4NPDE7IGIGrzKUCk5kXfhrboXZpLg09ivs&st=javascript-client-react&sv=3.29.1&t=1788761143815&sid=%5Bredacted%5D&ec=1&gz=1",
+   "s": 202
+  }
+ ],
+ "afterLoad": {
+  "href": "https://hummingdeck.com/r/mt3uu5qwv7kpxb3g",
+  "origin": "https://hummingdeck.com",
+  "cookie": "",
+  "localStorage": [],
+  "sessionStorage": [],
+  "scripts": [
+   "https://hummingdeck.com/_next/static/chunks/05b59a5db9c2e1df.js",
+   "https://hummingdeck.com/_next/static/chunks/49d6f9dedfde8d1c.js",
+   "https://hummingdeck.com/_next/static/chunks/7d717c39c92678e0.js",
+   "https://hummingdeck.com/_next/static/chunks/67f08d286d761f4c.js",
+   "https://hummingdeck.com/_next/static/chunks/turbopack-b884f0b5483e5303.js",
+   "https://hummingdeck.com/_next/static/chunks/734d57db25def93f.js",
+   "https://hummingdeck.com/_next/static/chunks/45a8309c9f3759bb.js",
+   "https://hummingdeck.com/_next/static/chunks/f50726f54a894de8.js",
+   "https://hummingdeck.com/_next/static/chunks/5f41a41a69c42041.js",
+   "https://hummingdeck.com/_next/static/chunks/638d3b1f581b2bad.js",
+   "https://hummingdeck.com/_next/static/chunks/bed7aae31954e407.js",
+   "https://hummingdeck.com/_next/static/chunks/ad327709d78594e9.js",
+   "https://hummingdeck.com/_next/static/chunks/180a7f84c1eeb236.js",
+   "https://hummingdeck.com/_next/static/chunks/60c744ebbcdaff53.js",
+   "https://hummingdeck.com/_next/static/chunks/e6061da869e46ac7.js",
+   "https://hummingdeck.com/_next/static/chunks/fc31f25eae30b039.js",
+   "https://hummingdeck.com/_next/static/chunks/a6dad97d9634a72d.js",
+   "https://hummingdeck.com/_next/static/chunks/93bc14e32b083d85.js"
+  ],
+  "iframes": [
+   "https://calendly.com/ilya-hummingdeck/30min"
+  ],
+  "textHead": "Velora | North Star - Example Deal Room\nJS\n\nJake Sullivan · Senior Account Executive\n\n[redacted]\n\nHi Sarah, you'll find all the materials for our project in this Deal Room.\n\nDocuments\nLet's meet!\nNext Steps\nVideos\nFeedback\nDiscussions\n7\nCommercials\nFinancials\nReference Materials\nLegal\nAbout HummingDeck\nCOMMERCIALS\n\nProposal Doc\n\nAccepted\n\n7 pages\n\nPricing\n\n5 pages\n\nFINANCIALS\n\nDeliverability ROI\n\n6 pages\n\nREFERENCE MATERIALS\n\nCase Study\n\n6 pages\n\nEmail Deliverability Playbook 2026\n\n11 pages\n\nLEGAL\n\nSecurity and Compliance Deck\n\n7 pages\n\nABOUT HUMMINGDECK\n\nHummingDeck Pitch Deck\n\n5 pages\n\nUSEFUL LINKS\n\nRead more about Digital Sales Rooms here\n\nhummingdeck.com\n\nBOOK A MEETING\n\nDiscussions\n\nExample discussion from this demo room\n\nExample conversation. Replies are turned off in this demo.\n\nGENERAL\nVelora | North Star - Example Deal Room\nPerfect. I added the key milestones to the action plan so both teams can follow progress.\n3\nIN CONTEXT\nSign NDA\nWorks for us. I’ve asked our IT lead to review the documents this week.\n2\nClose CRM\nYes. Guided onboarding for the initial workspace is included.\n2"
+ },
+ "afterScroll": {
+  "href": "https://hummingdeck.com/r/mt3uu5qwv7kpxb3g",
+  "origin": "https://hummingdeck.com",
+  "cookie": "",
+  "localStorage": [],
+  "sessionStorage": [],
+  "scripts": [
+   "https://hummingdeck.com/_next/static/chunks/05b59a5db9c2e1df.js",
+   "https://hummingdeck.com/_next/static/chunks/49d6f9dedfde8d1c.js",
+   "https://hummingdeck.com/_next/static/chunks/7d717c39c92678e0.js",
+   "https://hummingdeck.com/_next/static/chunks/67f08d286d761f4c.js",
+   "https://hummingdeck.com/_next/static/chunks/turbopack-b884f0b5483e5303.js",
+   "https://hummingdeck.com/_next/static/chunks/734d57db25def93f.js",
+   "https://hummingdeck.com/_next/static/chunks/45a8309c9f3759bb.js",
+   "https://hummingdeck.com/_next/static/chunks/f50726f54a894de8.js",
+   "https://hummingdeck.com/_next/static/chunks/5f41a41a69c42041.js",
+   "https://hummingdeck.com/_next/static/chunks/638d3b1f581b2bad.js",
+   "https://hummingdeck.com/_next/static/chunks/bed7aae31954e407.js",
+   "https://hummingdeck.com/_next/static/chunks/ad327709d78594e9.js",
+   "https://hummingdeck.com/_next/static/chunks/180a7f84c1eeb236.js",
+   "https://hummingdeck.com/_next/static/chunks/60c744ebbcdaff53.js",
+   "https://hummingdeck.com/_next/static/chunks/e6061da869e46ac7.js",
+   "https://hummingdeck.com/_next/static/chunks/fc31f25eae30b039.js",
+   "https://hummingdeck.com/_next/static/chunks/a6dad97d9634a72d.js",
+   "https://hummingdeck.com/_next/static/chunks/93bc14e32b083d85.js"
+  ],
+  "iframes": [
+   "https://calendly.com/ilya-hummingdeck/30min"
+  ],
+  "textHead": "Velora | North Star - Example Deal Room\nJS\n\nJake Sullivan · Senior Account Executive\n\n[redacted]\n\nHi Sarah, you'll find all the materials for our project in this Deal Room.\n\nDocuments\nLet's meet!\nNext Steps\nVideos\nFeedback\nDiscussions\n7\nCommercials\nFinancials\nReference Materials\nLegal\nAbout HummingDeck\nCOMMERCIALS\n\nProposal Doc\n\nAccepted\n\n7 pages\n\nPricing\n\n5 pages\n\nFINANCIALS\n\nDeliverability ROI\n\n6 pages\n\nREFERENCE MATERIALS\n\nCase Study\n\n6 pages\n\nEmail Deliverability Playbook 2026\n\n11 pages\n\nLEGAL\n\nSecurity and Compliance Deck\n\n7 pages\n\nABOUT HUMMINGDECK\n\nHummingDeck Pitch Deck\n\n5 pages\n\nUSEFUL LINKS\n\nRead more about Digital Sales Rooms here\n\nhummingdeck.com\n\nBOOK A MEETING\n\nDiscussions\n\nExample discussion from this demo room\n\nExample conversation. Replies are turned off in this demo.\n\nGENERAL\nVelora | North Star - Example Deal Room\nPerfect. I added the key milestones to the action plan so both teams can follow progress.\n3\nIN CONTEXT\nSign NDA\nWorks for us. I’ve asked our IT lead to review the documents this week.\n2\nClose CRM\nYes. Guided onboarding for the initial workspace is included.\n2"
+ }
+}

@@ -1,0 +1,1141 @@
+{
+ "name": "docsend",
+ "url": "https://docsend.com/view/58em2uebezhisqvy",
+ "started": "2026-08-31T05:25:38.115Z",
+ "finished": "2026-08-31T05:25:56.436Z",
+ "nav": 200,
+ "hosts": {
+  "docsend.com": 4,
+  "assets.docsend.com": 89,
+  "fonts.googleapis.com": 2,
+  "www.dropbox.com": 27,
+  "d.dropbox.com": 1,
+  "lh3.googleusercontent.com": 1,
+  "accounts.google.com": 3,
+  "d1v40ehxpt7a5l.cloudfront.net": 1,
+  "cfl.dropboxstatic.com": 28,
+  "marketing.docsend.com": 1,
+  "fonts.gstatic.com": 1,
+  "www.googletagmanager.com": 3,
+  "www.google-analytics.com": 2,
+  "www.google.com": 4,
+  "googleads.g.doubleclick.net": 1,
+  "www.google.co.in": 2,
+  "analytics.google.com": 1,
+  "stats.g.doubleclick.net": 1,
+  "play.google.com": 1
+ },
+ "total": 173,
+ "reqs": [
+  {
+   "n": 1,
+   "m": "GET",
+   "u": "https://docsend.com/view/58em2uebezhisqvy",
+   "s": 200
+  },
+  {
+   "n": 2,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/presentation-DTS2PLNZ.css",
+   "s": 200
+  },
+  {
+   "n": 3,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/presentation-VCJLUTNW.css",
+   "s": 200
+  },
+  {
+   "n": 4,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/en-2DW3CJE6.js",
+   "s": 200
+  },
+  {
+   "n": 5,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/presentation-QLW2WTFN.js",
+   "s": 200
+  },
+  {
+   "n": 6,
+   "m": "GET",
+   "u": "https://fonts.googleapis.com/css?family=Open+Sans:700,600,400,400italic,300,300italic",
+   "s": 200
+  },
+  {
+   "n": 7,
+   "m": "GET",
+   "u": "https://www.dropbox.com/pithos/privacy_consent",
+   "s": 307
+  },
+  {
+   "n": 8,
+   "m": "GET",
+   "u": "https://www.dropbox.com/pithos/ux_analytics",
+   "s": 307
+  },
+  {
+   "n": 9,
+   "m": "GET",
+   "u": "https://www.dropbox.com/pithos/marketing_tracker_client",
+   "s": 307
+  },
+  {
+   "n": 10,
+   "m": "GET",
+   "u": "https://assets.docsend.com/public/loading_images/large-loader.gif",
+   "s": 200
+  },
+  {
+   "n": 11,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/whitey-D4AB5XBH.png",
+   "s": 200
+  },
+  {
+   "n": 12,
+   "m": "GET",
+   "u": "https://assets.docsend.com/public/blank.gif",
+   "s": 200
+  },
+  {
+   "n": 13,
+   "m": "GET",
+   "u": "https://fonts.googleapis.com/css?family=Homemade+Apple&display=swap",
+   "s": 200
+  },
+  {
+   "n": 14,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/AtlasGrotesk-Regular-Web-DLQSG2XM.ttf",
+   "s": 200
+  },
+  {
+   "n": 15,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/AtlasGrotesk-Medium-Web-LFHKUOTE.woff2",
+   "s": 200
+  },
+  {
+   "n": 16,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-PC447A3I.js",
+   "s": 200
+  },
+  {
+   "n": 17,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-ORK7FNDT.js",
+   "s": 200
+  },
+  {
+   "n": 18,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-C34M5WNY.js",
+   "s": 200
+  },
+  {
+   "n": 19,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-EAGA5UTJ.js",
+   "s": 200
+  },
+  {
+   "n": 20,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-C5GRQO37.js",
+   "s": 200
+  },
+  {
+   "n": 21,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-2EKL6NR2.js",
+   "s": 200
+  },
+  {
+   "n": 22,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-FV7P4FCT.js",
+   "s": 200
+  },
+  {
+   "n": 23,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-MQK2QKVA.js",
+   "s": 200
+  },
+  {
+   "n": 24,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-JYJBICFU.js",
+   "s": 200
+  },
+  {
+   "n": 25,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-ZZOIRAAT.js",
+   "s": 200
+  },
+  {
+   "n": 26,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-TCBVS54A.js",
+   "s": 200
+  },
+  {
+   "n": 27,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-4GLO5XWG.js",
+   "s": 200
+  },
+  {
+   "n": 28,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-RN22ONX3.js",
+   "s": 200
+  },
+  {
+   "n": 29,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-PWC4BXZH.js",
+   "s": 200
+  },
+  {
+   "n": 30,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-UUQEFGJI.js",
+   "s": 200
+  },
+  {
+   "n": 31,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-5ACQRVRL.js",
+   "s": 200
+  },
+  {
+   "n": 32,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-VM5PGHBG.js",
+   "s": 200
+  },
+  {
+   "n": 33,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-YCMCN3RF.js",
+   "s": 200
+  },
+  {
+   "n": 34,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-ZWW7RQMT.js",
+   "s": 200
+  },
+  {
+   "n": 35,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-O6MINUD5.js",
+   "s": 200
+  },
+  {
+   "n": 36,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-2YPUS75L.js",
+   "s": 200
+  },
+  {
+   "n": 37,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-5YWI6KDL.js",
+   "s": 200
+  },
+  {
+   "n": 38,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-PDSXXAJ5.js",
+   "s": 200
+  },
+  {
+   "n": 39,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-VVL6AXCL.js",
+   "s": 200
+  },
+  {
+   "n": 40,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-KGEMTU7M.js",
+   "s": 200
+  },
+  {
+   "n": 41,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-UIMT7H4F.js",
+   "s": 200
+  },
+  {
+   "n": 42,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-5AODB37F.js",
+   "s": 200
+  },
+  {
+   "n": 43,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-5ARVEH6Z.js",
+   "s": 200
+  },
+  {
+   "n": 44,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-ZVTPRPXW.js",
+   "s": 200
+  },
+  {
+   "n": 45,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-RVBE36I5.js",
+   "s": 200
+  },
+  {
+   "n": 46,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-6GS7VSVJ.js",
+   "s": 200
+  },
+  {
+   "n": 47,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-MXGURGNL.js",
+   "s": 200
+  },
+  {
+   "n": 48,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-RZHKSFAB.js",
+   "s": 200
+  },
+  {
+   "n": 49,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-BUFYEIYY.js",
+   "s": 200
+  },
+  {
+   "n": 50,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-DIK7MKQX.js",
+   "s": 200
+  },
+  {
+   "n": 51,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-JBECL4WZ.js",
+   "s": 200
+  },
+  {
+   "n": 52,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-Y5B7J37R.js",
+   "s": 200
+  },
+  {
+   "n": 53,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-RTZWDII2.js",
+   "s": 200
+  },
+  {
+   "n": 54,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-2OZBRUAX.js",
+   "s": 200
+  },
+  {
+   "n": 55,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-LEXMLRKY.js",
+   "s": 200
+  },
+  {
+   "n": 56,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-CNNLV4LD.js",
+   "s": 200
+  },
+  {
+   "n": 57,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-KFBYYDCN.js",
+   "s": 200
+  },
+  {
+   "n": 58,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-2V2QFE36.js",
+   "s": 200
+  },
+  {
+   "n": 59,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-GRVW45S5.js",
+   "s": 200
+  },
+  {
+   "n": 60,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-EO34XB7N.js",
+   "s": 200
+  },
+  {
+   "n": 61,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-ZJ2LPL6U.js",
+   "s": 200
+  },
+  {
+   "n": 62,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-AN77VYRF.js",
+   "s": 200
+  },
+  {
+   "n": 63,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-JQG6C3CL.js",
+   "s": 200
+  },
+  {
+   "n": 64,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-CRCSC7QI.js",
+   "s": 200
+  },
+  {
+   "n": 65,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-ZAQREMNZ.js",
+   "s": 200
+  },
+  {
+   "n": 66,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-3XU7KTJM.js",
+   "s": 200
+  },
+  {
+   "n": 67,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-CV6P7JAZ.js",
+   "s": 200
+  },
+  {
+   "n": 68,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-KMMFBNGC.js",
+   "s": 200
+  },
+  {
+   "n": 69,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-Q2CLERBX.js",
+   "s": 200
+  },
+  {
+   "n": 70,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-XVSLMEZ3.js",
+   "s": 200
+  },
+  {
+   "n": 71,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-KJF3RUW6.js",
+   "s": 200
+  },
+  {
+   "n": 72,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-YXTAHYKD.js",
+   "s": 200
+  },
+  {
+   "n": 73,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-2WHFNM3F.js",
+   "s": 200
+  },
+  {
+   "n": 74,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-K5NB5POI.js",
+   "s": 200
+  },
+  {
+   "n": 75,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-O36RPG7B.js",
+   "s": 200
+  },
+  {
+   "n": 76,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-WVT64H5M.js",
+   "s": 200
+  },
+  {
+   "n": 77,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-RE72ONIJ.js",
+   "s": 200
+  },
+  {
+   "n": 78,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-JNPQDWIY.js",
+   "s": 200
+  },
+  {
+   "n": 79,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-23JHNKOZ.js",
+   "s": 200
+  },
+  {
+   "n": 80,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-TF2X74K5.js",
+   "s": 200
+  },
+  {
+   "n": 81,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-P2DABEUZ.js",
+   "s": 200
+  },
+  {
+   "n": 82,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-SCNCSPLO.js",
+   "s": 200
+  },
+  {
+   "n": 83,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-633Y4AHY.js",
+   "s": 200
+  },
+  {
+   "n": 84,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-BAYLEVFH.js",
+   "s": 200
+  },
+  {
+   "n": 85,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-WUAFULGD.js",
+   "s": 200
+  },
+  {
+   "n": 86,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-Q4Q5ZYTY.js",
+   "s": 200
+  },
+  {
+   "n": 87,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-SNPVGBS6.js",
+   "s": 200
+  },
+  {
+   "n": 88,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-YZV6WTEH.js",
+   "s": 200
+  },
+  {
+   "n": 89,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-UVAVDKYS.js",
+   "s": 200
+  },
+  {
+   "n": 90,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-T5ZACA3F.js",
+   "s": 200
+  },
+  {
+   "n": 91,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/chunk-EMMBJKEY.js",
+   "s": 200
+  },
+  {
+   "n": 92,
+   "m": "POST",
+   "u": "https://d.dropbox.com/api/4508202598334464/envelope/?sentry_key=%5Bredacted%5D&sentry_version=7&sentry_client=sentry.javascript.react%2F8.37.1",
+   "s": 200
+  },
+  {
+   "n": 93,
+   "m": "GET",
+   "u": "https://www.dropbox.com/pithos/host%3Adocsend.com/marketing_tracker_client",
+   "s": 200
+  },
+  {
+   "n": 94,
+   "m": "GET",
+   "u": "https://www.dropbox.com/pithos/host%3Adocsend.com/privacy_consent",
+   "s": 200
+  },
+  {
+   "n": 95,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/Analytics-DK273XZR.png",
+   "s": 200
+  },
+  {
+   "n": 96,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/SharpGroteskDBCyrBook20-UVUPP24D.woff2",
+   "s": 200
+  },
+  {
+   "n": 97,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/SharpGroteskDBCyrMedium20-VJ4UMVVJ.woff2",
+   "s": 200
+  },
+  {
+   "n": 98,
+   "m": "GET",
+   "u": "https://docsend.com/view/58em2uebezhisqvy/page_data/1?timezoneOffset=19800&viewLoadTime=1788153940",
+   "s": 200
+  },
+  {
+   "n": 99,
+   "m": "GET",
+   "u": "https://lh3.googleusercontent.com/a/ACg8ocIw_L8s1VcWvxmKlozcIR2dTO0RrRRKLKvTKXZKu1j0ISvQDw=s96-c",
+   "s": 200
+  },
+  {
+   "n": 100,
+   "m": "GET",
+   "u": "https://www.dropbox.com/pithos/host%3Adocsend.com/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 101,
+   "m": "GET",
+   "u": "https://accounts.google.com/gsi/client?hl=en",
+   "s": 200
+  },
+  {
+   "n": 102,
+   "m": "POST",
+   "u": "https://docsend.com/metrics/properties",
+   "s": 204
+  },
+  {
+   "n": 103,
+   "m": "GET",
+   "u": "https://d1v40ehxpt7a5l.cloudfront.net/docs%2F5104dd0a-8834-4ca5-8f0a-e9661335025c%2Friviera_images%2F1?Expires=%5Bredacted%5D&Signature=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 104,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/marketing_tracker_client.bundle-vflQHh-Ua.js",
+   "s": 200
+  },
+  {
+   "n": 105,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/ux_analytics.bundle-vflKquauV.js",
+   "s": 200
+  },
+  {
+   "n": 106,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/privacy_consent.bundle-vflWU7J47.js",
+   "s": 200
+  },
+  {
+   "n": 107,
+   "m": "GET",
+   "u": "https://marketing.docsend.com/view/58em2uebezhisqvy",
+   "s": 403
+  },
+  {
+   "n": 108,
+   "m": "GET",
+   "u": "https://accounts.google.com/gsi/style",
+   "s": 200
+  },
+  {
+   "n": 109,
+   "m": "GET",
+   "u": "https://www.dropbox.com/ccpa_iframe?hide_gdpr=false&should_disable_banner=false&gpc=false&origin=https%253A%252F%252Fdocsend.com&uri_for_logging=docsend.com&should_show_floating_button=false&should_auto_open_options=undefined&width=1512&third_party_session_id=%5Bredacted%5D&csrf_origin=https%253A%252F%252Fdocsend.com&default_non_ccpa=true",
+   "s": "FAILED net::ERR_ABORTED"
+  },
+  {
+   "n": 110,
+   "m": "GET",
+   "u": "https://accounts.google.com/gsi/button?click_listener=%28%29%3D%3E%7BQit%28t%3D%3D%3D%22signin%22%3F%22login_continue_with_google%22%3A%22signup_continue_with_google%22%29%7D&logo_alignment=center&shape=rectangular&size=large&text=continue_with&theme=outline&type=standard&width=400&is_fedcm_supported=true&client_id=%5Bredacted%5D&iframe_id=gsi_942118_938489&cas=%5Bredacted%5D&hl=en",
+   "s": 200
+  },
+  {
+   "n": 111,
+   "m": "GET",
+   "u": "https://www.dropbox.com/ccpa_iframe?hide_gdpr=false&should_disable_banner=false&gpc=false&origin=https%253A%252F%252Fdocsend.com&uri_for_logging=docsend.com&should_show_floating_button=false&should_auto_open_options=undefined&width=1512&third_party_session_id=%5Bredacted%5D&csrf_origin=https%253A%252F%252Fdocsend.com&default_non_ccpa=true&locale=en",
+   "s": 200
+  },
+  {
+   "n": 112,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 113,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 114,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 115,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 116,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/googlesans/v62/4UaRrENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iq2vgCIhM907w.woff2",
+   "s": 200
+  },
+  {
+   "n": 117,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/ccpa_iframe/ccpa_iframe-vfllzUK5d.css",
+   "s": 200
+  },
+  {
+   "n": 118,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/index.web-vfl_EhcsL.css",
+   "s": 200
+  },
+  {
+   "n": 119,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/tokens-vfl7mzrCc.css",
+   "s": 200
+  },
+  {
+   "n": 120,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/font_paper_atlas_grotesk-vflDoDLsu.css",
+   "s": 200
+  },
+  {
+   "n": 121,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/maestro_appshell_styles-vflfNNLV5.css",
+   "s": 200
+  },
+  {
+   "n": 122,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/maestro_layout-vfl-iR-NS.css",
+   "s": 200
+  },
+  {
+   "n": 123,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/e_atlas__privacy_consent__static__ccpa_iframe-vfl1BFZlB.js",
+   "s": 200
+  },
+  {
+   "n": 124,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/components-vflIdk1ZQ.css",
+   "s": 200
+  },
+  {
+   "n": 125,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/legacy-token-migration-vfl1sMmEL.css",
+   "s": 200
+  },
+  {
+   "n": 126,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/logos-vfl1VlwqW.css",
+   "s": 200
+  },
+  {
+   "n": 127,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/icons-vflOQoqw9.css",
+   "s": 200
+  },
+  {
+   "n": 128,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/foundations-tokens-vflGR-o4-.css",
+   "s": 200
+  },
+  {
+   "n": 129,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/foundations-components-vflgZ3b67.css",
+   "s": 200
+  },
+  {
+   "n": 130,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/css/dig-components/content-icons-vflEYkRKM.css",
+   "s": 200
+  },
+  {
+   "n": 131,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_edison_cookies_check-vflWA_JjW.js",
+   "s": 200
+  },
+  {
+   "n": 132,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_decimal_js_decimal-vflo0mhs2.js",
+   "s": 200
+  },
+  {
+   "n": 133,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_formatjs_intl-displaynames_polyfill-force-vflIvu38O.js",
+   "s": 200
+  },
+  {
+   "n": 134,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_ccpa_iframe_rspb_langpacks_icu-en_json-vfl0fYi8L.js",
+   "s": 200
+  },
+  {
+   "n": 135,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_api_v2_unauthed_client-vflcduihX.js",
+   "s": 200
+  },
+  {
+   "n": 136,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_formatjs_intl-displaynames_locale-data_en-vflugU5Uj.js",
+   "s": 200
+  },
+  {
+   "n": 137,
+   "m": "POST",
+   "u": "https://www.dropbox.com/2/client_metrics/record",
+   "s": 200
+  },
+  {
+   "n": 138,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_core_toast_toast_on_init-vfl6PLb-Q.js",
+   "s": 200
+  },
+  {
+   "n": 139,
+   "m": "POST",
+   "u": "https://www.dropbox.com/2/identity/get_privacy_preferences",
+   "s": 200
+  },
+  {
+   "n": 140,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 141,
+   "m": "GET",
+   "u": "https://www.googletagmanager.com/gtm.js?id=GTM-5VPH2V",
+   "s": 200
+  },
+  {
+   "n": 142,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/fonts/paper-atlasgrotesk/AtlasGrotesk-Regular-Web-vflk7bxjs.woff2",
+   "s": 200
+  },
+  {
+   "n": 143,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/fonts/paper-atlasgrotesk/AtlasGrotesk-Medium-Web-vfl38XiTL.woff2",
+   "s": 200
+  },
+  {
+   "n": 144,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/metaserver/static/fonts/sharpgrotesk/SharpGroteskDBMedium20-vflI3qtaE.woff2",
+   "s": 200
+  },
+  {
+   "n": 145,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 146,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 147,
+   "m": "GET",
+   "u": "https://www.googletagmanager.com/gtag/js?id=AW-982651595&cx=c&gtm=4e68q1",
+   "s": 200
+  },
+  {
+   "n": 148,
+   "m": "GET",
+   "u": "https://www.google-analytics.com/analytics.js",
+   "s": 200
+  },
+  {
+   "n": 149,
+   "m": "POST",
+   "u": "https://www.google.com/ccm/collect?rcb=12&frm=0&apvc=1&ae=g&auid=%5Bredacted%5D&dt=DocSend&en=page_view&dl=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&scrsrc=www.googletagmanager.com&rnd=366951420.1788153943&navt=n&npa=0&ep.ads_data_redaction=0&gtm=45He68q1v71607741za200zd71607741xea&gcs=G111&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938469%7E118897920%7E118897930%7E120385422&tft=1788153943246&tfd=3975&fmt=8",
+   "s": 200
+  },
+  {
+   "n": 150,
+   "m": "POST",
+   "u": "https://www.dropbox.com/csp_log?policy_name=docsend_default",
+   "s": "FAILED net::ERR_BLOCKED_BY_ORB"
+  },
+  {
+   "n": 151,
+   "m": "POST",
+   "u": "https://www.dropbox.com/2/identity/collect_privacy_preferences",
+   "s": 200
+  },
+  {
+   "n": 152,
+   "m": "POST",
+   "u": "https://www.google-analytics.com/j/collect?v=1&_v=j102&a=204710604&t=pageview&_s=1&dl=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&ul=en-us&dt=DocSend&sr=1512x982&vp=1512x982&_u=YEBAAEABAAAAACAAI%7E&jid=1249417846&gjid=1485896765&cid=%5Bredacted%5D&tid=UA-40340055-1&_gid=%5Bredacted%5D&_r=1&_slc=1&gtm=45He68q1n715VPH2Vv71607741za200zd71607741&gcs=G111&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938469%7E118897920%7E118897930%7E120385422&z=2108405821",
+   "s": 200
+  },
+  {
+   "n": 153,
+   "m": "GET",
+   "u": "https://googleads.g.doubleclick.net/pagead/viewthroughconversion/982651595/?random=1788153943419&cv=11&fst=1788153943419&bg=ffffff&guid=%5Bredacted%5D&async=1&en=gtag.config&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&u_w=1512&u_h=982&url=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&rcb=9&frm=0&tiba=DocSend&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=%5Bredacted%5D&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uamb=0&uam=&uap=macOS&uapv=10_15_7&uaw=0&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=4",
+   "s": 200
+  },
+  {
+   "n": 154,
+   "m": "POST",
+   "u": "https://www.dropbox.com/csp_log?policy_name=docsend_default",
+   "s": "FAILED net::ERR_BLOCKED_BY_ORB"
+  },
+  {
+   "n": 155,
+   "m": "POST",
+   "u": "https://www.google.com/ccm/collect?rcb=9&frm=0&apvc=0&auid=%5Bredacted%5D&dt=DocSend&tid=AW-982651595&en=page_view&dl=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&scrsrc=www.googletagmanager.com&rnd=366951420.1788153943&navt=n&npa=0&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcs=G111&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&tft=1788153943440&tfd=4168&tids=AW-982651595&fmt=8",
+   "s": 200
+  },
+  {
+   "n": 156,
+   "m": "GET",
+   "u": "https://www.google.com/rmkt/collect/982651595/?random=1788153943419&cv=11&fst=1788153943419&fmt=3&bg=ffffff&guid=%5Bredacted%5D&async=1&en=gtag.config&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&u_w=1512&u_h=982&url=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&rcb=9&frm=0&tiba=DocSend&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=%5Bredacted%5D&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uamb=0&uam=&uap=macOS&uapv=10_15_7&uaw=0&data=event%3Dgtag.config&ept=68&gcp=5",
+   "s": 200
+  },
+  {
+   "n": 157,
+   "m": "GET",
+   "u": "https://www.googletagmanager.com/gtag/js?id=G-JPP8SP2PRX&cx=c&_slc=1",
+   "s": 200
+  },
+  {
+   "n": 158,
+   "m": "GET",
+   "u": "https://www.google.com/pagead/1p-user-list/982651595/?random=1788153943419&cv=11&fst=1788152400000&bg=ffffff&guid=%5Bredacted%5D&async=1&en=gtag.config&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&u_w=1512&u_h=982&url=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&rcb=9&frm=0&tiba=DocSend&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=%5Bredacted%5D&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uamb=0&uam=&uap=macOS&uapv=10_15_7&uaw=0&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=3&is_vtc=1&cid=%5Bredacted%5D&random=4262590939&rmt_tld=0&ipr=y",
+   "s": 200
+  },
+  {
+   "n": 159,
+   "m": "GET",
+   "u": "https://www.google.co.in/pagead/1p-user-list/982651595/?random=1788153943419&cv=11&fst=1788152400000&bg=ffffff&guid=%5Bredacted%5D&async=1&en=gtag.config&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&u_w=1512&u_h=982&url=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&rcb=9&frm=0&tiba=DocSend&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=%5Bredacted%5D&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uamb=0&uam=&uap=macOS&uapv=10_15_7&uaw=0&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=3&is_vtc=1&cid=%5Bredacted%5D&random=4262590939&rmt_tld=1&ipr=y",
+   "s": 200
+  },
+  {
+   "n": 160,
+   "m": "POST",
+   "u": "https://analytics.google.com/g/collect?v=2&tid=G-JPP8SP2PRX&gtm=45je68q1v9135195435za20g&_p=1788153943035&_gaz=%5Bredacted%5D&gcs=G111&gcd=13r3r3r3r6l1&npa=0&dma=0&_eu=EBAIAGAC&_ng=1&are=1&cid=%5Bredacted%5D&frm=0&ir=1&pscdl=noapi&rcb=4&sr=1512x982&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uam=&uamb=0&uap=macOS&uapv=10_15_7&uaw=0&ul=en-us&gaf=2&_s=1&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120213116%7E120385422&dl=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&dt=DocSend&sid=%5Bredacted%5D&sct=1&seg=0&en=page_view&_fv=1&_ss=1&_ee=1&gap.uat=115938466%7E115938469%7E118897920%7E118897930%7E120385422&tfd=4359",
+   "s": 204
+  },
+  {
+   "n": 161,
+   "m": "POST",
+   "u": "https://stats.g.doubleclick.net/g/collect?v=2&_ng=1&tid=G-JPP8SP2PRX&cid=%5Bredacted%5D&gtm=45je68q1v9135195435za20g&rcb=4&aip=1&dma=0&gcs=G111&gcd=13r3r3r3r6l1&npa=0&frm=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120213116%7E120385422",
+   "s": 204
+  },
+  {
+   "n": 162,
+   "m": "GET",
+   "u": "https://www.google.co.in/ads/ga-audiences?v=1&t=sr&slf_rd=1&_r=4&_ng=1&tid=G-JPP8SP2PRX&cid=%5Bredacted%5D&gtm=45je68q1v9135195435za20g&rcb=4&aip=1&dma=0&gcs=G111&gcd=13r3r3r3r6l1&npa=0&frm=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120213116%7E120385422&z=337372673",
+   "s": 200
+  },
+  {
+   "n": 163,
+   "m": "GET",
+   "u": "https://assets.docsend.com/static/favicon-YWN454J5.ico?v=6",
+   "s": 200
+  },
+  {
+   "n": 164,
+   "m": "POST",
+   "u": "https://www.dropbox.com/2/udcl/log_timing",
+   "s": 200
+  },
+  {
+   "n": 165,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 166,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 167,
+   "m": "POST",
+   "u": "https://docsend.com/presentation_analytics/record_page_view",
+   "s": 200
+  },
+  {
+   "n": 168,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 169,
+   "m": "POST",
+   "u": "https://play.google.com/log?format=json&hasfast=true&authuser=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 170,
+   "m": "GET",
+   "u": "https://cfl.dropboxstatic.com/static/atlas/privacy_consent/ccpa_iframe_rspb_modern/c_ux_analytics_www_init-vflQUbDB0.js",
+   "s": 200
+  },
+  {
+   "n": 171,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 172,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  },
+  {
+   "n": 173,
+   "m": "POST",
+   "u": "https://www.dropbox.com/log/ux_analytics",
+   "s": 200
+  }
+ ],
+ "afterLoad": {
+  "href": "https://docsend.com/view/58em2uebezhisqvy",
+  "origin": "https://docsend.com",
+  "cookie": "dbx_js_analytics_id=[redacted]; statsig_stable_id=[redacted]; _v_=[redacted]; g_state=[redacted]; __dbx-consent-session-id__=[redacted]; __Secure-dbx_consent=[redacted]; _gcl_au=[redacted]; _ga=[redacted]; _gid=[redacted]; _gat_UA-40340055-1=[redacted]; _ga_JPP8SP2PRX=[redacted]",
+  "localStorage": [
+   "_gcl_ls",
+   "amp-sink-origin-id"
+  ],
+  "sessionStorage": [
+   "uxa.visit_id",
+   "uxa.last_active_time",
+   "uxa.previous_url"
+  ],
+  "scripts": [
+   "https://www.googletagmanager.com/gtag/js?id=G-JPP8SP2PRX&cx=c&_slc=1",
+   "https://www.google-analytics.com/analytics.js",
+   "https://www.googletagmanager.com/gtag/js?id=AW-982651595&cx=c&gtm=4e68q1",
+   "https://www.googletagmanager.com/gtm.js?id=GTM-5VPH2V",
+   "https://accounts.google.com/gsi/client?hl=en",
+   "https://www.dropbox.com/pithos/privacy_consent",
+   "https://www.dropbox.com/pithos/ux_analytics",
+   "https://www.dropbox.com/pithos/marketing_tracker_client",
+   "https://assets.docsend.com/static/en-2DW3CJE6.js",
+   "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/marketing_tracker_client.bundle-vflQHh-Ua.js",
+   "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/ux_analytics.bundle-vflKquauV.js",
+   "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/privacy_consent.bundle-vflWU7J47.js",
+   "https://googleads.g.doubleclick.net/pagead/viewthroughconversion/982651595/?random=1788153943419&cv=11&fst=1788153943419&bg=ffffff&guid=%5Bredacted%5D&async=1&en=gtag.config&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&u_w=1512&u_h=982&url=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&rcb=9&frm=0&tiba=DocSend&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=%5Bredacted%5D&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uamb=0&uam=&uap=macOS&uapv=10_15_7&uaw=0&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=4",
+   "https://assets.docsend.com/static/presentation-QLW2WTFN.js"
+  ],
+  "iframes": [
+   "https://www.dropbox.com/ccpa_iframe?hide_gdpr=false&should_disable_banner=false&gpc=false&origin=https%253A%252F%252Fdocsend.com&uri_for_logging=docsend.com&should_show_floating_button=false&should_auto_open_options=undefined&width=1512&third_party_session_id=%5Bredacted%5D&csrf_origin=https%253A%252F%252Fdocsend.com&default_non_ccpa=true&locale=en",
+   "https://accounts.google.com/gsi/button?click_listener=%28%29%3D%3E%7BQit%28t%3D%3D%3D%22signin%22%3F%22login_continue_with_google%22%3A%22signup_continue_with_google%22%29%7D&logo_alignment=center&shape=rectangular&size=large&text=continue_with&theme=outline&type=standard&width=400&is_fedcm_supported=true&client_id=%5Bredacted%5D&iframe_id=gsi_942118_938489&cas=%5Bredacted%5D&hl=en",
+   "https://marketing.docsend.com/view/58em2uebezhisqvy"
+  ],
+  "textHead": "1 / 2\nLooking for better insights and control over the content you share?\nCreate a free DocSend account!\nContinue with Dropbox\nor\nEmail\nContinue with email\nDocSend Privacy Policy\nCookies & CCPA preferences"
+ },
+ "afterScroll": {
+  "href": "https://docsend.com/view/58em2uebezhisqvy",
+  "origin": "https://docsend.com",
+  "cookie": "dbx_js_analytics_id=[redacted]; statsig_stable_id=[redacted]; _v_=[redacted]; g_state=[redacted]; __dbx-consent-session-id__=[redacted]; __Secure-dbx_consent=[redacted]; _gcl_au=[redacted]; _ga=[redacted]; _gid=[redacted]; _gat_UA-40340055-1=[redacted]; _ga_JPP8SP2PRX=[redacted]",
+  "localStorage": [
+   "_gcl_ls",
+   "amp-sink-origin-id"
+  ],
+  "sessionStorage": [
+   "uxa.visit_id",
+   "uxa.last_active_time",
+   "uxa.previous_url"
+  ],
+  "scripts": [
+   "https://www.googletagmanager.com/gtag/js?id=G-JPP8SP2PRX&cx=c&_slc=1",
+   "https://www.google-analytics.com/analytics.js",
+   "https://www.googletagmanager.com/gtag/js?id=AW-982651595&cx=c&gtm=4e68q1",
+   "https://www.googletagmanager.com/gtm.js?id=GTM-5VPH2V",
+   "https://accounts.google.com/gsi/client?hl=en",
+   "https://www.dropbox.com/pithos/privacy_consent",
+   "https://www.dropbox.com/pithos/ux_analytics",
+   "https://www.dropbox.com/pithos/marketing_tracker_client",
+   "https://assets.docsend.com/static/en-2DW3CJE6.js",
+   "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/marketing_tracker_client.bundle-vflQHh-Ua.js",
+   "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/ux_analytics.bundle-vflKquauV.js",
+   "https://cfl.dropboxstatic.com/static/metaserver/static/pithos/privacy_consent.bundle-vflWU7J47.js",
+   "https://googleads.g.doubleclick.net/pagead/viewthroughconversion/982651595/?random=1788153943419&cv=11&fst=1788153943419&bg=ffffff&guid=%5Bredacted%5D&async=1&en=gtag.config&gtm=45be68q1v892451398z871607741za20gzb71607741zd71607741xec&gcd=13r3r3r3r5l1&dma=0&tag_exp=115938466%7E115938468%7E118897920%7E118897930%7E120385423%7E120474864&u_w=1512&u_h=982&url=https%3A%2F%2Fdocsend.com%2Fview%2F58em2uebezhisqvy&rcb=9&frm=0&tiba=DocSend&hn=www.googleadservices.com&npa=0&pscdl=noapi&auid=%5Bredacted%5D&uaa=x64&uab=64&uafvl=Chromium%3B133.0.6943.16%7CNot%28A%253ABrand%3B99.0.0.0&uamb=0&uam=&uap=macOS&uapv=10_15_7&uaw=0&data=event%3Dgtag.config&ept=9&rfmt=3&fmt=4",
+   "https://assets.docsend.com/static/presentation-QLW2WTFN.js"
+  ],
+  "iframes": [
+   "https://www.dropbox.com/ccpa_iframe?hide_gdpr=false&should_disable_banner=false&gpc=false&origin=https%253A%252F%252Fdocsend.com&uri_for_logging=docsend.com&should_show_floating_button=false&should_auto_open_options=undefined&width=1512&third_party_session_id=%5Bredacted%5D&csrf_origin=https%253A%252F%252Fdocsend.com&default_non_ccpa=true&locale=en",
+   "https://accounts.google.com/gsi/button?click_listener=%28%29%3D%3E%7BQit%28t%3D%3D%3D%22signin%22%3F%22login_continue_with_google%22%3A%22signup_continue_with_google%22%29%7D&logo_alignment=center&shape=rectangular&size=large&text=continue_with&theme=outline&type=standard&width=400&is_fedcm_supported=true&client_id=%5Bredacted%5D&iframe_id=gsi_942118_938489&cas=%5Bredacted%5D&hl=en",
+   "https://marketing.docsend.com/view/58em2uebezhisqvy"
+  ],
+  "textHead": "1 / 2\nLooking for better insights and control over the content you share?\nCreate a free DocSend account!\nContinue with Dropbox\nor\nEmail\nContinue with email\nDocSend Privacy Policy\nCookies & CCPA preferences"
+ }
+}

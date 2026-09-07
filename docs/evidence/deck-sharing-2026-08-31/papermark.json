@@ -1,0 +1,493 @@
+{
+ "name": "papermark",
+ "url": "https://www.papermark.com/view/cmkz9p9de0014js04sf4ex5u8",
+ "started": "2026-08-31T05:25:56.524Z",
+ "finished": "2026-08-31T05:26:13.143Z",
+ "nav": 200,
+ "hosts": {
+  "www.papermark.com": 5,
+  "app.papermark.com": 46,
+  "d1ff41ind5a7r1.cloudfront.net": 10
+ },
+ "total": 61,
+ "reqs": [
+  {
+   "n": 1,
+   "m": "GET",
+   "u": "https://www.papermark.com/view/cmkz9p9de0014js04sf4ex5u8",
+   "s": 200
+  },
+  {
+   "n": 2,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+   "s": 200
+  },
+  {
+   "n": 3,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/css/16ae0dbe2cec81c4.css?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 4,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/css/5da50ef98105408a.css?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 5,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/css/585773bb8e10eeff.css?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 6,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/webpack-293fc0cd14fd5b18.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 7,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/framework-af5bf1f1c87152a3.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 8,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/main-934e6233715828e4.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 9,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/pages/_app-957d75a8b820ab68.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 10,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/da3b1ef4-0a11c08abf0818c1.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 11,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/53f4e58a-fa574f5d1f641ae7.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 12,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/11e07bb4-fbc3f13ae3a575cc.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 13,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/6763fea0-7aa5a483b9e08d53.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 14,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/2b7b2d2a-e4837c8e8d9dcf6c.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 15,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/15639-f01baf2874ed30aa.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 16,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/41664-76abf7ee2f5aac12.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 17,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/81691-4a7e0525ee0b0d09.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 18,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/55593-a0ad533a050ec37e.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 19,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/96466-3a3585d9a67b3160.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 20,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/70976-08713491ceff1212.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 21,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/46053-0d2104cb5ddfb649.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 22,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/74425-afdfd1e421cc1716.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 23,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/29371-29f1cc1d86052c35.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 24,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/20194-47e9f8a694a985ff.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 25,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/42018-0676711b09a6e148.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 26,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/82720-6d989ef841d9f013.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 27,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/86210-0d3d8716b84acbb0.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 28,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/63717-7cde73193c3306e0.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 29,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/48841-9ae5e374c5c32024.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 30,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/92716-9e87000d86c0a950.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 31,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/66839-c69d8ae5a31e706c.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 32,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/35845-bfb01362d8aad3ad.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 33,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/13338-ac4d52a866614265.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 34,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/32674-16d3a08d0f3dadf2.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 35,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/10098-c37c06aed9124555.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 36,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/506-f7fd6a37510232c3.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 37,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/49363-024f718c5fc33706.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 38,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/83548-fe0f6946193d4700.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 39,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/30726-75d5ab2078110181.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 40,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/chunks/pages/view/%5BlinkId%5D-50cd7888df17920b.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 41,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/DBDMEcIwxleTbFMBsuW0K/_buildManifest.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 42,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/DBDMEcIwxleTbFMBsuW0K/_ssgManifest.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 43,
+   "m": "GET",
+   "u": "https://www.papermark.com/api/auth/session",
+   "s": 200
+  },
+  {
+   "n": 44,
+   "m": "GET",
+   "u": "https://app.papermark.com/ingest/array/phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D/config.js",
+   "s": 200
+  },
+  {
+   "n": 45,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/css/5da50ef98105408a.css?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 46,
+   "m": "GET",
+   "u": "https://app.papermark.com/_next/static/css/585773bb8e10eeff.css?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "s": 200
+  },
+  {
+   "n": 47,
+   "m": "GET",
+   "u": "https://www.papermark.com/api/auth/session",
+   "s": 200
+  },
+  {
+   "n": 48,
+   "m": "GET",
+   "u": "https://app.papermark.com/ingest/static/1.418.7/surveys.js",
+   "s": 200
+  },
+  {
+   "n": 49,
+   "m": "POST",
+   "u": "https://app.papermark.com/ingest/flags/?v=2&compression=base64",
+   "s": 200
+  },
+  {
+   "n": 50,
+   "m": "POST",
+   "u": "https://www.papermark.com/api/views",
+   "s": 200
+  },
+  {
+   "n": 51,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-1.jpeg?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 52,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-2.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 53,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-3.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 54,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-4.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 55,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-5.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 56,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-6.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 57,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-7.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 58,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-8.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 59,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-9.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 60,
+   "m": "GET",
+   "u": "https://d1ff41ind5a7r1.cloudfront.net/cmffbvxeh0000lb042jvf7i0r/doc_NVMq4rwK2ZQhj2S2yZTxfC/page-10.png?Expires=%5Bredacted%5D&Key-Pair-Id=%5Bredacted%5D&Signature=%5Bredacted%5D",
+   "s": 200
+  },
+  {
+   "n": 61,
+   "m": "POST",
+   "u": "https://www.papermark.com/api/record_view",
+   "s": 200
+  }
+ ],
+ "afterLoad": {
+  "href": "https://www.papermark.com/view/cmkz9p9de0014js04sf4ex5u8",
+  "origin": "https://www.papermark.com",
+  "cookie": "ph_phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D_posthog=[redacted]",
+  "localStorage": [
+   "nextauth.message",
+   "ph_phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D_posthog"
+  ],
+  "sessionStorage": [
+   "ph_phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D_primary_window_exists"
+  ],
+  "scripts": [
+   "https://app.papermark.com/_next/static/chunks/polyfills-42372ed130431b0a.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/webpack-293fc0cd14fd5b18.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/framework-af5bf1f1c87152a3.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/main-934e6233715828e4.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/pages/_app-957d75a8b820ab68.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/da3b1ef4-0a11c08abf0818c1.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/53f4e58a-fa574f5d1f641ae7.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/11e07bb4-fbc3f13ae3a575cc.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/6763fea0-7aa5a483b9e08d53.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/2b7b2d2a-e4837c8e8d9dcf6c.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/15639-f01baf2874ed30aa.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/41664-76abf7ee2f5aac12.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/81691-4a7e0525ee0b0d09.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/55593-a0ad533a050ec37e.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/96466-3a3585d9a67b3160.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/70976-08713491ceff1212.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/46053-0d2104cb5ddfb649.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/74425-afdfd1e421cc1716.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/29371-29f1cc1d86052c35.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/20194-47e9f8a694a985ff.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/42018-0676711b09a6e148.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/82720-6d989ef841d9f013.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/86210-0d3d8716b84acbb0.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/63717-7cde73193c3306e0.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/48841-9ae5e374c5c32024.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/92716-9e87000d86c0a950.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/66839-c69d8ae5a31e706c.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/35845-bfb01362d8aad3ad.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/13338-ac4d52a866614265.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/32674-16d3a08d0f3dadf2.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/10098-c37c06aed9124555.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/506-f7fd6a37510232c3.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/49363-024f718c5fc33706.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/83548-fe0f6946193d4700.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/30726-75d5ab2078110181.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/pages/view/%5BlinkId%5D-50cd7888df17920b.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/DBDMEcIwxleTbFMBsuW0K/_buildManifest.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/DBDMEcIwxleTbFMBsuW0K/_ssgManifest.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/ingest/static/1.418.7/surveys.js",
+   "https://app.papermark.com/ingest/array/phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D/config.js"
+  ],
+  "iframes": [],
+  "textHead": "Papermark\n1\n/\n53\n\nShare docs via Papermark"
+ },
+ "afterScroll": {
+  "href": "https://www.papermark.com/view/cmkz9p9de0014js04sf4ex5u8",
+  "origin": "https://www.papermark.com",
+  "cookie": "ph_phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D_posthog=[redacted]",
+  "localStorage": [
+   "nextauth.message",
+   "ph_phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D_posthog"
+  ],
+  "sessionStorage": [
+   "ph_phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D_primary_window_exists"
+  ],
+  "scripts": [
+   "https://app.papermark.com/_next/static/chunks/polyfills-42372ed130431b0a.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/webpack-293fc0cd14fd5b18.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/framework-af5bf1f1c87152a3.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/main-934e6233715828e4.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/pages/_app-957d75a8b820ab68.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/da3b1ef4-0a11c08abf0818c1.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/53f4e58a-fa574f5d1f641ae7.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/11e07bb4-fbc3f13ae3a575cc.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/6763fea0-7aa5a483b9e08d53.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/2b7b2d2a-e4837c8e8d9dcf6c.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/15639-f01baf2874ed30aa.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/41664-76abf7ee2f5aac12.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/81691-4a7e0525ee0b0d09.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/55593-a0ad533a050ec37e.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/96466-3a3585d9a67b3160.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/70976-08713491ceff1212.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/46053-0d2104cb5ddfb649.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/74425-afdfd1e421cc1716.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/29371-29f1cc1d86052c35.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/20194-47e9f8a694a985ff.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/42018-0676711b09a6e148.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/82720-6d989ef841d9f013.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/86210-0d3d8716b84acbb0.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/63717-7cde73193c3306e0.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/48841-9ae5e374c5c32024.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/92716-9e87000d86c0a950.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/66839-c69d8ae5a31e706c.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/35845-bfb01362d8aad3ad.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/13338-ac4d52a866614265.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/32674-16d3a08d0f3dadf2.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/10098-c37c06aed9124555.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/506-f7fd6a37510232c3.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/49363-024f718c5fc33706.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/83548-fe0f6946193d4700.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/30726-75d5ab2078110181.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/chunks/pages/view/%5BlinkId%5D-50cd7888df17920b.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/DBDMEcIwxleTbFMBsuW0K/_buildManifest.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/_next/static/DBDMEcIwxleTbFMBsuW0K/_ssgManifest.js?dpl=dpl_6RMP3y4YzYeXW9PeDWSYGjvUCyVp",
+   "https://app.papermark.com/ingest/static/1.418.7/surveys.js",
+   "https://app.papermark.com/ingest/array/phc_FLSpiXB7aDMlA1BOEYveAbLvxOoU8kZjkj5ODUiqj0D/config.js"
+  ],
+  "iframes": [],
+  "textHead": "Papermark\n1\n/\n53\n\nShare docs via Papermark"
+ }
+}

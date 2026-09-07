@@ -23,5 +23,8 @@ module.exports = {
     '*.config.*',
     // Public assets that ship compiled bundles (tracker IIFE etc.)
     'packages/app/public/',
+    // Published evidence: the capture script and its output are kept exactly
+    // as they were run, so the files people re-run match the files we cite.
+    'docs/evidence/',
   ],
 };

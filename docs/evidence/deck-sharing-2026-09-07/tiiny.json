@@ -1,0 +1,91 @@
+{
+ "name": "tiiny",
+ "url": "https://ai-agents-guide.tiiny.site/",
+ "started": "2026-09-07T06:05:14.706Z",
+ "finished": "2026-09-07T06:05:31.217Z",
+ "nav": 200,
+ "hosts": {
+  "ai-agents-guide.tiiny.site": 1,
+  "fonts.googleapis.com": 1,
+  "analytics.tiiny.site": 1,
+  "tiiny.host": 2,
+  "fonts.gstatic.com": 3
+ },
+ "total": 8,
+ "reqs": [
+  {
+   "n": 1,
+   "m": "GET",
+   "u": "https://ai-agents-guide.tiiny.site/",
+   "s": 200
+  },
+  {
+   "n": 2,
+   "m": "GET",
+   "u": "https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap",
+   "s": 200
+  },
+  {
+   "n": 3,
+   "m": "GET",
+   "u": "https://analytics.tiiny.site/js/plausible.js",
+   "s": 200
+  },
+  {
+   "n": 4,
+   "m": "GET",
+   "u": "https://tiiny.host/ad-script.js",
+   "s": 200
+  },
+  {
+   "n": 5,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD7OwGtT0rU.woff2",
+   "s": 200
+  },
+  {
+   "n": 6,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/syne/v24/8vIH7w4qzmVxm2BL9G78HEY.woff2",
+   "s": 200
+  },
+  {
+   "n": 7,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/outfit/v15/QGYvz_MVcBeNP4NJtEtqUYLknw.woff2",
+   "s": 200
+  },
+  {
+   "n": 8,
+   "m": "GET",
+   "u": "https://tiiny.host/assets/img/ad.png",
+   "s": 200
+  }
+ ],
+ "afterLoad": {
+  "href": "https://ai-agents-guide.tiiny.site/",
+  "origin": "https://ai-agents-guide.tiiny.site",
+  "cookie": "",
+  "localStorage": [],
+  "sessionStorage": [],
+  "scripts": [
+   "https://analytics.tiiny.site/js/plausible.js",
+   "https://tiiny.host/ad-script.js"
+  ],
+  "iframes": [],
+  "textHead": "COMPLETE GUIDE · 2025 EDITION\nThe World of\nAI Agents\n\nFrom simple chatbots to autonomous multi-agent systems — your complete reference for understanding, building, and deploying AI agents in the real world.\n\n7+\nAGENT TYPES\n30+\nTOOLS & PLATFORMS\n6\nBUILD STEPS\n∞\nPOSSIBILITIES\n↓ scroll to explore\nAI Agents\nWHAT IS AN AGENT\nTYPES\nHOW THEY WORK\nTOOLS\nBUILD\nCHALLENGES\nRESOURCES\nGLOSSARY\nCHAPTER 01\nWhat Is an AI Agent?\n\nAn AI agent is a software system that uses a Large Language Model (LLM) as its \"brain\" to autonomously perceive its environment, make decisions, use tools, and take actions — across multiple steps — to achieve a goal, without needing a human to guide every move.\n\n🧠\nThe Simple Difference\n\nA regular chatbot responds to one message at a time and forgets everything. An AI agent can plan a multi-step task, remember what it did, use tools like web search or code execution, and keep working until the job is done. It's the difference between asking someone a question and hiring an assistant.\n\nCore Components\n🧠 Brain (LLM)\nFoundation\n💾 Memory\nContext & Recall\n🛠️ Tools\nReal-World Ability\n📋 Planning\nMulti-Step Reasoning\n⚡ Action\nReal-World Execution\n\nEvery agent needs all five c"
+ },
+ "afterScroll": {
+  "href": "https://ai-agents-guide.tiiny.site/",
+  "origin": "https://ai-agents-guide.tiiny.site",
+  "cookie": "",
+  "localStorage": [],
+  "sessionStorage": [],
+  "scripts": [
+   "https://analytics.tiiny.site/js/plausible.js",
+   "https://tiiny.host/ad-script.js"
+  ],
+  "iframes": [],
+  "textHead": "COMPLETE GUIDE · 2025 EDITION\nThe World of\nAI Agents\n\nFrom simple chatbots to autonomous multi-agent systems — your complete reference for understanding, building, and deploying AI agents in the real world.\n\n7+\nAGENT TYPES\n30+\nTOOLS & PLATFORMS\n6\nBUILD STEPS\n∞\nPOSSIBILITIES\n↓ scroll to explore\nAI Agents\nWHAT IS AN AGENT\nTYPES\nHOW THEY WORK\nTOOLS\nBUILD\nCHALLENGES\nRESOURCES\nGLOSSARY\nCHAPTER 01\nWhat Is an AI Agent?\n\nAn AI agent is a software system that uses a Large Language Model (LLM) as its \"brain\" to autonomously perceive its environment, make decisions, use tools, and take actions — across multiple steps — to achieve a goal, without needing a human to guide every move.\n\n🧠\nThe Simple Difference\n\nA regular chatbot responds to one message at a time and forgets everything. An AI agent can plan a multi-step task, remember what it did, use tools like web search or code execution, and keep working until the job is done. It's the difference between asking someone a question and hiring an assistant.\n\nCore Components\n🧠 Brain (LLM)\nFoundation\n💾 Memory\nContext & Recall\n🛠️ Tools\nReal-World Ability\n📋 Planning\nMulti-Step Reasoning\n⚡ Action\nReal-World Execution\n\nEvery agent needs all five c"
+ }
+}

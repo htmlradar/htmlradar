@@ -1,0 +1,50 @@
+{
+ "name": "stacktree",
+ "url": "https://example-brand-audit.stacktr.ee/",
+ "started": "2026-09-07T06:04:57.873Z",
+ "finished": "2026-09-07T06:05:14.622Z",
+ "nav": 200,
+ "hosts": {
+  "example-brand-audit.stacktr.ee": 1,
+  "static.cloudflareinsights.com": 1
+ },
+ "total": 2,
+ "reqs": [
+  {
+   "n": 1,
+   "m": "GET",
+   "u": "https://example-brand-audit.stacktr.ee/",
+   "s": 200
+  },
+  {
+   "n": 2,
+   "m": "GET",
+   "u": "https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495",
+   "s": "FAILED csp"
+  }
+ ],
+ "afterLoad": {
+  "href": "https://example-brand-audit.stacktr.ee/",
+  "origin": "https://example-brand-audit.stacktr.ee",
+  "cookie": "",
+  "localStorage": [],
+  "sessionStorage": [],
+  "scripts": [
+   "https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495"
+  ],
+  "iframes": [],
+  "textHead": "← stacktr.ee · example deliverable · fictional client, real product · Publish your own version\n🔒 Confidential · prepared for Kestrel Coffee\nUpdated in place · same link since kickoff\nMERIDIAN\nBRAND & GROWTH STUDIO\nBrand & Growth Audit\n\nKestrel Coffee · where the next year of growth comes from\n\nPrepared for\nKestrel Coffee Ltd\nPeriod reviewed\nQ1–Q2 2026\nIssued\n21 July 2026\nLead\nR. Okafor\nCONTENTS\n01\nThe headline\n02\nScorecard\n03\nWhere the brand sits\n04\nIdentity system\n05\nThe funnel\n06\nWhat we found\n07\nGrowth levers\n01 · THE HEADLINE\nStrong brand, four growth levers sitting unused.\nIN ONE SENTENCE\nKestrel doesn’t have a brand problem; it has a conversion and retention problem wearing a brand’s clothes.\n\nThe brand work is genuinely good: distinctive, consistent, and loved by the customers who find it. The leaks are downstream. Mobile checkout loses four in ten baskets, the email list has never been segmented, and subscribers churn quietly at month three with no intervention. Fixing the first three outgrows any rebrand.\n\n02 · SCORECARD\nSix areas, scored against category benchmarks\nMEDIAN 6.8\n0\n10\n5.6/10\nBRAND HEALTH INDEX\n\nEqual-weight composite of the six areas below. The specialty-cof"
+ },
+ "afterScroll": {
+  "href": "https://example-brand-audit.stacktr.ee/",
+  "origin": "https://example-brand-audit.stacktr.ee",
+  "cookie": "",
+  "localStorage": [],
+  "sessionStorage": [],
+  "scripts": [
+   "https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495"
+  ],
+  "iframes": [],
+  "textHead": "← stacktr.ee · example deliverable · fictional client, real product · Publish your own version\n🔒 Confidential · prepared for Kestrel Coffee\nUpdated in place · same link since kickoff\nMERIDIAN\nBRAND & GROWTH STUDIO\nBrand & Growth Audit\n\nKestrel Coffee · where the next year of growth comes from\n\nPrepared for\nKestrel Coffee Ltd\nPeriod reviewed\nQ1–Q2 2026\nIssued\n21 July 2026\nLead\nR. Okafor\nCONTENTS\n01\nThe headline\n02\nScorecard\n03\nWhere the brand sits\n04\nIdentity system\n05\nThe funnel\n06\nWhat we found\n07\nGrowth levers\n01 · THE HEADLINE\nStrong brand, four growth levers sitting unused.\nIN ONE SENTENCE\nKestrel doesn’t have a brand problem; it has a conversion and retention problem wearing a brand’s clothes.\n\nThe brand work is genuinely good: distinctive, consistent, and loved by the customers who find it. The leaks are downstream. Mobile checkout loses four in ten baskets, the email list has never been segmented, and subscribers churn quietly at month three with no intervention. Fixing the first three outgrows any rebrand.\n\n02 · SCORECARD\nSix areas, scored against category benchmarks\nMEDIAN 6.8\n0\n10\n5.6/10\nBRAND HEALTH INDEX\n\nEqual-weight composite of the six areas below. The specialty-cof"
+ }
+}

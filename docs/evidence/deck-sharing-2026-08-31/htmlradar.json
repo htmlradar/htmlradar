@@ -1,0 +1,89 @@
+{
+ "name": "htmlradar",
+ "url": "https://htmlradar.com/r/lumenforge-demo",
+ "started": "2026-08-31T05:27:20.399Z",
+ "finished": "2026-08-31T05:27:37.601Z",
+ "nav": 200,
+ "hosts": {
+  "htmlradar.com": 1,
+  "htmlradar.page": 2,
+  "fonts.googleapis.com": 1,
+  "fonts.gstatic.com": 3,
+  "ewennjnxuqjzsgawbzur.supabase.co": 1
+ },
+ "total": 8,
+ "reqs": [
+  {
+   "n": 1,
+   "m": "GET",
+   "u": "https://htmlradar.com/r/lumenforge-demo",
+   "s": 301
+  },
+  {
+   "n": 2,
+   "m": "GET",
+   "u": "https://htmlradar.page/r/lumenforge-demo",
+   "s": 200
+  },
+  {
+   "n": 3,
+   "m": "GET",
+   "u": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap",
+   "s": 200
+  },
+  {
+   "n": 4,
+   "m": "GET",
+   "u": "https://htmlradar.page/v1/tracker.js",
+   "s": 200
+  },
+  {
+   "n": 5,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2",
+   "s": 200
+  },
+  {
+   "n": 6,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/fraunces/v38/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2",
+   "s": 200
+  },
+  {
+   "n": 7,
+   "m": "GET",
+   "u": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7W0Q5n-wU.woff2",
+   "s": 200
+  },
+  {
+   "n": 8,
+   "m": "POST",
+   "u": "https://ewennjnxuqjzsgawbzur.supabase.co/rest/v1/rpc/start_session",
+   "s": 200
+  }
+ ],
+ "afterLoad": {
+  "href": "https://htmlradar.page/r/lumenforge-demo",
+  "origin": "null",
+  "cookie": "THREW SecurityError: Failed to read the 'cookie' property from 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag.",
+  "localStorage": "THREW SecurityError: Failed to read the 'localStorage' property from 'Window': The document is sandboxed and lacks the 'allow-same-origin' flag.",
+  "sessionStorage": "THREW SecurityError: Failed to read the 'sessionStorage' property from 'Window': The document is sandboxed and lacks the 'allow-same-origin' flag.",
+  "scripts": [
+   "https://htmlradar.page/v1/tracker.js"
+  ],
+  "iframes": [],
+  "textHead": "SEED DECK · MAY 2026 · CONFIDENTIAL\nLumenforge.\n\nFusion-grade lighting for indoor agriculture — eight times the photon density, one third the wattage.\n\nStage · Seed\nRound · $4.5M on $20M post\nLocation · Eindhoven · Boulder\nPrepared for · Strategic & Lead Investors\n01Problem\n02Solution\n03How it works\n04Market\n05Traction\n06Roadmap\n07Business model\n08Competition\n09Team\n10Ask\n11Use of funds\n12Contact\n01Problem\n\nIndoor agriculture lighting has been stuck on plant-grade LEDs since 2015. Diodes have crept from 2.5 to 3.1 µmol/J in a decade — a 24% gain — while energy is now the single largest line item for every commercial vertical farm in North America and the EU.\n\nThe result is a category that quietly broke. Of the eleven vertical-farm operators that raised over $50M between 2019 and 2023, seven have shut down, sold for parts, or restructured at zero equity value. Three of the survivors cite lighting cost-per-gram as the headline blocker on their next facility.\n\nGreenhouse supplemental lighting is the same shape of problem, masked by daylight. A 12-hectare Dutch tomato greenhouse running 200 W/m² HPS supplement for 16 hours a day spends roughly €3.1M per year on electricity for photons."
+ },
+ "afterScroll": {
+  "href": "https://htmlradar.page/r/lumenforge-demo",
+  "origin": "null",
+  "cookie": "THREW SecurityError: Failed to read the 'cookie' property from 'Document': The document is sandboxed and lacks the 'allow-same-origin' flag.",
+  "localStorage": "THREW SecurityError: Failed to read the 'localStorage' property from 'Window': The document is sandboxed and lacks the 'allow-same-origin' flag.",
+  "sessionStorage": "THREW SecurityError: Failed to read the 'sessionStorage' property from 'Window': The document is sandboxed and lacks the 'allow-same-origin' flag.",
+  "scripts": [
+   "https://htmlradar.page/v1/tracker.js"
+  ],
+  "iframes": [],
+  "textHead": "SEED DECK · MAY 2026 · CONFIDENTIAL\nLumenforge.\n\nFusion-grade lighting for indoor agriculture — eight times the photon density, one third the wattage.\n\nStage · Seed\nRound · $4.5M on $20M post\nLocation · Eindhoven · Boulder\nPrepared for · Strategic & Lead Investors\n01Problem\n02Solution\n03How it works\n04Market\n05Traction\n06Roadmap\n07Business model\n08Competition\n09Team\n10Ask\n11Use of funds\n12Contact\n01Problem\n\nIndoor agriculture lighting has been stuck on plant-grade LEDs since 2015. Diodes have crept from 2.5 to 3.1 µmol/J in a decade — a 24% gain — while energy is now the single largest line item for every commercial vertical farm in North America and the EU.\n\nThe result is a category that quietly broke. Of the eleven vertical-farm operators that raised over $50M between 2019 and 2023, seven have shut down, sold for parts, or restructured at zero equity value. Three of the survivors cite lighting cost-per-gram as the headline blocker on their next facility.\n\nGreenhouse supplemental lighting is the same shape of problem, masked by daylight. A 12-hectare Dutch tomato greenhouse running 200 W/m² HPS supplement for 16 hours a day spends roughly €3.1M per year on electricity for photons."
+ }
+}

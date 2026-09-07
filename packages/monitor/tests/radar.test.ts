@@ -392,7 +392,7 @@ describe('scanThreads mines every source into radar_items and stays silent', () 
       }),
     });
 
-    await scanThreads(env, 0, TUESDAY);
+    await scanThreads({ ...env, REDDIT_SCAN_ENABLED: 'true' }, 0, TUESDAY);
 
     // No founder-facing message: the digest does that, not the scan.
     expect(telegram).toHaveLength(0);
@@ -443,6 +443,26 @@ describe('scanThreads mines every source into radar_items and stays silent', () 
     expect(run.meta).toMatchObject({ items_stored: 0 });
     expect(run.meta!['store_error']).toContain('HTTP 500');
   });
+
+  it('skips Reddit entirely and records the pause instead of six failures, with REDDIT_SCAN_ENABLED unset', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { outbox } = stubMiningWorld({
+      hn: json({ hits: [] }),
+      // If scanThreads still fetched Reddit, this 403 would be the six
+      // failures the pause exists to avoid.
+      reddit: new Response('', { status: 403 }),
+    });
+
+    await scanThreads(env, 0, TUESDAY);
+
+    const run = outbox.find((r) => r.kind === 'scan_run')!;
+    const fetches = run.meta!['fetches'] as { source: string }[];
+    expect(fetches.some((f) => f.source === 'Reddit')).toBe(false);
+    // One feed + six HN queries, no Reddit fetches at all.
+    expect(fetches.length).toBe(7);
+    expect(run.message).toContain('reddit: paused (blocked by 403s since 5 Sep)');
+    expect(run.meta!['reddit_paused']).toBe('reddit: paused (blocked by 403s since 5 Sep)');
+  });
 });
 
 describe('scanReddit retries a 429 against r/all/search.rss before giving up', () => {
@@ -460,7 +480,7 @@ describe('scanReddit retries a 429 against r/all/search.rss before giving up', (
       ),
     });
 
-    await scanThreads(env, 0, TUESDAY, 5);
+    await scanThreads({ ...env, REDDIT_SCAN_ENABLED: 'true' }, 0, TUESDAY, 5);
 
     const rows = upserts[0]!;
     const item = rows.find(
@@ -500,7 +520,7 @@ describe('scanReddit retries a 200 non-XML block page before giving up', () => {
       ),
     });
 
-    await scanThreads(env, 0, TUESDAY, 5);
+    await scanThreads({ ...env, REDDIT_SCAN_ENABLED: 'true' }, 0, TUESDAY, 5);
 
     const rows = upserts[0]!;
     const item = rows.find(

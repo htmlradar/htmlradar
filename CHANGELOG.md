@@ -35,6 +35,7 @@ Notable changes between releases. Following [Keep a Changelog](https://keepachan
 - **Share expiry timezone** — the live share form now converts the `datetime-local` value to ISO in the browser before submit, so an expiry set as local time is stored at the intended instant.
 - **Copy-link button** — falls back to a hidden-textarea copy when the async clipboard API is unavailable, instead of silently doing nothing.
 - **Flaky connector rate-limit tests** — `packages/connector/tests/ratelimit.test.ts` now freezes the clock with `vi.setSystemTime` so a slow CI runner can't carry a test across a 60-second window boundary, and the three heavy-iteration cases get a 20s timeout instead of vitest's 5s default.
+- **Reddit thread scan paused** — Reddit began refusing the monitor Worker's anonymous searches with HTTP 403 on 5 Sep 2026 (429 the same day), after 4 of 6 queries had worked on the 3rd; its Responsible Builder Policy forbids anonymous scraping, so retrying daily only deepened the block. The `REDDIT_SCAN_ENABLED` var (`packages/monitor/wrangler.toml`, default `"false"`) now gates the Reddit half of `scanThreads`; Google Alerts and Hacker News are unaffected. The `scan_run` row records the pause instead of six failing fetches, and the maintenance sentinel reports it as one "reddit paused" line rather than counting it toward failed fetches.
 
 ---
 

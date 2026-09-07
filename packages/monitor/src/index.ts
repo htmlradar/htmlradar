@@ -107,6 +107,12 @@ export interface Env {
   // rules ask for. A secret rather than a [vars] entry only because it is a
   // personal handle and this repository is public.
   REDDIT_USERNAME?: string;
+  // Kill switch for the Reddit half of the thread scan. Reddit started
+  // refusing our Worker's address with HTTP 403 on 5 Sep 2026 — continuing to
+  // fetch daily only deepens the block. 'true' turns Reddit fetching back on;
+  // anything else (including unset) skips it, leaving Google Alerts and HN
+  // unaffected. See wrangler.toml [vars] for the flip.
+  REDDIT_SCAN_ENABLED?: string;
 }
 
 // What a healthy production answers, one entry per probe.
@@ -620,6 +626,13 @@ async function scanHN(query: string, sinceSec: number): Promise<ScanResult> {
     }));
   return { status: res.status, items };
 }
+
+// Reddit started refusing our Worker's address with HTTP 403 on every
+// anonymous search on 5 Sep 2026 (429 the same day; 4 of 6 queries had worked
+// on the 3rd). Its Responsible Builder Policy forbids anonymous scraping, so
+// this is Reddit enforcing that, not a transient block — retrying daily only
+// deepens it. See REDDIT_SCAN_ENABLED on Env.
+const REDDIT_PAUSE_REASON = 'reddit: paused (blocked by 403s since 5 Sep)';
 
 function redditRssUrl(query: string): string {
   return `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new&t=week`;
@@ -1167,9 +1180,15 @@ export async function scanThreads(
     }
   }
 
+  // Reddit is paused: it started refusing our Worker's address with HTTP 403
+  // on 5 Sep 2026, and fetching daily into a block only deepens it. See
+  // REDDIT_SCAN_ENABLED on Env and wrangler.toml [vars] for the flip.
+  const redditEnabled = env.REDDIT_SCAN_ENABLED === 'true';
+
   // Sources two and three: HN and Reddit, per phrase, spaced for Reddit's limit.
   for (const [i, { query }] of SCAN_QUERIES.entries()) {
     for (const source of ['HN', 'Reddit'] as const) {
+      if (source === 'Reddit' && !redditEnabled) continue;
       try {
         ingest(
           source,
@@ -1209,13 +1228,15 @@ export async function scanThreads(
     source: 'scanThreads',
     message:
       `${items.length} item(s) mined across ${fetches.length} fetch(es)` +
-      (storeError ? `; store FAILED: ${storeError}` : `; ${stored} stored`),
+      (storeError ? `; store FAILED: ${storeError}` : `; ${stored} stored`) +
+      (redditEnabled ? '' : `; ${REDDIT_PAUSE_REASON}`),
     telegram_ok: null,
     meta: {
       fetches,
       total_items: items.length,
       items_stored: stored,
       ...(storeError ? { store_error: storeError } : {}),
+      ...(redditEnabled ? {} : { reddit_paused: REDDIT_PAUSE_REASON }),
     },
   });
 
@@ -2780,7 +2801,7 @@ interface AbuseRow {
 
 interface ScanRunRow {
   created_at: string;
-  meta: { fetches?: ScanFetch[]; total_items?: number } | null;
+  meta: { fetches?: ScanFetch[]; total_items?: number; reddit_paused?: string } | null;
 }
 
 /**
@@ -2888,8 +2909,19 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
     }
     const fetches = row.meta?.fetches ?? [];
     const items = row.meta?.total_items ?? 0;
+    const redditPaused = row.meta?.reddit_paused;
+    // Paused is not a failure: no Reddit fetches were attempted, so none of
+    // them land in `bad` below. Say it once, on its own line, rather than
+    // silently absorbing it into "all clear".
+    if (redditPaused) findings.push(`reddit paused — ${redditPaused}`);
     const bad = fetches.filter((f) => f.error || f.status !== 200);
-    meta['scan_run'] = { at: row.created_at, items, fetches: fetches.length, failed: bad.length };
+    meta['scan_run'] = {
+      at: row.created_at,
+      items,
+      fetches: fetches.length,
+      failed: bad.length,
+      ...(redditPaused ? { reddit_paused: redditPaused } : {}),
+    };
     if (bad.length === 0) return null;
     const detail = bad
       .map((f) => `${f.source} ${f.query}: ${f.error ?? `HTTP ${f.status}`}`)

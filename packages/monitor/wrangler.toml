@@ -26,6 +26,15 @@ crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *", "0 5 * * *"]
 # Non-sensitive config travels in [vars] so they're visible in the
 # wrangler.toml diff. Everything else is a Worker secret, set once with
 # `wrangler secret put <NAME>` (see README.md) and never enters the repo:
+#   REDDIT_SCAN_ENABLED   kill switch for the Reddit half of the thread scan
+#                         (see scanReddit / scanThreads in src/index.ts).
+#                         Paused since 5 Sep 2026: Reddit started refusing our
+#                         Worker's address with HTTP 403 on every anonymous
+#                         search. Default "false" — Google Alerts and Hacker
+#                         News keep scanning unaffected. Flip back on by
+#                         editing this file to REDDIT_SCAN_ENABLED = "true"
+#                         and redeploying, once Reddit access is sorted out
+#                         (see docs/control/MAINTENANCE-REGISTER.md).
 #   SUPABASE_SERVICE_ROLE_KEY
 #   RESEND_API_KEY
 #   POSTHOG_PROJECT_KEY   PostHog project key for the app_events replay;
@@ -63,6 +72,9 @@ ALERT_TO = "hello@htmlradar.com"
 # PostHog ingest host for the app_events replay (see replayAppEvents in
 # src/index.ts).
 POSTHOG_HOST = "https://us.i.posthog.com"
+# Reddit fetches paused since 5 Sep 2026 (see the comment block above).
+# Flip: set to "true" here and redeploy to resume.
+REDDIT_SCAN_ENABLED = "false"
 
 [observability]
 enabled = true

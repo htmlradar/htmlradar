@@ -210,6 +210,31 @@ describe('findings arrive as one message', () => {
     expect(telegram[0]!.text).toContain('Reddit refused this address');
   });
 
+  it('reports a paused Reddit source as one line, not a fetch failure', async () => {
+    const { telegram } = stubWorld({
+      ...allClear(TUESDAY),
+      scanRun: [
+        {
+          created_at: new Date(TUESDAY - 23.5 * 3_600_000).toISOString(),
+          meta: {
+            total_items: 1,
+            fetches: [{ source: 'HN', query: 'papermark alternative', status: 200, items: 1 }],
+            reddit_paused: 'reddit: paused (blocked by 403s since 5 Sep)',
+          },
+        },
+      ],
+    });
+
+    await sentinel(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).toContain(
+      'reddit paused — reddit: paused (blocked by 403s since 5 Sep)',
+    );
+    // No Reddit fetch was attempted, so it must not also read as a failure.
+    expect(telegram[0]!.text).not.toContain('fetch(es) failed');
+  });
+
   it('flags a climbing unverified-notification count — the reconciler handoff from schema/044', async () => {
     const { telegram } = stubWorld({ ...allClear(TUESDAY), notificationsUnverified: 5 });
 

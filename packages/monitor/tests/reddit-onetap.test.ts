@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   DRAFT_ANSWER_SLOT,
@@ -43,7 +43,16 @@ const PERMALINK = '/r/sales/comments/abc123/how_do_i_share_a_deck/def456/';
 const NONCE = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
 const MSG = 500;
 
-afterEach(() => vi.restoreAllMocks());
+// handleWebhookRequest checks a draft's expires_at against the real clock
+// (it takes no injectable nowMs), so every fixture's 72-hour expiry is only
+// valid relative to NOW, not to whatever day the suite happens to run on.
+// Freeze the clock at NOW, the same fix already applied to the connector's
+// rate-limit tests for the same reason.
+beforeEach(() => vi.useFakeTimers({ now: NOW, toFake: ['Date'] }));
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // A stand-in for the three systems the handler talks to, faithful on the two

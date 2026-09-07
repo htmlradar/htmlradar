@@ -11,10 +11,14 @@ Read tracking for the decks, reports and proposals you now send as HTML.
 
 **HTMLRadar is an open-source tool for sharing an HTML deck, brief, or proposal
 as a tracked link, and seeing who opened it, which sections they read, and for
-how long.** Not just that it was opened — dwell time, section by section.
+how long.** Not just that it was opened — dwell time, section by section. You
+know who a reader is when the share's email gate collected an address;
+otherwise the reader is an anonymous row with the same reading detail.
 
 [htmlradar.com](https://htmlradar.com) · free for 2 tracked links, $15/mo or
 $150/yr for unlimited · or self-host the whole thing.
+
+[Try the public demo, no sign-up](https://htmlradar.com/r/lumenforge-demo) — a live tracked link you can open in a browser.
 
 Using Claude? Add HTMLRadar as a connector by pasting one address —
 `https://mcp.htmlradar.com/mcp`. Nothing to install and no API key to make first;
@@ -37,8 +41,10 @@ is fixed. More of them are written with AI tools now, and ChatGPT, Claude, v0,
 Lovable and Anthropic Artifacts all produce HTML. The format is what makes these
 documents better; who typed them is beside the point.
 
-The tracking tooling never followed. DocSend and everything like it is built
-around uploading a file and tracking that file. PDF was the print-era container.
+The tracking tooling never followed. When I went looking, I could not find an
+open-source tool that reported reading at section level for an HTML document.
+The document-tracking products I did find grew up around uploading a file and
+tracking that file.
 
 HTMLRadar tracks the document people actually send now, and reports reading at
 section level rather than a single "opened" flag.
@@ -51,17 +57,17 @@ Send-side analytics for HTML documents. Upload an HTML file (or paste a URL you 
 
 ## What it does
 
-- **Section-level dwell — on any HTML.** At least half a section must stay visible for one continuous second before its dwell starts qualifying; the read signal fires after three qualified seconds. The tracker auto-detects sections from your HTML: explicit anchored headings → bare `h1/h2/h3` (slugged from text) → slide/page containers (`section`, `.slide`, `.page`) → paragraph buckets on plain prose. Dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12s on Problem, and skipped Market sizing.
+- **Section-level dwell.** At least half a section must stay visible for one continuous second before its dwell starts qualifying; the read signal fires after three qualified seconds. The tracker auto-detects sections from your HTML: explicit anchored headings → bare `h1/h2/h3` (slugged from text) → slide/page containers (`section`, `.slide`, `.page`) → paragraph buckets on plain prose. Dashboard tells you a recipient spent 2m 41s on §03 The Ask, 12s on Problem, and skipped Market sizing.
 - **Per-viewer dashboard, aggregated across every share.** One row per person who actually opened the doc, with email + country + device + referrer + total time + scroll depth + visits + first/last seen. Updates live every 30 seconds while the tab is in focus.
 - **Per-recipient share links.** One document, many shares. Each share carries its own email gate, password, expiry, revocation, and email-domain or per-email allow-list.
-- **Files alongside the deck.** Attach PDFs, financial models, images, and ZIPs to any share. Recipients see a small corner pill that opens a side drawer; files are always available when present (the per-share "Lock the deck" toggle controls deck save/print only, never attachments). Every download is logged per viewer + per session + per filename.
+- **Files alongside the deck.** Attach PDFs, financial models, images, and ZIPs to any share. Recipients see a small corner pill that opens a side drawer; files are always available when present (the per-share "Lock the deck" toggle controls deck save/print only, never attachments). Every download is logged per session and per filename, and tied to the viewer record when one exists.
 - **Version history.** Replace the HTML after partner feedback. Every existing share keeps the same link and serves the new version on next open. The `v{n}` chip on the doc page is a popover with every upload's original local filename, byte size, and timestamp.
 - **Retroactive share access.** Change a share's password, expiry, or allow-list without revoking. The proxy re-checks the allow-list on every request — removing an email kicks them out immediately on their next click, not their next browser session.
 - **Edit + preview without leaving the dashboard.** Preview the doc as the recipient sees it before sending (short-lived HMAC token, no gate). Both "Preview document" and "Preview as you" open in a new tab so your dashboard stays where you left it.
 - **Branded first-open email.** When a recipient creates their first real session, HTMLRadar requests an HTML notification — viewer email + doc title + a single "See the read →" CTA back to the dashboard. Tease, not report.
-- **Engaged-time, not tab-open time.** Both per-section dwell and per-session active time apply a 5-second idle watchdog (keydown / scroll / touchstart, mousemove deliberately excluded). Same methodology as Chartbeat / Parse.ly engagement-time. A tab parked while the reader walked away stops counting after 5 seconds.
+- **Engaged-time, not tab-open time.** Both per-section dwell and per-session active time apply a 5-second idle watchdog (keydown / scroll / touchstart, mousemove deliberately excluded). That is the same five-second inactivity window engaged-time tools such as Chartbeat and Parse.ly use; those tools also read further interaction signals that HTMLRadar deliberately does not collect. A tab parked while the reader walked away stops counting after 5 seconds.
 - **Bot / accidental-tap filter.** After the document loads, HTMLRadar waits through a 5-second warm-up before creating the session. If the recipient backgrounds the tab or bounces during that wait, there is no session, notification request, or inflated viewer count.
-- **Privacy-respecting.** Recipient records contain an email when entered or a random browser ID, referrer, coarse device and location data, section dwell, scroll depth, and active time. HTMLRadar stores no raw IP address, keystrokes, mouse positions, DOM snapshots, or session replay. Recipients can opt out via `window.HTMLRadar.optOut()`.
+- **Data collected.** A recipient record holds an email address when a share's gate collects one, otherwise a random identifier (kept in the browser's localStorage where the page can reach it, freshly generated on each load where it cannot — which is the case on the sandboxed proxy-served links); first-seen and last-seen times; visit count; the browser identification string; referrer; country and city; device type; operating system; browser. A session record holds the document version seen, start and last-heartbeat times, active seconds, and maximum scroll depth. A section record holds dwell per section. These records are kept until the owner deletes the document — there is no automatic purge. Not stored in recipient records: raw IP address, cursor positions, keystrokes, page snapshots, session replay. An ungated document shows no tracking notice; the email-gate page shows one sentence ("Reading activity on this document is shared with the sender") and a link to the privacy page. Opt-out is a developer-console call, `window.HTMLRadar.optOut()`, followed by a confirmation page — documented, but not something an ordinary recipient will discover. Audit for comparison: [what each of seven tools loads in a recipient's browser, HTMLRadar included](https://htmlradar.com/blog/what-deck-sharing-tools-record).
 
 ## What it deliberately is not
 

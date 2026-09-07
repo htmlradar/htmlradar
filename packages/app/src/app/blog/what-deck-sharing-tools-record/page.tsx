@@ -324,8 +324,25 @@ export default function Post() {
                 upload answered <code className="font-mono text-[14px] text-signal-dark">200</code>,
                 not the <code className="font-mono text-[14px] text-signal-dark">402</code> recorded
                 on 30 and 31 August: the upload that had been stalling behind a payment gate went
-                through this time. Everything else held. This piece re-runs the same check once more
-                immediately before publishing, so this line is updated again if that changes.
+                through this time. Everything else held.
+              </p>
+              <p className="mt-4">
+                <strong className="font-semibold text-ink">Final run, 7 September 2026.</strong> All
+                seven links were opened once more on 7 September 2026, the day before this piece was
+                posted to Hacker News, with the same script and the same fifteen-second window. It
+                found no change from the findings published here: every host, cookie name and
+                storage key recorded above was still present, none had been added, and Peony&apos;s
+                Session Replay upload still answered{' '}
+                <code className="font-mono text-[14px] text-signal-dark">200</code>. The capture
+                script and the raw JSON for the 31 August and 7 September runs are in the
+                repository, with cookie values, credentials and identifiers redacted:{' '}
+                <a
+                  href="https://github.com/htmlradar/htmlradar/tree/main/docs/evidence/"
+                  className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
+                >
+                  github.com/htmlradar/htmlradar/tree/main/docs/evidence
+                </a>
+                .
               </p>
             </section>
 

@@ -221,6 +221,29 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
+            <Section title="If we e-mailed you first" id="outreach">
+              <p>
+                Sometimes we write to a business we have not spoken to before, because its published
+                work suggests it sends proposals, decks or reports as web pages. When we do, this is
+                what happens with the address. We take it from the firm's own website or a public
+                professional profile, and the e-mail says which page. We store the address, the name
+                if one was published, the firm, the page it came from and the dates we wrote, in a
+                private spreadsheet that only the founder can read, for at most twelve months. We
+                use it for at most two e-mails and for nothing else. We do not sell it, share it or
+                add it to any list. Reply with the word stop, or any words that mean the same, and
+                we delete the row the same day and never write again. The lawful basis in the UK is
+                legitimate interest in telling a relevant business about a product for that
+                business; the assessment behind that is available on request. Write to{' '}
+                <a
+                  href="mailto:hello@htmlradar.com"
+                  className="text-signal-dark underline decoration-line decoration-2 underline-offset-4 hover:decoration-signal"
+                >
+                  hello@htmlradar.com
+                </a>{' '}
+                for a copy, to ask what we hold about you, or to have it deleted.
+              </p>
+            </Section>
+
             <Section title="Contact">
               <p>
                 <a
@@ -239,9 +262,17 @@ export default function PrivacyPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  id,
+  children,
+}: {
+  title: string;
+  id?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section>
+    <section id={id}>
       <h2 className="font-serif text-[24px] leading-snug text-ink md:text-[26px]">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>

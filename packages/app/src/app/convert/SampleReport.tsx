@@ -58,7 +58,9 @@ export function SampleReport({ titles }: { titles: string[] }) {
                   const seconds = SECONDS[row]![column]!;
                   return (
                     <td key={reader} className="py-3 pl-2 align-top">
-                      <span className="block tabular-nums">{duration(seconds)}</span>
+                      <span className="block tabular-nums">
+                        {seconds ? duration(seconds) : '—'}
+                      </span>
                       <span
                         aria-hidden
                         className="mt-2 block h-1.5 overflow-hidden rounded-full bg-paper-2"

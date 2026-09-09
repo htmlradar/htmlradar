@@ -19,6 +19,28 @@ import { HTML_ACCEPT, isHtmlFile } from '@/lib/html-source';
 import { MAX_STAGED_BYTES } from '@/lib/staged-file';
 import { useStagedHandoff, type HandoffAction } from '@/lib/staged-handoff';
 
+const TOOL_HANDOFF_MESSAGES = {
+  missing: (
+    <>
+      That file was already turned into a link — find it under{' '}
+      <a href="/docs" className="underline underline-offset-4">
+        Documents
+      </a>
+      .
+    </>
+  ),
+  storage: (
+    <>
+      This browser will not let the page hold your file while you sign in. Sign in first, then
+      upload the file on the{' '}
+      <a href="/new" className="underline underline-offset-4">
+        new document page
+      </a>
+      .
+    </>
+  ),
+};
+
 export function HtmlToolPanel({
   tool,
   action,
@@ -42,7 +64,13 @@ export function HtmlToolPanel({
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const handoff = useStagedHandoff({ path: `/tools/${tool}`, action, resumeToken, signedIn });
+  const handoff = useStagedHandoff({
+    path: `/tools/${tool}`,
+    action,
+    resumeToken,
+    signedIn,
+    messages: TOOL_HANDOFF_MESSAGES,
+  });
   const { file: staged, busy, restored, replaceFile } = handoff;
   const [error, setError] = useState<string | null>(null);
   const [pdfRejected, setPdfRejected] = useState(false);

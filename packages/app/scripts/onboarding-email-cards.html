@@ -279,9 +279,14 @@
         display: grid;
         grid-template-columns: 230px 1fr 1fr 1fr;
         column-gap: 16px;
+        align-items: start;
         margin-top: 22px;
       }
       .orecipient {
+        display: flex;
+        flex-direction: column;
+      }
+      .ohead {
         display: flex;
         align-items: center;
         gap: 12px;
@@ -306,9 +311,11 @@
       }
       .ostats {
         margin-top: 3px;
+        margin-left: 52px;
         font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
         font-size: 13px;
         color: var(--graphite);
+        white-space: nowrap;
       }
       .otable {
         margin-top: 24px;
@@ -561,25 +568,25 @@
         <div class="orecipients">
           <div></div>
           <div class="orecipient">
-            <div class="oravatar">N</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">N</div>
               <div class="oname">Northgate Capital</div>
-              <div class="ostats">3 opens &middot; 4m 36s active</div>
             </div>
+            <div class="ostats">3 opens &middot; 4m 36s</div>
           </div>
           <div class="orecipient">
-            <div class="oravatar">H</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">H</div>
               <div class="oname">Harbour &amp; Co</div>
-              <div class="ostats">2 opens &middot; 3m 15s active</div>
             </div>
+            <div class="ostats">2 opens &middot; 3m 15s</div>
           </div>
           <div class="orecipient">
-            <div class="oravatar">M</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">M</div>
               <div class="oname">M. Okafor</div>
-              <div class="ostats">1 open &middot; 46s active</div>
             </div>
+            <div class="ostats">1 open &middot; 46s</div>
           </div>
         </div>
         <div class="otable">
@@ -675,25 +682,25 @@
         <div class="orecipients">
           <div></div>
           <div class="orecipient">
-            <div class="oravatar">N</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">N</div>
               <div class="oname">Northgate Capital</div>
-              <div class="ostats">3 opens &middot; 4m 25s active</div>
             </div>
+            <div class="ostats">3 opens &middot; 4m 25s</div>
           </div>
           <div class="orecipient">
-            <div class="oravatar">H</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">H</div>
               <div class="oname">Harbour &amp; Co</div>
-              <div class="ostats">2 opens &middot; 2m 17s active</div>
             </div>
+            <div class="ostats">2 opens &middot; 2m 17s</div>
           </div>
           <div class="orecipient">
-            <div class="oravatar">M</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">M</div>
               <div class="oname">M. Okafor</div>
-              <div class="ostats">1 open &middot; 22s active</div>
             </div>
+            <div class="ostats">1 open &middot; 22s</div>
           </div>
         </div>
         <div class="otable">
@@ -789,25 +796,25 @@
         <div class="orecipients">
           <div></div>
           <div class="orecipient">
-            <div class="oravatar">N</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">N</div>
               <div class="oname">Northgate Capital</div>
-              <div class="ostats">3 opens &middot; 3m 56s active</div>
             </div>
+            <div class="ostats">3 opens &middot; 3m 56s</div>
           </div>
           <div class="orecipient">
-            <div class="oravatar">H</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">H</div>
               <div class="oname">Harbour &amp; Co</div>
-              <div class="ostats">2 opens &middot; 1m 57s active</div>
             </div>
+            <div class="ostats">2 opens &middot; 1m 57s</div>
           </div>
           <div class="orecipient">
-            <div class="oravatar">M</div>
-            <div>
+            <div class="ohead">
+              <div class="oravatar">M</div>
               <div class="oname">M. Okafor</div>
-              <div class="ostats">1 open &middot; 18s active</div>
             </div>
+            <div class="ostats">1 open &middot; 18s</div>
           </div>
         </div>
         <div class="otable">

@@ -225,6 +225,54 @@ describe('PDF admission using generated PDFs', () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
+  it.each([2, 3])('joins %i consecutive title lines from a synthetic PDF', async (count) => {
+    const lines = ['Social, the most', 'important trend', 'for growing teams'].slice(0, count);
+    const pdf = await open(
+      await fixture(2, (doc) => {
+        lines.forEach((text, i) =>
+          doc.getPage(0).drawText(text, { x: 40, y: 390 - i * 30, size: 24 }),
+        );
+      }),
+    );
+    expect(finalizeSlideTitles((await admitPdf(pdf)).candidates)[0]).toBe(
+      `Slide 1: ${lines.join(' ')}`,
+    );
+  });
+
+  it.each([
+    ['different left edges', 60, 350, 24],
+    ['different font sizes', 40, 350, 23],
+    ['nonconsecutive baselines', 40, 310, 24],
+    ['separate columns', 400, 380, 24],
+  ])(
+    'keeps the existing ambiguity fallback for %s in a synthetic PDF',
+    async (_name, x, y, size) => {
+      const pdf = await open(
+        await fixture(2, (doc) => {
+          doc.getPage(0).drawText('First heading', { x: 40, y: 380, size: 24 });
+          doc.getPage(0).drawText('Second heading', { x, y, size });
+        }),
+      );
+      expect(finalizeSlideTitles((await admitPdf(pdf)).candidates)[0]).toBe('Slide 1: Untitled');
+    },
+  );
+
+  it('does not turn four lines or a bullet list into a wrapped title in synthetic PDFs', async () => {
+    for (const lines of [
+      ['First heading', 'Second heading', 'Third heading', 'Fourth heading'],
+      ['- First item', '- Second item'],
+    ]) {
+      const pdf = await open(
+        await fixture(2, (doc) => {
+          lines.forEach((text, i) =>
+            doc.getPage(0).drawText(text, { x: 40, y: 410 - i * 30, size: 24 }),
+          );
+        }),
+      );
+      expect(finalizeSlideTitles((await admitPdf(pdf)).candidates)[0]).toBe('Slide 1: Untitled');
+    }
+  });
+
   it('keeps hostile text from a generated PDF inert in the assembled HTML', async () => {
     const payload = '</h2><img src="https://evil.example/" alt=\'leak\'>';
     const pdf = await open(
@@ -409,12 +457,12 @@ describe('title catalogue', () => {
     ).toBe('Slide 1: Untitled');
   });
 
-  it('does not combine two columns, ambiguous multiline titles, or uncertain RTL order', () => {
+  it('does not combine two columns, misaligned multiline titles, or uncertain RTL order', () => {
     expect(
       labelFor([run('Left title'), run('Right title', { transform: [24, 0, 0, 24, 400, 380] })]),
     ).toBe('Slide 1: Untitled');
     expect(
-      labelFor([run('First line'), run('Second line', { transform: [24, 0, 0, 24, 40, 350] })]),
+      labelFor([run('First line'), run('Second line', { transform: [24, 0, 0, 24, 60, 350] })]),
     ).toBe('Slide 1: Untitled');
     expect(
       labelFor([
@@ -472,17 +520,36 @@ const slide = (
 
 describe('HTML assembly', () => {
   it('emits exactly the per-slide markup measured by the tracker fixture', async () => {
-    const slides = ['Slide 1: Company overview', 'Slide 2: Untitled', 'Slide 3: 日本語の紹介'].map(
-      (title) => ({
-        title,
-        width: 1600,
-        height: 1280,
-        image: new Blob([new Uint8Array([0])], { type: 'image/png' }),
-      }),
-    );
+    const slides = [
+      'Slide 1: Company overview',
+      'Slide 2: Untitled',
+      'Slide 3: 日本語の紹介',
+      'Slide 4: Next steps',
+    ].map((title) => ({
+      title,
+      width: 1600,
+      height: 1280,
+      image: new Blob([new Uint8Array([0])], { type: 'image/png' }),
+    }));
     const html = await (await assembleDeckHtml('deck.pdf', slides)).text();
-    expect(html.match(/<nav[\s\S]*?<\/nav>/)?.[0]).toBe(PDF_DECK_TOC);
+    expect(html.match(/<details[\s\S]*?<\/details>/)?.[0]).toBe(PDF_DECK_TOC);
     expect(html.match(/<section class="slide">[\s\S]*<\/section>/)?.[0]).toBe(PDF_DECK_SECTIONS);
+    expect(html).toContain(`${PDF_DECK_TOC}<main>${PDF_DECK_SECTIONS}`);
+    expect(html).not.toMatch(/href="(?!#slide-\d+")/);
+    expect(new Blob([html]).size).toBe(new TextEncoder().encode(html).byteLength);
+  });
+
+  it.each([0, 1, 2])('omits contents entirely with only %i detected titles', async (named) => {
+    const html = await (
+      await assembleDeckHtml(
+        'deck.pdf',
+        Array.from({ length: 4 }, (_, i) =>
+          slide(`Slide ${i + 1}: ${i < named ? 'Title' : 'Untitled'}`),
+        ),
+      )
+    ).text();
+    expect(html).not.toMatch(/<details|<summary|<a\s/);
+    expect(html.match(/<h2 /g)).toHaveLength(4);
   });
 
   it('sanitises suggested download names', () => {
@@ -543,17 +610,21 @@ describe('HTML assembly', () => {
     expect(encode).not.toHaveBeenCalled();
   });
 
-  it('accepts exactly 20 MiB and rejects one byte more', async () => {
-    const pages = [slide('Slide 1: Title'), slide('Slide 2: Untitled')];
-    const initial = await assembleDeckHtml('test.pdf', pages);
-    const remaining = MAX_DECK_BYTES - initial.size;
-    pages[0]!.image = new Blob([new Uint8Array(3 + Math.floor(remaining / 4) * 3)], {
-      type: 'image/jpeg',
-    });
-    const name = `test${'x'.repeat(remaining % 4)}.pdf`;
-    expect((await assembleDeckHtml(name, pages)).size).toBe(MAX_DECK_BYTES);
-    await expect(assembleDeckHtml(`x${name}`, pages)).rejects.toMatchObject({ code: 'overflow' });
-  });
+  it.each([false, true])(
+    'accepts exactly 20 MiB and rejects one byte more, with contents: %s',
+    async (contents) => {
+      const pages = [slide('Slide 1: Title'), slide('Slide 2: Untitled')];
+      if (contents) pages.push(slide('Slide 3: 日本語の紹介'), slide('Slide 4: Next steps'));
+      const initial = await assembleDeckHtml('test.pdf', pages);
+      const remaining = MAX_DECK_BYTES - initial.size;
+      pages[0]!.image = new Blob([new Uint8Array(3 + Math.floor(remaining / 4) * 3)], {
+        type: 'image/jpeg',
+      });
+      const name = `test${'x'.repeat(remaining % 4)}.pdf`;
+      expect((await assembleDeckHtml(name, pages)).size).toBe(MAX_DECK_BYTES);
+      await expect(assembleDeckHtml(`x${name}`, pages)).rejects.toMatchObject({ code: 'overflow' });
+    },
+  );
 
   it('rejects non-raster image sources and out-of-bounds dimensions', async () => {
     await expect(

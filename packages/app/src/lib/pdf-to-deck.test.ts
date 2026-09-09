@@ -19,9 +19,11 @@ import type {
   TextItem,
 } from 'pdfjs-dist/types/src/display/api';
 import type { PageViewport } from 'pdfjs-dist/types/src/display/page_viewport';
+import { PDF_DECK_SECTIONS, PDF_DECK_TOC } from '../../../tracker/tests/fixtures/pdf-deck';
 import { isMetaPattern } from '../../../tracker/src/sections-v2';
 import {
   admitPdf,
+  downloadFilename,
   assembleDeckHtml,
   convertPdfToDeck,
   extractTitleCandidates,
@@ -268,12 +270,12 @@ describe('PDF admission using generated PDFs', () => {
 });
 
 describe('admission boundaries', () => {
-  it('accepts strictly less than 30 MiB and rejects the exact ceiling', () => {
+  it('accepts exactly 30 MiB and rejects one byte more', () => {
     expect(() =>
-      validatePdfFile({ name: 'deck.PDF', type: '', size: MAX_PDF_BYTES - 1 }),
+      validatePdfFile({ name: 'deck.PDF', type: '', size: MAX_PDF_BYTES }),
     ).not.toThrow();
     expect(() =>
-      validatePdfFile({ name: 'deck.pdf', type: 'application/pdf', size: MAX_PDF_BYTES }),
+      validatePdfFile({ name: 'deck.pdf', type: 'application/pdf', size: MAX_PDF_BYTES + 1 }),
     ).toThrow(PDF_DECK_MESSAGES.size);
     expect(() => validatePdfFile({ name: 'deck.txt', type: 'text/plain', size: 10 })).toThrow(
       PDF_DECK_MESSAGES.format,
@@ -469,6 +471,26 @@ const slide = (
 ): DeckSlide => ({ title, image, width: 1600, height: 1000 });
 
 describe('HTML assembly', () => {
+  it('emits exactly the per-slide markup measured by the tracker fixture', async () => {
+    const slides = ['Slide 1: Company overview', 'Slide 2: Untitled', 'Slide 3: 日本語の紹介'].map(
+      (title) => ({
+        title,
+        width: 1600,
+        height: 1280,
+        image: new Blob([new Uint8Array([0])], { type: 'image/png' }),
+      }),
+    );
+    const html = await (await assembleDeckHtml('deck.pdf', slides)).text();
+    expect(html.match(/<nav[\s\S]*?<\/nav>/)?.[0]).toBe(PDF_DECK_TOC);
+    expect(html.match(/<section class="slide">[\s\S]*<\/section>/)?.[0]).toBe(PDF_DECK_SECTIONS);
+  });
+
+  it('sanitises suggested download names', () => {
+    expect(downloadFilename('a/b\\c"d\n.pdf')).toBe('abcd.html');
+    expect(downloadFilename('/\\.pdf')).toBe('deck.html');
+    expect(downloadFilename('日本語.pdf')).toBe('日本語.html');
+  });
+
   it('emits the fixed offline structure, correct labels, dimensions, lazy images, and final credit', async () => {
     const html = await assembleDeckHtml('Agency.pdf', [
       slide('Slide 1: Company overview'),
@@ -483,13 +505,13 @@ describe('HTML assembly', () => {
     expect(text.match(/<h[1-3]\b/g)).toHaveLength(2);
     expect(text).toContain('<h2 id="slide-1" dir="auto">Slide 1: Company overview</h2><img');
     expect(text).toContain(
-      'width="1600" height="1000" alt="Image of slide 2; text is not selectable" loading="lazy"',
+      'width="1600" height="1000" alt="Image of slide 2; text is not selectable." loading="lazy"',
     );
     expect(text.match(/loading="lazy"/g)).toHaveLength(1);
     expect(text).toContain('Converted with HTMLRadar.</p></section></main>');
     expect(text).toContain('.slide{position:relative}');
     expect(text).toContain('width:1px;height:1px');
-    expect(text).not.toMatch(/<script|<iframe|<a\s|<link|https?:\/\//i);
+    expect(text).not.toMatch(/<script|<iframe|<link|https?:\/\//i);
     expect(html.size).toBe(new TextEncoder().encode(text).byteLength);
   });
 
@@ -528,10 +550,9 @@ describe('HTML assembly', () => {
     pages[0]!.image = new Blob([new Uint8Array(3 + Math.floor(remaining / 4) * 3)], {
       type: 'image/jpeg',
     });
-    pages[0]!.title += 'x'.repeat(remaining % 4);
-    expect((await assembleDeckHtml('test.pdf', pages)).size).toBe(MAX_DECK_BYTES);
-    pages[0]!.title += 'x';
-    await expect(assembleDeckHtml('test.pdf', pages)).rejects.toMatchObject({ code: 'overflow' });
+    const name = `test${'x'.repeat(remaining % 4)}.pdf`;
+    expect((await assembleDeckHtml(name, pages)).size).toBe(MAX_DECK_BYTES);
+    await expect(assembleDeckHtml(`x${name}`, pages)).rejects.toMatchObject({ code: 'overflow' });
   });
 
   it('rejects non-raster image sources and out-of-bounds dimensions', async () => {
@@ -597,6 +618,17 @@ describe('runtime loading and conversion lifecycle', () => {
   }
 
   const file = () => new File(['%PDF- synthetic'], 'deck.pdf', { type: 'application/pdf' });
+
+  it('reports mixed sizes when a later page exceeds the canvas height within the two-percent tolerance', async () => {
+    const env = await runtime(
+      await fixture(4, (pdf) => {
+        pdf.getPages().forEach((page, i) => page.setSize(562.5, i === 3 ? 454 : 450));
+      }),
+    );
+    await expect(convertPdfToDeck(file())).rejects.toMatchObject({ code: 'sizes' });
+    expect(env.renders[3]).not.toHaveBeenCalled();
+    expect(env.destroy).toHaveBeenCalledOnce();
+  });
 
   it('loads matching runtime assets and converts sequentially, choosing the smaller PNG', async () => {
     const env = await runtime(await fixture(2));
@@ -699,8 +731,7 @@ describe('runtime loading and conversion lifecycle', () => {
   });
 
   it('renders generated PDFs with the real pdf.js renderer and native test canvases', async () => {
-    const pdfRequire = createRequire(require.resolve('pdfjs-dist/package.json'));
-    const { createCanvas } = pdfRequire('@napi-rs/canvas');
+    const { createCanvas } = require('@napi-rs/canvas');
     const canvases: HTMLCanvasElement[] = [];
     vi.stubGlobal('document', {
       createElement: () => {
@@ -737,7 +768,7 @@ describe('runtime loading and conversion lifecycle', () => {
       [350, 150],
       [350, 150],
     ]);
-    const { loadImage } = pdfRequire('@napi-rs/canvas');
+    const { loadImage } = require('@napi-rs/canvas');
     for (const { image } of result.slides) {
       const decoded = await loadImage(Buffer.from(await image.arrayBuffer()));
       expect([decoded.width, decoded.height]).toEqual([1600, 1000]);

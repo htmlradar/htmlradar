@@ -25,8 +25,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const templatePath = resolve(__dirname, 'onboarding-email-cards.html');
 const outputDir = resolve(__dirname, '..', 'public', 'brand', 'email');
 
+const outreachDir = resolve(outputDir, 'outreach');
+
 async function main() {
   await mkdir(outputDir, { recursive: true });
+  await mkdir(outreachDir, { recursive: true });
   const browser = await chromium.launch();
   try {
     const ctx = await browser.newContext({
@@ -48,9 +51,14 @@ async function main() {
       const card = cards.nth(i);
       const id = await card.getAttribute('id');
       if (!id) throw new Error(`card ${i} has no id; it names the output file`);
-      const out = resolve(outputDir, `${id}.png`);
+      // outreach-report-<slug> cards are sample decks for the outreach lane,
+      // served from public/brand/email/outreach/<slug>.png instead.
+      const outreachSlug = id.match(/^outreach-report-(.+)$/)?.[1];
+      const out = outreachSlug
+        ? resolve(outreachDir, `${outreachSlug}.png`)
+        : resolve(outputDir, `${id}.png`);
       await card.screenshot({ path: out });
-      console.log(`  ${id}.png`);
+      console.log(`  ${outreachSlug ? `outreach/${outreachSlug}` : id}.png`);
     }
     console.log(`${count} onboarding e-mail cards written -> ${outputDir}`);
   } finally {

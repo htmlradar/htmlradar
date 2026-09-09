@@ -274,6 +274,82 @@
         text-transform: uppercase;
         color: var(--graphite);
       }
+      /* ---- outreach report card: one deck, three recipients ---- */
+      .orecipients {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        margin-top: 22px;
+      }
+      .orecipient {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .oravatar {
+        width: 40px;
+        height: 40px;
+        flex: none;
+        border-radius: 999px;
+        background: var(--paper-2);
+        color: var(--signal-dark);
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .oname {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .ostats {
+        margin-top: 3px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 13px;
+        color: var(--graphite);
+      }
+      .otable {
+        margin-top: 24px;
+      }
+      .orow {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 13px;
+      }
+      .orow .onm {
+        width: 230px;
+        flex: none;
+        font-size: 16px;
+        line-height: 1.25;
+        color: var(--ink-soft);
+      }
+      .ocell {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .ocell .otrack {
+        height: 7px;
+        border-radius: 99px;
+        background: var(--paper-2);
+        overflow: hidden;
+      }
+      .ocell .ofill {
+        height: 100%;
+        border-radius: 99px;
+        background: var(--signal-dark);
+      }
+      .ocell .ot {
+        text-align: center;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 13px;
+        color: var(--graphite);
+      }
     </style>
   </head>
   <body>
@@ -473,6 +549,346 @@
           </div>
         </div>
         <div class="rfoot">Sample data</div>
+      </div>
+    </div>
+
+    <!-- 7-9. Outreach report cards: one deck sent to three recipients -->
+    <div class="card report" id="outreach-report-agencysr-global-cities">
+      <div class="rshell">
+        <div class="rtop">
+          <span>htmlradar.page / r / agencysr-global-cities</span>
+          <span class="live">&#9679; Sent to 3 recipients</span>
+        </div>
+        <div class="rtitle">Global Cities</div>
+        <div class="rrule"></div>
+        <div class="orecipients">
+          <div class="orecipient">
+            <div class="oravatar">N</div>
+            <div>
+              <div class="oname">Northgate Capital</div>
+              <div class="ostats">3 opens &middot; 4m 36s active</div>
+            </div>
+          </div>
+          <div class="orecipient">
+            <div class="oravatar">H</div>
+            <div>
+              <div class="oname">Harbour &amp; Co</div>
+              <div class="ostats">2 opens &middot; 3m 15s active</div>
+            </div>
+          </div>
+          <div class="orecipient">
+            <div class="oravatar">M</div>
+            <div>
+              <div class="oname">M. Okafor</div>
+              <div class="ostats">1 open &middot; 46s active</div>
+            </div>
+          </div>
+        </div>
+        <div class="otable">
+          <div class="label" style="margin-bottom: 16px">Time spent per section</div>
+          <div class="orow">
+            <div class="onm">Global Research Reports</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 71%"></div></div>
+              <div class="ot">58s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 100%"></div></div>
+              <div class="ot">1m 22s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 56%"></div></div>
+              <div class="ot">46s</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">The Project</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 87%"></div></div>
+              <div class="ot">1m 11s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 84%"></div></div>
+              <div class="ot">1m 9s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">Covers &mdash; Global Cities</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 78%"></div></div>
+              <div class="ot">1m 4s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 54%"></div></div>
+              <div class="ot">44s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">New Tech City</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 63%"></div></div>
+              <div class="ot">52s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">Contents</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 38%"></div></div>
+              <div class="ot">31s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+        </div>
+        <div class="rfoot">Sample numbers &middot; your sections</div>
+      </div>
+    </div>
+
+    <div class="card report" id="outreach-report-verdanabold-gen-z">
+      <div class="rshell">
+        <div class="rtop">
+          <span>htmlradar.page / r / verdanabold-gen-z</span>
+          <span class="live">&#9679; Sent to 3 recipients</span>
+        </div>
+        <div class="rtitle">The ABCs of Gen Z</div>
+        <div class="rrule"></div>
+        <div class="orecipients">
+          <div class="orecipient">
+            <div class="oravatar">N</div>
+            <div>
+              <div class="oname">Northgate Capital</div>
+              <div class="ostats">3 opens &middot; 4m 25s active</div>
+            </div>
+          </div>
+          <div class="orecipient">
+            <div class="oravatar">H</div>
+            <div>
+              <div class="oname">Harbour &amp; Co</div>
+              <div class="ostats">2 opens &middot; 2m 17s active</div>
+            </div>
+          </div>
+          <div class="orecipient">
+            <div class="oravatar">M</div>
+            <div>
+              <div class="oname">M. Okafor</div>
+              <div class="ostats">1 open &middot; 22s active</div>
+            </div>
+          </div>
+        </div>
+        <div class="otable">
+          <div class="label" style="margin-bottom: 16px">Time spent per section</div>
+          <div class="orow">
+            <div class="onm">hello!</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 50%"></div></div>
+              <div class="ot">34s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 59%"></div></div>
+              <div class="ot">40s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 32%"></div></div>
+              <div class="ot">22s</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">who is gen Z?</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 90%"></div></div>
+              <div class="ot">1m 1s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 85%"></div></div>
+              <div class="ot">58s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">why gen Zs matter</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 100%"></div></div>
+              <div class="ot">1m 8s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 57%"></div></div>
+              <div class="ot">39s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">social media unites vs. divides</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 81%"></div></div>
+              <div class="ot">55s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">the creator economy is real</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 69%"></div></div>
+              <div class="ot">47s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+        </div>
+        <div class="rfoot">Sample numbers &middot; your sections</div>
+      </div>
+    </div>
+
+    <div class="card report" id="outreach-report-studiostorm-capabilities">
+      <div class="rshell">
+        <div class="rtop">
+          <span>htmlradar.page / r / studiostorm-capabilities</span>
+          <span class="live">&#9679; Sent to 3 recipients</span>
+        </div>
+        <div class="rtitle">Studio Storm Capabilities</div>
+        <div class="rrule"></div>
+        <div class="orecipients">
+          <div class="orecipient">
+            <div class="oravatar">N</div>
+            <div>
+              <div class="oname">Northgate Capital</div>
+              <div class="ostats">3 opens &middot; 3m 56s active</div>
+            </div>
+          </div>
+          <div class="orecipient">
+            <div class="oravatar">H</div>
+            <div>
+              <div class="oname">Harbour &amp; Co</div>
+              <div class="ostats">2 opens &middot; 1m 57s active</div>
+            </div>
+          </div>
+          <div class="orecipient">
+            <div class="oravatar">M</div>
+            <div>
+              <div class="oname">M. Okafor</div>
+              <div class="ostats">1 open &middot; 18s active</div>
+            </div>
+          </div>
+        </div>
+        <div class="otable">
+          <div class="label" style="margin-bottom: 16px">Time spent per section</div>
+          <div class="orow">
+            <div class="onm">Welcome</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 24%"></div></div>
+              <div class="ot">21s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 30%"></div></div>
+              <div class="ot">26s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 20%"></div></div>
+              <div class="ot">18s</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">Purpose</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 51%"></div></div>
+              <div class="ot">45s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 58%"></div></div>
+              <div class="ot">51s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">Disciplines</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 72%"></div></div>
+              <div class="ot">1m 3s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 45%"></div></div>
+              <div class="ot">40s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">Selected Clients</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 100%"></div></div>
+              <div class="ot">1m 28s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+          <div class="orow">
+            <div class="onm">Thank You</div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 22%"></div></div>
+              <div class="ot">19s</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+            <div class="ocell">
+              <div class="otrack"><div class="ofill" style="width: 0"></div></div>
+              <div class="ot">&ndash;</div>
+            </div>
+          </div>
+        </div>
+        <div class="rfoot">Sample numbers &middot; your sections</div>
       </div>
     </div>
   </body>

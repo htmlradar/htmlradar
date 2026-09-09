@@ -657,7 +657,8 @@ function extractSlideTitle(el: HTMLElement, ord: number): string {
   return `Slide ${ord}`;
 }
 
-function isMetaPattern(text: string): boolean {
+// Shared with the PDF converter: generated labels must survive discovery.
+export function isMetaPattern(text: string): boolean {
   const t = text.trim();
   if (!t) return true;
   if (/^\d{1,3}\s*[/—-]\s*\d{1,3}$/.test(t)) return true;

@@ -17,7 +17,8 @@
 // does.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SectionTracker } from '../src/sections-v2.js';
+import { isMetaPattern, SectionTracker } from '../src/sections-v2.js';
+import { DEFAULTS } from '../src/config.js';
 
 const VIEWPORT = 800;
 const HEADING_HEIGHT = 40;
@@ -344,5 +345,46 @@ describe('slide decks are unaffected', () => {
       expect(time[id], `slide ${id}`).toBeGreaterThan(3.5);
       expect(time[id], `slide ${id}`).toBeLessThanOrEqual(4.25);
     }
+  });
+});
+
+describe('converted PDF decks', () => {
+  it('discovers every numbered slide and measures images and the final credit', () => {
+    const titles = ['Slide 1: Company overview', 'Slide 2: Untitled', 'Slide 3: 日本語の紹介'];
+    document.body.innerHTML = `<main>${titles
+      .map(
+        (title, i) => `
+      <section class="slide" style="position:relative">
+        <h2 id="slide-${i + 1}" style="position:absolute;top:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">${title}</h2>
+        <img width="1600" height="1280" alt="Image of slide ${i + 1}; text is not selectable" src="data:image/png;base64,AA==">
+        ${i === 2 ? '<p id="credit">Converted with HTMLRadar.</p>' : ''}
+      </section>`,
+      )
+      .join('')}</main>`;
+    document.querySelectorAll<HTMLElement>('section.slide').forEach((section, i) => {
+      place(section, i * 1280, 1280 + (i === 2 ? 24 : 0));
+      place(section.querySelector('h2')!, i * 1280, 1);
+      place(section.querySelector('img')!, i * 1280, 1280);
+    });
+    place(document.getElementById('credit')!, 3 * 1280, 24);
+    const t = new SectionTracker({ ...DEFAULTS.sections, minDwellMs: 500 });
+    t.start();
+    for (let i = 0; i < 3; i++) {
+      scrollTo(i * 1280 + 400); // The clipped heading has left the viewport.
+      advance(5000);
+    }
+    expect(t.snapshot().map(({ id, title, depth }) => ({ id, title, depth }))).toEqual(
+      titles.map((title, i) => ({ id: `slide-${i + 1}`, title, depth: 2 })),
+    );
+    for (const title of titles) expect(isMetaPattern(title)).toBe(false);
+    expect(isMetaPattern('Slide 2')).toBe(true);
+    for (const time of Object.values(timeById(t))) expect(time).toBeGreaterThan(3.5);
+    // At exactly half a viewport, including the credit makes the last
+    // range qualify; an image-only range would leave just 376 px visible.
+    const before = timeById(t)['slide-3']!;
+    scrollTo(3 * 1280 - 376);
+    advance(2000);
+    expect(timeById(t)['slide-3']).toBeGreaterThan(before);
+    t.stop();
   });
 });

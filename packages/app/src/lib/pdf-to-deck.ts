@@ -1,11 +1,11 @@
 import type { PDFDocumentProxy, PDFPageProxy, TextContent } from 'pdfjs-dist/types/src/display/api';
 import type { PageViewport } from 'pdfjs-dist/types/src/display/page_viewport';
-import { version as pdfjsVersion } from 'pdfjs-dist/package.json';
+import pdfjsPackage from 'pdfjs-dist/package.json';
 import { isMetaPattern } from '../../../tracker/src/sections-v2';
 
 export const MAX_PDF_BYTES = 30 * 1024 * 1024;
 export const MAX_DECK_BYTES = 20 * 1024 * 1024;
-export const PDFJS_BASE_URL = `/pdfjs/${pdfjsVersion}/`;
+export const PDFJS_BASE_URL = `/pdfjs/${pdfjsPackage.version}/`;
 const WIDTH = 1600;
 const MAX_HEIGHT = 1280;
 const MAX_PIXELS = WIDTH * MAX_HEIGHT;
@@ -85,8 +85,13 @@ export async function loadPdfJs(): Promise<PdfJs> {
   return pdfjs;
 }
 
+export function downloadFilename(name: string): string {
+  const stem = cleanText(name.replace(/\.pdf$/i, '').replace(/[\\/"'<>:|?*\p{Cc}]/gu, ''));
+  return `${truncate(stem, 180) || 'deck'}.html`;
+}
+
 export function validatePdfFile(file: Pick<File, 'name' | 'type' | 'size'>): void {
-  if (file.size >= MAX_PDF_BYTES) throw new PdfDeckError('size');
+  if (file.size > MAX_PDF_BYTES) throw new PdfDeckError('size');
   if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')
     throw new PdfDeckError('format');
 }
@@ -286,13 +291,17 @@ function escapeHtml(text: string): string {
 
 function htmlStart(filename: string): string {
   const title = truncate(cleanText(filename.replace(/\.pdf$/i, '')), 200) || 'Untitled deck';
-  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#fff}main{max-width:1600px;margin:0 auto}.slide{position:relative}.slide h2{position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap}.slide img{display:block;width:100%;height:auto}.credit{margin:0;padding:8px 12px;font:12px sans-serif}</style></head><body><main>`;
+  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#fff}main{max-width:1600px;margin:0 auto}.slide{position:relative}.slide h2{position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap}.slide img{display:block;width:100%;height:auto}nav{padding:16px;font:16px/1.5 sans-serif}nav ol{margin:8px 0 0;padding-left:24px}nav a{color:#5a1521}nav a:focus-visible{outline:2px solid #7a1f2e;outline-offset:3px}.credit{margin:0;padding:8px 12px;font:12px sans-serif}</style></head><body><main>`;
 }
 
 const HTML_END = '</main></body></html>';
 
+function contentsHtml(titles: string[]): string {
+  return `<nav aria-label="Table of contents"><strong>Contents</strong><ol>${titles.map((title, i) => `<li><a href="#slide-${i + 1}" dir="auto">${escapeHtml(title)}</a></li>`).join('')}</ol></nav>`;
+}
+
 function sectionHtml(slide: DeckSlide, index: number, last: boolean, data: string): string {
-  return `<section class="slide"><h2 id="slide-${index + 1}" dir="auto">${escapeHtml(slide.title)}</h2><img src="${data}" width="${slide.width}" height="${slide.height}" alt="Image of slide ${index + 1}; text is not selectable"${index ? ' loading="lazy"' : ''}>${last ? '<p class="credit">Converted with HTMLRadar.</p>' : ''}</section>`;
+  return `<section class="slide"><h2 id="slide-${index + 1}" dir="auto">${escapeHtml(slide.title)}</h2><img src="${data}" width="${slide.width}" height="${slide.height}" alt="Image of slide ${index + 1}; text is not selectable."${index ? ' loading="lazy"' : ''}>${last ? '<p class="credit">Converted with HTMLRadar.</p>' : ''}</section>`;
 }
 
 function dataPrefix(image: Blob): string {
@@ -334,7 +343,8 @@ export async function assembleDeckHtml(
   signal?: AbortSignal,
 ): Promise<Blob> {
   checkCancelled(signal);
-  let bytes = new TextEncoder().encode(htmlStart(filename) + HTML_END).byteLength;
+  const contents = contentsHtml(slides.map((slide) => slide.title));
+  let bytes = new TextEncoder().encode(htmlStart(filename) + contents + HTML_END).byteLength;
   for (const [i, slide] of slides.entries()) {
     if (
       !Number.isInteger(slide.width) ||
@@ -347,7 +357,7 @@ export async function assembleDeckHtml(
     bytes += sectionBytes(slide, i, i === slides.length - 1);
     withinOutputLimit(bytes);
   }
-  const parts: BlobPart[] = [htmlStart(filename)];
+  const parts: BlobPart[] = [htmlStart(filename), contents];
   for (const [i, slide] of slides.entries()) {
     const buffer = new Uint8Array(await withAbort(slide.image.arrayBuffer(), signal));
     // Chunk the conversion so spread never exceeds the JS argument limit.
@@ -495,7 +505,13 @@ export async function convertPdfToDeck(file: File, options: PdfDeckOptions = {})
     const pdf = await withAbort(loading.promise, signal);
     const admission = await admitPdf(pdf, signal);
     const slides: DeckSlide[] = [];
-    let bytes = new TextEncoder().encode(htmlStart(file.name) + HTML_END).byteLength;
+    // Count the smallest possible TOC labels now; final assembly counts the
+    // exact escaped title bytes in both the TOC and the slide headings.
+    let bytes = new TextEncoder().encode(
+      htmlStart(file.name) +
+        contentsHtml(Array.from({ length: pdf.numPages }, (_, i) => `Slide ${i + 1}: `)) +
+        HTML_END,
+    ).byteLength;
     for (let number = 1; number <= pdf.numPages; number++) {
       checkCancelled(signal);
       options.onProgress?.({ phase: 'rendering', page: number, total: pdf.numPages });
@@ -515,7 +531,7 @@ export async function convertPdfToDeck(file: File, options: PdfDeckOptions = {})
         }
         const output = page.getViewport({ scale: WIDTH / viewport.width });
         const height = Math.round(output.height);
-        if (height > MAX_HEIGHT || WIDTH * height > MAX_PIXELS) throw new PdfDeckError('aspect');
+        if (height > MAX_HEIGHT || WIDTH * height > MAX_PIXELS) throw new PdfDeckError('sizes');
         canvas = document.createElement('canvas');
         canvas.width = WIDTH;
         canvas.height = height;
@@ -568,7 +584,7 @@ export async function convertPdfToDeck(file: File, options: PdfDeckOptions = {})
     checkCancelled(signal);
     return {
       html,
-      filename: `${cleanText(file.name.replace(/\.pdf$/i, '')) || 'deck'}.html`,
+      filename: downloadFilename(file.name),
       bytes: html.size,
       slides,
     };

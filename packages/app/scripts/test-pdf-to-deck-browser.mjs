@@ -122,7 +122,8 @@ try {
     [...document.images].every((image) => image.complete && image.naturalWidth === 1600),
   );
   assert.equal(await output.locator('section.slide').count(), 4);
-  assert.equal(await output.locator('script,a,iframe,link').count(), 0);
+  assert.equal(await output.locator('script,iframe,link').count(), 0);
+  assert.equal(await output.locator('nav a[href^="#slide-"]').count(), 4);
   const boxes = await output.locator('section.slide').evaluateAll((sections) =>
     sections.map((section) => {
       const heading = section.querySelector('h2').getBoundingClientRect();

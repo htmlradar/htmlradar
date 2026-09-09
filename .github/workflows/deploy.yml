@@ -254,11 +254,10 @@ jobs:
           fi
           echo "All smoke checks passed."
 
-      - name: Verify the deployed converter assets and browser worker
+      - name: Verify the deployed converter page and JavaScript assets
         env:
           PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
         run: |
-          pnpm --filter @htmlradar/app exec playwright install --with-deps chromium
           pnpm --filter @htmlradar/app exec node scripts/smoke-pdfjs.mjs "$PREVIEW_URL"
 
       # Same retry pattern as the preview step. This is the worse of the

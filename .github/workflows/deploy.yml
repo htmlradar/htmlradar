@@ -67,7 +67,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
 
       - name: Install
@@ -253,6 +253,13 @@ jobs:
             exit 1
           fi
           echo "All smoke checks passed."
+
+      - name: Verify the deployed converter assets and browser worker
+        env:
+          PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
+        run: |
+          pnpm --filter @htmlradar/app exec playwright install --with-deps chromium
+          pnpm --filter @htmlradar/app exec node scripts/smoke-pdfjs.mjs "$PREVIEW_URL"
 
       # Same retry pattern as the preview step. This is the worse of the
       # two failure modes — preview already passed smoke, so a transient

@@ -276,13 +276,12 @@
       }
       /* ---- outreach report card: one deck, three recipients ---- */
       .orecipients {
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
+        display: grid;
+        grid-template-columns: 230px 1fr 1fr 1fr;
+        column-gap: 16px;
         margin-top: 22px;
       }
       .orecipient {
-        flex: 1;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -315,20 +314,18 @@
         margin-top: 24px;
       }
       .orow {
-        display: flex;
+        display: grid;
+        grid-template-columns: 230px 1fr 1fr 1fr;
+        column-gap: 16px;
         align-items: center;
-        gap: 16px;
         margin-bottom: 13px;
       }
       .orow .onm {
-        width: 230px;
-        flex: none;
         font-size: 16px;
         line-height: 1.25;
         color: var(--ink-soft);
       }
       .ocell {
-        flex: 1;
         display: flex;
         flex-direction: column;
         gap: 5px;
@@ -562,6 +559,7 @@
         <div class="rtitle">Global Cities</div>
         <div class="rrule"></div>
         <div class="orecipients">
+          <div></div>
           <div class="orecipient">
             <div class="oravatar">N</div>
             <div>
@@ -675,6 +673,7 @@
         <div class="rtitle">The ABCs of Gen Z</div>
         <div class="rrule"></div>
         <div class="orecipients">
+          <div></div>
           <div class="orecipient">
             <div class="oravatar">N</div>
             <div>
@@ -788,6 +787,7 @@
         <div class="rtitle">Studio Storm Capabilities</div>
         <div class="rrule"></div>
         <div class="orecipients">
+          <div></div>
           <div class="orecipient">
             <div class="oravatar">N</div>
             <div>

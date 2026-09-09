@@ -1,4 +1,4 @@
-// /tools index. The three free tools, one line each. Exists so "Tools" in
+// /tools index. The four free tools, one line each. Exists so "Tools" in
 // the header and footer has a single target instead of pointing at one of
 // the three tools and hoping the visitor finds the other two.
 
@@ -14,7 +14,7 @@ export const runtime = 'edge';
 export const metadata = pageMeta({
   title: 'Free Tools | HTMLRadar',
   description:
-    'Free tools from HTMLRadar: turn an HTML file into a shareable link, share a Claude artifact as a link, or save a Claude artifact as a PDF.',
+    'Free tools from HTMLRadar: turn an HTML file into a shareable link, share a Claude artifact as a link, save a Claude artifact as a PDF, or turn a PDF deck into a web page.',
   path: '/tools',
 });
 
@@ -33,6 +33,12 @@ const TOOLS = [
     href: '/tools/claude-artifact-to-pdf',
     title: 'Claude artifact to PDF',
     description: 'Save a Claude artifact as a PDF you can attach or print.',
+  },
+  {
+    href: '/convert',
+    title: 'PDF deck to web page',
+    description:
+      'Turn a landscape PDF deck into a downloadable HTML page, with an optional tracked link.',
   },
 ];
 

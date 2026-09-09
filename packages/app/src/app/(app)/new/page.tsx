@@ -35,6 +35,12 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         Excel, and ZIPs ride along as downloadable files once the HTML is up.
       </p>
 
+      <p className="mt-4 text-[14px] text-signal-dark">
+        <a href="/convert" className="underline underline-offset-4">
+          Have a PDF? Turn it into a web page first.
+        </a>
+      </p>
+
       {uploadError ? (
         <p className="mt-6 rounded-md border border-signal/30 bg-signal/5 px-4 py-3 text-[14px] leading-relaxed text-signal-dark">
           That upload didn&apos;t go through: {uploadError}

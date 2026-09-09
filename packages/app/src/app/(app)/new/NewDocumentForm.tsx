@@ -33,6 +33,7 @@ interface NewDocumentFormProps {
 export function NewDocumentForm({ action, initialMode = 'upload' }: NewDocumentFormProps) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [pdfRejected, setPdfRejected] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [urlValue, setUrlValue] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -128,7 +129,11 @@ export function NewDocumentForm({ action, initialMode = 'upload' }: NewDocumentF
             <UploadPanel
               fileName={fileName}
               fileError={fileError}
+              pdfRejected={pdfRejected}
               onFileChange={(file) => {
+                setPdfRejected(
+                  Boolean(file && (/\.pdf$/i.test(file.name) || file.type === 'application/pdf')),
+                );
                 if (!file) {
                   setFileName(null);
                   setFileError(null);
@@ -235,10 +240,12 @@ function SegmentButton({
 function UploadPanel({
   fileName,
   fileError,
+  pdfRejected,
   onFileChange,
 }: {
   fileName: string | null;
   fileError: string | null;
+  pdfRejected: boolean;
   onFileChange: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -332,6 +339,13 @@ function UploadPanel({
           }}
         />
       </div>
+      {fileError && pdfRejected && (
+        <p className="mt-3 text-[13px] text-signal-dark">
+          <a href="/convert" className="underline underline-offset-4">
+            Have a PDF? Turn it into a web page first.
+          </a>
+        </p>
+      )}
       {fileError && (
         <p className="mt-3 inline-flex items-start gap-2 text-[13px] text-alert">
           <AlertCircle aria-hidden className="mt-0.5 size-3.5 shrink-0" />

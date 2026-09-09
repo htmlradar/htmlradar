@@ -156,7 +156,16 @@ export async function createDocumentForUser(
   userId: string,
   title: string,
   source: DocumentSource,
+  clientCreationId?: string,
 ): Promise<string> {
+  if (
+    clientCreationId &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      clientCreationId,
+    )
+  ) {
+    throw new Error('Invalid creation identifier');
+  }
   const docId = crypto.randomUUID();
 
   if (source.type === 'url') {
@@ -209,8 +218,24 @@ export async function createDocumentForUser(
     r2_key: key,
     screen_score: screen.score,
     screen_signals: screen.signals,
+    ...(clientCreationId ? { client_creation_id: clientCreationId } : {}),
   });
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) {
+    if (clientCreationId && insertError.code === '23505') {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, client_upload_complete')
+        .eq('owner_id', userId)
+        .eq('client_creation_id', clientCreationId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data?.client_upload_complete) return data.id as string;
+      // The first request may still be uploading. Never claim success for a
+      // row alone, and never run a second upload against that in-flight row.
+      throw new Error('Upload not confirmed');
+    }
+    throw new Error(insertError.message);
+  }
 
   try {
     await uploadHtml(key, source.bytes);
@@ -236,5 +261,21 @@ export async function createDocumentForUser(
   // an operator to look at. The captured event above has no foreign key and
   // survives, so the attempt is still visible on /admin/events.
   await flagIfHighScore(docId, userId, screen);
+  if (clientCreationId) {
+    const { error } = await supabase
+      .from('documents')
+      .update({ client_upload_complete: true })
+      .eq('id', docId)
+      .eq('owner_id', userId);
+    if (error) throw new Error(error.message);
+    // A conflict returns above, so recovering a lost response does not count
+    // as another creation. The older dashboard/API callers emit their own.
+    await captureServerEvent({
+      event: 'document.created',
+      distinctId: userId,
+      userId,
+      properties: { source_type: 'upload', doc_id: docId },
+    });
+  }
   return docId;
 }

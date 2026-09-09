@@ -90,6 +90,7 @@ beforeEach(() => {
 afterEach(async () => {
   await settle(() => root.unmount());
   host.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -103,15 +104,82 @@ describe('converter page states', () => {
     expect(host.textContent).toContain(
       'Slides become pictures: text is not selectable or fully accessible to screen readers, links and comments are removed, and fonts, colours and detected titles may differ.',
     );
-    expect(host.textContent).toContain(
-      'If Safari closed the page, try a smaller deck or use a computer.',
-    );
+    expect(host.textContent).toContain('Only convert and share decks you have permission to use.');
     await choose([new File(['pdf'], 'a.pdf'), new File(['pdf'], 'b.pdf')]);
     expect(host.textContent).toContain('Choose one PDF at a time.');
     expect(button('Choose another PDF')).toBeDefined();
     expect(convertPdfToDeck).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(host.querySelector('[role="alert"]'));
   });
+  it.each([
+    ['iPhone Safari', 'iPhone Version/18.0 Mobile Safari/604.1', 'iPhone', 5, true],
+    ['iPad Safari', 'iPad Version/18.0 Mobile Safari/604.1', 'iPad', 5, true],
+    ['iPad desktop mode', 'Macintosh Version/18.0 Safari/605.1', 'MacIntel', 5, true],
+    ['desktop Safari', 'Macintosh Version/18.0 Safari/605.1', 'MacIntel', 0, false],
+    ['iPhone Chrome', 'iPhone CriOS/140.0 Mobile Safari/604.1', 'iPhone', 5, false],
+    ['iPhone Firefox', 'iPhone FxiOS/140.0 Mobile Safari/604.1', 'iPhone', 5, false],
+    ['iPhone Edge', 'iPhone EdgiOS/140.0 Mobile Safari/604.1', 'iPhone', 5, false],
+    ['Android Chrome', 'Android Chrome/140.0 Mobile Safari/537.36', 'Linux', 5, false],
+  ])(
+    'limits Safari help to iOS Safari: %s',
+    async (_name, userAgent, platform, maxTouchPoints, shown) => {
+      vi.stubGlobal('navigator', { userAgent, platform, maxTouchPoints });
+      vi.mocked(convertPdfToDeck).mockResolvedValue(makeDeck());
+      await render();
+      expect(host.textContent?.includes('If Safari closed the page')).toBe(shown);
+      await choose([new File(['pdf'], 'a.pdf')]);
+      expect(host.textContent?.includes('Use Share, then Save to Files.')).toBe(shown);
+    },
+  );
+  it('keeps a completed download and explains a staging read failure', async () => {
+    vi.mocked(convertPdfToDeck).mockResolvedValue(makeDeck());
+    vi.spyOn(File.prototype, 'text').mockRejectedValue(new Error('Memory exhausted'));
+    await render();
+    await choose([new File(['pdf'], 'a.pdf')]);
+    expect(host.textContent).toContain('Your HTML file is ready.');
+    expect(host.textContent).toContain(HANDOFF_MESSAGES.storage);
+    expect(host.textContent).not.toContain('We couldn’t read this PDF');
+    expect(host.querySelector('a[download]')?.getAttribute('href')).toMatch(/^blob:/);
+    expect(host.querySelectorAll('img')).toHaveLength(1);
+    expect(button('Get a tracked link').disabled).toBe(true);
+  });
+  it('ignores a late staging failure after choosing another PDF', async () => {
+    vi.mocked(convertPdfToDeck).mockResolvedValue(makeDeck());
+    let fail!: (error: Error) => void;
+    vi.spyOn(File.prototype, 'text').mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        }),
+    );
+    await render();
+    await choose([new File(['pdf'], 'a.pdf')]);
+    await settle(() => button('Choose another PDF').click());
+    await settle(() => fail(new Error('Late read failure')));
+    expect(host.textContent).not.toContain(HANDOFF_MESSAGES.storage);
+    expect(host.textContent).not.toContain('Your HTML file is ready.');
+  });
+  it.each([
+    '<main>Old saved format</main>',
+    '<main><section class="slide"><h2 id="slide-1">Title</h2><img src="data:image/png;base64,A" width="1600" height="1000"></section><section class="slide"></section></main>',
+  ])(
+    'explains a saved deck that returns null or throws during preview restoration',
+    async (contents) => {
+      await stageFile({
+        name: 'deck.html',
+        contents,
+        type: 'text/html',
+        path: '/convert',
+        stagedAt: Date.now(),
+        token: 'unreadable',
+      });
+      await render({ resumeToken: 'unreadable' });
+      await waitFor(() => expect(host.textContent).toContain(HANDOFF_MESSAGES.missing));
+      expect(host.querySelector('input[aria-label="Choose a PDF deck"]')).not.toBeNull();
+      expect(action).not.toHaveBeenCalled();
+      expect(host.querySelector('a[download]')).toBeNull();
+    },
+  );
   it('announces progress, shows the first preview, and ignores late completion after Cancel', async () => {
     let finish!: (deck: PdfDeck) => void;
     let options!: PdfDeckOptions;
@@ -206,6 +274,11 @@ describe('converter page states', () => {
       ),
     );
     expect(host.querySelectorAll('tbody tr')).toHaveLength(5);
+    const times = [...host.querySelectorAll('tbody td > span:first-child')].map(
+      (cell) => cell.textContent,
+    );
+    expect(times.filter((time) => time === '—')).toHaveLength(6);
+    expect(times).not.toContain('0s');
     const headers = [...host.querySelectorAll('thead th')].slice(1);
     expect(headers.map((h) => h.textContent)).toEqual([
       'Northgate Capital3 opens4m 36s',

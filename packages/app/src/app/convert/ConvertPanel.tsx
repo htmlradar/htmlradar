@@ -11,7 +11,7 @@ import {
   type DeckSlide,
   type PdfDeck,
 } from '@/lib/pdf-to-deck';
-import { useStagedHandoff, type HandoffAction } from '@/lib/staged-handoff';
+import { HANDOFF_MESSAGES, useStagedHandoff, type HandoffAction } from '@/lib/staged-handoff';
 import { SampleReport } from './SampleReport';
 
 type State = 'empty' | 'dragging' | 'rejected' | 'converting' | 'done' | 'error';
@@ -72,7 +72,7 @@ export function ConvertPanel({
   const [total, setTotal] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [safari, setSafari] = useState(false);
+  const [iosSafari, setIosSafari] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const focus = useRef<HTMLDivElement>(null);
   const controller = useRef<AbortController | null>(null);
@@ -84,9 +84,11 @@ export function ConvertPanel({
   const slide = deck?.slides[page] ?? firstSlide;
 
   useEffect(() => {
-    setSafari(
-      /Safari/.test(navigator.userAgent) &&
-        !/Chrome|Chromium|CriOS|Android/.test(navigator.userAgent),
+    setIosSafari(
+      (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) &&
+        /Safari/.test(navigator.userAgent) &&
+        !/Chrome|Chromium|CriOS|FxiOS|EdgiOS|OPiOS|Android/.test(navigator.userAgent),
     );
     return () => {
       generation.current++;
@@ -119,12 +121,15 @@ export function ConvertPanel({
     restoring.current = true;
     try {
       const result = restoreConvertedDeck(handoff.file.contents, handoff.file.name);
-      if (!result) return;
+      if (!result) {
+        setMessage(HANDOFF_MESSAGES.missing);
+        return;
+      }
       setDeck(result);
       setTotal(result.slides.length);
       setState('done');
     } catch {
-      /* Keep the saved file for upload; offer choosing a PDF again. */
+      setMessage(HANDOFF_MESSAGES.missing);
     }
   }, [handoff.file, handoff.restored]);
 
@@ -180,7 +185,11 @@ export function ConvertPanel({
       setTotal(result.slides.length);
       setState('done');
       void captureClientEvent('converter.completed');
-      await handoff.replaceFile(new File([result.html], result.filename, { type: 'text/html' }));
+      try {
+        await handoff.replaceFile(new File([result.html], result.filename, { type: 'text/html' }));
+      } catch {
+        if (attempt === generation.current) setMessage(HANDOFF_MESSAGES.storage);
+      }
     } catch (error) {
       if (attempt !== generation.current) return;
       const code = error instanceof PdfDeckError ? error.code : 'damaged';
@@ -257,9 +266,11 @@ export function ConvertPanel({
                 Or drop one here. Landscape slides, 2–60 pages, up to 30 MB.
               </span>
             </button>
-            <p className="mt-4 text-[12px] leading-relaxed text-ink-soft">
-              If Safari closed the page, try a smaller deck or use a computer.
-            </p>
+            {iosSafari && (
+              <p className="mt-4 text-[12px] leading-relaxed text-ink-soft">
+                If Safari closed the page, try a smaller deck or use a computer.
+              </p>
+            )}
           </>
         )}
         <div
@@ -282,9 +293,10 @@ export function ConvertPanel({
                 {deck.slides.length} slides · {(deck.bytes / 1024 / 1024).toFixed(1)} MB.
               </p>
             </div>
-          ) : message ? (
-            <p className="mt-3 text-[14px] leading-relaxed text-signal-dark">{message}</p>
           ) : null}
+          {message && (
+            <p className="mt-3 text-[14px] leading-relaxed text-signal-dark">{message}</p>
+          )}
         </div>
         {previewUrl && slide && (state === 'converting' || state === 'done') && (
           <figure className="mt-6">
@@ -361,7 +373,7 @@ export function ConvertPanel({
                   <ArrowDownToLine aria-hidden className="size-4" />
                   Download HTML
                 </a>
-                {safari && (
+                {iosSafari && (
                   <p className="mt-2 text-[12px] text-ink-soft">Use Share, then Save to Files.</p>
                 )}
               </div>
@@ -410,7 +422,7 @@ export function ConvertPanel({
         )}
       </div>
       <p className="mt-4 text-[12px] text-ink-soft">
-        Only convert and share decks you have permission to use
+        Only convert and share decks you have permission to use.
       </p>
     </div>
   );

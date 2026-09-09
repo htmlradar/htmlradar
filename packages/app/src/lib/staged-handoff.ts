@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   clearStagedFile,
@@ -75,16 +75,18 @@ export function useStagedHandoff({
   action,
   resumeToken,
   signedIn,
+  messages = HANDOFF_MESSAGES,
 }: {
   path: string;
   action?: HandoffAction | undefined;
   resumeToken?: string | null;
   signedIn: boolean;
+  messages?: { missing: ReactNode; storage: ReactNode };
 }) {
   const router = useRouter();
   const [file, setFile] = useState<StagedFile | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<ReactNode>(null);
   const [restored, setRestored] = useState(false);
   const current = useRef<StagedFile | null>(null);
   const stored = useRef(false);
@@ -125,7 +127,7 @@ export function useStagedHandoff({
         locked.current = false;
         setBusy(false);
         if (!ready) {
-          setMessage(HANDOFF_MESSAGES.storage);
+          setMessage(messages.storage);
           return;
         }
         remember(ready);
@@ -133,14 +135,14 @@ export function useStagedHandoff({
       } else {
         setMessage(
           result.reason === 'storage'
-            ? HANDOFF_MESSAGES.storage
+            ? messages.storage
             : result.reason === 'missing'
-              ? HANDOFF_MESSAGES.missing
+              ? messages.missing
               : HANDOFF_MESSAGES.uncertain,
         );
       }
     },
-    [action, path, remember, router],
+    [action, messages, path, remember, router],
   );
 
   useEffect(() => {
@@ -150,12 +152,12 @@ export function useStagedHandoff({
       .then(async (waiting) => {
         if (cancelled || generation !== revision.current) return;
         if (!waiting || (waiting.path && waiting.path !== path)) {
-          if (resumeToken) setMessage(HANDOFF_MESSAGES.missing);
+          if (resumeToken) setMessage(messages.missing);
           return;
         }
         // Older tool records without a path are never restored by /convert.
         if (path === '/convert' && waiting.path !== path) {
-          if (resumeToken) setMessage(HANDOFF_MESSAGES.missing);
+          if (resumeToken) setMessage(messages.missing);
           return;
         }
         remember(waiting);
@@ -167,7 +169,7 @@ export function useStagedHandoff({
         }
         if (!resumeToken) return; // A plain visit only restores the preview.
         if (waiting.token !== resumeToken) {
-          setMessage(HANDOFF_MESSAGES.missing);
+          setMessage(messages.missing);
           return;
         }
         if (!signedIn || !action || resumeAttempted.current) return;
@@ -178,12 +180,12 @@ export function useStagedHandoff({
       })
       .catch(() => {
         if (!cancelled && generation === revision.current && resumeToken)
-          setMessage(HANDOFF_MESSAGES.storage);
+          setMessage(messages.storage);
       });
     return () => {
       cancelled = true;
     };
-  }, [action, path, remember, resumeToken, signedIn, upload]);
+  }, [action, messages, path, remember, resumeToken, signedIn, upload]);
 
   // Invalidate synchronously, before reading a replacement's contents. Late
   // reads, worker callbacks and old upload responses cannot restore old UI.
@@ -236,7 +238,7 @@ export function useStagedHandoff({
         if (generation === revision.current) {
           locked.current = false;
           setBusy(false);
-          setMessage(HANDOFF_MESSAGES.storage);
+          setMessage(messages.storage);
         }
         return;
       }

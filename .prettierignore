@@ -1,8 +1,7 @@
-# Build artifact — the minified tracker bundle is copied from
-# packages/tracker/dist at deploy time (see .github/workflows/deploy.yml).
-# Prettier reformatting a minified file only bloats it (it did once:
-# 22 KB -> 29 KB) without changing behavior.
-packages/app/public/v1/tracker.js
+# Public assets include generated tracker bundles and self-hosted pdf.js.
+# Keep copied third-party files byte-for-byte as published.
+packages/app/public/v1/
+packages/app/public/pdfjs/
 
 # Published evidence: raw capture output and the script that produced it, kept
 # byte-for-byte as run so a re-run can be diffed against it.

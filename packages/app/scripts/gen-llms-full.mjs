@@ -40,6 +40,7 @@ const PAGES = [
   '/mcp',
   '/self-hosted',
   '/tools/html-to-link',
+  '/convert',
   '/for/claude-artifacts',
   '/compare/docsend',
   '/blog/what-deck-sharing-tools-record',

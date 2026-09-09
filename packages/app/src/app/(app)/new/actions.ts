@@ -14,6 +14,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
 import { isHtmlFile, validateSourceUrl } from '@/lib/html-source';
+import type { HandoffUploadResult } from '@/lib/staged-handoff';
 import { createDocumentForUser, MAX_UPLOAD_BYTES } from '@/lib/create-document';
 
 export async function createDocument(formData: FormData) {
@@ -80,4 +81,60 @@ export async function createDocument(formData: FormData) {
 
   revalidatePath('/docs');
   redirect(`/docs/${docId}`);
+}
+
+// The tools need a structured outcome: redirect() throws, and cannot tell a
+// browser whether to retain its file after an uncertain network response.
+export async function createStagedDocument(formData: FormData): Promise<HandoffUploadResult> {
+  let userId: string | null = null;
+  const fail = async (reason: 'invalid_file' | 'upload_failed'): Promise<HandoffUploadResult> => {
+    if (userId)
+      await captureServerEvent({
+        event: 'document.upload_failed',
+        distinctId: userId,
+        userId,
+        properties: { source_type: 'upload', reason },
+      });
+    return { ok: false, reason };
+  };
+  try {
+    const supabase = serverClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, reason: 'auth' };
+    userId = user.id;
+    const file = formData.get('file');
+    const creationId = formData.get('creation_id');
+    if (
+      !(file instanceof File) ||
+      !file.size ||
+      file.size > MAX_UPLOAD_BYTES ||
+      !isHtmlFile(file.name, file.type) ||
+      typeof creationId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(creationId)
+    ) {
+      return fail('invalid_file');
+    }
+    const title =
+      String(formData.get('title') ?? '')
+        .trim()
+        .slice(0, 120) || 'Untitled document';
+    const documentId = await createDocumentForUser(
+      supabase,
+      user.id,
+      title,
+      {
+        type: 'upload',
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        filename: file.name,
+      },
+      creationId,
+    );
+    revalidatePath('/docs');
+    return { ok: true, documentId };
+  } catch {
+    // No PDF-derived strings or raw exceptions in analytics or error URLs.
+    return fail('upload_failed');
+  }
 }

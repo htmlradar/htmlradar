@@ -1,18 +1,5 @@
-// Staging for the /tools upload flow.
-//
-// The tools pages let someone drop an HTML file BEFORE they sign in, so the
-// file must never leave the browser until there is an account to attach it
-// to (no anonymous server-side storage, ever). It waits here in IndexedDB
-// across the OAuth round-trip and is read back when the page reloads with
-// `?resume=<token>`.
-//
-// One slot, one key: staging a second file replaces the first. There is no
-// use for a queue.
-//
-// The token is what ties a resume load to the sign-in that started it. A
-// visit with the wrong token (a crafted link, a refresh, a second tab) never
-// creates anything, and the record is deleted before the document is created
-// so a repeat load finds nothing.
+// One local file survives sign-in. A reservation rotates its token atomically,
+// retaining the contents and creation identifier until success is confirmed.
 
 const DB_NAME = 'htmlradar-tools';
 const STORE = 'staged';
@@ -32,8 +19,11 @@ export interface StagedFile {
   type: string;
   contents: string;
   stagedAt: number;
-  // Random, minted when the file is staged and echoed back in the resume URL.
+  // Authorizes one reservation. Echoed in the resume URL, then rotated on use.
   token: string;
+  creationId?: string;
+  reserved?: boolean;
+  path?: string;
 }
 
 // Kept pure so the expiry rule is testable without a browser.
@@ -60,6 +50,9 @@ export function validateStagedFile(row: unknown, now: number = Date.now()): Stag
     contents: r.contents,
     stagedAt: r.stagedAt,
     token: r.token,
+    ...(typeof r.creationId === 'string' ? { creationId: r.creationId } : {}),
+    ...(r.reserved === true ? { reserved: true } : {}),
+    ...(typeof r.path === 'string' ? { path: r.path } : {}),
   };
 }
 
@@ -95,38 +88,108 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+// All decisions and writes happen synchronously inside one transaction. A
+// request succeeding is not a commit: aborts can still happen afterwards.
 async function run<T>(
   mode: IDBTransactionMode,
-  request: (store: IDBObjectStore) => IDBRequest<T>,
+  operation: (store: IDBObjectStore, result: (value: T) => void) => void,
 ): Promise<T> {
   const db = await openDb();
   return new Promise<T>((resolve, reject) => {
-    const req = request(db.transaction(STORE, mode).objectStore(STORE));
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
+    const tx = db.transaction(STORE, mode);
+    let value: T;
+    tx.oncomplete = () => {
+      db.close();
+      resolve(value);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+    };
+    tx.onerror = () => {}; // The transaction's abort is the failure boundary.
+    try {
+      operation(tx.objectStore(STORE), (result) => {
+        value = result;
+      });
+    } catch (error) {
+      tx.abort();
+      db.close();
+      reject(error);
+    }
   });
 }
 
-export function stageFile(file: StagedFile): Promise<IDBValidKey> {
-  return run('readwrite', (store) => store.put(file, KEY));
+export function stageFile(file: StagedFile): Promise<void> {
+  const valid = validateStagedFile(file);
+  if (!valid) return Promise.reject(new Error('Invalid staged file'));
+  return run('readwrite', (store, result) => {
+    store.put({ ...valid, creationId: valid.creationId ?? crypto.randomUUID() }, KEY);
+    result(undefined);
+  });
 }
 
-export function clearStagedFile(): Promise<undefined> {
-  return run('readwrite', (store) => store.delete(KEY));
+export function clearStagedFile(token: string): Promise<void> {
+  return run('readwrite', (store, result) => {
+    const request = store.get(KEY);
+    request.onsuccess = () => {
+      if (request.result?.token === token) store.delete(KEY);
+      result(undefined);
+    };
+  });
 }
 
-let warnedOnce = false;
+export function readStagedFile(): Promise<StagedFile | null> {
+  return run('readwrite', (store, result) => {
+    const request = store.get(KEY);
+    request.onsuccess = () => {
+      const row: unknown = request.result;
+      if (shouldDiscardStagedRow(row)) store.delete(KEY);
+      result(validateStagedFile(row));
+    };
+  });
+}
 
-export async function readStagedFile(): Promise<StagedFile | null> {
-  const row = await run<unknown>('readonly', (store) => store.get(KEY));
-  if (row === undefined) return null;
-  const valid = restorableStagedFile(row);
-  if (valid) return valid;
-  if (shouldDiscardStagedRow(row)) {
-    await clearStagedFile();
-  } else if (!warnedOnce) {
-    warnedOnce = true;
-    console.warn('[staged-file] ignoring a staged record this build does not recognise');
-  }
-  return null;
+export function reserveStagedFile(token: string): Promise<StagedFile | null> {
+  return run('readwrite', (store, result) => {
+    const request = store.get(KEY);
+    request.onsuccess = () => {
+      const row: unknown = request.result;
+      const file = validateStagedFile(row);
+      if (shouldDiscardStagedRow(row)) store.delete(KEY);
+      if (!canResume(file, token)) {
+        result(null);
+        return;
+      }
+      // Delete the matching authorization, not the file. Even an explicit
+      // retry must present the current token; two tabs cannot both win.
+      const reserved = {
+        ...file!,
+        token: crypto.randomUUID(),
+        reserved: true,
+        creationId: file!.creationId ?? crypto.randomUUID(),
+      };
+      store.put(reserved, KEY);
+      result(reserved);
+    };
+  });
+}
+
+// Only an explicit server auth failure can re-arm a reservation for sign-in.
+// An uncertain upload must stay consumed and can only be retried by a click.
+export function releaseStagedReservation(token: string): Promise<StagedFile | null> {
+  return run('readwrite', (store, result) => {
+    const request = store.get(KEY);
+    request.onsuccess = () => {
+      const file = validateStagedFile(request.result);
+      if (shouldDiscardStagedRow(request.result)) store.delete(KEY);
+      if (!file || file.token !== token) {
+        result(null);
+        return;
+      }
+      const ready = { ...file };
+      delete ready.reserved;
+      store.put(ready, KEY);
+      result(ready);
+    };
+  });
 }

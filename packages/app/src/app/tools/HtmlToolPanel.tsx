@@ -11,31 +11,13 @@
 // The file never reaches a server before there is a signed-in account to
 // attach it to. That is the whole reason for the IndexedDB detour.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, FileText, Printer } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { captureClientEvent } from '@/lib/events-client';
 import { HTML_ACCEPT, isHtmlFile } from '@/lib/html-source';
-import {
-  canResume,
-  clearStagedFile,
-  readStagedFile,
-  stageFile,
-  MAX_STAGED_BYTES,
-  type StagedFile,
-} from '@/lib/staged-file';
-
-// The document title createDocument requires, derived from the filename so
-// nobody has to type one before they have seen the product work.
-function titleFromFilename(name: string): string {
-  const stem = name
-    .replace(/\.html?$/i, '')
-    .replace(/[-_]+/g, ' ')
-    .trim()
-    .slice(0, 120);
-  return stem || 'Untitled document';
-}
+import { MAX_STAGED_BYTES } from '@/lib/staged-file';
+import { useStagedHandoff, type HandoffAction } from '@/lib/staged-handoff';
 
 export function HtmlToolPanel({
   tool,
@@ -46,7 +28,7 @@ export function HtmlToolPanel({
   // Which tool page this instance is on. Sent with the analytics events; no
   // file name or file content is ever included in a payload.
   tool: string;
-  action?: (formData: FormData) => Promise<void>;
+  action?: HandoffAction;
   // Both come from the server render, which already has the session cookie in
   // hand. Asking Supabase from the browser instead would put its whole client
   // in the bundle of three pages whose main job is to load fast for search
@@ -58,157 +40,39 @@ export function HtmlToolPanel({
   resumeToken?: string | null;
   signedIn?: boolean;
 }) {
-  const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const [staged, setStaged] = useState<StagedFile | null>(null);
+  const handoff = useStagedHandoff({ path: `/tools/${tool}`, action, resumeToken, signedIn });
+  const { file: staged, busy, restored, replaceFile } = handoff;
   const [error, setError] = useState<string | null>(null);
+  const [pdfRejected, setPdfRejected] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [busy, setBusy] = useState(false);
-  // Private-mode browsers and locked-down profiles can refuse IndexedDB.
-  // There is no silent fallback that keeps the file off our servers, so we
-  // say so plainly and send them to the signed-in upload page instead.
-  const [storageBlocked, setStorageBlocked] = useState(false);
-  const [needsSignIn, setNeedsSignIn] = useState(false);
-  // Put back from IndexedDB on mount rather than dropped just now — the file
-  // survives a back-navigation even though React state does not.
-  const [restored, setRestored] = useState(false);
-  // Arrived on a `?resume=` URL whose record is gone: the document it names
-  // was already created.
-  const [resumeSpent, setResumeSpent] = useState(false);
-
   const isPdfMode = !action;
 
-  const accept = useCallback(async (file: File | null) => {
-    if (!file) return;
-    if (file.size > MAX_STAGED_BYTES) {
-      setStaged(null);
-      setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 30 MB.`);
-      return;
-    }
-    if (!isHtmlFile(file.name, file.type)) {
-      setStaged(null);
-      setError('Only single-file HTML works here. Rename your export to .html and try again.');
-      return;
-    }
-    setError(null);
-    setRestored(false);
-    setStaged({
-      name: file.name,
-      type: file.type || 'text/html',
-      contents: await file.text(),
-      stagedAt: Date.now(),
-      // Minted here and carried through sign-in in the `?resume=` value, so
-      // only the round-trip this file started can turn it into a document.
-      token: crypto.randomUUID(),
-    });
-  }, []);
-
-  // One read of the staged record per mount, doing two jobs. Coming back from
-  // sign-in on a matching `?resume=` URL it creates the document. On any other
-  // load it puts the file back on screen: iOS Safari throws this component's
-  // state away when you navigate back to it, so without this the file is still
-  // in IndexedDB but the page looks like you never dropped anything.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (resumeToken) setBusy(true);
-      let waiting: StagedFile | null = null;
+  const accept = useCallback(
+    async (file: File | null) => {
+      if (!file || busy) return;
+      setError(null);
+      setPdfRejected(false);
+      if (file.size > MAX_STAGED_BYTES) {
+        await replaceFile(null);
+        setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 30 MB.`);
+        return;
+      }
+      if (!isHtmlFile(file.name, file.type)) {
+        await replaceFile(null);
+        setPdfRejected(/\.pdf$/i.test(file.name) || file.type === 'application/pdf');
+        setError('Only single-file HTML works here. Rename your export to .html and try again.');
+        return;
+      }
       try {
-        waiting = await readStagedFile();
+        await replaceFile(file);
       } catch {
-        if (!cancelled) {
-          setStorageBlocked(true);
-          setBusy(false);
-        }
-        return;
+        setError('We couldn’t read this file. Choose it again.');
       }
-      if (cancelled) return;
-      if (!waiting) {
-        // Nothing staged, or it aged out after 24 hours. A resume URL with
-        // nothing behind it means the document was already created — the
-        // record is deleted before the create — so say where it went.
-        if (resumeToken) setResumeSpent(true);
-        setBusy(false);
-        return;
-      }
-      const found = waiting;
-      // Never clobber a file dropped while this read was in flight.
-      setStaged((current) => current ?? found);
-      const create = action;
-      if (!create || !canResume(found, resumeToken)) {
-        // A plain visit, a crafted link, a refresh after the file was already
-        // created, a second tab, or the PDF tool. Show the file and its
-        // button; create nothing.
-        setRestored(true);
-        setBusy(false);
-        return;
-      }
-      if (!signedIn) {
-        setNeedsSignIn(true);
-        setBusy(false);
-        return;
-      }
-
-      // Delete before create, and wait for it. Whatever happens next — a
-      // redirect, a reload, a second tab opening the same URL — there is no
-      // longer a record to create a second document from.
-      try {
-        await clearStagedFile();
-      } catch {
-        if (!cancelled) {
-          setStorageBlocked(true);
-          setBusy(false);
-        }
-        return;
-      }
-
-      void captureClientEvent('tools.resume_created', { tool });
-      const formData = new FormData();
-      formData.set('source_type', 'upload');
-      formData.set('title', titleFromFilename(waiting.name));
-      formData.set(
-        'file',
-        new File([waiting.contents], waiting.name, { type: waiting.type || 'text/html' }),
-      );
-      try {
-        await create(formData);
-      } catch {
-        // Put it back so the button below can retry rather than making them
-        // find the file again.
-        await stageFile(waiting).catch(() => undefined);
-        if (!cancelled) {
-          setError('That upload did not go through. Try again, or upload it from the dashboard.');
-          setBusy(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [action, resumeToken, signedIn, tool]);
-
-  async function stageAndSignIn() {
-    if (!staged) return;
-    setBusy(true);
-    const record = { ...staged, stagedAt: Date.now(), token: crypto.randomUUID() };
-    try {
-      await stageFile(record);
-    } catch {
-      setStorageBlocked(true);
-      setBusy(false);
-      return;
-    }
-    setStaged(record);
-    void captureClientEvent('tools.file_staged', { tool });
-    // Same-origin relative path only — /sign-in and /auth/callback both run it
-    // through safeNext() before redirecting. The token is what makes the
-    // return load create anything.
-    const next = `${window.location.pathname}?resume=${record.token}`;
-    router.push(`/sign-in?next=${encodeURIComponent(next)}`);
-  }
+    },
+    [busy, replaceFile],
+  );
 
   return (
     <div className="rounded-2xl border border-line bg-paper p-6 shadow-[0_18px_40px_-30px_rgba(31,17,8,0.18)] md:p-8">
@@ -275,7 +139,10 @@ export function HtmlToolPanel({
           type="file"
           accept={HTML_ACCEPT}
           className="sr-only"
-          onChange={(e) => void accept(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            void accept(e.target.files?.[0] ?? null);
+            e.target.value = '';
+          }}
         />
       </div>
 
@@ -286,24 +153,16 @@ export function HtmlToolPanel({
         </p>
       ) : null}
 
-      {resumeSpent && !staged ? (
-        <p className="mt-3 text-[13px] leading-relaxed text-graphite">
-          That file was already turned into a link — find it under{' '}
-          <a href="/docs" className="underline underline-offset-4">
-            Documents
+      {pdfRejected ? (
+        <p className="mt-3 text-[13px] text-signal-dark">
+          <a href="/convert" className="underline underline-offset-4">
+            Have a PDF? Turn it into a web page first.
           </a>
-          .
         </p>
       ) : null}
-
-      {storageBlocked ? (
-        <p className="mt-3 text-[13px] leading-relaxed text-alert">
-          This browser will not let the page hold your file while you sign in. Sign in first, then
-          upload the file on the{' '}
-          <a href="/new" className="underline underline-offset-4">
-            new document page
-          </a>
-          .
+      {handoff.message ? (
+        <p role="alert" className="mt-3 text-[13px] text-alert">
+          {handoff.message}
         </p>
       ) : null}
 
@@ -340,7 +199,10 @@ export function HtmlToolPanel({
             ) : (
               <button
                 type="button"
-                onClick={() => void stageAndSignIn()}
+                onClick={() => {
+                  void captureClientEvent('tools.file_staged', { tool });
+                  void handoff.start();
+                }}
                 disabled={busy}
                 className="group inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-signal"
               >
@@ -351,7 +213,7 @@ export function HtmlToolPanel({
             <p className="text-[13px] leading-relaxed text-graphite">
               {isPdfMode
                 ? 'Opens your browser print dialog. Choose "Save as PDF" as the destination.'
-                : needsSignIn || restored
+                : !signedIn && restored
                   ? 'Your file is still here. Sign in and it becomes a tracked link.'
                   : 'Your file uploads only after you sign in. First 2 tracked links are free.'}
             </p>

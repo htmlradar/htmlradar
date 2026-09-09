@@ -248,7 +248,36 @@ export function extractTitleCandidates(
       lines.push({ ...run });
     }
   }
-  return lines
+  const titles: TitleCandidate[] = [];
+  let lineCount = 0;
+  for (const [i, line] of lines.entries()) {
+    const title = titles.at(-1);
+    const previous = lines[i - 1];
+    if (
+      title &&
+      previous &&
+      lineCount < 3 &&
+      !title.ambiguous &&
+      !line.ambiguous &&
+      usefulTitle(title.text) &&
+      usefulTitle(line.text) &&
+      title.dir === line.dir &&
+      Math.abs(title.size - line.size) <= 0.01 &&
+      Math.abs(title.x - line.x) <= 0.5 &&
+      line.y - previous.y >= line.size * 0.8 &&
+      line.y - previous.y <= line.size * 1.6
+    ) {
+      // ponytail: join at most three consecutive aligned lines; longer or
+      // ambiguous layouts keep the existing title-ranking fallback.
+      title.text = truncate(`${title.text} ${line.text}`, 400);
+      title.width = Math.max(title.width, line.width);
+      lineCount++;
+    } else {
+      titles.push({ ...line });
+      lineCount = 1;
+    }
+  }
+  return titles
     .filter((line) => usefulTitle(line.text))
     .sort((left, right) => right.size - left.size || left.y - right.y || left.x - right.x)
     .slice(0, MAX_CANDIDATES);
@@ -291,13 +320,17 @@ function escapeHtml(text: string): string {
 
 function htmlStart(filename: string): string {
   const title = truncate(cleanText(filename.replace(/\.pdf$/i, '')), 200) || 'Untitled deck';
-  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#fff}main{max-width:1600px;margin:0 auto}.slide{position:relative}.slide h2{position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap}.slide img{display:block;width:100%;height:auto}nav{padding:16px;font:16px/1.5 sans-serif}nav ol{margin:8px 0 0;padding-left:24px}nav a{color:#5a1521}nav a:focus-visible{outline:2px solid #7a1f2e;outline-offset:3px}.credit{margin:0;padding:8px 12px;font:12px sans-serif}</style></head><body><main>`;
+  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#fff}main{max-width:1600px;margin:0 auto}.slide{position:relative}.slide h2{position:absolute;top:0;left:0;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap}.slide img{display:block;width:100%;height:auto}details{max-width:1568px;margin:0 auto;padding:8px 16px;font:14px/1.5 sans-serif}summary{cursor:pointer}details ul{list-style:none;margin:8px 0 0;padding:0}details a{display:block;padding:4px 0;color:#5a1521;overflow-wrap:anywhere}details a:focus-visible,summary:focus-visible{outline:2px solid #7a1f2e;outline-offset:3px}.credit{margin:0;padding:8px 12px;font:12px sans-serif}</style></head><body>`;
 }
 
 const HTML_END = '</main></body></html>';
 
 function contentsHtml(titles: string[]): string {
-  return `<nav aria-label="Table of contents"><strong>Contents</strong><ol>${titles.map((title, i) => `<li><a href="#slide-${i + 1}" dir="auto">${escapeHtml(title)}</a></li>`).join('')}</ol></nav>`;
+  const named = titles
+    .map((title, i) => ({ title, i }))
+    .filter(({ title }) => !/^Slide \d+: Untitled$/.test(title));
+  if (named.length < 3) return '';
+  return `<details><summary>Contents</summary><ul>${named.map(({ title, i }) => `<li><a href="#slide-${i + 1}" dir="auto">${escapeHtml(title)}</a></li>`).join('')}</ul></details>`;
 }
 
 function sectionHtml(slide: DeckSlide, index: number, last: boolean, data: string): string {
@@ -344,7 +377,9 @@ export async function assembleDeckHtml(
 ): Promise<Blob> {
   checkCancelled(signal);
   const contents = contentsHtml(slides.map((slide) => slide.title));
-  let bytes = new TextEncoder().encode(htmlStart(filename) + contents + HTML_END).byteLength;
+  let bytes = new TextEncoder().encode(
+    htmlStart(filename) + contents + '<main>' + HTML_END,
+  ).byteLength;
   for (const [i, slide] of slides.entries()) {
     if (
       !Number.isInteger(slide.width) ||
@@ -357,7 +392,7 @@ export async function assembleDeckHtml(
     bytes += sectionBytes(slide, i, i === slides.length - 1);
     withinOutputLimit(bytes);
   }
-  const parts: BlobPart[] = [htmlStart(filename), contents];
+  const parts: BlobPart[] = [htmlStart(filename), contents, '<main>'];
   for (const [i, slide] of slides.entries()) {
     const buffer = new Uint8Array(await withAbort(slide.image.arrayBuffer(), signal));
     // Chunk the conversion so spread never exceeds the JS argument limit.
@@ -505,13 +540,10 @@ export async function convertPdfToDeck(file: File, options: PdfDeckOptions = {})
     const pdf = await withAbort(loading.promise, signal);
     const admission = await admitPdf(pdf, signal);
     const slides: DeckSlide[] = [];
-    // Count the smallest possible TOC labels now; final assembly counts the
-    // exact escaped title bytes in both the TOC and the slide headings.
-    let bytes = new TextEncoder().encode(
-      htmlStart(file.name) +
-        contentsHtml(Array.from({ length: pdf.numPages }, (_, i) => `Slide ${i + 1}: `)) +
-        HTML_END,
-    ).byteLength;
+    // Title detection may omit the contents block altogether. Count the
+    // fixed shell now; assembly includes the exact optional block and labels
+    // before encoding images, so this lower bound cannot reject a deck that fits.
+    let bytes = new TextEncoder().encode(htmlStart(file.name) + '<main>' + HTML_END).byteLength;
     for (let number = 1; number <= pdf.numPages; number++) {
       checkCancelled(signal);
       options.onProgress?.({ phase: 'rendering', page: number, total: pdf.numPages });

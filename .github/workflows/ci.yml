@@ -44,6 +44,12 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Verify PDF conversion in the runner's installed browser
+        run: |
+          export PDF_BROWSER_EXECUTABLE="$(command -v google-chrome)"
+          test -n "$PDF_BROWSER_EXECUTABLE"
+          pnpm --filter @htmlradar/app test:pdf-browser
+
   gitleaks:
     name: Secret scanning
     runs-on: ubuntu-latest

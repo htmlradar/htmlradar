@@ -1,4 +1,4 @@
-// Optional local integration check; no product route or external PDF fixture.
+// Browser integration check used locally and in CI; no external PDF fixture.
 /* eslint-env browser, node */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -30,7 +30,7 @@ const font = await source.embedFont(StandardFonts.Helvetica);
 for (let i = 0; i < 4; i++) {
   const page = source.addPage([720, 450]);
   page.drawRectangle({ x: 0, y: 0, width: 720, height: 450, color: rgb(0.95, 0.95, 1) });
-  if (i === 1 || i === 2)
+  if (i > 0)
     page.drawText(`Company overview and next steps ${i}`, { x: 40, y: 370, font, size: 28 });
 }
 const bytes = [...(await source.save())];
@@ -67,7 +67,10 @@ const server = createServer(async (request, response) => {
 await new Promise((ready) => server.listen(0, '127.0.0.1', ready));
 let browser;
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PDF_BROWSER_EXECUTABLE,
+  });
   const page = await browser.newPage();
   const requests = [];
   const errors = [];
@@ -103,7 +106,7 @@ try {
   assert.equal(result.titles.length, 4);
   assert.equal(result.titles[0], 'Slide 1: Untitled');
   assert.equal(result.titles[1], 'Slide 2: Company overview and next steps 1');
-  assert.equal(result.titles[3], 'Slide 4: Untitled');
+  assert.equal(result.titles[3], 'Slide 4: Company overview and next steps 3');
   assert.equal(result.previews, 1);
   assert.deepEqual(result.dimensions, [
     [1600, 1000],
@@ -123,7 +126,19 @@ try {
   );
   assert.equal(await output.locator('section.slide').count(), 4);
   assert.equal(await output.locator('script,iframe,link').count(), 0);
-  assert.equal(await output.locator('nav a[href^="#slide-"]').count(), 4);
+  assert.equal(await output.locator('body > details:not([open]) + main').count(), 1);
+  assert.equal(await output.locator('details a[href^="#slide-"]').count(), 3);
+  assert.equal(await output.locator('details a[href="#slide-1"]').count(), 0);
+  for (const width of [390, 1280]) {
+    await output.setViewportSize({ width, height: 800 });
+    await output.locator('summary').click();
+    assert.equal(await output.locator('details[open]').count(), 1);
+    assert.ok(await output.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await output.locator('a[href="#slide-3"]').click();
+    assert.equal(await output.evaluate(() => location.hash), '#slide-3');
+    await output.locator('summary').click();
+    assert.equal(await output.locator('details[open]').count(), 0);
+  }
   const boxes = await output.locator('section.slide').evaluateAll((sections) =>
     sections.map((section) => {
       const heading = section.querySelector('h2').getBoundingClientRect();

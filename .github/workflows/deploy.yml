@@ -36,6 +36,11 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      preview_only:
+        description: 'Deploy to the Pages preview only; do not promote to prod or touch the Workers (for testing a branch)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -265,6 +270,7 @@ jobs:
       # CF 5xx on the prod promotion was emailing a false failure for a
       # deploy that was effectively done. 3 attempts with 30s back-off.
       - name: Promote preview → prod (deploy to main branch) with retry
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -306,6 +312,7 @@ jobs:
       # and htmlradar.com/r/* for the redirect that keeps old links open — so
       # the token needs Workers Routes:Edit on both zones.
       - name: Deploy proxy worker (packages/proxy)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -321,6 +328,7 @@ jobs:
       # proxy step. Without this step the cron monitor sits at whatever
       # version was last manually deployed.
       - name: Deploy monitor worker (packages/monitor)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -347,7 +355,7 @@ jobs:
       # production deploy of the app, the proxy or the monitor. See
       # CONNECTOR-INFRA-RUNBOOK-2026-09-02.md, "Before the gate opens".
       - name: Deploy connector worker (packages/connector)
-        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        if: ${{ (vars.CONNECTOR_DEPLOY_ENABLED == 'true') && !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -364,7 +372,7 @@ jobs:
       # never existed. Same gate as the deploy step: skipped until the four
       # CONNECTOR_DEPLOY_ENABLED prerequisites are met.
       - name: Provision connector Worker secrets (packages/connector)
-        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        if: ${{ (vars.CONNECTOR_DEPLOY_ENABLED == 'true') && !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -385,7 +393,7 @@ jobs:
       # deployment from the existing build output with the new secret bound,
       # so no separate re-deploy step is needed for it to take effect.
       - name: Provision Pages secrets for the connector (shared HMACs)
-        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        if: ${{ (vars.CONNECTOR_DEPLOY_ENABLED == 'true') && !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -407,6 +415,7 @@ jobs:
       # served from. htmlradar.com/r/ only redirects there now, which the
       # next step checks.
       - name: Verify proxy worker serves this commit
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
@@ -426,6 +435,7 @@ jobs:
       # The monitor has no HTTP route (cron only), so read the GIT_SHA
       # binding of the active version back from the Workers API instead.
       - name: Verify monitor worker carries this commit
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -448,7 +458,7 @@ jobs:
       # must be a POST), so that response is what's checked — it never
       # depends on OAuth state and needs no test credentials.
       - name: Verify connector worker serves this commit
-        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        if: ${{ (vars.CONNECTOR_DEPLOY_ENABLED == 'true') && !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
@@ -471,7 +481,7 @@ jobs:
       # calling a tool with no token is refused rather than silently
       # allowed. Neither needs a real grant or the QA account.
       - name: Smoke test connector discovery and auth
-        if: ${{ vars.CONNECTOR_DEPLOY_ENABLED == 'true' }}
+        if: ${{ (vars.CONNECTOR_DEPLOY_ENABLED == 'true') && !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         run: |
           set -e
           fail=0
@@ -518,6 +528,7 @@ jobs:
       # answer to that is a wider token, not a silent no-op, and Sol's review
       # of the switch plan called for exactly this.
       - name: Purge Cloudflare edge cache (both zones)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
@@ -559,6 +570,7 @@ jobs:
       # out of the deployed wrangler.toml is what makes the check follow the
       # deploy instead of having to be edited alongside it.
       - name: Verify the legacy host answers in the mode it was deployed in
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         run: |
           set -e
           legacy=$(sed -n 's/^LEGACY_HOSTS[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' packages/proxy/wrangler.toml)

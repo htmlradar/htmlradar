@@ -3150,39 +3150,130 @@ export default {
       }
     }
 
-    if (alerts.length === 0) return;
-
-    // Deliberately NOT written to telegram_outbox: this alert goes out by
-    // email, and an inbox is already a readable record — the outbox exists
-    // for the one channel that isn't. A healthy run writes nothing here
-    // either; a row every five minutes would bury the scan runs the table was
-    // built to surface. ponytail: if health alerts ever move to Telegram they
-    // go through sendTelegram with kind='alert', which the schema already
-    // allows.
-    //
-    // Single consolidated alert. Plain text — no template to break.
-    const body = [
-      'HTMLRadar prod looks unhealthy.',
-      '',
-      'Checks tripped:',
-      ...alerts.map((a) => `  • ${a}`),
-      '',
-      `Run at: ${new Date().toISOString()}`,
-      'Dashboards: https://htmlradar.com/docs · https://dash.cloudflare.com',
-    ].join('\n');
-
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: env.RESEND_FROM,
-        to: [env.ALERT_TO],
-        subject: `[HTMLRadar] ${alerts.length} prod check${alerts.length === 1 ? '' : 's'} failing`,
-        text: body,
-      }),
-    });
+    await deliverHealthAlert(env, alerts);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Health-alert delivery, throttled.
+//
+// Until 14 Sep 2026 every failing five-minute run sent its own email, so a
+// condition that lasted three hours (a single Cloudflare colo returning 503
+// for the sign-in edge function while the site was fine everywhere else) put
+// 31 identical emails in the founder's inbox. Now the same set of tripped
+// checks emails once per ALERT_REPEAT_MS, and the run that finds everything
+// healthy again sends one "recovered" note if an alert went out inside that
+// window. The memory is the telegram_outbox table (kind 'alert'), which the
+// worker already writes: an outbox row per SENT email, never per run, so the
+// table is not buried under five-minute noise.
+export const ALERT_REPEAT_MS = 60 * 60_000;
+const ALERT_SOURCE = 'prodcheck';
+
+/** Newest 'alert' row from this source inside the repeat window, or null. */
+async function lastHealthAlert(
+  env: Env,
+  nowMs: number,
+): Promise<{ message: string; recovered: boolean } | null> {
+  const since = new Date(nowMs - ALERT_REPEAT_MS).toISOString();
+  const res = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+      `?kind=eq.alert&source=eq.${ALERT_SOURCE}&created_at=gte.${since}` +
+      `&order=created_at.desc&limit=1&select=message,meta`,
+    {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const rows = (await res.json()) as { message: string; meta?: { recovered?: boolean } }[];
+  const row = rows[0];
+  return row ? { message: row.message, recovered: row.meta?.recovered === true } : null;
+}
+
+async function sendAlertEmail(env: Env, subject: string, text: string): Promise<void> {
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: env.RESEND_FROM, to: [env.ALERT_TO], subject, text }),
+  });
+}
+
+/**
+ * Emails the tripped checks, at most once per ALERT_REPEAT_MS for the same
+ * set, and emails one recovery note when a run is clean after an alert.
+ * The outbox lookup failing must not silence a real outage, so a lookup
+ * error falls back to sending.
+ */
+export async function deliverHealthAlert(
+  env: Env,
+  alerts: string[],
+  nowMs: number = Date.now(),
+): Promise<'sent' | 'suppressed' | 'recovered' | 'quiet'> {
+  const message = alerts.join('\n');
+  let last: { message: string; recovered: boolean } | null = null;
+  let lookupFailed = false;
+  try {
+    last = await lastHealthAlert(env, nowMs);
+  } catch (err) {
+    lookupFailed = true;
+    // eslint-disable-next-line no-console
+    console.error('[alert] outbox lookup failed:', (err as Error).message);
+  }
+
+  if (alerts.length === 0) {
+    // Recovery is worth one email, and only when the last thing we said was
+    // that something was wrong.
+    if (!last || last.recovered) return 'quiet';
+    const text = [
+      'HTMLRadar prod checks are passing again.',
+      '',
+      'Previously tripped:',
+      ...last.message.split('\n').map((a) => `  • ${a}`),
+      '',
+      `Run at: ${new Date(nowMs).toISOString()}`,
+    ].join('\n');
+    await sendAlertEmail(env, '[HTMLRadar] prod checks recovered', text);
+    await recordOutbox(env, {
+      kind: 'alert',
+      source: ALERT_SOURCE,
+      message: last.message,
+      telegram_ok: null,
+      meta: { recovered: true, channel: 'email' },
+    });
+    return 'recovered';
+  }
+
+  if (!lookupFailed && last && !last.recovered && last.message === message) {
+    return 'suppressed';
+  }
+
+  // Single consolidated alert. Plain text — no template to break.
+  const text = [
+    'HTMLRadar prod looks unhealthy.',
+    '',
+    'Checks tripped:',
+    ...alerts.map((a) => `  • ${a}`),
+    '',
+    `Run at: ${new Date(nowMs).toISOString()}`,
+    `Next email for this same problem: not before ${ALERT_REPEAT_MS / 60_000} minutes from now, unless the set of failing checks changes.`,
+    'Dashboards: https://htmlradar.com/docs · https://dash.cloudflare.com',
+  ].join('\n');
+  await sendAlertEmail(
+    env,
+    `[HTMLRadar] ${alerts.length} prod check${alerts.length === 1 ? '' : 's'} failing`,
+    text,
+  );
+  await recordOutbox(env, {
+    kind: 'alert',
+    source: ALERT_SOURCE,
+    message,
+    telegram_ok: null,
+    meta: { recovered: false, channel: 'email', checks: alerts.length },
+  });
+  return 'sent';
+}

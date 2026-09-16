@@ -18,8 +18,29 @@ workers_dev = false  # We don't want this exposed at *.workers.dev — only via 
 # DEPLOY PERMISSION: `wrangler deploy` syncs this block, so the API token
 # needs Workers Routes: Edit on BOTH zones. Adding the second zone is
 # PENDING-ON-ABHI P-30.
+#
+# THE ROUTE IS THE WHOLE ZONE, AND IT SHIPS AS ITS OWN SEPARATE DEPLOY.
+#
+# `*/*` on this zone is what custom domains need: Cloudflare for SaaS sends a
+# customer's own hostname (decks.acme.com) here through the fallback origin
+# customers.htmlradar.page, and the worker only sees it if the route covers
+# every hostname on the zone rather than the apex alone.
+#
+# ORDER, and it is not negotiable (Astra's review, 17 September; sprint file
+# "Sequencing"). The stored-host checks, the refusal of unknown hostnames and
+# the probe path go out FIRST, on the old `htmlradar.page/*` route, and are
+# verified on production. This line goes out AFTERWARDS, as a second small
+# deploy of its own, and is verified again (customers.htmlradar.page 404, a
+# claimed test hostname answering the probe path and nothing else). One deploy
+# carrying both does not prove that the route change and the code reached the
+# edge together, and for the minutes in between a widened route with the old
+# code would serve every apex share on every hostname pointed at us.
+#
+# The checks are correct under the old route too: with `htmlradar.page/*` no
+# custom hostname reaches this worker at all, so every rule about them is
+# inert rather than wrong.
 [[routes]]
-pattern = "htmlradar.page/*"
+pattern = "*/*"
 zone_name = "htmlradar.page"
 
 [[routes]]
@@ -44,8 +65,16 @@ SHARE_HOST = "htmlradar.page"
 # GATE 2 (docs/workstreams/content-domain/SWITCH-PLAN-2026-08-31.md) turns the
 # permanent redirect on: set this to "htmlradar.com" and deploy. From then on
 # every htmlradar.com/r/ link answers 301 to the same path and query on
-# SHARE_HOST. Setting it back to "" and deploying is the whole rollback; no
-# data is touched either way.
+# SHARE_HOST.
+#
+# CHANGED 17 September 2026, with custom domains. This list is now also the
+# list of hosts the worker RECOGNISES besides the share host and its
+# subdomains: resolveHost no longer treats an unknown hostname as the apex,
+# because with the widened route above that would serve every apex share on
+# any hostname pointed at us. Emptying this line therefore no longer serves
+# htmlradar.com in place — it makes htmlradar.com a 404. Rolling the redirect
+# back now means pointing htmlradar.com's route somewhere else, not emptying
+# this value.
 LEGACY_HOSTS = "htmlradar.com"
 
 # The trust layer's one gate setting, and the whole of its rollback.
@@ -89,18 +118,16 @@ TRUST_WRAPPER = ""
 # Needs the wildcard record and route below installed first.
 TRUST_HANDLES = ""
 
-# WILDCARD ROUTE, NOT YET INSTALLED. Per-customer hostnames need one wildcard
-# DNS record (*.htmlradar.page, proxied) and one more route here:
+# WILDCARD DNS RECORD, NOT YET INSTALLED. Handle hosts still need one wildcard
+# DNS record (*.htmlradar.page, proxied); the `*/*` route above now covers them
+# as well, so no further route is needed. Until the record exists no handle
+# host resolves, so every handle rule in resolveHost/enforceStoredHost stays
+# inert in production.
 #
-#   [[routes]]
-#   pattern = "*.htmlradar.page/*"
-#   zone_name = "htmlradar.page"
-#
-# The stored-hostname check ships FIRST, in this commit, deliberately: a
-# wildcard route live before that check would briefly let any handle host serve
-# any customer's document. Installing the record and the route is the
-# operations half of Gate 0, and until it happens no handle host resolves, so
-# every rule in resolveHost/enforceStoredHost is inert in production.
+# Customer domains do not use that record: they arrive through Cloudflare for
+# SaaS and the fallback origin customers.htmlradar.page, which is reserved
+# infrastructure and answers 404 to everything (see FALLBACK_ORIGIN_LABEL in
+# src/index.ts).
 
 # Secrets — set via `wrangler secret put`:
 #   SUPABASE_URL

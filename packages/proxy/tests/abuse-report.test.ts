@@ -58,6 +58,10 @@ vi.mock('../src/supabase.js', async () => {
   return {
     ...actual,
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
+    // No hostname is a claimed customer domain unless a test says so. Real
+    // network calls must never happen here, and resolveHost reads
+    // custom_domains for every host that is not the apex or a handle.
+    getCustomDomainByHostname: vi.fn(async () => null),
     getDocument: vi.fn(async () => doc),
     listAttachmentsForDocument: vi.fn(async () => []),
     logAppEvent: vi.fn(async () => undefined),
@@ -137,10 +141,14 @@ describe('the form is reachable from the link the recipient was sent', () => {
     expect(body).toContain('Report this document.');
   });
 
-  it('renders on the old host too, while that host still serves in place', async () => {
+  it('is refused on a host this worker does not recognise', async () => {
+    // Was 200: the old host used to be served in place when it was not in the
+    // legacy list, because an unknown hostname fell back to the apex. That
+    // fallback is gone with the widened route (see resolveHost). The report
+    // form is reachable on every host that serves the share — the apex, a
+    // handle host, a customer's own domain — and on no other.
     const res = await fetchAs('https://htmlradar.com/r/acme-proposal/report', {}, bothHosts);
-    expect(res.status).toBe(200);
-    expect(await res.text()).toContain('action="/r/acme-proposal/report"');
+    expect(res.status).toBe(404);
   });
 
   it('follows the same redirect as everything else once the old host is legacy', async () => {

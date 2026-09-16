@@ -56,6 +56,10 @@ vi.mock('../src/supabase.js', async () => {
   return {
     ...actual,
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
+    // No hostname is a claimed customer domain unless a test says so. Real
+    // network calls must never happen here, and resolveHost reads
+    // custom_domains for every host that is not the apex or a handle.
+    getCustomDomainByHostname: vi.fn(async () => null),
     getDocument: vi.fn(async () => doc),
     // No attachment by this id. Enough to prove the download path was handled
     // where the request arrived rather than redirected away from it.
@@ -266,47 +270,43 @@ describe('a self-hoster sets their own hosts', () => {
     }
   });
 
-  it('leaves htmlradar.com alone once it is no longer a legacy host', async () => {
+  it('refuses htmlradar.com once it is no longer a legacy host', async () => {
+    // CHANGED 17 September 2026, with custom domains. This used to be served
+    // as the apex, because an unknown hostname fell back to the apex. That
+    // fallback is gone: the route is now the whole zone, so every hostname
+    // Cloudflare for SaaS points at us arrives here, and "unknown behaves
+    // like the apex" would have been every apex share on every such hostname.
     const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, selfHosted);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 });
 
-describe('an empty legacy list turns the redirect off', () => {
-  // How the content domain ships on its first deploy, and where a rollback
-  // puts it afterwards: both hosts serve documents, neither one redirects, so
-  // a single link opens on either. Gate 2 of the switch plan sets
-  // LEGACY_HOSTS = "htmlradar.com" to turn the permanent redirect on.
+describe('a host that is neither the share host nor a legacy host is refused', () => {
+  // The legacy list is now also the list of hosts this worker RECOGNISES
+  // besides the share host and its subdomains. Emptying it no longer serves
+  // the old host in place — it makes the old host a stranger, and a stranger
+  // gets the standard not-found on every path.
   const noRedirect = { ...baseEnv, LEGACY_HOSTS: '' } as import('../src/env.js').Env;
 
-  it('serves the old host in place instead of redirecting it', async () => {
+  it('404s the old host instead of serving it in place', async () => {
     const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, noRedirect);
-    expect(res.status).toBe(200);
-    expect(getShareBySlug).toHaveBeenCalledWith(noRedirect, 'acme-proposal');
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Location')).toBeNull();
   });
 
-  it('serves the share host at the same time, so one link opens on either', async () => {
+  it('serves the share host at the same time, so its own links are untouched', async () => {
     const res = await fetchAs('https://htmlradar.page/r/acme-proposal', {}, noRedirect);
     expect(res.status).toBe(200);
   });
 
-  it('sends no Location at all, query string included', async () => {
-    const res = await fetchAs('https://htmlradar.com/r/acme-proposal?x=1', {}, noRedirect);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('Location')).toBeNull();
-  });
-
-  it('serves the attachment path in place as well, query and all', async () => {
-    // 404 because the mocked lookup has no attachment by that id — the point
-    // is that the download route ran here at all instead of answering 301.
-    const res = await fetchAs(
+  it('never looks the share up on a host it does not recognise', async () => {
+    await fetchAs('https://htmlradar.com/r/acme-proposal?x=1', {}, noRedirect);
+    await fetchAs(
       'https://htmlradar.com/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?v=2',
       {},
       noRedirect,
     );
-    expect(res.status).toBe(404);
-    expect(res.headers.get('Location')).toBeNull();
-    expect(getShareBySlug).toHaveBeenCalledWith(noRedirect, 'acme-proposal');
+    expect(getShareBySlug).not.toHaveBeenCalled();
   });
 
   it('still upgrades plain HTTP, which is a separate rule from the host', async () => {

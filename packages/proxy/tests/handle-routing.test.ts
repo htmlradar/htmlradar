@@ -62,6 +62,10 @@ vi.mock('../src/supabase.js', async () => {
   return {
     ...actual,
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
+    // No hostname is a claimed customer domain unless a test says so. Real
+    // network calls must never happen here, and resolveHost reads
+    // custom_domains for every host that is not the apex or a handle.
+    getCustomDomainByHostname: vi.fn(async () => null),
     getDocument: vi.fn(async () => doc),
     getAttachment: vi.fn(async () => null),
     listAttachmentsForDocument: vi.fn(async () => []),

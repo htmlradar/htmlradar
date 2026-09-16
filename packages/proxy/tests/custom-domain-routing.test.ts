@@ -169,6 +169,15 @@ vi.mock('../src/fetch-html.js', () => ({
   ),
 }));
 
+// The app mints the sender's raw-preview token, not the proxy, so there is no
+// signing helper to borrow. Accepting every token is the point here: it makes
+// the refusals below about the HOST and nothing else. Everything the worker
+// signs for itself — the print grant, the opt-out token — is the real thing.
+vi.mock('../src/auth.js', async () => {
+  const actual = await vi.importActual<typeof import('../src/auth.js')>('../src/auth.js');
+  return { ...actual, verifyOwnerDocPreviewToken: vi.fn(async () => true) };
+});
+
 type Env = import('../src/env.js').Env;
 
 const env = {
@@ -557,6 +566,16 @@ describe('the probe path, and nothing else, on a claimed hostname', () => {
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
+  it('carries no deploy version, unlike every other response', async () => {
+    // The one thing a hostname answers before anybody has proved they own it.
+    // It names the claim being checked and nothing else about us.
+    const probe = await fetchAs(`https://${PENDING.hostname}${PROBE}`);
+    expect(probe.headers.get('X-HTMLRadar-Version')).toBeNull();
+    // Everything else still does, which is what deploy verification reads.
+    const anythingElse = await fetchAs('https://htmlradar.page/robots.txt');
+    expect(anythingElse.headers.get('X-HTMLRadar-Version')).not.toBeNull();
+  });
+
   it('is not there on the apex, a handle host, a retired claim or a stranger', async () => {
     for (const host of [
       'htmlradar.page',
@@ -586,6 +605,9 @@ describe('the probe path, and nothing else, on a claimed hostname', () => {
 });
 
 describe('robots, sitemap and the raw preview on a customer domain', () => {
+  // The sender-side preview address, with a token this file always accepts.
+  const RAW_PREVIEW = `/r/_doc/${attachment.id}?owner_doc_preview=tok`;
+
   it('serves robots.txt on a customer domain, with the same blanket Disallow', async () => {
     // A customer's own domain is where a crawler is likeliest to find its way
     // in, because it has links pointing at it that ours does not.
@@ -601,15 +623,42 @@ describe('robots, sitemap and the raw preview on a customer domain', () => {
     }
   });
 
-  it('refuses the sender-side raw preview on a customer domain', async () => {
+  it('serves the sender-side raw preview on the apex, with a valid token', async () => {
+    // The control for the two refusals below: the token IS valid everywhere in
+    // this file, so what refuses them is the host.
+    const res = await fetchAs(`https://htmlradar.page${RAW_PREVIEW}`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('<h1>Deck</h1>');
+  });
+
+  it('refuses the raw preview on a customer domain, valid token and all', async () => {
     // It carries no share and therefore no stored hostname to check, and it
     // serves the raw upload with no tracker and no gate. On a customer's
-    // domain it would put a document there that no share ever chose.
-    const path = `/r/_doc/${attachment.id}?owner_doc_preview=tok`;
+    // domain it would put a document there that no share ever chose — wearing
+    // the customer's name over somebody else's upload.
     await expectStandardNotFound(
-      await fetchAs(`https://${LIVE.hostname}${path}`),
+      await fetchAs(`https://${LIVE.hostname}${RAW_PREVIEW}`),
       'the raw preview on a customer domain',
     );
+  });
+
+  it('refuses the raw preview on any handle host, valid token and all', async () => {
+    // A preview token is bound to a document and to nothing else, so without
+    // this rule one would open on every handle host there is, including a
+    // rival's and a name nobody owns.
+    for (const host of [
+      'rival.htmlradar.page',
+      'acme.htmlradar.page',
+      'microsoft.htmlradar.page',
+    ]) {
+      await expectStandardNotFound(await fetchAs(`https://${host}${RAW_PREVIEW}`), host);
+    }
+  });
+
+  it('refuses the raw preview on a claimed hostname that is not live', async () => {
+    for (const host of [PENDING.hostname, DISCONNECTED.hostname, 'nobody.example.net']) {
+      await expectStandardNotFound(await fetchAs(`https://${host}${RAW_PREVIEW}`), host);
+    }
   });
 });
 

@@ -130,6 +130,25 @@ const TRACKER_PATH = '/v1/tracker.js';
 const isLocal = (hostname: string): boolean =>
   hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 
+// The hostname this worker served before the content domain existed, and the
+// one every link sent before the move still points at.
+//
+// TWO SEPARATE QUESTIONS, and conflating them is what broke the rollback in
+// the first draft of this change. `LEGACY_HOSTS` answers "does this host
+// REDIRECT to the share host?" — emptying it is the documented rollback of the
+// 31 August switch, after which both hosts serve documents and neither one
+// redirects. This constant answers the other question, "is this a host we
+// serve at all?", and it is not configurable, because the answer for
+// htmlradar.com is yes for as long as those links are in circulation.
+//
+// Without it, removing htmlradar.com from LEGACY_HOSTS would have made every
+// link sent before the move a 404 rather than a document, which is an outage
+// dressed as a rollback.
+//
+// It is the apex's equal for routing and for nothing else: a share issued on
+// a customer's own domain is still never served here (see enforceStoredHost).
+const ORIGIN_HOST = 'htmlradar.com';
+
 function isLegacyHost(hostname: string, env: Env): boolean {
   return (env.LEGACY_HOSTS ?? LEGACY_HOSTS_DEFAULT)
     .split(',')
@@ -174,7 +193,13 @@ function withNoIndex(res: Response, env: Env): Response {
   out.headers.set('X-Robots-Tag', 'noindex, nofollow');
   // Deploy verification reads this back from the live route to prove the
   // commit it just uploaded is the one the edge serves.
-  out.headers.set('X-HTMLRadar-Version', env.GIT_SHA ?? 'dev');
+  //
+  // Not on the domain-check probe. That response is content-free on purpose:
+  // it is the one thing a hostname answers before anybody has proved they own
+  // it, and it should name the claim being checked and nothing else about us.
+  if (!out.headers.has(DOMAIN_CHECK_HEADER)) {
+    out.headers.set('X-HTMLRadar-Version', env.GIT_SHA ?? 'dev');
+  }
 
   // Sandbox every proxy response into an opaque origin.
   //
@@ -230,9 +255,9 @@ function withNoIndex(res: Response, env: Env): Response {
  * the whole zone (see wrangler.toml) every hostname Cloudflare for SaaS points
  * at us arrives here, and "unknown host behaves like the apex" would mean any
  * such hostname — including one whose claim we retired minutes ago — serving
- * every apex share. Unknown is now refused. A legacy host being served in place and
- * localhost under `wrangler dev` are still the apex, which is what they have
- * always been; nothing else is.
+ * every apex share. Unknown is now refused. What is still the apex: a legacy
+ * host being served in place, ORIGIN_HOST whatever the redirect setting says,
+ * and localhost under `wrangler dev`. Nothing else is.
  *
  * Async because the custom shape is a database read. There is no cache: see
  * getCustomDomainByHostname.
@@ -268,12 +293,13 @@ const FALLBACK_ORIGIN_LABEL = 'customers';
 // Content-free by design: it says only which claim this hostname belongs to,
 // which the prober already knows.
 const DOMAIN_CHECK_PATH = '/.well-known/htmlradar-domain-check';
+const DOMAIN_CHECK_HEADER = 'x-htmlradar-domain';
 
 async function resolveHost(hostname: string, env: Env): Promise<HostKind> {
   const apex = shareHostOf(env).toLowerCase();
   const host = hostname.toLowerCase();
   if (host === apex) return APEX;
-  if (isLegacyHost(host, env) || isLocal(host)) return APEX;
+  if (isLegacyHost(host, env) || host === ORIGIN_HOST || isLocal(host)) return APEX;
 
   if (host.endsWith(`.${apex}`)) {
     const label = host.slice(0, -(apex.length + 1));
@@ -302,7 +328,7 @@ const domainCheck = (domainId: string): Response =>
     status: 200,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'x-htmlradar-domain': domainId,
+      [DOMAIN_CHECK_HEADER]: domainId,
       'Cache-Control': 'no-store',
     },
   });
@@ -515,12 +541,18 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   // prefix that would confuse the recipient namespace.
   const docPreviewMatch = /^\/r\/_doc\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
   if (docPreviewMatch) {
-    // Never on a customer's own domain. This route is sender-side, carries no
-    // share and therefore no stored hostname to check against, and serves the
-    // raw upload with no tracker and no gate. On a customer's domain it would
-    // be a way to put any document of that owner's on that hostname without
-    // a share ever having chosen it.
-    if (host.kind === 'custom') return notFound();
+    // THE APEX ONLY, and every other host is the standard not-found.
+    //
+    // This route is sender-side. It carries no share, so it has no stored
+    // hostname to check against, and it serves the raw upload with no gate and
+    // no tracker. A valid token is bound to a document and to nothing else —
+    // so on any host but the apex it was a way to put a document on a hostname
+    // no share ever chose: another customer's handle host, or a customer's own
+    // domain, wearing their name over somebody else's upload.
+    //
+    // The apex is where the application mints these tokens and where the
+    // Preview button sends the sender, so nothing legitimate loses anything.
+    if (host.kind !== 'apex') return notFound();
     const docId = docPreviewMatch[1]!;
     const previewToken = url.searchParams.get('owner_doc_preview');
     const tokenValid = previewToken

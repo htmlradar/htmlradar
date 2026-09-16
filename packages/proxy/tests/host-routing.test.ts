@@ -270,48 +270,72 @@ describe('a self-hoster sets their own hosts', () => {
     }
   });
 
-  it('refuses htmlradar.com once it is no longer a legacy host', async () => {
-    // CHANGED 17 September 2026, with custom domains. This used to be served
-    // as the apex, because an unknown hostname fell back to the apex. That
-    // fallback is gone: the route is now the whole zone, so every hostname
-    // Cloudflare for SaaS points at us arrives here, and "unknown behaves
-    // like the apex" would have been every apex share on every such hostname.
+  it('leaves htmlradar.com alone once it is no longer a legacy host', async () => {
     const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, selfHosted);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
   });
 });
 
-describe('a host that is neither the share host nor a legacy host is refused', () => {
-  // The legacy list is now also the list of hosts this worker RECOGNISES
-  // besides the share host and its subdomains. Emptying it no longer serves
-  // the old host in place — it makes the old host a stranger, and a stranger
-  // gets the standard not-found on every path.
+describe('an empty legacy list turns the redirect off', () => {
+  // How the content domain ships on its first deploy, and where a rollback
+  // puts it afterwards: both hosts serve documents, neither one redirects, so
+  // a single link opens on either. Gate 2 of the switch plan sets
+  // LEGACY_HOSTS = "htmlradar.com" to turn the permanent redirect on.
+  //
+  // This still holds with custom domains, and it is the reason ORIGIN_HOST
+  // exists in src/index.ts. The legacy list decides whether the old host
+  // REDIRECTS; whether the old host is served at all is not configurable,
+  // because the answer is yes for as long as those links are in circulation.
+  // An unknown hostname is refused now — the old host is not an unknown one.
   const noRedirect = { ...baseEnv, LEGACY_HOSTS: '' } as import('../src/env.js').Env;
 
-  it('404s the old host instead of serving it in place', async () => {
+  it('serves the old host in place instead of redirecting it', async () => {
     const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, noRedirect);
-    expect(res.status).toBe(404);
-    expect(res.headers.get('Location')).toBeNull();
+    expect(res.status).toBe(200);
+    expect(getShareBySlug).toHaveBeenCalledWith(noRedirect, 'acme-proposal');
   });
 
-  it('serves the share host at the same time, so its own links are untouched', async () => {
+  it('serves the share host at the same time, so one link opens on either', async () => {
     const res = await fetchAs('https://htmlradar.page/r/acme-proposal', {}, noRedirect);
     expect(res.status).toBe(200);
   });
 
-  it('never looks the share up on a host it does not recognise', async () => {
-    await fetchAs('https://htmlradar.com/r/acme-proposal?x=1', {}, noRedirect);
-    await fetchAs(
+  it('sends no Location at all, query string included', async () => {
+    const res = await fetchAs('https://htmlradar.com/r/acme-proposal?x=1', {}, noRedirect);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Location')).toBeNull();
+  });
+
+  it('serves the attachment path in place as well, query and all', async () => {
+    // 404 because the mocked lookup has no attachment by that id — the point
+    // is that the download route ran here at all instead of answering 301.
+    const res = await fetchAs(
       'https://htmlradar.com/r/acme-proposal/m/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?v=2',
       {},
       noRedirect,
     );
-    expect(getShareBySlug).not.toHaveBeenCalled();
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Location')).toBeNull();
+    expect(getShareBySlug).toHaveBeenCalledWith(noRedirect, 'acme-proposal');
   });
 
   it('still upgrades plain HTTP, which is a separate rule from the host', async () => {
     const res = await fetchAs('http://htmlradar.com/r/acme-proposal', {}, noRedirect);
     expect(res.status).toBe(301);
     expect(res.headers.get('Location')).toBe('https://htmlradar.com/r/acme-proposal');
+  });
+
+  it('still refuses a customer-domain share there', async () => {
+    // The old host is the apex's equal for routing and for nothing else.
+    getShareBySlug.mockResolvedValue({
+      ...share,
+      custom_domain_id: 'dom-1',
+      custom_domain_hostname: 'decks.acme.com',
+      custom_domain_state: 'live',
+      custom_domain_owner_id: 'owner-1',
+    });
+    const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, noRedirect);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Location')).toBeNull();
   });
 });

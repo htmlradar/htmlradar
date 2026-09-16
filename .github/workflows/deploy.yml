@@ -340,6 +340,25 @@ jobs:
           command: deploy
           vars: GIT_SHA
 
+      # First deploy of the Worker (above) has to happen before secrets can
+      # be pushed — `wrangler secret put` fails against a Worker that has
+      # never existed.
+      #
+      # Custom domains: the monitor calls Cloudflare's custom-hostnames API
+      # to reconcile them, same as the app below.
+      - name: Provision monitor worker secrets (packages/monitor)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID_PAGE: ${{ secrets.CLOUDFLARE_ZONE_ID_PAGE }}
+        run: |
+          set -e
+          for NAME in CLOUDFLARE_API_TOKEN CLOUDFLARE_ZONE_ID_PAGE; do
+            VALUE="${!NAME}"
+            echo "Setting Worker secret $NAME..."
+            printf '%s' "$VALUE" | npx --yes "wrangler@${WRANGLER_VERSION}" secret put "$NAME" --name htmlradar-monitor
+          done
+
       # Connector Worker (packages/connector) — Phase B, task B1, per
       # CONNECTOR-CONTRACT-2026-09-02.md. Same pattern as the proxy and
       # monitor steps above: `wrangler deploy` syncs [[routes]]
@@ -392,6 +411,9 @@ jobs:
       # — Worker-only). `wrangler pages secret put` creates a fresh Pages
       # deployment from the existing build output with the new secret bound,
       # so no separate re-deploy step is needed for it to take effect.
+      #
+      # Custom domains: the app and the monitor call Cloudflare's
+      # custom-hostnames API; the two flags below gate enrolment and the pilot.
       - name: Provision Pages secrets for the connector (shared HMACs)
         if: ${{ (vars.CONNECTOR_DEPLOY_ENABLED == 'true') && !(github.event_name == 'workflow_dispatch' && inputs.preview_only) }}
         env:
@@ -399,10 +421,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CONNECT_SIGNING_SECRET: ${{ secrets.CONNECT_SIGNING_SECRET }}
           CONNECT_EXCHANGE_SECRET: ${{ secrets.CONNECT_EXCHANGE_SECRET }}
+          CLOUDFLARE_ZONE_ID_PAGE: ${{ secrets.CLOUDFLARE_ZONE_ID_PAGE }}
+          CUSTOM_DOMAINS_ENABLED: ${{ secrets.CUSTOM_DOMAINS_ENABLED }}
+          CUSTOM_DOMAINS_PILOT_OWNERS: ${{ secrets.CUSTOM_DOMAINS_PILOT_OWNERS }}
         run: |
           set -e
-          for NAME in CONNECT_SIGNING_SECRET CONNECT_EXCHANGE_SECRET; do
+          for NAME in CONNECT_SIGNING_SECRET CONNECT_EXCHANGE_SECRET CLOUDFLARE_API_TOKEN CLOUDFLARE_ZONE_ID_PAGE CUSTOM_DOMAINS_ENABLED CUSTOM_DOMAINS_PILOT_OWNERS; do
             VALUE="${!NAME}"
+            [ -n "$VALUE" ] || { echo "skip $NAME (empty)"; continue; }
             echo "Setting Pages secret $NAME on project htmlradar..."
             printf '%s' "$VALUE" | npx --yes "wrangler@${WRANGLER_VERSION}" pages secret put "$NAME" --project-name=htmlradar
           done

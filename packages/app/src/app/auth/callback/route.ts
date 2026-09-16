@@ -1,7 +1,19 @@
-// OAuth + magic-link return path. Supabase Auth redirects here with a
-// `code` query param after the user completes sign-in. We exchange the
-// code for a session cookie, then redirect to the intended destination
-// (`?next=`).
+// OAuth + magic-link return path.
+//
+// Two ways in. OAuth (Google) returns with a `code` (PKCE), exchanged for a
+// session cookie. E-mail links carry `token_hash` + `type=email` instead: the
+// Supabase e-mail templates build the link as
+// `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`, and this route
+// verifies the hash server-side, which sets the cookie. That is the only form
+// that works when the link is requested by our server route
+// (/api/auth/magic-link, since 4 Sep 2026) rather than by the browser: with no
+// PKCE state in the browser, Supabase's default `{{ .ConfirmationURL }}` link
+// fell back to the implicit flow and put the tokens in the URL fragment, which
+// no server can read, so every e-mail sign-in from 4 to 16 Sep 2026 landed the
+// person on the page signed OUT (three of three fell back to Google on 14 Sep).
+// The hash form also works when the link is opened in a different browser
+// from the one that asked for it, which a phone opening a desktop's e-mail is.
+// Then we redirect to the intended destination (`?next=`).
 //
 // `next` is the only externally-controlled redirect target on the site
 // and must be validated — accepting `next=//evil.com` makes us a phishing
@@ -18,6 +30,7 @@ export const runtime = 'edge';
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
+  const tokenHash = url.searchParams.get('token_hash');
   const next = safeNext(url.searchParams.get('next'));
 
   // Redirect to /sign-in with an error, PRESERVING the intended destination
@@ -43,7 +56,7 @@ export async function GET(req: NextRequest) {
   // error (expired/denied magic link, OAuth error), surface it instead of
   // silently redirecting to `next` as though sign-in succeeded — otherwise the
   // user lands on a gated page, bounces back to sign-in, and never sees why.
-  if (!code) {
+  if (!code && !tokenHash) {
     const providerError =
       url.searchParams.get('error_description') || url.searchParams.get('error');
     if (providerError) {
@@ -56,9 +69,16 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = serverClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = tokenHash
+    ? await supabase.auth.verifyOtp({ type: 'email', token_hash: tokenHash })
+    : await supabase.auth.exchangeCodeForSession(code as string);
   if (error) {
-    return signInError('callback', error.message);
+    // An e-mail link is single-use and expires in an hour; say so rather than
+    // a generic failure, the same way an expired provider error is surfaced.
+    return signInError(
+      tokenHash && /expired|invalid|otp/i.test(error.message) ? 'expired' : 'callback',
+      error.message,
+    );
   }
 
   // Always fire signed_in. If the user row was created in the last 60s

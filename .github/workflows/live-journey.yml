@@ -1,0 +1,63 @@
+# Daily live-journey check against production.
+#
+# Why it exists: e-mail sign-in links landed people SIGNED OUT from 4 to 16
+# September 2026 and nothing caught it for twelve days — the five-minute
+# monitor only asks whether pages return 200, and a broken sign-in returns a
+# healthy 200. This job signs in for real and shares a document for real.
+#
+# It reads production and writes one throwaway tracked link per run, which it
+# revokes; the next day's run deletes the document. It never deploys. On
+# failure it exits 1 (a red run) and e-mails hello@htmlradar.com through
+# Resend.
+#
+# JOURNEY_EMAIL is a secret rather than a literal for two reasons: it must be
+# a Pro or comped account (a free one runs out of tracked links on the third
+# day), and this repository is public.
+name: Live journey
+
+on:
+  schedule:
+    # 03:17 UTC daily = 08:47 IST. Off the hour, because the hour is when
+    # every other cron on the internet runs.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One journey at a time: a manual run during the scheduled one would create
+# two links and read each other's activity.
+concurrency:
+  group: live-journey
+  cancel-in-progress: false
+
+jobs:
+  journey:
+    name: Sign in and share a document
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      # The script is plain Node with no imports outside node:*, so nothing is
+      # built here and no postinstall script needs to run.
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Walk the live journey
+        run: node packages/app/scripts/live-journey.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HTMLRADAR_API_KEY: ${{ secrets.HTMLRADAR_API_KEY }}
+          JOURNEY_EMAIL: ${{ secrets.JOURNEY_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

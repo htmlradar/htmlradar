@@ -37,8 +37,7 @@ const TOOLS = [
   {
     href: '/convert',
     title: 'PDF deck to web page',
-    description:
-      'Turn a landscape PDF deck into a downloadable HTML page, with an optional tracked link.',
+    description: 'Convert a PDF deck into an HTML web page, free in your browser.',
   },
 ];
 

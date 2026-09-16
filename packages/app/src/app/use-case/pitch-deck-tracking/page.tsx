@@ -139,6 +139,11 @@ export default function PitchDeckTrackingPage() {
           />
 
           <section className="mt-14">
+            <p className="mb-5 text-[15px] leading-relaxed text-ink-soft">
+              <Link href="/convert" className="text-signal-dark hover:underline">
+                Convert your PDF pitch deck into a web page before creating a tracked link.
+              </Link>
+            </p>
             <Link
               href="/sign-in"
               className="inline-flex items-center gap-2 rounded-md bg-signal px-6 py-3 text-[15px] font-medium text-paper shadow-[0_1px_0_rgba(31,17,8,0.15)] transition hover:bg-signal-dark"

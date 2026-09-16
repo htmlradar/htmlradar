@@ -168,7 +168,10 @@ export default function ComparePage() {
             <ul className="mt-4 list-disc space-y-2 pl-5 text-[16px] leading-[1.7] text-ink-soft">
               <li>
                 You send PDFs, presentations, office documents, media, or spreadsheets rather than
-                HTML.
+                HTML.{' '}
+                <Link href="/convert" className="text-signal-dark hover:underline">
+                  Turn your PDF pitch deck into a web page, then sign in to create a tracked link.
+                </Link>
               </li>
               <li>You need a mature hosted product built around broader document sharing.</li>
               <li>

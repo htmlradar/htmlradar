@@ -37,7 +37,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
 
       <p className="mt-4 text-[14px] text-signal-dark">
         <a href="/convert" className="underline underline-offset-4">
-          Have a PDF? Turn it into a web page first.
+          Convert your PDF deck into an HTML web page before uploading it.
         </a>
       </p>
 

@@ -854,6 +854,12 @@ export default function Post() {
 
           <div className="mt-20 border-t border-line pt-10">
             <p className="text-[14px] leading-relaxed text-ink-soft">
+              <Link href="/convert" className="text-signal-dark hover:underline">
+                Try the free PDF-deck converter to download a web page or create a tracked link
+                after sign-in.
+              </Link>
+            </p>
+            <p className="mt-4 text-[14px] leading-relaxed text-ink-soft">
               The launch piece explains why HTMLRadar exists:{' '}
               <Link
                 href="/blog/why-i-built-read-tracking-for-html"

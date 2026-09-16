@@ -391,7 +391,8 @@ export function ConvertPanel({
                   <ArrowRight aria-hidden className="size-4" />
                 </button>
                 <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
-                  Sign-in is required. Next, you’ll choose how to share it.
+                  Sign in to share your converted deck with a tracked link. The free plan includes 2
+                  tracked links.
                 </p>
               </div>
             </div>

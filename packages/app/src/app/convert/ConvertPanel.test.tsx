@@ -215,7 +215,9 @@ describe('converter page states', () => {
     expect(host.textContent).toContain('Harbour & Co');
     expect(host.textContent).toContain('M. Okafor');
     expect(host.textContent).toContain('sample numbers, your slides');
-    expect(host.textContent).toContain('Sign-in is required. Next, you’ll choose how to share it.');
+    expect(host.textContent).toContain(
+      'Sign in to share your converted deck with a tracked link. The free plan includes 2 tracked links.',
+    );
     expect(await readStagedFile()).toBeNull();
     expect(action).not.toHaveBeenCalled();
     await settle(() => button('Next').click());

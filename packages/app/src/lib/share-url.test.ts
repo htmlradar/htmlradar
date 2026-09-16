@@ -97,6 +97,49 @@ describe('a share that stores a hostname', () => {
 });
 
 // ---------------------------------------------------------------------------
+// The customer's own domain (schema/052).
+//
+// Same property as the handle above, one level up: the address follows the
+// share's own row. The difference is that a custom hostname is whole — it
+// belongs to the customer, so nothing of ours is prefixed to it.
+// ---------------------------------------------------------------------------
+
+describe('a share issued on the owner’s own domain', () => {
+  it('is served from that hostname, with none of ours left in it', async () => {
+    const { shareUrl, shareUrlLabel } = await load(undefined);
+    expect(shareUrl('acme-proposal', null, 'decks.acme.com')).toBe(
+      'https://decks.acme.com/r/acme-proposal',
+    );
+    expect(shareUrlLabel('acme-proposal', null, 'decks.acme.com')).toBe(
+      'decks.acme.com/r/acme-proposal',
+    );
+  });
+
+  // The two columns are mutually exclusive on the row (schema/052 refuses
+  // both), but the builder must not depend on the database to be right.
+  it('wins over a handle if a row somehow carries both', async () => {
+    const { shareUrl } = await load(undefined);
+    expect(shareUrl('acme-proposal', 'lumenforge', 'decks.acme.com')).toBe(
+      'https://decks.acme.com/r/acme-proposal',
+    );
+  });
+
+  it('changes nothing for a share that has no domain, however the absence is spelled', async () => {
+    const { shareUrl } = await load(undefined);
+    const apex = 'https://htmlradar.page/r/acme-proposal';
+    expect(shareUrl('acme-proposal', null, null)).toBe(apex);
+    expect(shareUrl('acme-proposal', null, undefined)).toBe(apex);
+    expect(shareUrl('acme-proposal', null, '')).toBe(apex);
+  });
+
+  // A self-hoster on plain HTTP must not have an https link built for them.
+  it('takes the scheme from the configured base', async () => {
+    const { shareUrl } = await load('http://docs.example.org');
+    expect(shareUrl('x-y-z', null, 'decks.acme.com')).toBe('http://decks.acme.com/r/x-y-z');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // One builder, and only one
 //
 // A hand-built `${SHARE_HOST}/r/${slug}` is how the dashboard ends up showing

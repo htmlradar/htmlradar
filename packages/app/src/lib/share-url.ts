@@ -37,12 +37,26 @@ export const SHARE_HOST = SHARE_BASE.replace(/^https?:\/\//, '');
 //
 // Null, absent, or a share created before the switch: the apex, byte for byte
 // what this file has always returned.
-const baseFor = (hostHandle?: string | null): string =>
-  hostHandle ? SHARE_BASE.replace('://', `://${hostHandle}.`) : SHARE_BASE;
+//
+// A share created on the owner's own domain (schema/052) stores that domain
+// instead, and `customHostname` is its hostname read off the same row. It wins
+// over the handle because the two are mutually exclusive on the row, and it is
+// a whole hostname rather than a label — it belongs to the customer, not to
+// us, so nothing of ours is prefixed to it. The scheme still comes from
+// SHARE_BASE, so a self-hoster running plain HTTP gets plain HTTP here too.
+const SCHEME = SHARE_BASE.startsWith('http://') ? 'http://' : 'https://';
+
+const baseFor = (hostHandle?: string | null, customHostname?: string | null): string => {
+  if (customHostname) return `${SCHEME}${customHostname}`;
+  return hostHandle ? SHARE_BASE.replace('://', `://${hostHandle}.`) : SHARE_BASE;
+};
 
 /** The public address of a share. */
-export const shareUrl = (slug: string, hostHandle?: string | null): string =>
-  `${baseFor(hostHandle)}/r/${slug}`;
+export const shareUrl = (
+  slug: string,
+  hostHandle?: string | null,
+  customHostname?: string | null,
+): string => `${baseFor(hostHandle, customHostname)}/r/${slug}`;
 
 /**
  * The same address without the scheme, for the places that print a link
@@ -53,5 +67,19 @@ export const shareUrl = (slug: string, hostHandle?: string | null): string =>
  * host, and the customer would copy an address that is not the one on the
  * button beside it.
  */
-export const shareUrlLabel = (slug: string, hostHandle?: string | null): string =>
-  shareUrl(slug, hostHandle).replace(/^https?:\/\//, '');
+/**
+ * What a surface prints instead of an address it could not determine.
+ *
+ * A share that names a customer domain whose hostname did not come back has no
+ * address we can vouch for, and the apex address is not a safe guess: it would
+ * look right, copy cleanly and open nothing. This module owns it because it
+ * owns every other printed address, and because a client component may import
+ * this file and may not import the server-only one.
+ */
+export const ADDRESS_UNAVAILABLE = 'Address unavailable — refresh the page';
+
+export const shareUrlLabel = (
+  slug: string,
+  hostHandle?: string | null,
+  customHostname?: string | null,
+): string => shareUrl(slug, hostHandle, customHostname).replace(/^https?:\/\//, '');

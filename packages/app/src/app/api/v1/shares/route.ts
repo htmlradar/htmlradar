@@ -49,6 +49,14 @@ import { captureServerEvent } from '@/lib/events';
 import { logServerError } from '@/lib/error-log';
 import { shareUrl } from '@/lib/share-url';
 import { stampShareHost } from '@/lib/handle';
+import {
+  customDomainsEnabled,
+  customHostnameMissing,
+  customHostnameOf,
+  hostnameOfDomain,
+  shareHostArgs,
+  type HostChoice,
+} from '@/lib/custom-domains';
 
 export const runtime = 'edge';
 
@@ -88,6 +96,12 @@ interface CreateShareBody {
   allowed_email_domains?: unknown;
   expires_in_hours?: unknown;
   slug?: unknown;
+  // Which hostname the link is served from (schema/052). Absent means the
+  // account's own domain when it has a live one; an explicit null is the
+  // HTMLRadar address; an id must be one of the caller's own live domains.
+  // Three states, so `undefined` and `null` are deliberately not the same
+  // thing here — `'domain_id' in body` is what tells them apart.
+  domain_id?: unknown;
 }
 
 // The deck's own <title>, when the caller did not name it. Deliberately not a
@@ -269,6 +283,28 @@ export async function POST(req: NextRequest) {
     expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
   }
 
+  // Three states, so an omitted field and an explicit null are deliberately
+  // not the same thing. Whether the named domain is the caller's and live is
+  // the database's answer, not ours: create_share_as raises on a domain it
+  // will not use, and mapCreateShareError turns that into this endpoint's 422.
+  // Checking it here as well would be a second opinion that can disagree.
+  const domainGiven = Object.prototype.hasOwnProperty.call(body, 'domain_id');
+  const domainIdRaw = domainGiven ? body.domain_id : undefined;
+  if (domainGiven && domainIdRaw !== null && typeof domainIdRaw !== 'string') {
+    return errorResponse(validationError('"domain_id" must be a domain id, or null.'));
+  }
+  if (typeof domainIdRaw === 'string' && !UUID.test(domainIdRaw)) {
+    return errorResponse(validationError('"domain_id" must be a domain id, or null.'));
+  }
+  if (typeof domainIdRaw === 'string' && !customDomainsEnabled()) {
+    return errorResponse(validationError('Custom domains are not available on this installation.'));
+  }
+  const hostChoice: HostChoice = !domainGiven
+    ? { kind: 'default' }
+    : domainIdRaw === null
+      ? { kind: 'htmlradar' }
+      : { kind: 'domain', id: domainIdRaw as string };
+
   // Passed straight through: validate_share_slug (schema/033) owns the format,
   // the reserved list and the Pro entitlement, and it is the only one of those
   // three a caller cannot walk around.
@@ -351,6 +387,7 @@ export async function POST(req: NextRequest) {
     p_allowed_emails: null,
     p_expires_at: expiresAt,
     p_slug: slug,
+    ...shareHostArgs(hostChoice),
   });
   if (error) {
     await undoDocument();
@@ -372,6 +409,7 @@ export async function POST(req: NextRequest) {
   const share = (Array.isArray(created) ? created[0] : created) as {
     id?: string;
     slug?: string;
+    custom_domain_id?: string | null;
   } | null;
   if (!share?.id || !share.slug) {
     await undoDocument();
@@ -448,15 +486,43 @@ export async function POST(req: NextRequest) {
       lock_deck: lockDeck,
       is_first_share: quota.used === 0,
       custom_slug: !!slug,
+      custom_domain: !!share.custom_domain_id,
       existing_document: existingDocumentId !== null,
       via: 'api',
     },
   });
 
+  // Read back from the row the database wrote, never from what was asked for:
+  // an implied choice falls back to the HTMLRadar address when the account's
+  // default has stopped serving, and the URL in this response is the URL the
+  // recipient will open.
+  const address = await hostnameOfDomain(supabase, share.custom_domain_id);
+  if (!address.ok) {
+    // The link exists and is correct; only its address could not be read. An
+    // htmlradar.page URL here would be a working-looking address for a link
+    // that is not there, which is worse than saying so — the caller can list
+    // their shares and find it.
+    await logServerError({
+      source: 'api.v1.shares',
+      message: 'could not read the hostname of the domain the share was created on',
+      userId: caller.userId,
+      route: ROUTE,
+      context: { step: 'hostname_of_domain', share_id: share.id },
+    });
+    return errorResponse({
+      status: 500,
+      body: {
+        error: 'internal',
+        message:
+          'The link was created, but we could not read the address it is served on. List your shares to get it.',
+      },
+    });
+  }
+
   return jsonResponse(201, {
     share_id: share.id,
     document_id: documentId,
-    url: shareUrl(share.slug, hostHandle),
+    url: shareUrl(share.slug, hostHandle, address.hostname),
     dashboard_url: `${SITE_URL}/docs/${documentId}`,
   });
 }
@@ -491,7 +557,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('document_shares')
     .select(
-      'id, slug, document_id, recipient_label, created_at, revoked_at, expires_at, host_handle',
+      'id, slug, document_id, recipient_label, created_at, revoked_at, expires_at, host_handle, custom_domain_id, custom_domains(hostname)',
     )
     .eq('owner_id', caller.userId)
     // Both columns, in both places: the sort and the cursor have to agree, or
@@ -515,6 +581,28 @@ export async function GET(req: NextRequest) {
 
   const rows = (data ?? []) as ShareListRow[];
   if (rows.length === 0) return jsonResponse(200, { shares: [], next_before: null });
+
+  // A row that names a domain the join did not bring back has no address we
+  // can vouch for, and the apex address would be a wrong one. One such row
+  // fails the page rather than handing the caller a mixture of correct and
+  // confidently incorrect links.
+  const unreadable = rows.find((row) => customHostnameMissing(row));
+  if (unreadable) {
+    await logServerError({
+      source: 'api.v1.shares',
+      message: 'a share names a custom domain whose hostname could not be read',
+      userId: caller.userId,
+      route: ROUTE,
+      context: { step: 'list_shares', share_id: unreadable.id },
+    });
+    return errorResponse({
+      status: 500,
+      body: {
+        error: 'internal',
+        message: 'We could not read the address one of these links is served on. Try again.',
+      },
+    });
+  }
 
   const shareIds = rows.map((row) => row.id);
   const documentIds = [...new Set(rows.map((row) => row.document_id))];
@@ -553,7 +641,7 @@ export async function GET(req: NextRequest) {
     shares: rows.map((row) => ({
       share_id: row.id,
       slug: row.slug,
-      url: shareUrl(row.slug, row.host_handle),
+      url: shareUrl(row.slug, row.host_handle, customHostnameOf(row)),
       recipient_label: row.recipient_label,
       document_id: row.document_id,
       document_title: titleById.get(row.document_id) ?? null,
@@ -582,6 +670,10 @@ interface ShareListRow {
   // Null on every share created before handle links were switched on, which
   // is every share that exists today: those are served on the apex forever.
   host_handle: string | null;
+  // Set when the link is on a customer's own domain. Selected beside the
+  // joined hostname so the two can be compared: the id says whether there is
+  // supposed to be a hostname, and the join says what it is.
+  custom_domain_id: string | null;
 }
 
 interface SessionListRow {

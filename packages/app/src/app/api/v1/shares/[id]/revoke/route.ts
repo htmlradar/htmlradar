@@ -34,6 +34,7 @@ import { findOwnedShare } from '@/lib/api-share-lookup';
 import { captureServerEvent } from '@/lib/events';
 import { logServerError } from '@/lib/error-log';
 import { shareUrl } from '@/lib/share-url';
+import { customHostnameMissing, customHostnameOf } from '@/lib/custom-domains';
 
 export const runtime = 'edge';
 
@@ -79,7 +80,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     slug: string;
     owner_id: string;
     host_handle: string | null;
-  }>(supabase, caller.userId, params.id, 'id, slug, host_handle');
+    custom_domain_id: string | null;
+  }>(
+    supabase,
+    caller.userId,
+    params.id,
+    'id, slug, host_handle, custom_domain_id, custom_domains(hostname)',
+  );
   if (!share) return errorResponse(NOT_FOUND);
 
   const revokedAt = revoked ? new Date().toISOString() : null;
@@ -108,9 +115,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     properties: { share_id: share.id, via: 'api' },
   });
 
+  // The revoke itself has already happened and is what the caller asked for.
+  // Only the address could not be read, and an apex URL would be a wrong one,
+  // so it is left out rather than guessed.
+  const unreadable = customHostnameMissing(share);
   return jsonResponse(200, {
     share_id: share.id,
-    url: shareUrl(share.slug, share.host_handle),
+    url: unreadable ? null : shareUrl(share.slug, share.host_handle, customHostnameOf(share)),
     revoked,
     revoked_at: revokedAt,
   });

@@ -41,6 +41,9 @@ interface DocTabsClientProps {
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
   freeShareCap?: { used: number; cap: number } | null;
+  // The owner's live custom domain, if they have one and the feature is on.
+  // Null means every new link is an HTMLRadar link, which is the shipped state.
+  defaultDomainHostname?: string | null;
   viewers: Viewer[];
   sessions: Session[];
   events: SectionEvent[];
@@ -206,6 +209,7 @@ export function DocTabsClient(props: DocTabsClientProps) {
             toggleShareAction={props.toggleShareAction}
             deleteShareAction={props.deleteShareAction}
             freeShareCap={props.freeShareCap ?? null}
+            defaultDomainHostname={props.defaultDomainHostname ?? null}
           />
         </TabPanel>
         <TabPanel tabKey="analytics" active={activeTab === 'analytics'}>
@@ -280,6 +284,7 @@ function SharingPanel({
   toggleShareAction,
   deleteShareAction,
   freeShareCap,
+  defaultDomainHostname,
 }: {
   documentId: string;
   shares: ShareRow[];
@@ -293,6 +298,9 @@ function SharingPanel({
   toggleShareAction: (formData: FormData) => Promise<void>;
   deleteShareAction: (formData: FormData) => Promise<void>;
   freeShareCap?: { used: number; cap: number } | null;
+  // The owner's live custom domain, if they have one and the feature is on.
+  // Null means every new link is an HTMLRadar link, which is the shipped state.
+  defaultDomainHostname?: string | null;
 }) {
   return (
     <section>
@@ -314,6 +322,7 @@ function SharingPanel({
         toggleShareAction={toggleShareAction}
         deleteShareAction={deleteShareAction}
         freeShareCap={freeShareCap ?? null}
+        defaultDomainHostname={defaultDomainHostname ?? null}
       />
     </section>
   );

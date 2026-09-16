@@ -10,6 +10,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { SHARE_SLUG_PATTERN } from './share-slug';
 import { SHARE_HOST } from './share-url';
+import { PILOT_HOSTNAMES, pilotOwners } from './custom-domains';
 
 const SITE_HOST = 'htmlradar.com';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,12 +32,44 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // the row and the lookup below is scoped to the caller's own shares anyway,
 // so accepting the label here only means an assistant can paste the link it
 // was given.
+//
+// A fourth shape once a customer connects their own domain (schema/052): the
+// link is `decks.acme.com/r/{slug}` and there is no list of hostnames we could
+// match it against — the whole point is that the hostname is theirs. So any
+// well-formed hostname is accepted in that position.
+//
+// That is not a loosening of who can see what. The host is never used to find
+// anything: a slug is only ever looked up inside the caller's OWN shares by an
+// owner filter written on the query below, and the slug itself still has to
+// match the format the database stores. Accepting a hostname here means an
+// assistant can paste the link it was handed, and nothing else.
+//
+// One name is still refused: a host with "htmlradar" anywhere in it that is
+// not one of the two above — `htmlradar.page.evil.example` and its family.
+// That is the same rule schema/052 applies when a customer connects a domain,
+// so no real customer hostname can contain the word, and a lookalike must not
+// be quietly read as ours here either.
 const escapeHost = (host: string): string => host.replace(/\./g, '\\.');
 const HANDLE_LABEL = '[a-z0-9][a-z0-9-]{1,22}[a-z0-9]';
-const LINK_HOSTS = [`(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`, escapeHost(SITE_HOST)].join(
-  '|',
-);
-const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
+const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?';
+// The lookahead spans the host and stops at the path separator, so a slug is
+// free to contain the word even though a hostname is not.
+const CUSTOM_HOST = `(?![^/]*htmlradar)${DNS_LABEL}(?:\\.${DNS_LABEL}){2,}`;
+const linkPattern = (extraHosts: string[]): RegExp => {
+  const hosts = [
+    `(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`,
+    escapeHost(SITE_HOST),
+    ...extraHosts.map(escapeHost),
+    CUSTOM_HOST,
+  ].join('|');
+  return new RegExp(`^(?:(?:https://)?(?:${hosts}))?/r/([^/]+)$`);
+};
+const LINK = linkPattern([]);
+// The pilot's two test names are ours, so the lookalike rule above refuses
+// them like any other. They are admitted only while a pilot is actually
+// configured — `CUSTOM_DOMAINS_PILOT_OWNERS` non-empty — which is never in a
+// shipped build, so the refusal is what a customer's installation does.
+const PILOT_LINK = linkPattern(PILOT_HOSTNAMES);
 
 /**
  * The slug in what the caller passed, or null.
@@ -45,7 +78,8 @@ const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
  * slug it stores, so a malformed value costs a regex and not a query.
  */
 export function slugOf(raw: string): string | null {
-  const candidate = LINK.exec(raw)?.[1] ?? raw;
+  const pattern = pilotOwners().length > 0 ? PILOT_LINK : LINK;
+  const candidate = pattern.exec(raw)?.[1] ?? raw;
   return SHARE_SLUG_PATTERN.test(candidate) ? candidate : null;
 }
 

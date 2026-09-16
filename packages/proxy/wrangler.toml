@@ -46,7 +46,7 @@ workers_dev = false  # We don't want this exposed at *.workers.dev — only via 
 # rather than wrong; under `*/*` the same rules answer. The test suite covers
 # the rules themselves, which do not read the route.
 [[routes]]
-pattern = "htmlradar.page/*"
+pattern = "*/*"
 zone_name = "htmlradar.page"
 
 [[routes]]

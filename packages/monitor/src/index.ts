@@ -113,6 +113,11 @@ export interface Env {
   // anything else (including unset) skips it, leaving Google Alerts and HN
   // unaffected. See wrangler.toml [vars] for the flip.
   REDDIT_SCAN_ENABLED?: string;
+  // The listening radar (04:00 scan + 05:00 digest) is switched off since
+  // 16 Sep 2026: two weeks produced no usable lead. 'true' makes the sentinel
+  // expect the scan_run and radar rows again; anything else skips those two
+  // checks. The crons themselves live in wrangler.toml.
+  RADAR_ENABLED?: string;
 }
 
 // What a healthy production answers, one entry per probe.
@@ -2892,64 +2897,72 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
       : null;
   });
 
-  // Yesterday's thread scan. A missing scan_run row is the finding schema/038
-  // was written for: it is what a cron that never fired looks like.
-  await run('scan_run', async () => {
-    const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
-        `?kind=eq.scan_run&created_at=gte.${since(SENTINEL_SCAN_WINDOW_MS)}` +
-        `&order=created_at.desc&limit=1&select=created_at,meta`,
-      { headers },
-    );
-    if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
-    const row = ((await res.json()) as ScanRunRow[])[0];
-    if (!row) {
-      meta['scan_run'] = null;
-      return 'thread scan: no scan_run row in the last 26h — the 04:00 UTC scan did not run, or could not write its row';
-    }
-    const fetches = row.meta?.fetches ?? [];
-    const items = row.meta?.total_items ?? 0;
-    const redditPaused = row.meta?.reddit_paused;
-    // Paused is not a failure: no Reddit fetches were attempted, so none of
-    // them land in `bad` below. Say it once, on its own line, rather than
-    // silently absorbing it into "all clear".
-    if (redditPaused) findings.push(`reddit paused — ${redditPaused}`);
-    const bad = fetches.filter((f) => f.error || f.status !== 200);
-    meta['scan_run'] = {
-      at: row.created_at,
-      items,
-      fetches: fetches.length,
-      failed: bad.length,
-      ...(redditPaused ? { reddit_paused: redditPaused } : {}),
-    };
-    if (bad.length === 0) return null;
-    const detail = bad
-      .map((f) => `${f.source} ${f.query}: ${f.error ?? `HTTP ${f.status}`}`)
-      .join('; ');
-    return (
-      `thread scan: ${items} item(s), ${bad.length} of ${fetches.length} fetch(es) failed — ` +
-      detail.slice(0, SENTINEL_DETAIL_CHARS)
-    );
-  });
+  // The two radar checks only mean something while the radar's crons run.
+  const radarOn = env.RADAR_ENABLED === 'true';
+  if (!radarOn) meta['radar'] = 'off';
+  if (radarOn) {
+    // Yesterday's thread scan. A missing scan_run row is the finding schema/038
+    // was written for: it is what a cron that never fired looks like.
+    await run('scan_run', async () => {
+      const res = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+          `?kind=eq.scan_run&created_at=gte.${since(SENTINEL_SCAN_WINDOW_MS)}` +
+          `&order=created_at.desc&limit=1&select=created_at,meta`,
+        { headers },
+      );
+      if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
+      const row = ((await res.json()) as ScanRunRow[])[0];
+      if (!row) {
+        meta['scan_run'] = null;
+        return 'thread scan: no scan_run row in the last 26h — the 04:00 UTC scan did not run, or could not write its row';
+      }
+      const fetches = row.meta?.fetches ?? [];
+      const items = row.meta?.total_items ?? 0;
+      const redditPaused = row.meta?.reddit_paused;
+      // Paused is not a failure: no Reddit fetches were attempted, so none of
+      // them land in `bad` below. Say it once, on its own line, rather than
+      // silently absorbing it into "all clear".
+      // A paused source is a chosen state, not a finding: it is written to meta
+      // for the record and said aloud only in Monday's one-liner (16 Sep 2026;
+      // it had been a daily line for nine days).
 
-  // Yesterday's radar digest. Every run now writes a kind='radar' row — the
-  // real digest, or on a silent day the no-send marker (see dailyDigest) — so
-  // a missing row means the 05:00 UTC digest did not run at all, which before
-  // the marker existed looked identical to "correctly found nothing today".
-  await run('radar_digest', async () => {
-    const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
-        `?kind=eq.radar&created_at=gte.${since(SENTINEL_SCAN_WINDOW_MS)}` +
-        `&order=created_at.desc&limit=1&select=created_at`,
-      { headers },
-    );
-    if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
-    const row = ((await res.json()) as { created_at: string }[])[0];
-    meta['radar_digest'] = row ? row.created_at : null;
-    return row
-      ? null
-      : 'radar: no radar row in the last 26h — the 05:00 UTC digest did not run, or could not write its row';
-  });
+      const bad = fetches.filter((f) => f.error || f.status !== 200);
+      meta['scan_run'] = {
+        at: row.created_at,
+        items,
+        fetches: fetches.length,
+        failed: bad.length,
+        ...(redditPaused ? { reddit_paused: redditPaused } : {}),
+      };
+      if (bad.length === 0) return null;
+      const detail = bad
+        .map((f) => `${f.source} ${f.query}: ${f.error ?? `HTTP ${f.status}`}`)
+        .join('; ');
+      return (
+        `thread scan: ${items} item(s), ${bad.length} of ${fetches.length} fetch(es) failed — ` +
+        detail.slice(0, SENTINEL_DETAIL_CHARS)
+      );
+    });
+
+    // Yesterday's radar digest. Every run now writes a kind='radar' row — the
+    // real digest, or on a silent day the no-send marker (see dailyDigest) — so
+    // a missing row means the 05:00 UTC digest did not run at all, which before
+    // the marker existed looked identical to "correctly found nothing today".
+    await run('radar_digest', async () => {
+      const res = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/telegram_outbox` +
+          `?kind=eq.radar&created_at=gte.${since(SENTINEL_SCAN_WINDOW_MS)}` +
+          `&order=created_at.desc&limit=1&select=created_at`,
+        { headers },
+      );
+      if (!res.ok) throw new Error(`telegram_outbox read HTTP ${res.status}`);
+      const row = ((await res.json()) as { created_at: string }[])[0];
+      meta['radar_digest'] = row ? row.created_at : null;
+      return row
+        ? null
+        : 'radar: no radar row in the last 26h — the 05:00 UTC digest did not run, or could not write its row';
+    });
+  }
 
   // The human half. Infinity when there is no heartbeat row at all, which
   // reads as infinitely stale and needs no second branch in the comparison.

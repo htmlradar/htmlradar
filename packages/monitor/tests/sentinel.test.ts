@@ -24,6 +24,7 @@ const env = {
   POSTHOG_HOST: 'https://posthog.test',
   TELEGRAM_BOT_TOKEN: 'bot-token-that-must-never-appear-in-a-row',
   TELEGRAM_CHAT_ID: '106874',
+  RADAR_ENABLED: 'true',
 } as Env;
 
 const OUTBOX_URL = 'https://db.test/rest/v1/telegram_outbox';
@@ -210,7 +211,7 @@ describe('findings arrive as one message', () => {
     expect(telegram[0]!.text).toContain('Reddit refused this address');
   });
 
-  it('reports a paused Reddit source as one line, not a fetch failure', async () => {
+  it('treats a paused Reddit source as a chosen state, not a finding', async () => {
     const { telegram } = stubWorld({
       ...allClear(TUESDAY),
       scanRun: [
@@ -227,12 +228,8 @@ describe('findings arrive as one message', () => {
 
     await sentinel(env, TUESDAY);
 
-    expect(telegram).toHaveLength(1);
-    expect(telegram[0]!.text).toContain(
-      'reddit paused — reddit: paused (blocked by 403s since 5 Sep)',
-    );
-    // No Reddit fetch was attempted, so it must not also read as a failure.
-    expect(telegram[0]!.text).not.toContain('fetch(es) failed');
+    // Paused is written to meta for the record; it is not said aloud every day.
+    expect(telegram).toHaveLength(0);
   });
 
   it('flags a climbing unverified-notification count — the reconciler handoff from schema/044', async () => {
@@ -332,5 +329,13 @@ describe('the heartbeat age decides whether anyone is minding the register', () 
     await sentinel(env, TUESDAY);
 
     expect(telegram[0]!.text).toContain('(no heartbeat row ever)');
+  });
+});
+
+describe('with the listening radar switched off', () => {
+  it('skips the scan_run and radar checks and stays silent on a clean weekday', async () => {
+    const { telegram } = stubWorld({ ...allClear(TUESDAY), scanRun: [], radarDigest: [] });
+    await sentinel({ ...env, RADAR_ENABLED: undefined }, TUESDAY);
+    expect(telegram).toHaveLength(0);
   });
 });

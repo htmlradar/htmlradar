@@ -21,7 +21,12 @@ workers_dev = true
 # Fourth cron: 05:00 UTC — the daily digest, an hour after the mining scan, so
 #   it reads a finished harvest. Drafts founder-voice replies for the worthwhile
 #   items and Telegrams one batch; Monday carries the weekly insight too.
-crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *", "0 5 * * *"]
+crons = ["*/5 * * * *", "30 3 * * *"]
+# 16 Sep 2026: the 04:00 mining scan and the 05:00 daily digest are switched off.
+# Two weeks of output was 204 noise items and 17 "buyer questions" that were all
+# unrelated news (generic Google Alerts phrases; every headline with a question
+# mark scored 85+), zero acted on. The code stays; re-add the two crons when the
+# feeds are rebuilt around specific phrases and the classifier is tightened.
 
 # Non-sensitive config travels in [vars] so they're visible in the
 # wrangler.toml diff. Everything else is a Worker secret, set once with
@@ -66,6 +71,9 @@ crons = ["*/5 * * * *", "0 4 * * *", "30 3 * * *", "0 5 * * *"]
 #                         User-Agent Reddit's API rules ask for; secret only
 #                         because it is personal and this repository is public
 [vars]
+# Listening radar off since 16 Sep 2026 (see the crons comment above). Set to
+# "true" and re-add the two crons to turn it back on.
+RADAR_ENABLED = "false"
 SUPABASE_URL = "https://ewennjnxuqjzsgawbzur.supabase.co"
 RESEND_FROM = "HTMLRadar <hello@htmlradar.com>"
 ALERT_TO = "hello@htmlradar.com"

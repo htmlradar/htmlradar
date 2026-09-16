@@ -322,7 +322,7 @@ declare
   -- Add the pilot account's id (select id from auth.users where email = …).
   -- ----------------------------------------------------------
   v_pilot_owners uuid[] := array[
-    '00000000-0000-0000-0000-000000000000'  -- pilot account id goes here
+    '2a840f99-24e7-46d9-8ba7-03fe9a58bc47'  -- pilot account id goes here
   ]::uuid[];
 
   -- Public suffixes that are themselves two labels. This is NOT the Public

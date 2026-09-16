@@ -1003,7 +1003,15 @@ async function upsertRadarItems(env: Env, items: RadarItem[]): Promise<void> {
 // The chat id does, because it is not a secret (it is the founder's own chat)
 // and without it a row can't be attributed to a destination.
 
-type OutboxKind = 'alert' | 'scan' | 'scan_run' | 'test' | 'heartbeat' | 'sentinel' | 'radar';
+type OutboxKind =
+  | 'alert'
+  | 'scan'
+  | 'scan_run'
+  | 'test'
+  | 'heartbeat'
+  | 'sentinel'
+  | 'radar'
+  | 'user_feed';
 
 interface OutboxRow {
   kind: OutboxKind;
@@ -3015,6 +3023,270 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
   }
 }
 
+// ---------------------------------------------------------------------------
+// User feed.
+//
+// Everything this worker said until now was about the machine: a route down, a
+// webhook stuck, a cron that didn't fire. The people were invisible. Somebody
+// signing up, sharing for the first time, being read by an outsider, or walking
+// into the free limit only ever showed up if the founder went and looked — so
+// in practice it showed up late, or not at all, and the first paying customer
+// was noticed a day after he paid.
+//
+// Four moments, one Telegram message each, on the five-minute cron:
+//   1. a real sign-up, with where they came from
+//   2. a real user's FIRST share — the moment someone stops browsing
+//   3. an outside read of a real user's document — their recipient, not them
+//   4. upgrade interest: /upgrade viewed, or the two-link cap refusing a create
+//
+// "Once" is the hard part, and it is not solved in memory. The window is
+// [cursor, now) — closed at BOTH ends, read from user_feed_cursor (schema/051),
+// written back only after the sends. An open-ended "since the cursor" window
+// would re-send anything created between the query and the cursor write, and a
+// worker-local "already told him" set would forget on every redeploy. Reads
+// happen first and the cursor moves last, so a Supabase refusal mid-run leaves
+// the cursor where it was and the next run covers the same window: at-least-
+// once, never at-most-once, which for four messages a day is the right way
+// round.
+//
+// Internal accounts are excluded everywhere, and by domain rather than by a
+// list of ids, because the founder's own testing is what made "2 connector
+// users" wrong once already. The demo share is excluded for the same reason:
+// it is linked from the blog, so strangers open it daily and none of it is a
+// customer doing anything.
+
+/** Accounts that are us. Their sign-ups, shares and reads are not news. */
+const INTERNAL_DOMAINS = ['htmlradar.com', 'draconic.ai'];
+/** The public demo link (blog + use-case pages). Opened by strangers daily. */
+const DEMO_SLUG = 'lumenforge-demo';
+/** First run only, before the cursor row exists: the cron's own cadence. */
+const USER_FEED_FALLBACK_MS = 5 * 60_000;
+
+/** Lowercased domain, or '' for an absent/odd address — never throws. */
+function domainOf(email: string | null | undefined): string {
+  return (email ?? '').split('@')[1]?.toLowerCase() ?? '';
+}
+
+function isInternal(email: string | null | undefined): boolean {
+  return INTERNAL_DOMAINS.includes(domainOf(email));
+}
+
+/** Host of a referrer URL, '' for direct traffic or an unparseable value. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return '';
+  }
+}
+
+interface FeedProfileRow {
+  id: string;
+  email: string;
+}
+
+interface FeedShareRow {
+  id: string;
+  owner_id: string;
+  slug: string;
+  document_id: string;
+  documents: { title: string } | null;
+}
+
+interface FeedSessionRow {
+  viewers: { email: string | null; country_code: string | null; device_type: string | null } | null;
+  document_shares: {
+    slug: string;
+    owner_id: string;
+    document_id: string;
+    documents: { title: string } | null;
+  } | null;
+}
+
+interface FeedEventRow {
+  event: string;
+  user_id: string | null;
+  properties?: Record<string, unknown>;
+}
+
+/**
+ * `nowMs` is the scheduled event's timestamp, not Date.now(): it is the closing
+ * edge of the window AND the value written back as the cursor, so the two can
+ * never disagree by however long the run took.
+ */
+export async function userFeed(env: Env, nowMs: number = Date.now()): Promise<void> {
+  // Nothing to say it with — don't spend four Supabase reads every five
+  // minutes, and don't advance the cursor past moments nobody heard.
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
+
+  const headers = {
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  const get = async <T>(path: string): Promise<T[]> => {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers });
+    if (!res.ok) throw new Error(`${path.split('?')[0]} read HTTP ${res.status}`);
+    return (await res.json()) as T[];
+  };
+
+  const cursor = await get<{ last_run_at: string }>('user_feed_cursor?id=eq.1&select=last_run_at');
+  const sinceMs = cursor[0] ? Date.parse(cursor[0].last_run_at) : nowMs - USER_FEED_FALLBACK_MS;
+  const from = encodeURIComponent(new Date(sinceMs).toISOString());
+  const to = encodeURIComponent(new Date(nowMs).toISOString());
+  const inWindow = (column: string) => `${column}=gte.${from}&${column}=lt.${to}`;
+
+  // Sign-ups come from profiles, not auth.users: PostgREST only exposes the
+  // public schema, and profiles is written by the on_auth_user_created trigger
+  // (schema/001) in the same transaction as the auth row, so its created_at IS
+  // the sign-up moment and it carries the email the feed needs.
+  const signups = (
+    await get<FeedProfileRow>(`profiles?${inWindow('created_at')}&select=id,email`)
+  ).filter((p) => !isInternal(p.email));
+
+  // document_shares carries owner_id itself (schema/001), so the owner does not
+  // need an embed; the title does, and documents is a plain FK away.
+  const shares = (
+    await get<FeedShareRow>(
+      `document_shares?${inWindow('created_at')}` +
+        `&select=id,owner_id,slug,document_id,documents(title)`,
+    )
+  ).filter((s) => s.slug !== DEMO_SLUG);
+
+  const reads = (
+    await get<FeedSessionRow>(
+      `sessions?${inWindow('started_at')}` +
+        `&select=viewers(email,country_code,device_type),` +
+        `document_shares(slug,owner_id,document_id,documents(title))`,
+    )
+  ).filter((s) => s.document_shares !== null && s.document_shares.slug !== DEMO_SLUG);
+
+  // free_tier.share_cap_hit is the create the two-link cap refused (the
+  // pre-check in docs/[id]/actions.ts, ahead of the schema/027 trigger);
+  // upgrade.viewed is someone reading the pricing. Both are money-shaped.
+  const intents = await get<FeedEventRow>(
+    `app_events?${inWindow('timestamp')}` +
+      `&event=in.(upgrade.viewed,free_tier.share_cap_hit)&select=event,user_id`,
+  );
+
+  // profiles.id is auth.users.id, but documents/document_shares/app_events all
+  // reference auth.users rather than profiles, so there is no FK for PostgREST
+  // to embed across. One batched lookup instead of an embed.
+  const emails = new Map<string, string>();
+  const needed = new Set<string>([
+    ...shares.map((s) => s.owner_id),
+    ...reads.map((s) => s.document_shares!.owner_id),
+    ...intents.map((e) => e.user_id).filter((id): id is string => id !== null),
+  ]);
+  if (needed.size > 0) {
+    const rows = await get<FeedProfileRow>(
+      `profiles?id=in.(${[...needed].join(',')})&select=id,email`,
+    );
+    for (const p of rows) emails.set(p.id, p.email);
+  }
+
+  // Attribution for the sign-ups, by user id and not by time: the callback
+  // route writes user.signed_up a beat after the trigger writes the profile,
+  // and a window boundary between the two would silently cost us the answer to
+  // the only question that matters about a new account — where it came from.
+  const signupProps = new Map<string, Record<string, unknown>>();
+  if (signups.length > 0) {
+    const rows = await get<FeedEventRow>(
+      `app_events?event=eq.user.signed_up&user_id=in.(${signups.map((p) => p.id).join(',')})` +
+        `&select=event,user_id,properties`,
+    );
+    for (const e of rows) if (e.user_id) signupProps.set(e.user_id, e.properties ?? {});
+  }
+
+  const messages: { source: string; text: string; meta: Record<string, unknown> }[] = [];
+
+  for (const p of signups) {
+    const props = signupProps.get(p.id) ?? {};
+    const provider = typeof props['provider'] === 'string' ? props['provider'] : '';
+    const referrer = typeof props['first_referrer'] === 'string' ? props['first_referrer'] : '';
+    const landing = typeof props['first_landing'] === 'string' ? props['first_landing'] : '';
+    const via = [hostOf(referrer), landing].filter(Boolean).join(' ') || 'source unknown';
+    messages.push({
+      source: 'signup',
+      text: `New sign-up: ${domainOf(p.email)}${provider ? ` (${provider})` : ''} via ${via}`,
+      meta: { user_id: p.id },
+    });
+  }
+
+  // "First" means first ever, not first in the window, so it needs the owner's
+  // total — and the total is what makes this quiet: every later share of a
+  // working account says nothing.
+  if (shares.length > 0) {
+    const owners = [...new Set(shares.map((s) => s.owner_id))];
+    const all = await get<{ owner_id: string }>(
+      `document_shares?owner_id=in.(${owners.join(',')})&select=owner_id`,
+    );
+    for (const s of shares) {
+      if (all.filter((r) => r.owner_id === s.owner_id).length !== 1) continue;
+      const email = emails.get(s.owner_id);
+      if (!email || isInternal(email)) continue;
+      messages.push({
+        source: 'first-share',
+        text: `First share: ${domainOf(email)} — '${s.documents?.title ?? 'untitled'}'`,
+        meta: { share_id: s.id, document_id: s.document_id },
+      });
+    }
+  }
+
+  // An owner opening their own link is not a read, and neither is the same
+  // recipient's second page-open a minute later — one message per document per
+  // run, because the news is "somebody outside looked at it", once.
+  const toldAbout = new Set<string>();
+  for (const r of reads) {
+    const share = r.document_shares!;
+    const email = emails.get(share.owner_id);
+    if (!email || isInternal(email)) continue;
+    const owner = domainOf(email);
+    // '' is an anonymous viewer, which is outside by definition.
+    if (domainOf(r.viewers?.email) === owner) continue;
+    if (toldAbout.has(share.document_id)) continue;
+    toldAbout.add(share.document_id);
+    messages.push({
+      source: 'outside-read',
+      text:
+        `${owner}'s '${share.documents?.title ?? 'untitled'}' was read from ` +
+        `${r.viewers?.country_code ?? '??'}/${r.viewers?.device_type ?? 'unknown'}`,
+      meta: { document_id: share.document_id },
+    });
+  }
+
+  const intentSeen = new Set<string>();
+  for (const e of intents) {
+    const email = e.user_id ? emails.get(e.user_id) : undefined;
+    if (!email || isInternal(email)) continue;
+    const key = `${e.user_id}:${e.event}`;
+    if (intentSeen.has(key)) continue;
+    intentSeen.add(key);
+    const what = e.event === 'upgrade.viewed' ? 'viewed upgrade' : 'hit the free limit';
+    messages.push({
+      source: 'upgrade-interest',
+      text: `${domainOf(email)} ${what}`,
+      meta: { user_id: e.user_id, event: e.event },
+    });
+  }
+
+  // Plain text, no parse_mode: a document title is user-supplied, and a stray
+  // underscore in one must not 400 the message.
+  for (const m of messages) {
+    await sendTelegram(env, 'user_feed', m.source, m.text, m.meta);
+  }
+
+  // Last, and only now: everything above is re-runnable, this is the line that
+  // makes the window close.
+  const at = new Date(nowMs).toISOString();
+  const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/user_feed_cursor?id=eq.1`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ last_run_at: at, updated_at: at }),
+  });
+  if (!patch.ok) throw new Error(`user_feed_cursor write HTTP ${patch.status}`);
+}
+
 export default {
   // The only HTTP this worker answers: Telegram delivering a button tap or a
   // reply to a draft. Everything else, every path and every method, is a 404.
@@ -3064,6 +3336,17 @@ export default {
       replayAppEvents(env).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[replay] failed:', (err as Error).message);
+      }),
+    );
+
+    // The user feed rides the same cron. Like the replay it is strictly
+    // secondary: its own catch, so a Supabase hiccup in the feed can never be
+    // the reason a route outage goes unreported. A failed run leaves the cursor
+    // alone and the next one covers the same window.
+    ctx.waitUntil(
+      userFeed(env, event.scheduledTime).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[userfeed] failed:', (err as Error).message);
       }),
     );
 

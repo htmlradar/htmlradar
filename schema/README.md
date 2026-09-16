@@ -48,12 +48,12 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - **Session bearer tokens** stored on the `sessions.token` column (replaces the HMAC-with-shared-secret scheme entirely — no app secret needed).
 - **Vault** for Resend secrets (decrypted at trigger execution time).
 
-## Tables (29)
+## Tables (30)
 
-Twenty of them carry a note below. The other nine are single-purpose and named by their migration:
+Twenty of them carry a note below. The other ten are single-purpose and named by their migration:
 `analytics_replay_cursor` (029), `app_error_log` (024), `cancellation_feedback` (023),
 `webhook_events_log` (022), `connect_handles` (045), `connector_grants` and `connector_events` (046),
-`radar_drafts` and `radar_post_reservations` (047).
+`radar_drafts` and `radar_post_reservations` (047), `user_feed_cursor` (051).
 
 - `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`). `handle` (043) is the account's subdomain label — links are served from `{handle}.htmlradar.page`. Nullable and null on every row until a later lane allocates one; immutable once set; three to twenty-four lowercase letters, digits and hyphens with no two hyphens in a row, which is also what bans a Punycode `xn--` prefix. It is a routing and reputation boundary, **not** an identity claim about the sender.
 - `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, `last_viewed_by_owner_at`, and the upload-time phishing screen's `screen_score` / `screen_signals` (039; null on every URL-source document and on everything predating the migration).
@@ -110,7 +110,7 @@ Verify the tables exist:
 
 ```sql
 select count(*) from pg_tables where schemaname = 'public';
--- 29 after the full chain through 047. Applying the chain a second time
+-- 30 after the full chain through 051. Applying the chain a second time
 -- leaves the count unchanged; that is what "idempotent" is being claimed to
 -- mean here, and it is checked rather than asserted.
 
@@ -121,7 +121,7 @@ select tablename from pg_tables where schemaname = 'public' order by tablename;
 -- document_versions, documents, error_log, feedback, handle_registry,
 -- notifications_log, profiles, radar_drafts, radar_items,
 -- radar_post_reservations, rate_limits, section_events, sessions,
--- telegram_outbox, viewers, waitlist, webhook_events_log
+-- telegram_outbox, user_feed_cursor, viewers, waitlist, webhook_events_log
 ```
 
 Manually invoke an RPC:

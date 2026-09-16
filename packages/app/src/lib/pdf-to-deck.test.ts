@@ -97,7 +97,7 @@ async function fixture(
       page.drawText(`Our presentation slide number ${i + 1}`, { x: 40, y: 380, size: 24, font });
   }
   await edit?.(pdf);
-  return pdf.save();
+  return pdf.save({ addDefaultPage: false });
 }
 
 async function open(data: Uint8Array): Promise<PDFDocumentProxy> {
@@ -118,6 +118,7 @@ describe('PDF admission using generated PDFs', () => {
   });
 
   it.each([
+    [0, 'single'],
     [1, 'single'],
     [61, 'pages'],
     [100, 'pages'],

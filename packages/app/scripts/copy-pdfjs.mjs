@@ -13,15 +13,16 @@ await rm(fileURLToPath(new URL('../public/pdfjs/', import.meta.url)), {
 });
 await mkdir(target, { recursive: true });
 for (const asset of [
-  'build/pdf.mjs',
-  'build/pdf.worker.mjs',
+  // Safari needs the compatibility build in both the page and its worker.
+  'legacy/build/pdf.mjs',
+  'legacy/build/pdf.worker.mjs',
   'cmaps',
   'standard_fonts',
   'wasm',
   'iccs',
   'LICENSE',
 ]) {
-  await cp(join(source, asset), join(target, asset.replace('build/', '')), {
+  await cp(join(source, asset), join(target, asset.replace('legacy/build/', '')), {
     recursive: true,
     // The converter never instantiates the PDF scripting sandbox.
     filter: (path) => !path.includes('quickjs-eval'),

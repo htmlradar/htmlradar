@@ -67,6 +67,14 @@ crons = ["*/5 * * * *", "30 3 * * *"]
 #   REDDIT_REFRESH_TOKEN  the permanent token ops/scripts/reddit_auth.py
 #                         obtains once; exchanged for a short-lived access
 #                         token on each post and never written down
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID_PAGE
+#                         the custom-domain lifecycle (see domainLifecycle in
+#                         src/index.ts). The token needs "Zone → SSL and
+#                         Certificates → Edit" on htmlradar.page; the zone id is
+#                         that zone's. Both optional and both needed together —
+#                         with either unset the job returns without a fetch, so
+#                         a monitor deployed before the feature is provisioned
+#                         simply does not run it
 #   REDDIT_USERNAME       the founder's Reddit handle, for the descriptive
 #                         User-Agent Reddit's API rules ask for; secret only
 #                         because it is personal and this repository is public

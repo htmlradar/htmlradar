@@ -23,13 +23,14 @@ export function EventTracker() {
     if (typeof window === 'undefined') return;
 
     const errorHandler = (e: ErrorEvent) => {
+      if (/^\/convert\/?$/.test(location.pathname)) return;
       void fetch('/api/errors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: e.message,
           stack: e.error?.stack,
-          url: location.href,
+          url: `${location.origin}${location.pathname}`,
         }),
         keepalive: true,
       });

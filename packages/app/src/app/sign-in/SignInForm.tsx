@@ -82,10 +82,32 @@ export function SignInForm({
   // Arriving from a /tools page with a file waiting in IndexedDB: name it, so
   // signing in reads as the next step of the thing they were already doing.
   useEffect(() => {
-    if (!/^\/tools\/[^?]+\?resume=/.test(next)) return;
+    setStagedName(null);
+    const destination = new URL(next, window.location.origin);
+    if (
+      destination.origin !== window.location.origin ||
+      !(destination.pathname === '/convert' || destination.pathname.startsWith('/tools/'))
+    )
+      return;
+    const token = destination.searchParams.get('resume');
+    if (!token) return;
+    let cancelled = false;
     void readStagedFile()
-      .then((file) => setStagedName(file?.name ?? null))
+      .then(
+        (file) =>
+          !cancelled &&
+          setStagedName(
+            file?.token === token &&
+              !file.reserved &&
+              (!file.path || file.path === destination.pathname)
+              ? file.name
+              : null,
+          ),
+      )
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [next]);
 
   async function signInWithGoogle() {

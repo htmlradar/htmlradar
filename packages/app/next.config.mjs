@@ -23,6 +23,7 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   experimental: {
+    externalDir: true,
     // Body-size ceiling for ALL Server Actions in this app:
     //   - HTML doc uploads (createDocument): up to 30 MB per file
     //   - Attachment batch uploads (Sprint B): 25 MB per file, may

@@ -17,7 +17,9 @@
 // does.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SectionTracker } from '../src/sections-v2.js';
+import { isMetaPattern, SectionTracker } from '../src/sections-v2.js';
+import { PDF_DECK_SECTIONS, PDF_DECK_TOC } from './fixtures/pdf-deck.js';
+import { DEFAULTS } from '../src/config.js';
 
 const VIEWPORT = 800;
 const HEADING_HEIGHT = 40;
@@ -344,5 +346,99 @@ describe('slide decks are unaffected', () => {
       expect(time[id], `slide ${id}`).toBeGreaterThan(3.5);
       expect(time[id], `slide ${id}`).toBeLessThanOrEqual(4.25);
     }
+  });
+});
+
+describe('converted PDF decks', () => {
+  it('discovers every numbered slide and measures images and the final credit', () => {
+    const titles = [
+      'Slide 1: Company overview',
+      'Slide 2: Untitled',
+      'Slide 3: 日本語の紹介',
+      'Slide 4: Next steps',
+    ];
+    document.body.innerHTML = `<style>.slide{position:relative}.slide h2{position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}</style>${PDF_DECK_TOC}<main>${PDF_DECK_SECTIONS}</main>`;
+    document.querySelectorAll<HTMLElement>('section.slide').forEach((section, i) => {
+      place(section, i * 1280, 1280 + (i === 3 ? 24 : 0));
+      place(section.querySelector('h2')!, i * 1280, 1);
+      place(section.querySelector('img')!, i * 1280, 1280);
+    });
+    place(document.querySelector('.credit')!, 4 * 1280, 24);
+    const t = new SectionTracker({ ...DEFAULTS.sections, minDwellMs: 500 });
+    t.start();
+    for (let i = 0; i < 4; i++) {
+      scrollTo(i * 1280 + 400); // The clipped heading has left the viewport.
+      advance(5000);
+    }
+    expect(t.snapshot().map(({ id, title, depth }) => ({ id, title, depth }))).toEqual(
+      titles.map((title, i) => ({ id: `slide-${i + 1}`, title, depth: 2 })),
+    );
+    for (const title of titles) expect(isMetaPattern(title)).toBe(false);
+    expect(isMetaPattern('Slide 2')).toBe(true);
+    for (const time of Object.values(timeById(t))) expect(time).toBeGreaterThan(3.5);
+    // At exactly half a viewport, including the credit makes the last
+    // range qualify; an image-only range would leave just 376 px visible.
+    const before = timeById(t)['slide-4']!;
+    scrollTo(4 * 1280 - 376);
+    advance(2000);
+    expect(timeById(t)['slide-4']).toBeGreaterThan(before);
+    t.stop();
+  });
+});
+
+// The contents control is outside main and before every measured range.
+// Exercise its collapsed and expanded geometry, then compare slide-one time
+// with a deck that has no contents control at all.
+describe('PDF contents reading time', () => {
+  it('gives the contents no section and preserves all slide-one reading time', () => {
+    const measure = (contents: boolean) => {
+      document.body.innerHTML = `${contents ? PDF_DECK_TOC : ''}<main>${PDF_DECK_SECTIONS}</main>`;
+      const details = document.querySelector('details');
+      if (details) {
+        expect(details.open).toBe(false);
+        expect(details.nextElementSibling?.tagName).toBe('MAIN');
+        expect(details.querySelectorAll('h1,h2,h3,section')).toHaveLength(0);
+        expect([...details.querySelectorAll('a')].map((link) => link.hash)).toEqual([
+          '#slide-1',
+          '#slide-3',
+          '#slide-4',
+        ]);
+      }
+      const layout = (height: number) => {
+        if (details) {
+          place(details, 0, height);
+          details
+            .querySelectorAll<HTMLElement>('summary,ul,li,a')
+            .forEach((el) => place(el, 0, height));
+        }
+        document.querySelectorAll<HTMLElement>('section.slide').forEach((section, i) => {
+          const top = height + i * 1280;
+          place(section, top, 1280 + (i === 3 ? 24 : 0));
+          place(section.querySelector('h2')!, top, 1);
+          place(section.querySelector('img')!, top, 1280);
+        });
+        place(document.querySelector('.credit')!, height + 4 * 1280, 24);
+      };
+      layout(details ? 40 : 0);
+      const t = tracker();
+      if (details) {
+        details.open = true;
+        layout(1000);
+        scrollTo(0);
+        advance(5000); // Only the open contents block is in view.
+        expect(t.snapshot()).toEqual([]);
+        details.open = false;
+        layout(40);
+      }
+      scrollTo((details ? 40 : 0) + 400);
+      advance(5000);
+      const time = timeById(t)['slide-1']!;
+      t.stop();
+      return time;
+    };
+    const withoutContents = measure(false);
+    const withContents = measure(true);
+    expect(withContents).toBeGreaterThan(3.5);
+    expect(withContents).toBe(withoutContents);
   });
 });

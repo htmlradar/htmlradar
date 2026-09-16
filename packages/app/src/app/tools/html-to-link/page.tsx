@@ -20,7 +20,7 @@ import { SectionMark } from '@/components/SectionMark';
 import { DirectAnswer } from '@/components/DirectAnswer';
 import { pageMeta } from '@/lib/seo';
 import { serverClient } from '@/lib/supabase-server';
-import { createDocument } from '@/app/(app)/new/actions';
+import { createStagedDocument } from '@/app/(app)/new/actions';
 import { HtmlToolPanel } from '../HtmlToolPanel';
 
 export const runtime = 'edge';
@@ -51,10 +51,8 @@ type SearchParams = Promise<{ resume?: string }>;
 
 export default async function HtmlToLinkToolPage({ searchParams }: { searchParams: SearchParams }) {
   const resumeToken = (await searchParams).resume ?? null;
-  // Only the resume load pays for the auth round-trip; every other visit here
-  // is an anonymous search visitor with no session to look up. The token still
-  // has to match the staged record before anything is created.
-  const signedIn = resumeToken ? Boolean((await serverClient().auth.getUser()).data.user) : false;
+  // Signed-in visitors upload directly; resume still requires the matching local token.
+  const signedIn = Boolean((await serverClient().auth.getUser()).data.user);
 
   return (
     <>
@@ -81,7 +79,7 @@ export default async function HtmlToLinkToolPage({ searchParams }: { searchParam
           <div className="mt-8">
             <HtmlToolPanel
               tool="html-to-link"
-              action={createDocument}
+              action={createStagedDocument}
               resumeToken={resumeToken}
               signedIn={signedIn}
             />

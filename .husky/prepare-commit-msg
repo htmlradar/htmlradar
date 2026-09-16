@@ -4,5 +4,7 @@ msg_file="$1"
 if ! grep -q '^Signed-off-by: ' "$msg_file"; then
   name=$(git config user.name)
   email=$(git config user.email)
+  # A blank line before the trailer, so it never joins the subject.
+  [ -n "$(tail -c1 "$msg_file")" ] && printf '\n' >> "$msg_file"
   printf '\nSigned-off-by: %s <%s>\n' "$name" "$email" >> "$msg_file"
 fi

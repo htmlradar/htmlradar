@@ -6,6 +6,42 @@ const ANON = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']!;
 
 const FP_KEY = 'hr:fp';
 
+export function stripUrlQuery(value: string): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value, 'https://htmlradar.com');
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
+const CONVERTER_EVENTS = new Set([
+  'converter.started',
+  'converter.completed',
+  'converter.rejected',
+  'converter.download_clicked',
+  'converter.tracked_link_clicked',
+]);
+const CONVERTER_REASONS = new Set([
+  'portrait',
+  'aspect',
+  'text',
+  'forms',
+  'sizes',
+  'pages',
+  'single',
+  'size',
+  'format',
+  'password',
+  'damaged',
+  'attachments',
+  'timeout',
+  'overflow',
+  'cancelled',
+  'multiple',
+]);
+
 function getFingerprint(): string {
   if (typeof window === 'undefined') return 'ssr';
   try {
@@ -52,11 +88,18 @@ function getFirstTouch(): Record<string, unknown> {
   if (typeof window === 'undefined') return {};
   try {
     const existing = localStorage.getItem(SRC_KEY);
-    if (existing) return JSON.parse(existing) as Record<string, unknown>;
+    if (existing) {
+      const touch = JSON.parse(existing) as Record<string, unknown>;
+      return {
+        ...touch,
+        first_referrer: stripUrlQuery(String(touch.first_referrer ?? '')),
+        first_landing: String(touch.first_landing ?? '').split(/[?#]/)[0],
+      };
+    }
 
     const params = new URLSearchParams(window.location.search);
     const touch: Record<string, unknown> = {
-      first_referrer: document.referrer || null,
+      first_referrer: stripUrlQuery(document.referrer),
       first_landing: location.pathname,
       first_seen: new Date().toISOString(),
       // Recorded so automated traffic can be excluded from the funnel — and
@@ -111,6 +154,19 @@ export async function captureClientEvent(
   properties: Record<string, unknown> = {},
 ): Promise<void> {
   try {
+    const converter = typeof location !== 'undefined' && /^\/convert\/?$/.test(location.pathname);
+    const converterEvent = event.startsWith('converter.');
+    if (converterEvent && !CONVERTER_EVENTS.has(event)) return;
+    if (converter && !converterEvent && event !== 'page.viewed') return;
+    // Converter payloads are allowlisted at the transport boundary, including
+    // callers outside the panel. Never carry arbitrary strings or attribution
+    // query parameters alongside local PDF work.
+    const safeProperties =
+      converter || converterEvent
+        ? typeof properties.reason === 'string' && CONVERTER_REASONS.has(properties.reason)
+          ? { reason: properties.reason }
+          : {}
+        : properties;
     await fetch(`${SUPABASE_URL}/rest/v1/app_events`, {
       method: 'POST',
       headers: {
@@ -123,11 +179,10 @@ export async function captureClientEvent(
         distinct_id: getFingerprint(),
         event,
         properties: {
-          ...getFirstTouch(),
-          ...getUtmParams(),
-          ...properties,
+          ...(!converter && !converterEvent ? { ...getFirstTouch(), ...getUtmParams() } : {}),
+          ...safeProperties,
           path: typeof location !== 'undefined' ? location.pathname : null,
-          referrer: typeof document !== 'undefined' ? document.referrer || null : null,
+          referrer: typeof document !== 'undefined' ? stripUrlQuery(document.referrer) : null,
         },
       }),
       keepalive: true,

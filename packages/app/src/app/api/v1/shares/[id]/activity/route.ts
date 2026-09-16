@@ -28,6 +28,7 @@ import {
 import { findOwnedShare } from '@/lib/api-share-lookup';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import { shareUrl } from '@/lib/share-url';
+import { customHostnameOf } from '@/lib/custom-domains';
 import type { Session, SectionEvent, Viewer } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -79,13 +80,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     owner_id: string;
     recipient_label: string | null;
     host_handle: string | null;
-  }>(supabase, caller.userId, params.id, 'id, slug, recipient_label, host_handle');
+  }>(
+    supabase,
+    caller.userId,
+    params.id,
+    'id, slug, recipient_label, host_handle, custom_domains(hostname)',
+  );
 
   // Someone else's link is indistinguishable from one that does not exist —
   // a key must not be usable to probe for share ids.
   if (!share) return errorResponse(NOT_FOUND);
 
-  const url = shareUrl(share.slug, share.host_handle);
+  const url = shareUrl(share.slug, share.host_handle, customHostnameOf(share));
 
   const [{ data: viewerRows }, { data: sessionRows }] = await Promise.all([
     supabase.from('viewers').select('*').eq('share_id', share.id),

@@ -147,7 +147,7 @@ export function SharesTable({
                       </div>
                     )}
                     <div className="mt-0.5 truncate font-mono text-[10.5px] text-graphite">
-                      {shareUrlLabel(share.slug, share.host_handle)}
+                      {shareUrlLabel(share.slug, share.host_handle, share.custom_hostname)}
                     </div>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">

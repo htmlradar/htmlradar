@@ -47,6 +47,12 @@ import type { Viewer, Session, SectionEvent } from '@/lib/types';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import { countDistinctViewers } from '@/lib/viewer-metrics';
 import { readQuota } from '@/lib/quota';
+import {
+  customDomainStateOf,
+  customHostnameOf,
+  defaultDomainForNewShare,
+} from '@/lib/custom-domains';
+import { serviceClient } from '@/lib/api-auth';
 
 export const runtime = 'edge';
 
@@ -110,6 +116,11 @@ async function renderV2({
   const quota = await readQuota(supabase, user.id);
   const freeShareCap = quota.tier === 'free' ? { used: quota.used, cap: quota.cap } : null;
 
+  // The domain a new link goes on unless the customer picks the HTMLRadar
+  // address on the form. Null while the feature is off, so the create form
+  // shows no choice at all and nothing about link creation changes.
+  const defaultDomain = await defaultDomainForNewShare(serviceClient(), user.id);
+
   const banners = collectBanners(searchParams ?? {});
   const initialTab: TabKey = normalizeTab(searchParams?.tab);
 
@@ -137,7 +148,7 @@ async function renderV2({
   const [sharesRes, versionsRes, attachmentsRes] = await Promise.all([
     supabase
       .from('document_shares')
-      .select('*')
+      .select('*, custom_domains(hostname, state)')
       .eq('document_id', params.id)
       .order('created_at', { ascending: false }),
     supabase
@@ -243,6 +254,8 @@ async function renderV2({
     expires_at: s.expires_at,
     revoked_at: s.revoked_at,
     host_handle: (s.host_handle as string | null) ?? null,
+    custom_hostname: customHostnameOf(s),
+    custom_domain_state: customDomainStateOf(s),
     viewCount: sessionsByShare[s.id]?.length ?? 0,
   }));
 
@@ -467,6 +480,7 @@ async function renderV2({
         previewShareAction={previewShareAction}
         editShareAction={editShareAction}
         freeShareCap={freeShareCap}
+        defaultDomainHostname={defaultDomain?.hostname ?? null}
         toggleShareAction={toggleShareAction}
         deleteShareAction={deleteShareAction}
         viewers={allViewers}

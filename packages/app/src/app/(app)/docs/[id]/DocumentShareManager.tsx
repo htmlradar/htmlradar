@@ -69,6 +69,14 @@ export interface ShareRow {
   // never moves — which is why it travels with the row instead of being
   // looked up.
   host_handle: string | null;
+  // The customer's own domain this link was created for (schema/052), read off
+  // the share row's joined `custom_domains`. Same rule as the handle above and
+  // for the same reason: the address follows the row, never the owner's
+  // current setting, so a link already sent never moves. Null is an HTMLRadar
+  // address, which is every link that exists today.
+  custom_hostname: string | null;
+  // 'live', or the reason links on it have stopped opening.
+  custom_domain_state: string | null;
   viewCount: number;
 }
 
@@ -409,7 +417,7 @@ function SharePane({
   const isRevoked = !!share.revoked_at;
   const isExpired = !!share.expires_at && new Date(share.expires_at) < new Date();
   const isLive = !isRevoked && !isExpired;
-  const fullUrl = shareUrl(share.slug, share.host_handle);
+  const fullUrl = shareUrl(share.slug, share.host_handle, share.custom_hostname);
 
   // Use the same identity resolver as the rail + tables so the
   // SharePane heading reads consistently across the page. Without
@@ -480,7 +488,13 @@ function SharePane({
           >
             {fullUrl}
           </span>
-          {isLive && <CopyInline slug={share.slug} hostHandle={share.host_handle} />}
+          {isLive && (
+            <CopyInline
+              slug={share.slug}
+              hostHandle={share.host_handle}
+              customHostname={share.custom_hostname}
+            />
+          )}
         </div>
 
         {/* Gate row — one chip per gate condition. Replaces the prior
@@ -517,6 +531,7 @@ function SharePane({
         <ShareAnalytics
           shareSlug={share.slug}
           hostHandle={share.host_handle}
+          customHostname={share.custom_hostname}
           recipientLabel={share.recipient_label}
           viewers={analytics.viewers}
           sessions={analytics.sessions}
@@ -538,6 +553,7 @@ function SharePane({
         <WaitingInline
           shareSlug={share.slug}
           hostHandle={share.host_handle}
+          customHostname={share.custom_hostname}
           recipientLabel={share.recipient_label}
         />
       ) : null}
@@ -631,10 +647,12 @@ function buildGateTags(share: ShareRow): ReactNode[] {
 function WaitingInline({
   shareSlug,
   hostHandle,
+  customHostname,
   recipientLabel,
 }: {
   shareSlug: string;
   hostHandle: string | null;
+  customHostname: string | null;
   recipientLabel: string | null;
 }) {
   return (
@@ -655,9 +673,9 @@ function WaitingInline({
       </div>
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper px-4 py-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">
-          {shareUrl(shareSlug, hostHandle)}
+          {shareUrl(shareSlug, hostHandle, customHostname)}
         </span>
-        <CopyInline slug={shareSlug} hostHandle={hostHandle} />
+        <CopyInline slug={shareSlug} hostHandle={hostHandle} customHostname={customHostname} />
       </div>
     </div>
   );
@@ -1323,18 +1341,26 @@ function StatusPill({ tone, label }: { tone: 'signal' | 'alert'; label: string }
   );
 }
 
-function CopyInline({ slug, hostHandle }: { slug: string; hostHandle: string | null }) {
+function CopyInline({
+  slug,
+  hostHandle,
+  customHostname,
+}: {
+  slug: string;
+  hostHandle: string | null;
+  customHostname?: string | null;
+}) {
   const [copied, setCopied] = useState(false);
   const handle = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl(slug, hostHandle));
+      await navigator.clipboard.writeText(shareUrl(slug, hostHandle, customHostname));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
       // navigator.clipboard fails in non-secure contexts; fall back to a
       // hidden-textarea copy so the action never silently no-ops.
       const el = document.createElement('textarea');
-      el.value = shareUrl(slug, hostHandle);
+      el.value = shareUrl(slug, hostHandle, customHostname);
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');

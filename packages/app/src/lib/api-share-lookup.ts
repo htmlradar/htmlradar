@@ -31,11 +31,34 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // the row and the lookup below is scoped to the caller's own shares anyway,
 // so accepting the label here only means an assistant can paste the link it
 // was given.
+//
+// A fourth shape once a customer connects their own domain (schema/052): the
+// link is `decks.acme.com/r/{slug}` and there is no list of hostnames we could
+// match it against — the whole point is that the hostname is theirs. So any
+// well-formed hostname is accepted in that position.
+//
+// That is not a loosening of who can see what. The host is never used to find
+// anything: a slug is only ever looked up inside the caller's OWN shares by an
+// owner filter written on the query below, and the slug itself still has to
+// match the format the database stores. Accepting a hostname here means an
+// assistant can paste the link it was handed, and nothing else.
+//
+// One name is still refused: a host with "htmlradar" anywhere in it that is
+// not one of the two above — `htmlradar.page.evil.example` and its family.
+// That is the same rule schema/052 applies when a customer connects a domain,
+// so no real customer hostname can contain the word, and a lookalike must not
+// be quietly read as ours here either.
 const escapeHost = (host: string): string => host.replace(/\./g, '\\.');
 const HANDLE_LABEL = '[a-z0-9][a-z0-9-]{1,22}[a-z0-9]';
-const LINK_HOSTS = [`(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`, escapeHost(SITE_HOST)].join(
-  '|',
-);
+const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?';
+// The lookahead spans the host and stops at the path separator, so a slug is
+// free to contain the word even though a hostname is not.
+const CUSTOM_HOST = `(?![^/]*htmlradar)${DNS_LABEL}(?:\\.${DNS_LABEL}){2,}`;
+const LINK_HOSTS = [
+  `(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`,
+  escapeHost(SITE_HOST),
+  CUSTOM_HOST,
+].join('|');
 const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
 
 /**

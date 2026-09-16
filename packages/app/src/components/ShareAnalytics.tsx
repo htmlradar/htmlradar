@@ -34,6 +34,9 @@ export interface ShareAnalyticsProps {
   // The hostname the share stores (schema/043), or null for the apex — every
   // printed and copied address goes through shareUrl with it.
   hostHandle: string | null;
+  // The customer's own domain when the share was issued on one (schema/052).
+  // It wins over the handle, and like the handle it travels with the row.
+  customHostname?: string | null;
   recipientLabel: string | null;
   viewers: Viewer[];
   sessions: Session[];
@@ -74,6 +77,7 @@ function formatDuration(seconds: number): string {
 export function ShareAnalytics({
   shareSlug,
   hostHandle,
+  customHostname = null,
   recipientLabel,
   viewers,
   sessions,
@@ -88,6 +92,7 @@ export function ShareAnalytics({
       <WaitingState
         shareSlug={shareSlug}
         hostHandle={hostHandle}
+        customHostname={customHostname}
         recipientLabel={recipientLabel}
         shareStatus={shareStatus}
       />
@@ -212,15 +217,17 @@ function Stat({
 function WaitingState({
   shareSlug,
   hostHandle,
+  customHostname,
   recipientLabel,
   shareStatus = 'live',
 }: {
   shareSlug: string;
   hostHandle: string | null;
+  customHostname: string | null;
   recipientLabel: string | null;
   shareStatus?: 'live' | 'revoked' | 'expired';
 }) {
-  const fullUrl = shareUrl(shareSlug, hostHandle);
+  const fullUrl = shareUrl(shareSlug, hostHandle, customHostname);
   const who = recipientLabel ?? 'the recipient';
 
   // Revoked/expired with no reads: don't tell the owner to send a link that
@@ -261,7 +268,7 @@ function WaitingState({
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper px-4 py-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">{fullUrl}</span>
-        <CopySlugButton slug={shareSlug} hostHandle={hostHandle} />
+        <CopySlugButton slug={shareSlug} hostHandle={hostHandle} customHostname={customHostname} />
       </div>
     </div>
   );

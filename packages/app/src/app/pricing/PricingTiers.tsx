@@ -37,6 +37,12 @@ const FREE_FEATURES = [
   '“Powered by HTMLRadar” footer on the viewer',
 ];
 
+// The line about a customer's own domain is written but not printed until the
+// feature is verified on production (Track E). One argument controls it, the
+// same setting that controls the Settings section, so the page cannot promise
+// something the product does not do yet.
+const OWN_DOMAIN_FEATURE = 'Your own domain for links: decks.yourcompany.com/r/acme-proposal';
+
 const PRO_FEATURES = [
   'Everything in Free, plus:',
   'Unlimited tracked links',
@@ -45,8 +51,17 @@ const PRO_FEATURES = [
   'Priority email support, response inside one business day',
 ];
 
-export function PricingTiers({ proHref }: { proHref: string }) {
+export function PricingTiers({
+  proHref,
+  customDomains = false,
+}: {
+  proHref: string;
+  customDomains?: boolean;
+}) {
   const [annual, setAnnual] = useState(false);
+  const proFeatures = customDomains
+    ? [...PRO_FEATURES.slice(0, 3), OWN_DOMAIN_FEATURE, ...PRO_FEATURES.slice(3)]
+    : PRO_FEATURES;
 
   return (
     <>
@@ -109,7 +124,7 @@ export function PricingTiers({ proHref }: { proHref: string }) {
           }
           accent
           description="For founders and consultants who send real diligence packages."
-          features={PRO_FEATURES}
+          features={proFeatures}
           ctaLabel="Upgrade to Pro"
           ctaHref={annual ? `${proHref}?plan=annual` : proHref}
           ctaPrimary

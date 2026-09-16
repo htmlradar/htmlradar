@@ -19,6 +19,13 @@ import { reconcileConnectorRevocation } from '@/lib/connector-revoke';
 import { AnnualSwitch } from './AnnualSwitch';
 import { ApiKeys, type ApiKeyRow } from './ApiKeys';
 import { ConnectedApps } from './ConnectedApps';
+import { CustomDomain } from './CustomDomain';
+import {
+  checkDomainAction,
+  connectDomainAction,
+  disconnectDomainAction,
+} from './custom-domain-actions';
+import { customDomainsEnabled, dnsRecord, readDomain } from '@/lib/custom-domains';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -469,6 +476,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   const connectorKeys = keyRows.filter((key) => key.label.startsWith(CONNECTOR_LABEL_PREFIX));
 
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
+
+  // Your domain. `comped` is a boolean beside the tier (schema/032), not a
+  // tier of its own, so both are read. The row is read whatever the tier says,
+  // because an account that has lapsed still has to be able to disconnect;
+  // eligibility only decides whether a NEW domain can be connected.
+  const domainsOn = customDomainsEnabled();
+  const domainEligible = tier === 'pro' || profile?.comped === true;
+  const domainRow = domainsOn ? await readDomain(supabase, user.id) : null;
   let subState: ActiveSubscription | null = null;
   if (tier === 'pro') {
     try {
@@ -579,6 +594,27 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
       />
 
       <ConnectedApps keys={connectorKeys} revokeAction={revokeApiKeyAction} />
+
+      {domainsOn && (domainEligible || domainRow) && (
+        <CustomDomain
+          domain={
+            domainRow
+              ? {
+                  id: domainRow.id,
+                  hostname: domainRow.hostname,
+                  state: domainRow.state,
+                  lastError: domainRow.last_error,
+                  needsReview: domainRow.previous_owner_review === true,
+                  ...dnsRecord(domainRow.hostname),
+                }
+              : null
+          }
+          eligible={domainEligible}
+          connectAction={connectDomainAction}
+          checkAction={checkDomainAction}
+          disconnectAction={disconnectDomainAction}
+        />
+      )}
 
       <form action={signOut} className="mt-12 border-t border-line pt-8">
         <button

@@ -18,6 +18,7 @@ import { V2Footer } from '@/components/V2Footer';
 import { PricingTiers } from './PricingTiers';
 import { EmailNotificationMock } from '@/components/mocks/EmailNotificationMock';
 import { pageMeta } from '@/lib/seo';
+import { customDomainsEnabled } from '@/lib/custom-domains';
 
 export const dynamic = 'force-static';
 
@@ -27,6 +28,14 @@ export const metadata: Metadata = pageMeta({
     'Simple pricing for tracked HTML documents. Free for 2 tracked links, then $15/mo or $150/yr for unlimited links and no viewer footer. Or self-host free under AGPL-3.0.',
   path: '/pricing',
 });
+
+// Answered only once a customer's domain has served a document on production
+// (Track E). Until then the page says nothing about it, which is the founder's
+// rule: no promise to anybody before it is live.
+const OWN_DOMAIN_FAQ = {
+  q: 'Can I use my own domain?',
+  a: 'Yes, on Pro. Point a subdomain of your own — decks.yourcompany.com — at HTMLRadar with one CNAME record, and every new link you create is served from it, with the same tracking, gates and reports. Links you have already sent keep working exactly where they are.',
+};
 
 const FAQ = [
   {
@@ -60,6 +69,11 @@ export default function PricingPage() {
   // what stops a monthly subscriber opening a second subscription by buying
   // the annual plan on top of the one they already have.
   const proHref = '/upgrade';
+
+  // Written now, printed only once a customer domain has actually served a
+  // document on production. Off is the shipped state.
+  const customDomains = customDomainsEnabled();
+  const faq = customDomains ? [...FAQ.slice(0, 2), OWN_DOMAIN_FAQ, ...FAQ.slice(2)] : FAQ;
 
   return (
     <div className="v2-root">
@@ -124,7 +138,7 @@ export default function PricingPage() {
 
       {/* ─────────────────────── TIERS ─────────────────────── */}
       <section style={{ padding: '40px 56px 100px', maxWidth: 1180, margin: '0 auto' }}>
-        <PricingTiers proHref={proHref} />
+        <PricingTiers proHref={proHref} customDomains={customDomains} />
         {/* The free tier used to list "real-time email when a real read happens"
             as a bullet. This is that email. */}
         <div style={{ maxWidth: 520, margin: '36px auto 0' }}>
@@ -246,7 +260,7 @@ export default function PricingPage() {
 
       {/* ─────────────────────── FAQ ─────────────────────── */}
       <section style={{ padding: '0 56px 110px', maxWidth: 1180, margin: '0 auto' }}>
-        <FaqLd items={FAQ} />
+        <FaqLd items={faq} />
         <div className="v2-kicker">FAQ</div>
         <h2
           style={{
@@ -270,7 +284,7 @@ export default function PricingPage() {
           }}
           className="v2-pricing-grid"
         >
-          {FAQ.map(({ q, a }) => (
+          {faq.map(({ q, a }) => (
             <div
               key={q}
               style={{

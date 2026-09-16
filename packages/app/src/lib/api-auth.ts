@@ -12,6 +12,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { describeSlugError } from './share-slug';
+import { describeShareDomainError } from './custom-domains';
 import { logServerError } from './error-log';
 
 export const API_KEY_PREFIX = 'hr_live_';
@@ -663,6 +664,12 @@ export function mapCreateShareError(message: string): ApiErrorResponse {
   if (message.includes('password_too_short')) {
     return validationError('Password must be at least 8 characters.');
   }
+  // `domain_id` naming a domain the caller does not own, or one that is not
+  // serving. The database is the only authority on both — it decides the
+  // hostname inside the insert — so the 422 for a bad `domain_id` is this
+  // translation and not a second check that could disagree with it.
+  const domainProblem = describeShareDomainError(message);
+  if (domainProblem) return validationError(domainProblem);
   return INTERNAL;
 }
 

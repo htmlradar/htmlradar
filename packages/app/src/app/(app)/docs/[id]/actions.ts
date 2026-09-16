@@ -22,6 +22,7 @@ import {
 import { describeSlugError, validateShareSlug } from '@/lib/share-slug';
 import { SHARE_BASE, shareUrl } from '@/lib/share-url';
 import { stampShareHost } from '@/lib/handle';
+import { customHostnameOf, describeShareDomainError, shareHostArgs } from '@/lib/custom-domains';
 import { serviceClient } from '@/lib/api-auth';
 
 // Shared parse for the two allowlist textareas. Domains in one field,
@@ -130,6 +131,14 @@ export async function createShareFormAction(formData: FormData): Promise<CreateS
       );
     }
 
+    // The hostname is chosen and written INSIDE create_share, in the same
+    // statement as the row (schema/052). Nothing is passed in the ordinary
+    // case: the database reads the owner's live default itself, so a link
+    // meant for a customer's domain is never briefly reachable on
+    // htmlradar.page. The only thing this form can say is the opposite
+    // choice, for this one link.
+    const useHtmlradarHost = formData.get('use_htmlradar_host') === 'on';
+
     const { data: created, error } = await supabase.rpc('create_share', {
       p_document_id: documentId,
       p_recipient_label: String(formData.get('recipient_label') ?? '') || null,
@@ -140,6 +149,7 @@ export async function createShareFormAction(formData: FormData): Promise<CreateS
       p_allowed_emails: emails,
       p_expires_at: expiresAt,
       p_slug: chosenSlug,
+      ...shareHostArgs(useHtmlradarHost ? { kind: 'htmlradar' } : { kind: 'default' }),
     });
     if (error) {
       // Translate the exceptions 033 raises into copy the customer can act
@@ -149,7 +159,7 @@ export async function createShareFormAction(formData: FormData): Promise<CreateS
         errorField = 'slug';
         throw new Error(slugProblem);
       }
-      throw new Error(error.message);
+      throw new Error(describeShareDomainError(error.message) ?? error.message);
     }
 
     slug =
@@ -199,6 +209,8 @@ export async function createShareFormAction(formData: FormData): Promise<CreateS
         // quota was read before the cap check above — zero extra queries.
         is_first_share: quota.used === 0,
         custom_slug: !!chosenSlug,
+        // What the customer asked for; the database decides what they got.
+        chose_htmlradar_address: useHtmlradarHost,
       },
     });
 
@@ -475,7 +487,7 @@ export async function previewShareAction(
   try {
     const { data: share, error } = await supabase
       .from('document_shares')
-      .select('slug, owner_id, document_id, host_handle')
+      .select('slug, owner_id, document_id, host_handle, custom_domains(hostname)')
       .eq('id', shareId)
       .single();
     if (error) throw new Error(error.message);
@@ -490,7 +502,10 @@ export async function previewShareAction(
     }
 
     const token = await issueOwnerPreviewToken(share.slug, secret);
-    const url = `${shareUrl(share.slug, share.host_handle)}?owner_preview=${encodeURIComponent(token)}`;
+    // The owner's own preview opens the share where the recipient's link
+    // does. Anywhere else and the worker refuses it, because the stored-host
+    // rule applies to every route that carries a share.
+    const url = `${shareUrl(share.slug, share.host_handle, customHostnameOf(share))}?owner_preview=${encodeURIComponent(token)}`;
 
     await captureServerEvent({
       event: 'share.preview_opened',

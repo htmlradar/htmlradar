@@ -37,9 +37,12 @@
 --
 --   1. A hostname belongs to at most one account at a time, and a name a
 --      different account once held cannot be re-claimed without a human
---      looking at it (`previous_owner_review`). This is the mitigation for
---      the refused second DNS record: with only a CNAME to go on, first
---      claim wins, so the claim has to be hard to take back.
+--      looking at it (`previous_owner_review`, cleared only by
+--      approve_custom_domain_reclaim, which insists on a reason and records
+--      it). This is the mitigation for the refused second DNS record: with
+--      only a CNAME to go on, first claim wins, so the claim has to be hard
+--      to take back — including by deleting the account, which retires the
+--      claim but does not erase it.
 --   2. A share's hostname is chosen and written in the SAME INSERT that
 --      creates the share, and is frozen afterwards INCLUDING null. 043 left
 --      null-to-handle open; a later stamp would expose a custom share on
@@ -70,6 +73,9 @@
 --   P0054 share_host_conflict              handle and domain both set
 --   P0055 default_custom_domain_invalid    default is not a live own domain
 --   P0056 custom_domain_unavailable        claimed by another account
+--   P0057 reclaim_note_required             support approval with no reason
+--   P0058 custom_domain_not_found           approval named a row that is gone
+--   P0059 custom_domain_not_under_review    approval of a row needing none
 --
 -- 043's P0042 (host_handle_immutable) and P0043 (host_handle_not_owned) are
 -- still raised, by the replacement trigger in section 3.
@@ -85,7 +91,19 @@
 --
 -- BEFORE APPLYING: section 1 carries a PILOT OWNER PLACEHOLDER. Put the pilot
 -- account's uuid in it, or leave it as the nil uuid, which matches nothing.
+--
+-- ONE TRANSACTION. Everything below is wrapped in begin/commit, because
+-- section 5 DROPS create_share and create_share_as before recreating them
+-- with their new signatures. Outside a transaction that is a window — however
+-- short — in which the application's share-creating call 404s on a missing
+-- function. Inside one, no session ever sees the gap: the old signatures are
+-- there until commit and the new ones from commit onwards. Every statement
+-- here is transactional (no CREATE INDEX CONCURRENTLY, no VACUUM), and the
+-- `notify pgrst` at the end fires at commit, which is exactly when the new
+-- signatures become visible.
 -- ------------------------------------------------------------
+
+begin;
 
 -- ------------------------------------------------------------
 -- 1. custom_domains — one row per claimed hostname
@@ -118,14 +136,29 @@
 -- ------------------------------------------------------------
 create table if not exists public.custom_domains (
   id                    uuid primary key default gen_random_uuid(),
-  owner_id              uuid not null references auth.users(id) on delete cascade,
+  -- NO FOREIGN KEY, deliberately, and for handle_registry's reason (043): a
+  -- key to auth.users would cascade this row away when the account is
+  -- deleted, and this row IS the record that the name was taken. Delete the
+  -- account and the claim would vanish with it, so the next person to claim
+  -- the same hostname would look like the first — which is precisely the
+  -- re-claim the review flag below exists to stop. The value is the account
+  -- that held the name, kept as a plain uuid on purpose.
+  owner_id              uuid not null,
   -- Lowercase, dotted, at least two labels by the constraint below and at
   -- least three (four under a multi-part suffix) by the trigger. Immutable
   -- after insert: it is half of the address of every link issued on it.
   hostname              text not null,
   -- The provider's id for the custom hostname, so get/restart/delete have
-  -- something to name. Null until the create call returns.
+  -- something to name. Null until the create call returns, and NEVER nulled
+  -- afterwards — not even on retire. A retired row whose id had been cleared
+  -- is a custom hostname left standing at Cloudflare with nothing recording
+  -- that it is ours to remove.
   cloudflare_id         text,
+  -- When Cloudflare confirmed the custom hostname was deleted. Set only after
+  -- the delete call came back, never hopefully. The monitor's sweep is
+  -- exactly the rows where `retired_at is not null and cloudflare_id is not
+  -- null and cloudflare_deleted_at is null`: disconnected here, still there.
+  cloudflare_deleted_at timestamptz,
   state                 text not null default 'pending'
                           check (state in ('pending', 'live', 'disconnected', 'retired')),
   cloudflare_status     text,
@@ -144,8 +177,20 @@ create table if not exists public.custom_domains (
   -- cost a support conversation, or a lapsed customer's name is a free
   -- hijack for whoever claims it next.
   previous_owner_review boolean not null default false,
+  -- Cleared by approve_custom_domain_reclaim (section 2b) and by nothing
+  -- else. Who, when and why, so support can answer "why is this serving now"
+  -- a year later. `reclaim_approved_by` is the database role that ran the
+  -- approval, which is the granularity the database actually has; the human
+  -- goes in the note.
+  reclaim_approved_at   timestamptz,
+  reclaim_approved_by   text,
+  reclaim_note          text,
   created_at            timestamptz not null default now(),
   retired_at            timestamptz,
+  -- Stamped when the holding profile row is deleted. The claim itself is
+  -- permanent regardless; this only records that the holder is gone, which is
+  -- what support needs to tell a retired claim from a live one.
+  owner_deleted_at      timestamptz,
   -- State and the tombstone cannot disagree. Without this a row could be
   -- stamped retired while still reading 'live' to the worker, or hold the
   -- unique partial indexes below while claiming to be gone.
@@ -162,12 +207,35 @@ create table if not exists public.custom_domains (
     )
 );
 
+-- An earlier draft of this migration carried `references auth.users(id) on
+-- delete cascade` here. Dropping it is the fix for account deletion defeating
+-- the re-claim review, and it has to be dropped explicitly because
+-- `create table if not exists` does nothing on a database where the table is
+-- already there.
+alter table public.custom_domains
+  drop constraint if exists custom_domains_owner_id_fkey;
+
+-- Columns added after the first draft of this file, for the same reason: the
+-- create-table above does nothing where the table already exists.
+alter table public.custom_domains
+  add column if not exists owner_deleted_at      timestamptz,
+  add column if not exists cloudflare_deleted_at timestamptz,
+  add column if not exists reclaim_approved_at   timestamptz,
+  add column if not exists reclaim_approved_by   text,
+  add column if not exists reclaim_note          text;
+
 comment on table public.custom_domains is
   'One row per hostname a customer has claimed for their tracked links. Rows are never deleted, only stamped retired_at, so a name can never be silently re-issued. `state` is our serving decision and the only field the worker trusts; cloudflare_status and ssl_status are the provider''s last word, kept for support. Owners may read their own row and write nothing.';
 comment on column public.custom_domains.state is
   'Our serving decision: pending (claimed, answers only the probe path), live (serving; the only state a share may point at), disconnected (stopped answering, can recover), retired (terminal — the customer disconnected it).';
+comment on column public.custom_domains.owner_id is
+  'The account that claimed this hostname. Deliberately NOT a foreign key: a key would cascade the row away on account deletion, and the row surviving is what keeps a deleted account''s hostname from being silently re-claimed as if it were new.';
+comment on column public.custom_domains.owner_deleted_at is
+  'Set when the holding profile row was deleted. The claim is permanent regardless; this is a record, not a release.';
 comment on column public.custom_domains.previous_owner_review is
   'True when another account has held this hostname before. Computed on insert, immutable, and blocks the row from reaching ''live'' until support clears it. With no DNS proof beyond the CNAME, first claim wins — so taking a claim back must cost a human conversation.';
+comment on column public.custom_domains.cloudflare_deleted_at is
+  'When Cloudflare confirmed the custom hostname was deleted, set only after the call returned. Retiring a row never clears cloudflare_id, so `retired_at is not null and cloudflare_id is not null and cloudflare_deleted_at is null` is the monitor''s list of hostnames still standing at the provider.';
 comment on column public.custom_domains.consecutive_failures is
   'Consecutive failed probes; two means disconnected. Reset to zero by any success.';
 
@@ -257,15 +325,25 @@ declare
     '00000000-0000-0000-0000-000000000000'  -- pilot account id goes here
   ]::uuid[];
 
-  -- Public suffixes that are themselves two labels. Deliberately short and
-  -- deliberately incomplete: this is not the Public Suffix List and must not
-  -- grow into a copy of it. Each entry is here because a customer plausibly
-  -- has their company there, and getting it wrong means admitting a bare
-  -- domain, which breaks their website rather than ours. Adding one later is
-  -- one array element.
+  -- Public suffixes that are themselves two labels. This is NOT the Public
+  -- Suffix List and must not grow into a copy of it — it is the second-level
+  -- suffixes a customer of ours plausibly sits under, and it errs towards
+  -- being long because the cost of a miss is admitting a bare domain, which
+  -- takes the customer's own website down. Adding one later is one array
+  -- element.
   v_multi_suffixes text[] := array[
-    'co.uk', 'org.uk', 'ac.uk', 'co.in', 'com.au', 'co.nz',
-    'com.sg', 'co.jp', 'com.br', 'com.mx', 'co.za'
+    -- United Kingdom
+    'co.uk', 'org.uk', 'net.uk', 'ac.uk', 'gov.uk', 'me.uk', 'ltd.uk', 'plc.uk',
+    -- India
+    'co.in', 'net.in', 'org.in', 'firm.in',
+    -- Australia and New Zealand
+    'com.au', 'net.au', 'org.au', 'co.nz', 'net.nz', 'org.nz',
+    -- Asia
+    'com.sg', 'co.jp', 'ne.jp', 'or.jp', 'com.hk', 'com.cn', 'co.kr',
+    'com.my', 'com.ph', 'com.pk', 'co.id', 'co.il',
+    -- Americas, Africa, Middle East, Turkey
+    'com.br', 'com.mx', 'com.ar', 'co.za', 'com.sa', 'com.tr',
+    'com.ng', 'com.eg'
   ];
 
   v_labels   text[];
@@ -300,12 +378,32 @@ begin
               hint = 'A domain claim cannot be moved between accounts.';
     end if;
 
-    -- Computed on insert and never again: a client-set value here would be a
-    -- one-column bypass of the whole re-claim safeguard.
+    -- Computed on insert, and afterwards moved by exactly one thing:
+    -- approve_custom_domain_reclaim (section 2b), which announces itself with
+    -- a transaction-local setting naming the row it is approving. A plain
+    -- UPDATE — from the app, from the monitor, from psql — cannot clear this
+    -- flag, because clearing it is what lets a stranger serve on a hostname
+    -- somebody else's customers have in their inboxes.
+    --
+    -- Binding the setting to the row id rather than to a boolean means a
+    -- stale setting cannot launder a different row, which is the reasoning
+    -- 033 wrote down for `app.generated_slug`. A client cannot set it either:
+    -- PostgREST exposes only functions in the public schema, and set_config
+    -- lives in pg_catalog.
     if new.previous_owner_review is distinct from old.previous_owner_review then
-      raise exception 'custom_domain_immutable'
-        using errcode = 'P0049',
-              hint = 'The re-claim review flag is set by the database, not by the caller.';
+      if not (old.previous_owner_review
+              and not new.previous_owner_review
+              -- `is not distinct from` rather than `=`: the setting is null
+              -- when nobody set it, and a null there would make the whole
+              -- condition null, which `if` treats as false — meaning the
+              -- refusal below would never fire. Three-valued logic is how a
+              -- guard like this quietly stops guarding.
+              and nullif(pg_catalog.current_setting('app.reclaim_approved', true), '')
+                  is not distinct from new.id::text) then
+        raise exception 'custom_domain_immutable'
+          using errcode = 'P0049',
+                hint = 'The re-claim review flag is set by the database, and cleared only by support approval.';
+      end if;
     end if;
 
     -- Retired is terminal. A retired row is the permanent record that this
@@ -379,7 +477,16 @@ begin
     -- to a recipient and is precisely the phishing shape this refuses.
     -- 043's reserved handle list is deliberately NOT applied here: it would
     -- refuse ordinary names like docs.acme.com and support.acme.com.
-    if v_label like '%htmlradar%' and not v_pilot then
+    --
+    -- Tested against the label with digits folded back to the letters they
+    -- imitate, so htm1radar, htmlr3dar-login and h7mlradar are refused too.
+    -- `1` is folded twice because it stands in for both `l` and `i`; only the
+    -- `l` form can spell our name, but reading it both ways costs one call
+    -- and stops the rule depending on that staying true.
+    if not v_pilot
+       and (v_label like '%htmlradar%'
+            or pg_catalog.translate(v_label, '01357', 'olest') like '%htmlradar%'
+            or pg_catalog.translate(v_label, '01357', 'ilest') like '%htmlradar%') then
       raise exception 'custom_domain_reserved'
         using errcode = 'P0046',
               hint = 'A name containing "htmlradar" cannot be used — it would read as one of ours to the person receiving the link.';
@@ -475,6 +582,118 @@ drop trigger if exists trg_validate_custom_domain on public.custom_domains;
 create trigger trg_validate_custom_domain
   before insert or update on public.custom_domains
   for each row execute function public.validate_custom_domain();
+
+-- ------------------------------------------------------------
+-- 2a. The profile is gone; the claim is not
+--
+-- The row surviving is what keeps the hostname from being re-claimed as if
+-- nobody had ever held it — that is why owner_id carries no foreign key.
+-- Stamping owner_deleted_at is the bookkeeping on top: without it nothing
+-- records that the holder went away, and support cannot tell a claim whose
+-- customer left from one whose customer is sitting in front of them.
+--
+-- It also RETIRES the claim, which 043's handle version has no equivalent of
+-- because a handle is a label and this is a running service. The account is
+-- gone and its shares went with it, so the hostname is serving nothing and
+-- must stop holding the "one account per hostname" index against everybody
+-- else — while the row itself stays, so the next claimant is still flagged
+-- for review. Retiring also puts the row in front of the monitor's sweep for
+-- Cloudflare hostnames that still need deleting.
+-- ------------------------------------------------------------
+create or replace function public.release_custom_domains()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.custom_domains
+     set owner_deleted_at = pg_catalog.now(),
+         state            = 'retired',
+         retired_at       = coalesce(retired_at, pg_catalog.now())
+   where owner_id = old.id
+     and owner_deleted_at is null;
+  return old;
+end;
+$$;
+
+drop trigger if exists trg_release_custom_domains on public.profiles;
+create trigger trg_release_custom_domains
+  after delete on public.profiles
+  for each row execute function public.release_custom_domains();
+
+-- ------------------------------------------------------------
+-- 2b. approve_custom_domain_reclaim — the one way past the review flag
+--
+-- A hostname another account once held is flagged on claim and cannot serve
+-- until a person agrees. This is that person's button, and it is the whole
+-- reason the flag is worth having: a safeguard with no documented way through
+-- it becomes a safeguard somebody disables at two in the morning.
+--
+-- Service role only, for api_keys' reason (034) turned around: the caller
+-- chooses the row, so a caller who could choose any row could approve their
+-- own re-claim of somebody else's name. There is no owner-facing path to it
+-- at all — the customer writes to support, and support runs this.
+--
+-- What it records: when, the database role that ran it, and the note. The
+-- note is where the human and the reason go, because `service_role` is the
+-- only role that can ever appear in `reclaim_approved_by` and a column that
+-- always says the same thing answers nothing on its own.
+--
+-- Returns the row, so the operator sees what they just did rather than
+-- trusting that they named the right id.
+-- ------------------------------------------------------------
+create or replace function public.approve_custom_domain_reclaim(
+  p_domain_id uuid,
+  p_note      text
+)
+returns public.custom_domains
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_note   text;
+  v_domain public.custom_domains%rowtype;
+begin
+  v_note := nullif(pg_catalog.btrim(coalesce(p_note, '')), '');
+  if v_note is null then
+    raise exception 'reclaim_note_required'
+      using errcode = 'P0057',
+            hint = 'Say who asked and what you checked. This is the record of why a hostname changed hands.';
+  end if;
+
+  select * into v_domain from public.custom_domains d where d.id = p_domain_id;
+  if not found then
+    raise exception 'custom_domain_not_found' using errcode = 'P0058';
+  end if;
+
+  if not v_domain.previous_owner_review then
+    raise exception 'custom_domain_not_under_review'
+      using errcode = 'P0059',
+            hint = 'That domain is not waiting on a review. Nothing to approve.';
+  end if;
+
+  -- Announce the approval to the immutability trigger, bound to this exact
+  -- row and gone at commit.
+  perform pg_catalog.set_config('app.reclaim_approved', p_domain_id::text, true);
+
+  update public.custom_domains
+     set previous_owner_review = false,
+         reclaim_approved_at   = pg_catalog.now(),
+         reclaim_approved_by   = current_user::text,
+         reclaim_note          = v_note
+   where id = p_domain_id
+  returning * into v_domain;
+
+  return v_domain;
+end;
+$$;
+
+revoke all on function public.approve_custom_domain_reclaim(uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.approve_custom_domain_reclaim(uuid, text)
+  to service_role;
 
 -- ------------------------------------------------------------
 -- 3. document_shares.custom_domain_id — the hostname this link was issued on
@@ -611,15 +830,25 @@ drop function if exists public.validate_share_host_handle();
 -- per-share "use the HTMLRadar address" choice stays available at creation.
 -- This column is that default, and nothing else — routing never reads it.
 --
--- Two rules in one trigger, because they are one invariant: A PROFILE THAT IS
--- NOT ELIGIBLE HOLDS NO DEFAULT, AND A DEFAULT IS ALWAYS A LIVE DOMAIN OF
--- THAT SAME ACCOUNT.
+-- Two rules, and they are deliberately not the same shape.
 --
--- Clearing on downgrade is written as a state rule ("not eligible ⇒ null")
--- rather than as a tier transition ("pro → free"). A transition test has to
--- be right about every writer; a state rule cannot be stale. It is also why
--- neither `expirePro` in the monitor nor the Polar webhook needs a code
--- change: both already write `tier`, and that write is what fires this.
+-- A PROFILE THAT IS NOT ELIGIBLE HOLDS NO DEFAULT is a state rule, checked on
+-- every write: "not eligible ⇒ null", not "pro → free". A transition test has
+-- to be right about every writer; a state rule cannot be stale. It is also
+-- why neither `expirePro` in the monitor nor the Polar webhook needs a code
+-- change — both already write `tier`, and that write is what fires this.
+--
+-- A DEFAULT HAS TO BE A LIVE DOMAIN OF THIS ACCOUNT is checked only when the
+-- default itself is being SET. It is an admission rule, not a standing one,
+-- and the difference matters: a customer's domain can go disconnected at
+-- three in the morning without anyone writing to their profile, and if the
+-- rule were standing, the next unrelated write to that row would fail. The
+-- next unrelated write to that row is a Polar renewal setting tier = 'pro'.
+-- Refusing it would fail the webhook, Polar would retry, and a paying
+-- customer would be stuck off Pro because their DNS was down. So a default
+-- that was valid when it was set stays put; what it is worth at serving time
+-- is decided at serving time, by create_share and by the worker, both of
+-- which read the domain's current state.
 --
 -- 032 revoked the table-level UPDATE on profiles and re-granted only
 -- (display_name, timezone), so this column is unreachable through PostgREST
@@ -644,11 +873,19 @@ begin
     return new;
   end if;
 
-  -- The downgrade rule. Silent, because it is not a refusal: the account
-  -- keeps its domain row, keeps serving every link already issued on it, and
-  -- gets the default back by becoming Pro again.
+  -- The downgrade rule, checked on every write. Silent, because it is not a
+  -- refusal: the account keeps its domain row, keeps serving every link
+  -- already issued on it, and gets the default back by becoming Pro again.
   if not (new.tier = 'pro' or coalesce(new.comped, false)) then
     new.default_custom_domain_id := null;
+    return new;
+  end if;
+
+  -- The default is not being touched by this write, so this write is not the
+  -- place to re-litigate it. Anything else refuses a Polar renewal because a
+  -- customer's DNS went down overnight.
+  if tg_op = 'UPDATE'
+     and new.default_custom_domain_id is not distinct from old.default_custom_domain_id then
     return new;
   end if;
 
@@ -763,16 +1000,27 @@ begin
       (select default_custom_domain_id from profiles where id = v_user_id)
     );
 
-    -- Implied choice, domain no longer serving: issue on htmlradar.page
-    -- rather than refuse to create the link at all. An explicit
-    -- p_custom_domain_id skips this and meets the trigger, which is what
-    -- turns into the API's 422.
+    -- A default that is no longer serving REFUSES, and says so. An earlier
+    -- draft quietly fell back to htmlradar.page, on the theory that a
+    -- customer whose DNS broke should still be able to send. That is the
+    -- wrong kindness: the customer picks the link out of the dashboard,
+    -- e-mails it to a buyer believing it carries their own domain, and
+    -- nothing anywhere tells them it does not. A refusal they can read is
+    -- better than a link that is silently not what they asked for, and the
+    -- per-share HTMLRadar choice is one argument away for anyone in a hurry.
+    --
+    -- The explicit case (p_custom_domain_id given) falls through to the same
+    -- refusal via the share trigger; this branch exists so the IMPLIED case
+    -- gets a message about the default rather than about an id the caller
+    -- never named.
     if p_custom_domain_id is null and v_domain_id is not null
        and not exists (
          select 1 from custom_domains
           where id = v_domain_id and owner_id = v_user_id and state = 'live'
        ) then
-      v_domain_id := null;
+      raise exception 'share_custom_domain_not_live'
+        using errcode = 'P0053',
+              hint = 'Your domain is not serving at the moment, so this link cannot be created on it. Reconnect it in Settings, or create this link on the HTMLRadar address.';
     end if;
   end if;
 
@@ -1098,5 +1346,7 @@ grant execute on function public.report_abuse(text, text, text, text) to service
 
 -- Make the new and re-signed RPCs callable immediately (PostgREST schema
 -- cache reload). Without this the app calls the old create_share signature
--- until the cache turns over on its own.
+-- until the cache turns over on its own. Queued here, delivered at commit.
 notify pgrst, 'reload schema';
+
+commit;

@@ -17,7 +17,9 @@
 --      once held cannot serve again without a human. That last rule is the
 --      whole mitigation for having no ownership proof beyond the CNAME
 --      (sprint: "Refused, with reasons"), so it is tested as a refusal to go
---      live and not merely as a flag being set.
+--      live and not merely as a flag being set — including after the previous
+--      holder's ACCOUNT IS DELETED, which is the case a foreign key would
+--      have quietly broken, and including the one audited way past the flag.
 --
 --   3. That a customer cannot write any of it. RLS scopes ROWS, not COLUMNS,
 --      and `authenticated` reaches document_shares through PostgREST with the
@@ -163,6 +165,10 @@ create or replace function pg_temp.doc(k text) returns uuid
 language sql stable security definer set search_path = public as
   $$ select id from documents where title = 'Deck ' || $1 $$;
 
+create or replace function pg_temp.domain(h text) returns uuid
+language sql stable security definer set search_path = public as
+  $$ select id from custom_domains where hostname = $1 and retired_at is null $$;
+
 -- ------------------------------------------------------------
 -- Section A — what may be claimed
 --
@@ -213,6 +219,21 @@ select pg_temp.expect_error(
          pg_temp.uid('free')),
   'P0045', 'A7 …and under com.au');
 
+select pg_temp.expect_error(
+  format('insert into custom_domains (owner_id, hostname) values (%L, ''acme.com.br'')',
+         pg_temp.uid('free')),
+  'P0045', 'A7b …and under com.br');
+
+select pg_temp.expect_error(
+  format('insert into custom_domains (owner_id, hostname) values (%L, ''acme.co.jp'')',
+         pg_temp.uid('free')),
+  'P0045', 'A7c …and under co.jp');
+
+select pg_temp.expect_error(
+  format('insert into custom_domains (owner_id, hostname) values (%L, ''acme.gov.uk'')',
+         pg_temp.uid('free')),
+  'P0045', 'A7d …and under gov.uk');
+
 select pg_temp.expect_ok(
   format('insert into custom_domains (owner_id, hostname) values (%L, ''decks.acme.co.uk'')',
          pg_temp.uid('comped')),
@@ -228,6 +249,21 @@ select pg_temp.expect_error(
   format('insert into custom_domains (owner_id, hostname) values (%L, ''htmlradar-login.example.com'')',
          pg_temp.uid('free')),
   'P0046', 'A10 a name carrying "htmlradar" is refused, wherever it sits');
+
+-- Digits standing in for letters. A recipient reading `htm1radar-login` in a
+-- browser bar does not see the difference, which is the entire trick. Of the
+-- five substitutions the rule folds, only `1` for `l` and `7` for `t` can
+-- spell our name at all — the rest are there so the rule does not have to be
+-- revisited if the name ever changes.
+select pg_temp.expect_error(
+  format('insert into custom_domains (owner_id, hostname) values (%L, ''htm1radar-login.example.com'')',
+         pg_temp.uid('free')),
+  'P0046', 'A10b a one standing in for an l is refused');
+
+select pg_temp.expect_error(
+  format('insert into custom_domains (owner_id, hostname) values (%L, ''h7mlradar.example.com'')',
+         pg_temp.uid('free')),
+  'P0046', 'A10d a seven standing in for a t is refused');
 
 select pg_temp.expect_error(
   format('insert into custom_domains (owner_id, hostname) values (%L, ''decks.htmlradar.page'')',
@@ -434,6 +470,136 @@ select pg_temp.expect_error(
   'update custom_domains set state = ''live'' where hostname = ''decks.example-co.com'' and retired_at is null',
   'P0050', 'B21 a flagged re-claim cannot serve until support clears it');
 
+-- The way past the flag, and the fact that there is exactly one. A safeguard
+-- with no documented way through it is a safeguard somebody disables at two
+-- in the morning; a safeguard with one audited way through it is a decision
+-- with a name on it.
+select pg_temp.expect_error(
+  'update custom_domains set previous_owner_review = false where hostname = ''decks.example-co.com'' and retired_at is null',
+  'P0049', 'B22 an ordinary update cannot clear the review flag');
+
+set local role service_role;
+
+select pg_temp.expect_error(
+  format('select approve_custom_domain_reclaim(%L, ''  '')',
+         pg_temp.domain('decks.example-co.com')),
+  'P0057', 'B23 approving without saying why is refused');
+
+select pg_temp.expect_error(
+  format('select approve_custom_domain_reclaim(%L, ''who cares'')', gen_random_uuid()),
+  'P0058', 'B24 approving a domain that does not exist is refused');
+
+select pg_temp.expect_error(
+  format('select approve_custom_domain_reclaim(%L, ''nothing to approve'')',
+         pg_temp.domain('decks.acme.com')),
+  'P0059', 'B25 approving a domain that is not under review is refused');
+
+select pg_temp.expect_eq(
+  (select previous_owner_review from approve_custom_domain_reclaim(
+     pg_temp.domain('decks.example-co.com'),
+     'Spoke to the new owner, they showed the registrar invoice — AR, 17 Sep')),
+  false,
+  'B26 support approval clears the flag');
+
+reset role;
+
+select pg_temp.expect_eq(
+  (select reclaim_approved_at is not null and reclaim_approved_by is not null
+          and reclaim_note like '%registrar invoice%'
+     from custom_domains where hostname = 'decks.example-co.com' and retired_at is null),
+  true,
+  'B27 …and records when, which role, and why');
+
+select pg_temp.expect_ok(
+  'update custom_domains set state = ''live'' where hostname = ''decks.example-co.com'' and retired_at is null',
+  'B28 …after which the re-claimed name may serve');
+
+-- The approval setting is bound to one row id and is transaction-local, so it
+-- cannot be reused to launder a second row in the same transaction.
+insert into auth.users (id, email) values
+  (gen_random_uuid(), 'cd-second@example.test'),
+  (gen_random_uuid(), 'cd-third@example.test');
+insert into t_ids select 'second', id from auth.users where email = 'cd-second@example.test';
+insert into t_ids select 'third',  id from auth.users where email = 'cd-third@example.test';
+update profiles set tier = 'pro' where id in (pg_temp.uid('second'), pg_temp.uid('third'));
+insert into custom_domains (owner_id, hostname) values (pg_temp.uid('second'), 'decks.spare-co.com');
+update custom_domains set state = 'retired' where hostname = 'decks.spare-co.com';
+insert into custom_domains (owner_id, hostname) values (pg_temp.uid('third'), 'decks.spare-co.com');
+
+select pg_temp.expect_error(
+  'update custom_domains set previous_owner_review = false where hostname = ''decks.spare-co.com'' and retired_at is null',
+  'P0049', 'B29 one approval does not clear the next row''s flag');
+
+-- ------------------------------------------------------------
+-- Deleting the account must not launder the name.
+--
+-- This is the case a foreign key would have broken: `on delete cascade` to
+-- auth.users would take the claim away with the account, and the next person
+-- to claim that hostname would look like the first one ever to hold it. The
+-- claim outlives the account exactly as handle_registry's does (043).
+-- ------------------------------------------------------------
+insert into auth.users (id, email) values
+  (gen_random_uuid(), 'cd-gone@example.test'),
+  (gen_random_uuid(), 'cd-newcomer@example.test');
+insert into t_ids select 'gone',     id from auth.users where email = 'cd-gone@example.test';
+insert into t_ids select 'newcomer', id from auth.users where email = 'cd-newcomer@example.test';
+update profiles set tier = 'pro' where id in (pg_temp.uid('gone'), pg_temp.uid('newcomer'));
+
+insert into custom_domains (owner_id, hostname, state, verified_at)
+values (pg_temp.uid('gone'), 'decks.leaving-co.com', 'live', now());
+
+select pg_temp.expect_ok(
+  format('delete from auth.users where id = %L', pg_temp.uid('gone')),
+  'B30 the account that held a domain is deleted');
+
+select pg_temp.expect_eq(
+  (select count(*)::int from profiles where id = pg_temp.uid('gone')),
+  0,
+  'B31 the profile row really is gone');
+
+select pg_temp.expect_eq(
+  (select owner_id = pg_temp.uid('gone') and owner_deleted_at is not null
+     from custom_domains where hostname = 'decks.leaving-co.com'),
+  true,
+  'B32 …and the claim survived it, stamped with the fact that its holder left');
+
+-- Retired as well as stamped: the hostname is serving nothing, so it must
+-- stop holding the one-per-hostname index against everybody else. The row
+-- stays; only the claim on the index goes.
+select pg_temp.expect_eq(
+  (select state from custom_domains where hostname = 'decks.leaving-co.com'),
+  'retired',
+  'B32b …and retired, because a deleted account serves nothing');
+
+-- And it lands on the monitor's list of Cloudflare hostnames still standing:
+-- retiring never clears cloudflare_id, or nothing would record that the
+-- hostname is ours to delete.
+update custom_domains set cloudflare_id = 'cf-leaving-co'
+ where hostname = 'decks.leaving-co.com';
+select pg_temp.expect_eq(
+  (select count(*)::int from custom_domains
+    where retired_at is not null and cloudflare_id is not null
+      and cloudflare_deleted_at is null
+      and hostname = 'decks.leaving-co.com'),
+  1,
+  'B32c …and shows up in the sweep for hostnames still standing at Cloudflare');
+
+-- The property the whole arrangement is for.
+select pg_temp.expect_ok(
+  format('insert into custom_domains (owner_id, hostname) values (%L, ''decks.leaving-co.com'')',
+         pg_temp.uid('newcomer')),
+  'B33 a new account may claim the hostname of a deleted account');
+
+select pg_temp.expect_eq(
+  (select previous_owner_review from custom_domains
+    where hostname = 'decks.leaving-co.com' and retired_at is null),
+  true,
+  'B34 …but it is still flagged for review — deleting the account did not launder the name');
+
+select pg_temp.expect_error(
+  'update custom_domains set state = ''live'' where hostname = ''decks.leaving-co.com'' and retired_at is null',
+  'P0050', 'B35 …and it still cannot serve until a person agrees');
+
 -- ------------------------------------------------------------
 -- Section C — a customer cannot write any of this
 --
@@ -474,6 +640,27 @@ select pg_temp.expect_error(
   'select count(*) from custom_domains', '42501',
   'C6 anon cannot read the table at all');
 reset role;
+
+-- The approval function is the one way past the re-claim review, so the grant
+-- on it is the whole of its security argument: a caller who can execute it
+-- chooses the row, and could therefore approve their own claim on somebody
+-- else's hostname.
+do $$
+declare
+  v_sig text := 'approve_custom_domain_reclaim(uuid, text)';
+  r record;
+begin
+  for r in select unnest(array['anon', 'authenticated', 'public']) as who loop
+    if has_function_privilege(r.who, v_sig, 'execute') then
+      raise exception 'FAIL C7: % can execute approve_custom_domain_reclaim', r.who;
+    end if;
+  end loop;
+  if not has_function_privilege('service_role', v_sig, 'execute') then
+    raise exception 'FAIL C7: the service role cannot execute approve_custom_domain_reclaim';
+  end if;
+  raise notice 'PASS  C7 only the service role may approve a re-claim';
+end;
+$$;
 select set_config('request.jwt.claim.sub', '', true);
 
 -- ------------------------------------------------------------
@@ -489,10 +676,6 @@ update custom_domains set state = 'retired'
  where owner_id = pg_temp.uid('pro2') and retired_at is null;
 insert into custom_domains (owner_id, hostname, state, verified_at)
 values (pg_temp.uid('pro2'), 'decks.other-co.com', 'live', now());
-
-create or replace function pg_temp.domain(h text) returns uuid
-language sql stable security definer set search_path = public as
-  $$ select id from custom_domains where hostname = $1 and retired_at is null $$;
 
 set local role authenticated;
 do $$ begin perform set_config('request.jwt.claim.sub', pg_temp.uid('pro')::text, true); end $$;
@@ -618,23 +801,32 @@ select pg_temp.expect_error(
 
 reset role;
 
--- The stale default. A customer whose DNS broke this morning must still be
--- able to send a link, so an IMPLIED choice falls back to the apex rather
--- than failing the whole creation.
+-- The stale default. There is NO silent fallback: a customer who asked for
+-- their own domain and got htmlradar.page instead would e-mail a buyer a link
+-- that is not what they believe it is, and nothing anywhere would say so. The
+-- refusal is the kindness.
 update custom_domains set state = 'disconnected' where hostname = 'decks.acme.com';
 
 set local role authenticated;
-select pg_temp.expect_eq(
-  (select custom_domain_id from create_share(
-     pg_temp.doc('pro'), 'Stale default', true, false, null, null, null, null)),
-  null::uuid,
-  'E5 a default that stopped serving falls back to the apex instead of failing the link');
+select pg_temp.expect_error(
+  format('select create_share(%L, ''Stale default'', true, false, null, null, null, null)',
+         pg_temp.doc('pro')),
+  'P0053', 'E5 a default that stopped serving refuses the link rather than quietly moving it to htmlradar.page');
 
--- …but naming it explicitly still says what went wrong.
+-- …and naming it explicitly is refused too, which is what the API turns into
+-- its 422.
 select pg_temp.expect_error(
   format('select create_share(%L, ''Stale explicit'', true, false, null, null, null, null, null, %L)',
          pg_temp.doc('pro'), pg_temp.domain('decks.acme.com')),
-  'P0053', 'E6 …while naming it explicitly is refused, so the API can say so');
+  'P0053', 'E6 …and so is naming it explicitly');
+
+-- The way out is one argument, which is why refusing is affordable.
+select pg_temp.expect_eq(
+  (select custom_domain_id from create_share(
+     pg_temp.doc('pro'), 'Stale but urgent', true, false, null, null, null, null,
+     null, null, true)),
+  null::uuid,
+  'E6b …while the HTMLRadar address is still one argument away');
 
 reset role;
 update custom_domains set state = 'live' where hostname = 'decks.acme.com';
@@ -675,6 +867,34 @@ select pg_temp.expect_error(
   format('update profiles set default_custom_domain_id = %L where id = %L',
          pg_temp.domain('pending.pro3.com'), pg_temp.uid('pro3')),
   'P0055', 'F2 …and it has to be live');
+
+-- The regression that costs money. A customer's domain goes disconnected at
+-- three in the morning; nobody writes to their profile until Polar renews
+-- them at the end of the month and sets tier = 'pro'. If the default were
+-- re-validated on every write, that write would fail, the webhook would fail,
+-- Polar would retry, and a paying customer would sit on the free tier because
+-- their DNS was down. The default is validated when it is SET and not
+-- afterwards; what it is worth at serving time is decided at serving time.
+update custom_domains set state = 'disconnected' where hostname = 'decks.acme.com';
+
+select pg_temp.expect_ok(
+  format('update profiles set tier = ''pro'', pro_until = now() + interval ''30 days'' where id = %L',
+         pg_temp.uid('pro')),
+  'F2b a renewal succeeds while the account''s default domain is disconnected');
+
+select pg_temp.expect_eq(
+  (select default_custom_domain_id is not null from profiles where id = pg_temp.uid('pro')),
+  true,
+  'F2c …and the default is left exactly where it was');
+
+-- Setting it afresh while it is disconnected is a different question, and
+-- that one is refused: admission is checked, standing is not.
+select pg_temp.expect_error(
+  format('update profiles set default_custom_domain_id = %L where id = %L',
+         pg_temp.domain('decks.acme.com'), pg_temp.uid('pro2')),
+  'P0055', 'F2d …while adopting a disconnected domain as a default is still refused');
+
+update custom_domains set state = 'live' where hostname = 'decks.acme.com';
 
 -- The drill (PRD M5): flip the tier, confirm issued links still serve and new
 -- branded links stop.

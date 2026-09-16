@@ -1041,6 +1041,9 @@ export async function recordOutbox(env: Env, row: OutboxRow): Promise<void> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(row),
+      // A receipt must never hold a run open: if Supabase is slow enough to
+      // matter, the caller's real work outranks the row.
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {
@@ -3306,14 +3309,31 @@ export async function userFeed(env: Env, nowMs: number = Date.now()): Promise<vo
 // would let a name that resolves somewhere else read as live; believing only
 // the probe would let us promise HTTPS before the certificate exists.
 //
-// Every write is a conditional PATCH naming the state it expects, so a check
-// that started before the customer disconnected cannot land after and
-// resurrect the row. Retired rows are never read and never written.
+// Two things this file is careful about, both of which cost a customer their
+// working links if they are got wrong:
+//
+//   A failure of OURS is not a failure of THEIRS. When the Cloudflare API is
+//   down, or times out, or answers something we cannot parse, we have learnt
+//   nothing about the customer's domain. That records a reason and stops. Only
+//   a probe that actually answered wrongly, or a successful Cloudflare call
+//   saying the hostname or certificate is no longer active, counts towards the
+//   two strikes that disconnect a domain.
+//
+//   Every write names the row it read — its state AND its last_checked_at — so
+//   a slow check cannot land on top of a newer one, and a check that started
+//   before the customer disconnected cannot resurrect the row. A PATCH that
+//   matches nothing means the world moved on, and the run stops there rather
+//   than announcing a transition it did not make. A retired row is touched by
+//   exactly one thing, the hourly sweep below, and only ever in one field.
 const DOMAIN_SETTLE_MS = 60_000;
 const DOMAIN_RECHECK_MS = 60 * 60_000;
 const DOMAIN_TIMEOUT_MS = 5_000;
+/** Supabase, not the customer's host: a slower budget for our own database. */
+const DOMAIN_DB_TIMEOUT_MS = 10_000;
 /** One failure is a blip (a deploy, a DNS edge). Two in a row is a fact. */
 const DOMAIN_FAILURES_TO_DISCONNECT = 2;
+/** The probe answers one short fixed string. Anything longer is not ours. */
+const PROBE_BODY_MAX_BYTES = 256;
 
 interface DomainRow {
   id: string;
@@ -3324,16 +3344,47 @@ interface DomainRow {
   consecutive_failures: number | null;
   created_at: string;
   last_checked_at: string | null;
+  cloudflare_deleted_at: string | null;
 }
 
 interface CloudflareHostname {
   result?: { status?: string; ssl?: { status?: string } };
 }
 
-/** Null when the hostname is serving us over a valid certificate; otherwise the
- *  reason it is not, short enough to read in a Telegram line. */
-async function checkDomain(env: Env, row: DomainRow): Promise<string | null> {
-  if (!row.cloudflare_id) return 'no Cloudflare hostname id on the row';
+/**
+ * `provider: true` means we failed, not the domain: nothing was learnt about
+ * the customer's hostname, so nothing may be counted against it.
+ */
+type DomainCheck = { ok: true } | { ok: false; provider: boolean; reason: string };
+
+const providerProblem = (reason: string): DomainCheck => ({ ok: false, provider: true, reason });
+const domainProblem = (reason: string): DomainCheck => ({ ok: false, provider: false, reason });
+
+/**
+ * Reads the probe's answer without trusting its size: at most
+ * PROBE_BODY_MAX_BYTES, then the body is cancelled. Null means it was longer
+ * than that, which is already an answer — ours is one short line.
+ */
+async function readCappedBody(res: Response): Promise<string | null> {
+  const reader = res.body?.getReader();
+  if (!reader) return '';
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    bytes += value.byteLength;
+    if (bytes > PROBE_BODY_MAX_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}
+
+async function checkDomain(env: Env, row: DomainRow): Promise<DomainCheck> {
+  if (!row.cloudflare_id) return domainProblem('no Cloudflare hostname id on the row');
   try {
     const res = await fetch(
       `https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID_PAGE}` +
@@ -3343,36 +3394,46 @@ async function checkDomain(env: Env, row: DomainRow): Promise<string | null> {
         signal: AbortSignal.timeout(DOMAIN_TIMEOUT_MS),
       },
     );
-    if (!res.ok) return `cloudflare HTTP ${res.status}`;
-    const body = (await res.json()) as CloudflareHostname;
-    const hostname = body.result?.status ?? 'unknown';
-    const ssl = body.result?.ssl?.status ?? 'unknown';
+    // Cloudflare refusing to answer says nothing about the customer's DNS.
+    if (!res.ok) return providerProblem(`cloudflare HTTP ${res.status}`);
+    let body: CloudflareHostname;
+    try {
+      body = (await res.json()) as CloudflareHostname;
+    } catch {
+      return providerProblem('cloudflare answered with a body we could not read');
+    }
+    if (!body.result) return providerProblem('cloudflare answered without a hostname');
+    const hostname = body.result.status ?? 'unknown';
+    const ssl = body.result.ssl?.status ?? 'unknown';
+    // A successful call saying "not active" IS news about the domain.
     if (hostname !== 'active' || ssl !== 'active') {
-      return `cloudflare hostname ${hostname}, certificate ${ssl}`;
+      return domainProblem(`cloudflare hostname ${hostname}, certificate ${ssl}`);
     }
   } catch (err) {
-    return `cloudflare unreachable: ${(err as Error).message}`;
+    return providerProblem(`cloudflare unreachable: ${(err as Error).message}`);
   }
 
   // The probe. No redirects: a name parked on somebody's redirector would
   // otherwise "pass" by bouncing us to a page that does answer. The body and
   // the header both carry this domain's id, so one customer's live hostname
-  // cannot validate another's claim.
+  // cannot validate another's claim, and the body has to match exactly —
+  // anything padded, wrapped or appended to is somebody else's server.
   try {
     const res = await fetch(`https://${row.hostname}/.well-known/htmlradar-domain-check`, {
       redirect: 'manual',
       signal: AbortSignal.timeout(DOMAIN_TIMEOUT_MS),
     });
-    if (!res.ok) return `probe HTTP ${res.status}`;
-    if (res.headers.get('x-htmlradar-domain') !== row.id)
-      return 'probe answered without our header';
-    if ((await res.text()).trim() !== `htmlradar-domain:${row.id}`) {
-      return 'probe answered with the wrong body';
+    if (!res.ok) return domainProblem(`probe HTTP ${res.status}`);
+    if (res.headers.get('x-htmlradar-domain') !== row.id) {
+      return domainProblem('probe answered without our header');
+    }
+    if ((await readCappedBody(res)) !== `htmlradar-domain:${row.id}`) {
+      return domainProblem('probe answered with the wrong body');
     }
   } catch (err) {
-    return `probe failed: ${(err as Error).message}`;
+    return domainProblem(`probe failed: ${(err as Error).message}`);
   }
-  return null;
+  return { ok: true };
 }
 
 const domainHeaders = (env: Env) => ({
@@ -3382,73 +3443,154 @@ const domainHeaders = (env: Env) => ({
 });
 
 /**
- * The only way this file writes a domain row: id AND the state we read. Returns
- * whether it matched — false means the row moved on while we were checking
- * (retired, disconnected by hand, or promoted by a concurrent run), and the
- * caller must not announce a transition it did not make.
+ * The only way this file writes a domain row: id, the state we read AND the
+ * last_checked_at we read. Returns whether it matched — false means the row
+ * moved on while we were checking (retired, disconnected by hand, or checked
+ * by an overlapping run), and the caller must neither follow up nor announce a
+ * transition it did not make.
  */
 async function patchDomain(
   env: Env,
   row: DomainRow,
   fields: Record<string, unknown>,
 ): Promise<boolean> {
+  const unchanged =
+    row.last_checked_at === null ? 'is.null' : `eq.${encodeURIComponent(row.last_checked_at)}`;
   const res = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/custom_domains?id=eq.${row.id}&state=eq.${row.state}`,
+    `${env.SUPABASE_URL}/rest/v1/custom_domains` +
+      `?id=eq.${row.id}&state=eq.${row.state}&last_checked_at=${unchanged}&select=id`,
     {
       method: 'PATCH',
       headers: { ...domainHeaders(env), Prefer: 'return=representation' },
       body: JSON.stringify(fields),
+      signal: AbortSignal.timeout(DOMAIN_DB_TIMEOUT_MS),
     },
   );
   if (!res.ok) throw new Error(`custom_domains PATCH HTTP ${res.status}`);
   return ((await res.json()) as unknown[]).length > 0;
 }
 
-/** The owner's e-mail, for the Telegram line. '' if the profile has gone. */
-async function domainOwnerEmail(env: Env, ownerId: string): Promise<string> {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${ownerId}&select=email`, {
-    headers: domainHeaders(env),
-  });
-  if (!res.ok) throw new Error(`profiles read HTTP ${res.status}`);
-  return ((await res.json()) as { email: string }[])[0]?.email ?? '';
-}
-
 /** Conditional too: only touches the default when it is what we expect it to
- *  be, so we never clear a default the owner has since pointed elsewhere. */
+ *  be, so we never clear a default the owner has since pointed elsewhere.
+ *  Returns whether it matched. */
 async function patchDefaultDomain(
   env: Env,
   ownerId: string,
   filter: string,
   value: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const res = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${ownerId}&default_custom_domain_id=${filter}`,
+    `${env.SUPABASE_URL}/rest/v1/profiles` +
+      `?id=eq.${ownerId}&default_custom_domain_id=${filter}&select=id`,
     {
       method: 'PATCH',
-      headers: domainHeaders(env),
+      headers: { ...domainHeaders(env), Prefer: 'return=representation' },
       body: JSON.stringify({ default_custom_domain_id: value }),
+      signal: AbortSignal.timeout(DOMAIN_DB_TIMEOUT_MS),
     },
   );
   if (!res.ok) throw new Error(`profiles PATCH HTTP ${res.status}`);
+  return ((await res.json()) as unknown[]).length > 0;
+}
+
+/**
+ * The half of a promotion that happens after the row is live: the domain
+ * becomes the owner's default for new links (no toggle — a live domain just is
+ * the default), and the founder hears one line.
+ *
+ * Claiming the default IS the announcement's lock. Exactly one run can match
+ * `is.null`, so exactly one run says the line; and a run that died between the
+ * promotion and here leaves a live row with no default, which the next hourly
+ * check finishes. No new column, no second source of truth.
+ */
+async function finishPromotion(env: Env, row: DomainRow): Promise<void> {
+  if (!(await patchDefaultDomain(env, row.owner_id, 'is.null', row.id))) return;
+  await sendTelegram(env, 'user_feed', 'domain-connected', `${row.hostname} connected`, {
+    domain_id: row.id,
+  });
+}
+
+/**
+ * The one write a retired row ever gets, and it touches exactly one field.
+ * Conditional on the row still being retired and still unswept, so a row
+ * reclaimed or cleaned between the read and here is left alone.
+ */
+async function patchRetiredDomain(
+  env: Env,
+  row: DomainRow,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/custom_domains` +
+      `?id=eq.${row.id}&state=eq.retired&cloudflare_deleted_at=is.null`,
+    {
+      method: 'PATCH',
+      headers: domainHeaders(env),
+      body: JSON.stringify(fields),
+      signal: AbortSignal.timeout(DOMAIN_DB_TIMEOUT_MS),
+    },
+  );
+  if (!res.ok) throw new Error(`custom_domains retired PATCH HTTP ${res.status}`);
+}
+
+/**
+ * Gives the hostname back to Cloudflare after the customer has disconnected.
+ * The app retires the row and stamps cloudflare_deleted_at only once Cloudflare
+ * has confirmed the delete, so anything left unstamped is a delete that never
+ * landed — one per free plan's hundred, and a hostname nobody can re-claim
+ * while it is still registered to us.
+ *
+ * Idempotent on purpose: 404 means it is already gone, which is the state we
+ * were asking for. A provider error records the reason and leaves the row for
+ * the next hour.
+ */
+async function sweepRetiredDomain(env: Env, row: DomainRow, at: string): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID_PAGE}` +
+        `/custom_hostnames/${row.cloudflare_id}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` },
+        signal: AbortSignal.timeout(DOMAIN_TIMEOUT_MS),
+      },
+    );
+    if (!res.ok && res.status !== 404) {
+      await patchRetiredDomain(env, row, { last_error: `cloudflare DELETE HTTP ${res.status}` });
+      return;
+    }
+  } catch (err) {
+    await patchRetiredDomain(env, row, {
+      last_error: `cloudflare unreachable: ${(err as Error).message}`,
+    });
+    return;
+  }
+  await patchRetiredDomain(env, row, { cloudflare_deleted_at: at });
 }
 
 async function settleDomain(env: Env, row: DomainRow, at: string): Promise<void> {
-  const reason = await checkDomain(env, row);
+  const check = await checkDomain(env, row);
 
-  if (reason !== null) {
-    const failures = (row.consecutive_failures ?? 0) + 1;
+  // Our own trouble. Say what happened and stop: no count, no state change.
+  if (!check.ok && check.provider) {
+    await patchDomain(env, row, { last_error: check.reason, last_checked_at: at });
+    return;
+  }
+
+  if (!check.ok) {
     // A pending domain has never worked, so a failure is just "not yet": it
     // carries no failure count and never disconnects. Only a domain that was
     // live can fall over.
     if (row.state === 'pending') {
-      await patchDomain(env, row, { last_error: reason, last_checked_at: at });
+      await patchDomain(env, row, { last_error: check.reason, last_checked_at: at });
       return;
     }
+    const failures = (row.consecutive_failures ?? 0) + 1;
     const disconnecting = row.state === 'live' && failures >= DOMAIN_FAILURES_TO_DISCONNECT;
     const changed = await patchDomain(env, row, {
       ...(disconnecting ? { state: 'disconnected' } : {}),
       consecutive_failures: failures,
-      last_error: reason,
+      last_error: check.reason,
       last_checked_at: at,
     });
     if (!changed || !disconnecting) return;
@@ -3457,21 +3599,25 @@ async function settleDomain(env: Env, row: DomainRow, at: string): Promise<void>
       env,
       'user_feed',
       'domain-disconnected',
-      `${row.hostname} disconnected: ${reason}`,
-      {
-        domain_id: row.id,
-      },
+      `${row.hostname} disconnected: ${check.reason}`,
+      { domain_id: row.id },
     );
     return;
   }
 
-  // A live domain that still answers is the ordinary case and says nothing.
   if (row.state === 'live') {
-    await patchDomain(env, row, { last_checked_at: at, consecutive_failures: 0, last_error: null });
+    const changed = await patchDomain(env, row, {
+      last_checked_at: at,
+      consecutive_failures: 0,
+      last_error: null,
+    });
+    // Silent in the ordinary case — the default is already claimed. This is
+    // the run that finishes a promotion an earlier run left half done.
+    if (changed) await finishPromotion(env, row);
     return;
   }
 
-  const first = row.state === 'pending';
+  // Pending or disconnected, and both parties agree: live, and say so.
   const changed = await patchDomain(env, row, {
     state: 'live',
     verified_at: at,
@@ -3479,20 +3625,7 @@ async function settleDomain(env: Env, row: DomainRow, at: string): Promise<void>
     consecutive_failures: 0,
     last_error: null,
   });
-  if (!changed) return;
-  const email = await domainOwnerEmail(env, row.owner_id);
-  // Only when the owner has no default. On the first promotion that is the
-  // whole point (a live domain is the default for new links, no toggle); on a
-  // recovery it puts back the default the disconnect cleared, unless the owner
-  // has chosen something else since.
-  await patchDefaultDomain(env, row.owner_id, 'is.null', row.id);
-  await sendTelegram(
-    env,
-    'user_feed',
-    first ? 'domain-connected' : 'domain-reconnected',
-    `${row.hostname} ${first ? 'connected' : 'reconnected'} for ${domainOf(email)}`,
-    { domain_id: row.id },
-  );
+  if (changed) await finishPromotion(env, row);
 }
 
 /**
@@ -3507,9 +3640,10 @@ export async function domainLifecycle(env: Env, nowMs: number = Date.now()): Pro
   if (!env.CLOUDFLARE_API_TOKEN || !env.CLOUDFLARE_ZONE_ID_PAGE) return;
 
   const res = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/custom_domains?state=in.(pending,live,disconnected)` +
-      `&select=id,owner_id,hostname,cloudflare_id,state,consecutive_failures,created_at,last_checked_at`,
-    { headers: domainHeaders(env) },
+    `${env.SUPABASE_URL}/rest/v1/custom_domains?state=in.(pending,live,disconnected,retired)` +
+      `&select=id,owner_id,hostname,cloudflare_id,state,consecutive_failures,created_at,` +
+      `last_checked_at,cloudflare_deleted_at`,
+    { headers: domainHeaders(env), signal: AbortSignal.timeout(DOMAIN_DB_TIMEOUT_MS) },
   );
   if (!res.ok) throw new Error(`custom_domains read HTTP ${res.status}`);
   const rows = (await res.json()) as DomainRow[];
@@ -3517,20 +3651,39 @@ export async function domainLifecycle(env: Env, nowMs: number = Date.now()): Pro
   // ponytail: the whole table, filtered here. One row per Pro account, so tens
   // of rows for a long while; push the due-ness into the query if it grows.
   const due = rows.filter((row) =>
-    row.state === 'pending'
-      ? Date.parse(row.created_at) <= nowMs - DOMAIN_SETTLE_MS
-      : !row.last_checked_at || Date.parse(row.last_checked_at) <= nowMs - DOMAIN_RECHECK_MS,
+    row.state === 'retired'
+      ? false
+      : row.state === 'pending'
+        ? Date.parse(row.created_at) <= nowMs - DOMAIN_SETTLE_MS
+        : !row.last_checked_at || Date.parse(row.last_checked_at) <= nowMs - DOMAIN_RECHECK_MS,
   );
 
+  // The retired sweep, hourly and statelessly: the first five-minute slot of
+  // the hour. A retired row has no clock of its own we are allowed to write —
+  // only last_error and the stamp itself — and the delete is idempotent, so a
+  // missed hour costs nothing but an hour.
+  const sweeping = new Date(nowMs).getUTCMinutes() < 5;
+  const unswept = sweeping
+    ? rows.filter((r) => r.state === 'retired' && r.cloudflare_id && !r.cloudflare_deleted_at)
+    : [];
+
   const at = new Date(nowMs).toISOString();
+  // Per row, because one customer's unreachable name must not cost the next
+  // customer their promotion.
   for (const row of due) {
-    // Per row, because one customer's unreachable name must not cost the next
-    // customer their promotion.
     try {
       await settleDomain(env, row, at);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(`[domains] ${row.hostname}:`, (err as Error).message);
+    }
+  }
+  for (const row of unswept) {
+    try {
+      await sweepRetiredDomain(env, row, at);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[domains] ${row.hostname} sweep:`, (err as Error).message);
     }
   }
 }

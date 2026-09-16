@@ -29,6 +29,9 @@ keywords = ["cloudflare"]
 [allowlist]
 description = "Exact non-secret values that look like secrets"
 regexes = [
+  # Custom-domain error identifiers such as share_custom_domain_not_live: the
+  # substring "re_custom_domain_..." trips the Resend key rule (re_ + 20 chars).
+  '''(?:share_)?custom_domain_[a-z_]+''',
   # Fake webhook-signature fixture in payments.test.ts — NOT a real secret,
   # used only to exercise the standardwebhooks HMAC round-trip in tests.
   '''whsec_abc123xyz789defghijklmnop''',

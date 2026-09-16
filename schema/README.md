@@ -1,6 +1,6 @@
 # Schema
 
-Apply every numbered file directly in this folder, in ascending numeric order, starting at `001`, via the Supabase SQL Editor (or `psql`). No last file is named here on purpose — the folder grows, and a number written down goes stale the next time it does. As of this commit it ends at `048_onboarding_email.sql`. Never apply anything in `tests/` — those are destructive test programs for a scratch database only.
+Apply every numbered file directly in this folder, in ascending numeric order, starting at `001`, via the Supabase SQL Editor (or `psql`). No last file is named here on purpose — the folder grows, and a number written down goes stale the next time it does. As of this commit it ends at `052_custom_domains.sql`. Never apply anything in `tests/` — those are destructive test programs for a scratch database only.
 
 Two extensions are required and `001_init.sql` creates both: `pgcrypto` and `pg_net`. A third, `pg_cron`, is optional; `044` and `045` use it for scheduling and skip that step with a notice where it is absent.
 
@@ -48,17 +48,17 @@ Earlier drafts used `current_setting('app.session_secret')` and `ALTER DATABASE 
 - **Session bearer tokens** stored on the `sessions.token` column (replaces the HMAC-with-shared-secret scheme entirely — no app secret needed).
 - **Vault** for Resend secrets (decrypted at trigger execution time).
 
-## Tables (30)
+## Tables (31)
 
-Twenty of them carry a note below. The other ten are single-purpose and named by their migration:
+Twenty-one of them carry a note below. The other ten are single-purpose and named by their migration:
 `analytics_replay_cursor` (029), `app_error_log` (024), `cancellation_feedback` (023),
 `webhook_events_log` (022), `connect_handles` (045), `connector_grants` and `connector_events` (046),
 `radar_drafts` and `radar_post_reservations` (047), `user_feed_cursor` (051).
 
-- `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`). `handle` (043) is the account's subdomain label — links are served from `{handle}.htmlradar.page`. Nullable and null on every row until a later lane allocates one; immutable once set; three to twenty-four lowercase letters, digits and hyphens with no two hyphens in a row, which is also what bans a Punycode `xn--` prefix. It is a routing and reputation boundary, **not** an identity claim about the sender.
+- `profiles` — mirrors `auth.users`, adds `tier` (`free` | `pro`). `default_custom_domain_id` (052) is the live customer domain new links are issued on by default; a trigger clears it the moment the profile stops being Pro or comped, which is why neither the expiry sweep nor the Polar webhook needed a code change, and routing never reads it. `handle` (043) is the account's subdomain label — links are served from `{handle}.htmlradar.page`. Nullable and null on every row until a later lane allocates one; immutable once set; three to twenty-four lowercase letters, digits and hyphens with no two hyphens in a row, which is also what bans a Punycode `xn--` prefix. It is a routing and reputation boundary, **not** an identity claim about the sender.
 - `documents` — uploaded HTML or pasted URL; `current_version`, `r2_key`, `last_viewed_by_owner_at`, and the upload-time phishing screen's `screen_score` / `screen_signals` (039; null on every URL-source document and on everything predating the migration).
 - `document_versions` (018) — one row per upload or replace, capturing original local filename + bytes + R2 key.
-- `document_shares` — per-recipient tracked links; password / expiry / revoke / `allowed_email_domains` / `allowed_emails` / `lock_deck` per share. `host_handle` (043) is the hostname this link was created for: null means it is served on the apex forever, a value means `{host_handle}.htmlradar.page`. Immutable, and a trigger requires it to equal the owner's own handle when set — without that a customer could have their document served on `microsoft.htmlradar.page`. Routing follows this column, never `profiles.handle`, so an already-sent link never moves.
+- `document_shares` — per-recipient tracked links; password / expiry / revoke / `allowed_email_domains` / `allowed_emails` / `lock_deck` per share. `host_handle` (043) is the hostname this link was created for: null means it is served on the apex forever, a value means `{host_handle}.htmlradar.page`. Immutable, and a trigger requires it to equal the owner's own handle when set — without that a customer could have their document served on `microsoft.htmlradar.page`. `custom_domain_id` (052) is the customer domain it was issued on instead — at most one of the two is ever set, both are frozen at creation **including null**, and the domain has to belong to the owner and be live at that moment. Routing follows these columns, never `profiles.handle` or the owner's current default, so an already-sent link never moves.
 - `document_attachments` (009) — file metadata per share (PDF / Office / image / ZIP), bytes in R2.
 - `attachment_downloads` (016) — per-viewer download log keyed on viewer_id + session_id + filename + size_bytes.
 - `viewers` — recipient identities (email or anonymous fingerprint), scoped per share; `is_internal` flag (012) hides owner-self test reads — narrowed in `036_internal_viewers_owner_only.sql` to the owner's own address, so colleagues on the sender's own email domain are ordinary, visible recipients.
@@ -74,6 +74,7 @@ Twenty of them carry a note below. The other ten are single-purpose and named by
 - `abuse_reports` (037) — one row per abuse report. A recipient's report names a share; an automated upload-screen flag names a document instead (039), which is why `share_id` is nullable and `document_id` exists. RLS on with no policies, so no customer-facing role can read or write it; the operator reads it with the service role. See `docs/workstreams/security/ABUSE-RUNBOOK.md`.
 - `telegram_outbox` (038) — every Telegram message the monitor worker sends, and every thread-scan run whether it sent anything or not. Exists because a Telegram bot cannot read back its own sent history. `kind` also allows `heartbeat` (a maintenance session stamping the register) and `sentinel` (the daily report on the register's machine-checkable duties) as of 041. RLS on with no policies; the worker writes with the service role.
 - `radar_items` (042) — every item the listening radar sees on Hacker News, Reddit and Google Alerts, upserted on `source_url` so re-seeing a thread refreshes it rather than duplicating it. RLS on with no policies; the monitor worker reads and writes with the service role.
+- `custom_domains` (052) — one row per hostname a customer has claimed for their tracked links (`decks.acme.com`). Rows are never deleted, only stamped `retired_at`, so a name can never be silently re-issued; a unique partial index on `hostname` and another on `owner_id`, both `where retired_at is null`, are what make "one account per hostname" and "one hostname per account" race-safe. `state` (`pending` / `live` / `disconnected` / `retired`) is **our** serving decision and the only field the worker trusts; `cloudflare_status` and `ssl_status` are the provider's last word, kept for support. A claim on a name another account once held is flagged `previous_owner_review` and cannot serve until support clears it — that flag is the whole substitute for a second DNS record. Owners may read their own row through RLS and write nothing: every write is the service role's. **Edit before applying:** the migration carries a placeholder list of pilot owner ids, the only accounts allowed to claim a `gethtmlradar.com` test name.
 - `handle_registry` (043) — every subdomain label that is spoken for: 193 reserved names seeded with `claimed_by` null, plus one row per allocated handle. Rows are never deleted, only stamped `released_at` when the holding profile goes, so a retired handle can never be inherited by a new account along with the old one's hostname reputation. `claimed_by` is deliberately **not** a foreign key — a key would cascade the row away on account deletion, which is the failure the table exists to prevent. Its primary key is also what resolves two simultaneous allocations of the same name. RLS on with no policies.
 
 ## Views (2)
@@ -81,7 +82,7 @@ Twenty of them carry a note below. The other ten are single-purpose and named by
 Both follow the same private-view pattern: `security_invoker` set explicitly, then every grant revoked and re-granted narrowly. Supabase's default privileges hand new objects in `public` to `anon` and `authenticated`, and PostgREST publishes every view in `public`, so the REVOKE is a control rather than tidiness.
 
 - `recent_events` (006) — the last seven days of `app_events` joined to the user's email. `security_invoker = on`; granted to `authenticated` and `service_role`.
-- `share_lookup` (043) — everything the proxy needs to answer one recipient request in a single read: the share, its stored `host_handle`, the owner's handle and tier, and the document's R2 key, version and soft-delete state. `security_invoker = off`; **service role only**, because it carries every customer's handle and every document's storage key. The password hash is deliberately absent — password checks go through the rate-limited `verify_share_password` RPC.
+- `share_lookup` (043, extended by 052) — everything the proxy needs to answer one recipient request in a single read: the share, its stored `host_handle`, its stored `custom_domain_id` and that domain's **current** `custom_domain_hostname`, `custom_domain_state` and `custom_domain_owner_id`, the owner's handle and tier, and the document's R2 key, version and soft-delete state. The domain's state is read here on every lookup and cached nowhere, because a cached "live" would survive a retirement and keep serving a hostname whose customer was told it had stopped. `security_invoker = off`; **service role only**, because it carries every customer's handle and every document's storage key. The password hash is deliberately absent — password checks go through the rate-limited `verify_share_password` RPC.
 
 ## RPCs (11)
 
@@ -93,10 +94,12 @@ Owner-side (authenticated, SECURITY DEFINER, invoked from server actions):
 
 - `create_share`, `update_share` (007), `set_share_lock_deck` (015), `toggle_viewer_internal` (012)
 
+  `create_share` (and `create_share_as`) gained two optional trailing arguments in 052, `p_custom_domain_id uuid default null` and `p_use_htmlradar_address boolean default false`. The hostname is chosen inside the function and written in the same insert that creates the share, never stamped on afterwards. Omitting both is what every existing caller does, and it means "use the account's default domain if it has a live one", so no call site had to change for links to start going out on a customer's domain.
+
 Server-side only (service role, SECURITY DEFINER, invoked by the proxy worker and the public API):
 
 - `send_onboarding_emails` (048) — the one-time onboarding e-mail, sent to accounts created between 15 minutes and 24 hours ago that have not had one, excluding comped accounts and the internal domains. Claims each row by stamping `profiles.onboarding_sent_at` inside the same statement that selects it, so re-running it never re-sends. **The migration deliberately does not schedule it**; the one statement that switches it on is in section 3 of the file, and `docs/workstreams/product-and-engineering/ONBOARDING-EMAIL-2026-09-04.md` is the operator's guide.
-- `create_share_as` (034), `notify_disabled_attempt` (028), `report_abuse` (037), `reconcile_notification_sends` (044) — scheduled every 10 minutes via `pg_cron` (`select cron.schedule('reconcile_notification_sends', '*/10 * * * *', ...)`); on a Postgres without `pg_cron` (a self-hosted install, a scratch test database) the migration logs a notice and skips scheduling instead of failing, so the function still exists and can be called by hand or by an external scheduler.
+- `create_share_as` (034), `notify_disabled_attempt` (028), `report_abuse` (037; 052 builds the reported link's address from the share's stored host rather than hard-coding `htmlradar.page`), `reconcile_notification_sends` (044) — scheduled every 10 minutes via `pg_cron` (`select cron.schedule('reconcile_notification_sends', '*/10 * * * *', ...)`); on a Postgres without `pg_cron` (a self-hosted install, a scratch test database) the migration logs a notice and skips scheduling instead of failing, so the function still exists and can be called by hand or by an external scheduler.
 
 ## RLS posture
 
@@ -110,16 +113,16 @@ Verify the tables exist:
 
 ```sql
 select count(*) from pg_tables where schemaname = 'public';
--- 30 after the full chain through 051. Applying the chain a second time
+-- 31 after the full chain through 052. Applying the chain a second time
 -- leaves the count unchanged; that is what "idempotent" is being claimed to
 -- mean here, and it is checked rather than asserted.
 
 select tablename from pg_tables where schemaname = 'public' order by tablename;
 -- abuse_reports, analytics_replay_cursor, api_keys, app_error_log, app_events,
 -- attachment_downloads, cancellation_feedback, connect_handles,
--- connector_events, connector_grants, document_attachments, document_shares,
--- document_versions, documents, error_log, feedback, handle_registry,
--- notifications_log, profiles, radar_drafts, radar_items,
+-- connector_events, connector_grants, custom_domains, document_attachments,
+-- document_shares, document_versions, documents, error_log, feedback,
+-- handle_registry, notifications_log, profiles, radar_drafts, radar_items,
 -- radar_post_reservations, rate_limits, section_events, sessions,
 -- telegram_outbox, user_feed_cursor, viewers, waitlist, webhook_events_log
 ```

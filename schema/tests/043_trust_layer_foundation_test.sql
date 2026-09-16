@@ -44,8 +44,15 @@
 -- a scratch copy.
 --
 --   psql -v ON_ERROR_STOP=1 -f schema/001_init.sql   (…then 002, 003, 008,
---                                                     015, 027, 032, 033, 043)
+--                                                     015, 027, 032, 033, 043,
+--                                                     052)
 --   psql -v ON_ERROR_STOP=1 -f schema/tests/043_trust_layer_foundation_test.sql
+--
+-- 052 IS PART OF THE RUN, not an optional extra. It replaces this migration's
+-- share-host trigger with one that also covers custom domains, freezes
+-- host_handle in the null direction too, and adds four columns to
+-- share_lookup. Sections C and D below assert the behaviour AFTER that
+-- replacement, because that is the behaviour production has.
 --
 -- A throwaway Postgres in Docker is the scratch database this was written
 -- against, exactly as 034's, 035's and 037's test files document:
@@ -364,11 +371,16 @@ select pg_temp.expect_error(
   'update document_shares set host_handle = null where slug = ''trust-layer-host-1''',
   'P0042', 'C7 a stored hostname cannot be cleared — that would move a sent link');
 
--- Null to the owner's own handle is the one permitted transition: it is how a
--- later lane records a hostname on a share it has just created.
-select pg_temp.expect_ok(
+-- 043 permitted null → the owner's own handle, so that a later lane could stamp
+-- a hostname onto a share it had just created. 052 closed it, because the stamp
+-- was the bug: `stampShareHost` updated after the insert and swallowed its
+-- failures, so a share meant for a custom host existed on htmlradar.page for the
+-- width of that window and stayed there whenever the update lost. The hostname
+-- is now chosen inside create_share, in the insert itself, and null is as frozen
+-- as any other value.
+select pg_temp.expect_error(
   'update document_shares set host_handle = ''zephyr-labs'' where slug = ''trust-layer-apex-1''',
-  'C8 null may become the account''s own handle');
+  'P0042', 'C8 null cannot become a handle either — the address is fixed at creation (052)');
 
 -- A malformed hostname is caught by the ownership check first, because a BEFORE
 -- trigger runs ahead of a CHECK constraint and no well-formed handle can equal
@@ -383,13 +395,13 @@ select pg_temp.expect_error(
 -- …and the CHECK constraint underneath it still holds on its own, which is what
 -- makes it worth having: if a later migration ever loosens the trigger, a
 -- string that could not be a hostname still cannot reach the column.
-alter table document_shares disable trigger trg_validate_share_host_handle;
+alter table document_shares disable trigger trg_validate_share_host;
 select pg_temp.expect_error(
   format('insert into document_shares (document_id, owner_id, slug, host_handle) values (%L, %L, ''trust-layer-host-4'', ''XN--BAD'')',
          (select v from t_ids where k = 'doc_c'),
          (select v from t_ids where k = 'owner_c')),
   '23514', 'C10 with the trigger suspended, the format constraint still refuses it');
-alter table document_shares enable trigger trg_validate_share_host_handle;
+alter table document_shares enable trigger trg_validate_share_host;
 
 -- ------------------------------------------------------------
 -- Section D — the private view
@@ -402,6 +414,8 @@ select pg_temp.expect_eq(
     'id', 'slug', 'document_id', 'owner_id', 'recipient_label',
     'require_email', 'require_password', 'allowed_email_domains',
     'allowed_emails', 'lock_deck', 'expires_at', 'revoked_at', 'host_handle',
+    'custom_domain_id', 'custom_domain_hostname', 'custom_domain_state',
+    'custom_domain_owner_id',
     'owner_handle', 'owner_tier', 'document_title', 'document_source_type',
     'document_source_url', 'document_current_version', 'document_r2_key',
     'document_deleted_at'

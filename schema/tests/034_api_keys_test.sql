@@ -24,7 +24,9 @@
 -- a scratch copy.
 --
 --   psql -v ON_ERROR_STOP=1 -f schema/001_init.sql   (…then 002, 003, 008,
---                                                     027, 033, 034)
+--                                                     027, 033, 034, and 052,
+--                                                     which re-signs
+--                                                     create_share_as)
 --   psql -v ON_ERROR_STOP=1 -f schema/tests/034_api_keys_test.sql
 --
 -- A throwaway Postgres in Docker is the scratch database this was written
@@ -464,10 +466,15 @@ select pg_temp.expect_error(
 -- This grant is the entire reason p_user_id is safe to accept. If
 -- `authenticated` could execute it, any signed-in customer could create links
 -- in anybody's account through PostgREST.
+--
+-- The signature spelled out below is 052's: that migration re-signed
+-- create_share_as with the two hostname-choice arguments and re-stated the
+-- grants. Run this file against the full chain, not against 034 alone, or
+-- has_function_privilege will not find the function.
 -- ============================================================
 do $$
 declare
-  v_sig text := 'create_share_as(uuid, uuid, text, boolean, boolean, text, text[], text[], timestamptz, text)';
+  v_sig text := 'create_share_as(uuid, uuid, text, boolean, boolean, text, text[], text[], timestamptz, text, uuid, boolean)';
   r record;
 begin
   for r in select unnest(array['anon', 'authenticated', 'public']) as who loop
@@ -480,7 +487,7 @@ end;
 $$;
 
 do $$
-declare v_sig text := 'create_share_as(uuid, uuid, text, boolean, boolean, text, text[], text[], timestamptz, text)';
+declare v_sig text := 'create_share_as(uuid, uuid, text, boolean, boolean, text, text[], text[], timestamptz, text, uuid, boolean)';
 begin
   if not has_function_privilege('service_role', v_sig, 'execute') then
     raise exception 'FAIL E2: the service role cannot execute create_share_as';

@@ -1,0 +1,8 @@
+# Append the DCO sign-off if the commit message does not already carry one.
+# CONTRIBUTING.md requires it and the DCO workflow blocks any pull request without it.
+msg_file="$1"
+if ! grep -q '^Signed-off-by: ' "$msg_file"; then
+  name=$(git config user.name)
+  email=$(git config user.email)
+  printf '\nSigned-off-by: %s <%s>\n' "$name" "$email" >> "$msg_file"
+fi

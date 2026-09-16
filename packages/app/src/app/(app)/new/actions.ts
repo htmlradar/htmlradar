@@ -131,7 +131,11 @@ export async function createStagedDocument(formData: FormData): Promise<HandoffU
       },
       creationId,
     );
-    revalidatePath('/docs');
+    // No revalidatePath here: on the edge runtime via next-on-pages it crashes
+    // the post-action re-render of the calling page and the browser sees a 500
+    // after the document was already created (seen on /convert, 16 Sep 2026;
+    // the settings actions skip it for the same reason). /docs reads fresh on
+    // every request, so there is nothing to revalidate.
     return { ok: true, documentId };
   } catch {
     // No PDF-derived strings or raw exceptions in analytics or error URLs.

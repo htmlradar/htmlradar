@@ -56,12 +56,15 @@ export async function uploadStagedFile(
       .slice(0, 120) || 'Untitled document',
   );
   form.set('file', new File([file.contents], file.name, { type: 'text/html' }));
-  let result: HandoffUploadResult;
+  let result: HandoffUploadResult | undefined;
   try {
     result = await action(form);
   } catch {
     return { ok: false, reason: 'upload_failed' };
   }
+  // A server action whose response failed resolves to undefined rather than
+  // throwing; treat it as the uncertain outcome it is.
+  if (!result) return { ok: false, reason: 'upload_failed' };
   if (result.ok) {
     // A replacement belongs to a different attempt and must survive this
     // older upload's completion. A cleanup failure cannot undo server success.

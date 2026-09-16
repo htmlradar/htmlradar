@@ -56,6 +56,10 @@ vi.mock('../src/supabase.js', async () => {
   return {
     ...actual,
     getShareBySlug: (...args: unknown[]) => getShareBySlug(...args),
+    // No hostname is a claimed customer domain unless a test says so. Real
+    // network calls must never happen here, and resolveHost reads
+    // custom_domains for every host that is not the apex or a handle.
+    getCustomDomainByHostname: vi.fn(async () => null),
     getDocument: vi.fn(async () => doc),
     // No attachment by this id. Enough to prove the download path was handled
     // where the request arrived rather than redirected away from it.
@@ -277,6 +281,12 @@ describe('an empty legacy list turns the redirect off', () => {
   // puts it afterwards: both hosts serve documents, neither one redirects, so
   // a single link opens on either. Gate 2 of the switch plan sets
   // LEGACY_HOSTS = "htmlradar.com" to turn the permanent redirect on.
+  //
+  // This still holds with custom domains, and it is the reason ORIGIN_HOST
+  // exists in src/index.ts. The legacy list decides whether the old host
+  // REDIRECTS; whether the old host is served at all is not configurable,
+  // because the answer is yes for as long as those links are in circulation.
+  // An unknown hostname is refused now — the old host is not an unknown one.
   const noRedirect = { ...baseEnv, LEGACY_HOSTS: '' } as import('../src/env.js').Env;
 
   it('serves the old host in place instead of redirecting it', async () => {
@@ -313,5 +323,19 @@ describe('an empty legacy list turns the redirect off', () => {
     const res = await fetchAs('http://htmlradar.com/r/acme-proposal', {}, noRedirect);
     expect(res.status).toBe(301);
     expect(res.headers.get('Location')).toBe('https://htmlradar.com/r/acme-proposal');
+  });
+
+  it('still refuses a customer-domain share there', async () => {
+    // The old host is the apex's equal for routing and for nothing else.
+    getShareBySlug.mockResolvedValue({
+      ...share,
+      custom_domain_id: 'dom-1',
+      custom_domain_hostname: 'decks.acme.com',
+      custom_domain_state: 'live',
+      custom_domain_owner_id: 'owner-1',
+    });
+    const res = await fetchAs('https://htmlradar.com/r/acme-proposal', {}, noRedirect);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Location')).toBeNull();
   });
 });

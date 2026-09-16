@@ -181,8 +181,17 @@ export function isTrackingOptedOut(cookieHeader: string | null): boolean {
 // attacker can reach the GET but cannot produce the signature, so the write
 // stays behind a deliberate click.
 //
-// Message is `optout|slug|expiry`, so a token minted to turn tracking off
-// cannot be replayed to turn it back on, nor moved to another share.
+// Message is `optout|slug|hostname|expiry`, so a token minted to turn tracking
+// off cannot be replayed to turn it back on, nor moved to another share, nor
+// moved to another hostname.
+//
+// The hostname is in the signature because a customer's own domain is now one
+// of the hosts these pages are served on (schema/052). `hr_optout` has no
+// Domain attribute, so it belongs to the exact host that set it and a token
+// carried across hosts could only ever write a cookie the recipient did not
+// ask for on that host. Bound here for the same reason the print grant binds
+// its hostname: a signed thing minted on one host should not spend on another.
+//
 // Format: `{expiry}.{hex hmac}` — hex rather than base64url so the value is
 // safe in an HTML attribute and a form field without any encoding thought.
 const OPT_OUT_TOKEN_TTL_SECONDS = 10 * 60;
@@ -190,16 +199,18 @@ const OPT_OUT_TOKEN_TTL_SECONDS = 10 * 60;
 export async function issueOptOutToken(
   optout: string,
   slug: string,
+  hostname: string,
   secret: string,
 ): Promise<string> {
   const expiresAt = Math.floor(Date.now() / 1000) + OPT_OUT_TOKEN_TTL_SECONDS;
-  return `${expiresAt}.${await hmacHex(`${optout}|${slug}|${expiresAt}`, secret)}`;
+  return `${expiresAt}.${await hmacHex(`${optout}|${slug}|${hostname}|${expiresAt}`, secret)}`;
 }
 
 export async function verifyOptOutToken(
   token: string,
   optout: string,
   slug: string,
+  hostname: string,
   secret: string,
 ): Promise<boolean> {
   const parts = token.split('.');
@@ -208,7 +219,7 @@ export async function verifyOptOutToken(
   const expiresAt = Number.parseInt(expiryStr, 10);
   if (!Number.isFinite(expiresAt)) return false;
   if (expiresAt < Math.floor(Date.now() / 1000)) return false;
-  const expected = await hmacHex(`${optout}|${slug}|${expiresAt}`, secret);
+  const expected = await hmacHex(`${optout}|${slug}|${hostname}|${expiresAt}`, secret);
   return constantTimeEqual(mac, expected);
 }
 

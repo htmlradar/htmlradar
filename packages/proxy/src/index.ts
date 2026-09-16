@@ -21,7 +21,16 @@
 //   GET  /r/{slug}/m/{att_id} downloads a supporting-material attachment
 //   GET  /r/_doc/{doc_id}     sender-side raw-doc preview (HMAC-gated)
 //   GET  /v1/tracker.js       the tracker, first-party to the document
-//   GET  /robots.txt          Disallow: / — SHARE_HOST is not a website
+//   GET  /robots.txt          Disallow: / — no host this worker serves is a website
+//   GET  /.well-known/htmlradar-domain-check
+//                             which claim a hostname belongs to, and the only
+//                             thing a claimed-but-not-live hostname answers
+//
+// CUSTOMERS' OWN DOMAINS (schema/052). A Pro customer can point their own
+// subdomain at us, and a share issued on it stores `custom_domain_id`. Such a
+// share is served on that exact hostname and on no other — not on the apex,
+// which does not redirect to it either. The hostname's claim is read fresh on
+// every request; nothing about a customer's domain is cached.
 //
 // THE TRUST WRAPPER. With TRUST_WRAPPER off — its shipped state — /r/{slug}
 // answers exactly as it always has and /frame and /print are not-found. Turned
@@ -52,6 +61,7 @@
 import type { Env } from './env.js';
 import {
   getShareBySlug,
+  getCustomDomainByHostname,
   getDocument,
   reportAbuse,
   getAttachment,
@@ -120,6 +130,25 @@ const TRACKER_PATH = '/v1/tracker.js';
 const isLocal = (hostname: string): boolean =>
   hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 
+// The hostname this worker served before the content domain existed, and the
+// one every link sent before the move still points at.
+//
+// TWO SEPARATE QUESTIONS, and conflating them is what broke the rollback in
+// the first draft of this change. `LEGACY_HOSTS` answers "does this host
+// REDIRECT to the share host?" — emptying it is the documented rollback of the
+// 31 August switch, after which both hosts serve documents and neither one
+// redirects. This constant answers the other question, "is this a host we
+// serve at all?", and it is not configurable, because the answer for
+// htmlradar.com is yes for as long as those links are in circulation.
+//
+// Without it, removing htmlradar.com from LEGACY_HOSTS would have made every
+// link sent before the move a 404 rather than a document, which is an outage
+// dressed as a rollback.
+//
+// It is the apex's equal for routing and for nothing else: a share issued on
+// a customer's own domain is still never served here (see enforceStoredHost).
+const ORIGIN_HOST = 'htmlradar.com';
+
 function isLegacyHost(hostname: string, env: Env): boolean {
   return (env.LEGACY_HOSTS ?? LEGACY_HOSTS_DEFAULT)
     .split(',')
@@ -164,7 +193,13 @@ function withNoIndex(res: Response, env: Env): Response {
   out.headers.set('X-Robots-Tag', 'noindex, nofollow');
   // Deploy verification reads this back from the live route to prove the
   // commit it just uploaded is the one the edge serves.
-  out.headers.set('X-HTMLRadar-Version', env.GIT_SHA ?? 'dev');
+  //
+  // Not on the domain-check probe. That response is content-free on purpose:
+  // it is the one thing a hostname answers before anybody has proved they own
+  // it, and it should name the claim being checked and nothing else about us.
+  if (!out.headers.has(DOMAIN_CHECK_HEADER)) {
+    out.headers.set('X-HTMLRadar-Version', env.GIT_SHA ?? 'dev');
+  }
 
   // Sandbox every proxy response into an opaque origin.
   //
@@ -204,23 +239,42 @@ function withNoIndex(res: Response, env: Env): Response {
 }
 
 /**
- * Which hostname this request arrived on, in the only three shapes that mean
- * anything: the apex, exactly one handle label under it, or a shape we refuse.
+ * Which hostname this request arrived on, in the only shapes that mean
+ * anything: the apex, exactly one handle label under it, a customer's own
+ * domain, a customer's domain that has been claimed but is not serving yet,
+ * or a shape we refuse.
  *
- * Rule 4 of the design's routing: hostnames are accepted only as the apex or
- * exactly one handle label. Extra levels and malformed labels get the same
- * not-found response as an unknown handle and a mismatched owner, so probing
- * the wildcard reveals nothing about who exists.
+ * Rule 4 of the design's routing: hostnames are accepted only as the apex, one
+ * handle label, or a hostname a customer has claimed. Extra levels, malformed
+ * labels and hostnames nobody has claimed get the same not-found response as
+ * an unknown handle and a mismatched owner, so probing reveals nothing about
+ * who exists.
  *
- * Anything that is not the apex and not under it — a legacy host being served
- * in place, a self-hoster's own host, localhost under `wrangler dev` — is
- * treated as the apex, which is what those hosts have always been. This
- * function only classifies hosts BELOW the share host, because those are the
- * only ones the wildcard record can create.
+ * THE FALLBACK THAT TREATED AN UNRELATED HOSTNAME AS THE APEX IS GONE. It was
+ * safe only while the route covered the apex alone. With the route widened to
+ * the whole zone (see wrangler.toml) every hostname Cloudflare for SaaS points
+ * at us arrives here, and "unknown host behaves like the apex" would mean any
+ * such hostname — including one whose claim we retired minutes ago — serving
+ * every apex share. Unknown is now refused. What is still the apex: a legacy
+ * host being served in place, ORIGIN_HOST whatever the redirect setting says,
+ * and localhost under `wrangler dev`. Nothing else is.
+ *
+ * Async because the custom shape is a database read. There is no cache: see
+ * getCustomDomainByHostname.
  */
-type HostKind = { kind: 'apex' } | { kind: 'handle'; handle: string } | { kind: 'refused' };
+type HostKind =
+  | { kind: 'apex' }
+  | { kind: 'handle'; handle: string }
+  // A hostname whose claim is live: it serves that owner's custom shares.
+  | { kind: 'custom'; domainId: string; ownerId: string }
+  // A hostname whose claim exists but is pending or disconnected. It serves
+  // nothing at all except the domain-check probe below, which is what lets a
+  // pending claim be activated without a deadlock (Astra's review).
+  | { kind: 'claim'; domainId: string }
+  | { kind: 'refused' };
 
 const APEX: HostKind = { kind: 'apex' };
+const REFUSED: HostKind = { kind: 'refused' };
 
 // The handle format, matching the check constraint in schema/043 exactly:
 // three to twenty-four characters, no leading or trailing hyphen, no
@@ -228,15 +282,56 @@ const APEX: HostKind = { kind: 'apex' };
 // the dot, which is what makes rule 4 fall out of the same test.
 const HANDLE_LABEL = /^[a-z0-9](?:[a-z0-9-]{1,22})[a-z0-9]$/;
 
-function resolveHost(hostname: string, env: Env): HostKind {
+// Reserved infrastructure: `customers.{SHARE_HOST}` is the fallback origin
+// every customer's CNAME points at. It is a valid handle label, so without
+// this it would be served as a handle host. It answers nothing, ever — not a
+// share, not robots.txt, not the probe.
+const FALLBACK_ORIGIN_LABEL = 'customers';
+
+// The one path a claimed-but-not-live hostname answers, and the one the
+// application and the monitor probe to decide a claim is really pointed at us.
+// Content-free by design: it says only which claim this hostname belongs to,
+// which the prober already knows.
+const DOMAIN_CHECK_PATH = '/.well-known/htmlradar-domain-check';
+const DOMAIN_CHECK_HEADER = 'x-htmlradar-domain';
+
+async function resolveHost(hostname: string, env: Env): Promise<HostKind> {
   const apex = shareHostOf(env).toLowerCase();
   const host = hostname.toLowerCase();
   if (host === apex) return APEX;
-  if (!host.endsWith(`.${apex}`)) return APEX;
-  const label = host.slice(0, -(apex.length + 1));
-  if (!HANDLE_LABEL.test(label) || label.includes('--')) return { kind: 'refused' };
-  return { kind: 'handle', handle: label };
+  if (isLegacyHost(host, env) || host === ORIGIN_HOST || isLocal(host)) return APEX;
+
+  if (host.endsWith(`.${apex}`)) {
+    const label = host.slice(0, -(apex.length + 1));
+    if (label === FALLBACK_ORIGIN_LABEL) return REFUSED;
+    if (!HANDLE_LABEL.test(label) || label.includes('--')) return REFUSED;
+    return { kind: 'handle', handle: label };
+  }
+
+  const domain = await getCustomDomainByHostname(env, host);
+  if (!domain) return REFUSED;
+  if (domain.state === 'live') {
+    return { kind: 'custom', domainId: domain.id, ownerId: domain.owner_id };
+  }
+  if (domain.state === 'pending' || domain.state === 'disconnected') {
+    return { kind: 'claim', domainId: domain.id };
+  }
+  return REFUSED;
 }
+
+// The probe. One line of text, no redirect, no caching: the application's
+// `probe()` and the monitor's hourly re-check require this exact body and
+// header for this exact claim, so a parked page or a stranger's server on the
+// same hostname cannot be mistaken for us.
+const domainCheck = (domainId: string): Response =>
+  new Response(`htmlradar-domain:${domainId}`, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      [DOMAIN_CHECK_HEADER]: domainId,
+      'Cache-Control': 'no-store',
+    },
+  });
 
 /**
  * The stored-hostname check, run on every route carrying a share identifier —
@@ -262,6 +357,16 @@ function resolveHost(hostname: string, env: Env): HostKind {
  *      found, and identically so. Without this an abuser could have their own
  *      document served on a rival's host, or on microsoft.htmlradar.page, and
  *      poison a name they do not own.
+ *   4. A share issued on a customer's own domain is served on that exact
+ *      hostname and NOWHERE else — not on the apex, not on a handle host, not
+ *      on another customer's domain. No redirect from the apex either: rule 2
+ *      moves a handle link because the apex form of it was never printed, but
+ *      a redirect from the apex to a customer's domain would let anybody turn
+ *      an htmlradar.page address into an address that wears the customer's
+ *      name. The apex simply does not have it.
+ *   5. A customer's domain serves only the shares that stored it. Everything
+ *      else — an apex share, a handle share, another customer's share — is the
+ *      same not-found.
  */
 function enforceStoredHost(
   host: HostKind,
@@ -270,10 +375,27 @@ function enforceStoredHost(
   method: string,
   env: Env,
 ): Response | null {
-  if (host.kind === 'refused') return notFound();
+  if (host.kind === 'refused' || host.kind === 'claim') return notFound();
+  if (host.kind === 'custom') {
+    // Three things must agree, and they come from two separate reads: the
+    // hostname's own claim row (resolveHost, read this request) and the
+    // domain columns joined onto the share (share_lookup, read this request).
+    // The state is checked on both sides so a claim that stopped being live
+    // between the two reads answers not-found rather than serving.
+    const ok =
+      !!share.custom_domain_id &&
+      share.custom_domain_id === host.domainId &&
+      share.custom_domain_owner_id === host.ownerId &&
+      share.owner_id === host.ownerId &&
+      share.custom_domain_state === 'live';
+    return ok ? null : notFound();
+  }
   if (host.kind === 'handle') {
+    if (share.custom_domain_id) return notFound();
     return share.host_handle === host.handle ? null : notFound();
   }
+  // The apex.
+  if (share.custom_domain_id) return notFound();
   if (!share.host_handle || !handleLinksEnabled(env)) return null;
   const target = new URL(url.toString());
   target.hostname = `${share.host_handle}.${shareHostOf(env)}`;
@@ -363,23 +485,47 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
     return new Response(null, { status: 301, headers: { Location: url.toString() } });
   }
 
-  // Rule 4, before anything else looks at the path: a hostname that is neither
-  // the apex nor exactly one well-formed handle label under it answers the
-  // standard not-found, whatever was asked for. Applied here so an extra
-  // hostname level cannot reach a single route, share-bearing or not.
-  const host = resolveHost(url.hostname, env);
+  // Rule 4, before anything else looks at the path: a hostname that is not the
+  // apex, not one well-formed handle label under it, and not a hostname some
+  // customer has claimed answers the standard not-found, whatever was asked
+  // for. Applied here so an extra hostname level, or a hostname nobody owns,
+  // cannot reach a single route, share-bearing or not.
+  const host = await resolveHost(url.hostname, env);
   if (host.kind === 'refused') return notFound();
 
-  if (url.pathname === TRACKER_PATH) {
-    return fetch(env.TRACKER_URL);
+  // The activation probe, above everything else a claimed hostname may do.
+  //
+  // A claim starts pending, and until it is live its hostname serves nothing —
+  // which would deadlock activation, because the only way to know the
+  // customer's CNAME really reaches us is to fetch something from it. This
+  // path is that something, and it is all a pending or disconnected claim
+  // answers. It answers on a live claim too: the monitor re-probes a live
+  // domain every hour, and a live domain must not fail its own check.
+  if (url.pathname === DOMAIN_CHECK_PATH) {
+    if (host.kind !== 'custom' && host.kind !== 'claim') return notFound();
+    if (request.method !== 'GET' && request.method !== 'HEAD') return notFound();
+    return domainCheck(host.domainId);
   }
 
-  // SHARE_HOST carries documents, not a website. Nothing on it should ever be
-  // crawled; the 404 below covers every path that is not a share.
+  // Every host this worker serves carries documents, not a website, and
+  // nothing on any of them should ever be crawled. Answered on customer
+  // hostnames too — that is where a crawler is likeliest to find its way in,
+  // because a customer's own domain has links pointing at it that ours does
+  // not. NOT answered on a hostname we do not serve: a refused host is a
+  // blanket 404, which is what keeps every refusal indistinguishable.
   if (url.pathname === '/robots.txt') {
     return new Response('User-agent: *\nDisallow: /\n', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
+  }
+
+  // A claimed hostname that is not live serves nothing else: not the tracker,
+  // not a share, not an answer that admits a share exists. sitemap.xml has
+  // never been a route on any host and falls through to the same 404.
+  if (host.kind === 'claim') return notFound();
+
+  if (url.pathname === TRACKER_PATH) {
+    return fetch(env.TRACKER_URL);
   }
 
   // Sender's "Preview document" — minted by /docs/[id] in the app when
@@ -395,6 +541,18 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   // prefix that would confuse the recipient namespace.
   const docPreviewMatch = /^\/r\/_doc\/([a-f0-9-]{8,})\/?$/i.exec(url.pathname);
   if (docPreviewMatch) {
+    // THE APEX ONLY, and every other host is the standard not-found.
+    //
+    // This route is sender-side. It carries no share, so it has no stored
+    // hostname to check against, and it serves the raw upload with no gate and
+    // no tracker. A valid token is bound to a document and to nothing else —
+    // so on any host but the apex it was a way to put a document on a hostname
+    // no share ever chose: another customer's handle host, or a customer's own
+    // domain, wearing their name over somebody else's upload.
+    //
+    // The apex is where the application mints these tokens and where the
+    // Preview button sends the sender, so nothing legitimate loses anything.
+    if (host.kind !== 'apex') return notFound();
     const docId = docPreviewMatch[1]!;
     const previewToken = url.searchParams.get('owner_doc_preview');
     const tokenValid = previewToken
@@ -473,22 +631,6 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   // leaks and no disabled-open alert fires.
   if (framed && !wrapperEnabled(slug, env)) return notFound();
 
-  // Read-tracking opt-out. Handled before the share lookup: the preference is
-  // browser-wide, not per-share, so it should not depend on this particular
-  // link still being live — and asking the question must not fire the
-  // disabled-open alert below.
-  if (!subroute) {
-    if (request.method === 'POST') {
-      const written = await handleOptOutSubmit(request, slug, env);
-      if (written) return written;
-    } else {
-      const param = url.searchParams.get('optout');
-      if (param === '1' || param === '0') {
-        return optOutConfirm(slug, param, await issueOptOutToken(param, slug, env.SESSION_SECRET));
-      }
-    }
-  }
-
   const share = await getShareBySlug(env, slug);
   if (!share) return notFound();
 
@@ -497,6 +639,36 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
   // the attachment route runs the same check against its own lookup.
   const wrongStoredHost = enforceStoredHost(host, share, url, request.method, env);
   if (wrongStoredHost) return wrongStoredHost;
+
+  // Read-tracking opt-out.
+  //
+  // AFTER the share lookup and the stored-host check, like every other route
+  // that carries a share identifier (Astra's review, 17 September). It used to
+  // run before both, which made it the one way to reach a share's address from
+  // a host that share was never created for and be answered rather than
+  // refused — and on a customer's own domain that answer would have worn the
+  // customer's name.
+  //
+  // BEFORE the revoked/expired branch below, which is the other half of the
+  // rule: the preference is browser-wide, not per-share, so a recipient must
+  // still be able to turn tracking off from a link that has since been turned
+  // off — and asking the question must not fire the owner's disabled-open
+  // alert. The report form sits in the same place for the same reason.
+  if (!subroute) {
+    if (request.method === 'POST') {
+      const written = await handleOptOutSubmit(request, slug, url.hostname, env);
+      if (written) return written;
+    } else {
+      const param = url.searchParams.get('optout');
+      if (param === '1' || param === '0') {
+        return optOutConfirm(
+          slug,
+          param,
+          await issueOptOutToken(param, slug, url.hostname, env.SESSION_SECRET),
+        );
+      }
+    }
+  }
 
   // The frame route refuses to be a top-level page.
   //
@@ -735,6 +907,7 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 async function handleOptOutSubmit(
   request: Request,
   slug: string,
+  hostname: string,
   env: Env,
 ): Promise<Response | null> {
   let form: FormData;
@@ -747,13 +920,13 @@ async function handleOptOutSubmit(
   const token = form.get('token');
   if ((optout !== '1' && optout !== '0') || typeof token !== 'string') return null;
 
-  if (!(await verifyOptOutToken(token, optout, slug, env.SESSION_SECRET))) {
+  if (!(await verifyOptOutToken(token, optout, slug, hostname, env.SESSION_SECRET))) {
     // Ask again with a fresh token rather than dead-ending: the common cause
     // is a confirmation page left open for more than ten minutes.
     return optOutConfirm(
       slug,
       optout,
-      await issueOptOutToken(optout, slug, env.SESSION_SECRET),
+      await issueOptOutToken(optout, slug, hostname, env.SESSION_SECRET),
       400,
     );
   }

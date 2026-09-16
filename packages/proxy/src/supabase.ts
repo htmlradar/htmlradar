@@ -45,6 +45,20 @@ export interface Share {
   // The owner's current handle. Not the routing key — that is host_handle
   // above — and read only for diagnostics and the app's link building.
   owner_handle: string | null;
+  // The customer's own domain THIS LINK was created for (schema/052), and the
+  // domain row joined in beside it. Immutable on the share, like host_handle,
+  // and never set together with one: a share is an apex share, a handle share
+  // or a custom-domain share, forever.
+  //
+  // The joined columns come back on the same read on purpose. There is no
+  // hostname cache in this worker — Astra's review, 17 September — so the
+  // domain's CURRENT state travels with every share lookup, and a domain that
+  // stopped being live stops serving on the very next request rather than
+  // sixty seconds later.
+  custom_domain_id: string | null;
+  custom_domain_hostname: string | null;
+  custom_domain_state: 'pending' | 'live' | 'disconnected' | 'retired' | null;
+  custom_domain_owner_id: string | null;
   // Free or Pro, from the same read. Null when the profile row is missing,
   // which a left join makes possible; every caller treats that as free.
   owner_tier: 'free' | 'pro' | null;
@@ -91,6 +105,10 @@ const SHARE_LOOKUP_COLUMNS = [
   'host_handle',
   'owner_handle',
   'owner_tier',
+  'custom_domain_id',
+  'custom_domain_hostname',
+  'custom_domain_state',
+  'custom_domain_owner_id',
 ].join(',');
 
 /**
@@ -120,6 +138,48 @@ export async function getShareBySlug(env: Env, slug: string): Promise<Share | nu
   const res = await call(env, url);
   if (!res.ok) throw new UpstreamError(`share_lookup failed: ${res.status}`);
   const rows = (await res.json()) as Share[];
+  return rows[0] ?? null;
+}
+
+export interface CustomDomain {
+  id: string;
+  owner_id: string;
+  hostname: string;
+  state: 'pending' | 'live' | 'disconnected' | 'retired';
+}
+
+/**
+ * Which claim, if any, a hostname belongs to — read fresh on every request
+ * that arrives on a hostname this worker does not already recognise.
+ *
+ * NO CACHE, deliberately. The first draft kept a sixty-second per-isolate map;
+ * Astra's review killed it, because a cached "live" outlives a disconnect and
+ * a retirement, and during a hostname's reassignment from one account to
+ * another that cached answer is one customer's host serving another
+ * customer's document. One extra read on a custom-host request is the price,
+ * and it only happens on hostnames that are neither the apex nor a handle.
+ *
+ * `state=neq.retired` rather than an ordering: schema/052's unique index is on
+ * (hostname) where retired_at is null, so at most one row per hostname is not
+ * retired. Retired rows are left behind and must never resolve — they are the
+ * disconnected customer's old hostname.
+ */
+export async function getCustomDomainByHostname(
+  env: Env,
+  hostname: string,
+): Promise<CustomDomain | null> {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/custom_domains`);
+  url.searchParams.set('hostname', `eq.${hostname.toLowerCase()}`);
+  url.searchParams.set('state', 'neq.retired');
+  url.searchParams.set('select', 'id,owner_id,hostname,state');
+  url.searchParams.set('limit', '1');
+
+  const res = await call(env, url);
+  // Thrown, not swallowed to null: a Supabase blip on a customer's own domain
+  // must show their reader the try-again page, not "this link doesn't open
+  // anything" on a link that is perfectly good.
+  if (!res.ok) throw new UpstreamError(`custom_domains lookup failed: ${res.status}`);
+  const rows = (await res.json()) as CustomDomain[];
   return rows[0] ?? null;
 }
 

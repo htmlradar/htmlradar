@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getShareBySlug } from '../src/supabase.js';
+import { getCustomDomainByHostname, getShareBySlug } from '../src/supabase.js';
 import type { Env } from '../src/env.js';
 
 // The one read a recipient request makes.
@@ -38,6 +38,10 @@ const row = {
   host_handle: null,
   owner_handle: null,
   owner_tier: 'free',
+  custom_domain_id: null,
+  custom_domain_hostname: null,
+  custom_domain_state: null,
+  custom_domain_owner_id: null,
 };
 
 function mockFetch(status: number, body: unknown) {
@@ -75,6 +79,23 @@ describe('getShareBySlug reads the private view', () => {
     expect(select).not.toContain('r2_key');
   });
 
+  it("asks for the share's customer domain in the same read", async () => {
+    // There is no hostname cache in the worker, so the domain's CURRENT
+    // state, hostname, id and owner travel with every share lookup. A domain
+    // that stopped being live stops serving on the very next request.
+    const spy = mockFetch(200, [row]);
+    await getShareBySlug(env, 'acme-proposal');
+    const select = new URL(spy.mock.calls[0]![0] as string).searchParams.get('select') ?? '';
+    expect(select.split(',')).toEqual(
+      expect.arrayContaining([
+        'custom_domain_id',
+        'custom_domain_hostname',
+        'custom_domain_state',
+        'custom_domain_owner_id',
+      ]),
+    );
+  });
+
   it('returns the stored hostname and the tier with the share', async () => {
     mockFetch(200, [{ ...row, host_handle: 'acme', owner_handle: 'acme', owner_tier: 'pro' }]);
     const share = await getShareBySlug(env, 'acme-proposal');
@@ -93,6 +114,43 @@ describe('getShareBySlug reads the private view', () => {
     // live share on a transient Supabase blip.
     mockFetch(500, { message: 'upstream exploded' });
     await expect(getShareBySlug(env, 'acme-proposal')).rejects.toThrow(/share_lookup/);
+  });
+});
+
+describe('getCustomDomainByHostname reads the claim itself', () => {
+  const claim = {
+    id: 'dom-1',
+    owner_id: 'owner-1',
+    hostname: 'decks.acme.com',
+    state: 'live',
+  };
+
+  it('asks for one hostname, lowercased, and never a retired row', async () => {
+    // schema/052's unique index is on (hostname) where retired_at is null, so
+    // at most one row per hostname is not retired and `limit 1` is
+    // deterministic. Retired rows are left behind and must never resolve —
+    // they are a disconnected customer's old hostname.
+    const spy = mockFetch(200, [claim]);
+    await getCustomDomainByHostname(env, 'Decks.ACME.com');
+    const requested = new URL(spy.mock.calls[0]![0] as string);
+    expect(requested.pathname).toBe('/rest/v1/custom_domains');
+    expect(requested.searchParams.get('hostname')).toBe('eq.decks.acme.com');
+    expect(requested.searchParams.get('state')).toBe('neq.retired');
+    expect(requested.searchParams.get('limit')).toBe('1');
+  });
+
+  it('returns null for a hostname nobody has claimed', async () => {
+    mockFetch(200, []);
+    await expect(getCustomDomainByHostname(env, 'decks.stranger.com')).resolves.toBeNull();
+  });
+
+  it('throws upstream rather than reading as "unclaimed" when the read fails', async () => {
+    // The difference a customer's reader sees: the try-again page rather than
+    // "this link doesn't open anything" on a perfectly good link.
+    mockFetch(500, { message: 'upstream exploded' });
+    await expect(getCustomDomainByHostname(env, 'decks.acme.com')).rejects.toThrow(
+      /custom_domains/,
+    );
   });
 });
 

@@ -18,6 +18,33 @@ workers_dev = false  # We don't want this exposed at *.workers.dev — only via 
 # DEPLOY PERMISSION: `wrangler deploy` syncs this block, so the API token
 # needs Workers Routes: Edit on BOTH zones. Adding the second zone is
 # PENDING-ON-ABHI P-30.
+#
+# THE ROUTE STAYS THE APEX IN THIS COMMIT. WIDENING IT IS A SEPARATE DEPLOY,
+# AND THE ORCHESTRATOR DOES IT.
+#
+# Custom domains need this pattern to become `*/*`: Cloudflare for SaaS sends a
+# customer's own hostname (decks.acme.com) here through the fallback origin
+# customers.htmlradar.page, and the worker only sees it if the route covers
+# every hostname on the zone rather than the apex alone.
+#
+# ORDER, and it is not negotiable (Astra's review, 17 September; sprint file
+# "Sequencing"). The stored-host checks, the refusal of unknown hostnames and
+# the probe path go out FIRST, on this route, and are verified on production.
+# Only then does the orchestrator change this one line to
+#
+#   pattern = "*/*"
+#
+# and deploy again, on its own, verifying a second time: customers.htmlradar.page
+# 404, and a claimed test hostname answering the probe path and nothing else.
+# One deploy carrying both does not prove that the route change and the code
+# reached the edge together, and for the minutes in between a widened route
+# with the old code would serve every apex share on every hostname pointed at
+# us.
+#
+# The checks are correct under BOTH routes. Under this one no custom hostname
+# reaches the worker at all, so every rule about customer domains is inert
+# rather than wrong; under `*/*` the same rules answer. The test suite covers
+# the rules themselves, which do not read the route.
 [[routes]]
 pattern = "htmlradar.page/*"
 zone_name = "htmlradar.page"
@@ -46,6 +73,15 @@ SHARE_HOST = "htmlradar.page"
 # every htmlradar.com/r/ link answers 301 to the same path and query on
 # SHARE_HOST. Setting it back to "" and deploying is the whole rollback; no
 # data is touched either way.
+#
+# NOTE, 17 September 2026, with custom domains. This line decides only whether
+# the old host REDIRECTS. Whether the old host is SERVED is not configurable:
+# resolveHost recognises htmlradar.com as the apex whatever this says (see
+# ORIGIN_HOST in src/index.ts), so emptying this value still serves every link
+# sent before the move, in place, exactly as it did before. What changed is
+# that a hostname named NOWHERE — neither the share host, nor a subdomain of
+# it, nor this list, nor a claimed customer domain — is now refused instead of
+# being treated as the apex.
 LEGACY_HOSTS = "htmlradar.com"
 
 # The trust layer's one gate setting, and the whole of its rollback.
@@ -89,18 +125,16 @@ TRUST_WRAPPER = ""
 # Needs the wildcard record and route below installed first.
 TRUST_HANDLES = ""
 
-# WILDCARD ROUTE, NOT YET INSTALLED. Per-customer hostnames need one wildcard
-# DNS record (*.htmlradar.page, proxied) and one more route here:
+# WILDCARD DNS RECORD, NOT YET INSTALLED. Handle hosts still need one wildcard
+# DNS record (*.htmlradar.page, proxied); the `*/*` route above now covers them
+# as well, so no further route is needed. Until the record exists no handle
+# host resolves, so every handle rule in resolveHost/enforceStoredHost stays
+# inert in production.
 #
-#   [[routes]]
-#   pattern = "*.htmlradar.page/*"
-#   zone_name = "htmlradar.page"
-#
-# The stored-hostname check ships FIRST, in this commit, deliberately: a
-# wildcard route live before that check would briefly let any handle host serve
-# any customer's document. Installing the record and the route is the
-# operations half of Gate 0, and until it happens no handle host resolves, so
-# every rule in resolveHost/enforceStoredHost is inert in production.
+# Customer domains do not use that record: they arrive through Cloudflare for
+# SaaS and the fallback origin customers.htmlradar.page, which is reserved
+# infrastructure and answers 404 to everything (see FALLBACK_ORIGIN_LABEL in
+# src/index.ts).
 
 # Secrets — set via `wrangler secret put`:
 #   SUPABASE_URL

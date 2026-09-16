@@ -26,14 +26,25 @@ import {
 const OFF: DomainOutcome = { error: 'Custom domains are not available yet.' };
 const NONE: DomainOutcome = { error: 'You have no domain connected.' };
 
+/**
+ * Claim a hostname. The one action the runtime switch turns off, because it
+ * is the one action that creates something new.
+ */
 export async function connectDomainAction(hostname: string): Promise<DomainOutcome> {
   if (!customDomainsEnabled()) return OFF;
   const user = await requireUser();
   return connectDomain(serviceClient(), user.id, hostname);
 }
 
+/**
+ * Where the domain stands now.
+ *
+ * Deliberately NOT gated on the switch. A customer whose hostname is pointed
+ * at us needs to be able to see what it is doing whatever we have turned off
+ * at our end, and this is also how a live domain that failed to become the
+ * account's default gets made the default: the button retries it.
+ */
 export async function checkDomainAction(): Promise<DomainOutcome> {
-  if (!customDomainsEnabled()) return OFF;
   const user = await requireUser();
   const admin = serviceClient();
   const domain = await readDomain(admin, user.id);
@@ -44,12 +55,11 @@ export async function checkDomainAction(): Promise<DomainOutcome> {
 /**
  * Give the domain up.
  *
- * Deliberately not gated on the tier. An account whose Pro has lapsed must
- * still be able to take its own hostname back, and a customer who cannot
- * disconnect is a customer whose DNS is stuck pointing at us.
+ * Gated on neither the tier nor the switch. An account whose Pro has lapsed,
+ * or a feature we have rolled back, must never be the reason somebody cannot
+ * take their own hostname out of our product.
  */
 export async function disconnectDomainAction(): Promise<DomainOutcome> {
-  if (!customDomainsEnabled()) return OFF;
   const user = await requireUser();
   const admin = serviceClient();
   const domain = await readDomain(admin, user.id);

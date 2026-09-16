@@ -18,7 +18,7 @@ import { V2Footer } from '@/components/V2Footer';
 import { PricingTiers } from './PricingTiers';
 import { EmailNotificationMock } from '@/components/mocks/EmailNotificationMock';
 import { pageMeta } from '@/lib/seo';
-import { customDomainsEnabled } from '@/lib/custom-domains';
+import { customDomainsPublished } from '@/lib/custom-domains';
 
 export const dynamic = 'force-static';
 
@@ -70,9 +70,11 @@ export default function PricingPage() {
   // the annual plan on top of the one they already have.
   const proHref = '/upgrade';
 
-  // Written now, printed only once a customer domain has actually served a
-  // document on production. Off is the shipped state.
-  const customDomains = customDomainsEnabled();
+  // Its OWN switch, separate from the runtime one, so the feature can be
+  // working on production for the pilot account without the pricing page
+  // telling the world it exists. Off is the shipped state, and turning it on
+  // is a deliberate second act after the journey has been walked.
+  const customDomains = customDomainsPublished();
   const faq = customDomains ? [...FAQ.slice(0, 2), OWN_DOMAIN_FAQ, ...FAQ.slice(2)] : FAQ;
 
   return (

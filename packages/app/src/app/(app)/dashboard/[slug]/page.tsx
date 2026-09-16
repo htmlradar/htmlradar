@@ -21,8 +21,8 @@ import { requireUser, serverClient } from '@/lib/supabase-server';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { CopySlugButton } from '@/components/CopySlugButton';
 import { isMetaSectionTitle } from '@/lib/section-filter';
-import { shareUrlLabel } from '@/lib/share-url';
-import { customHostnameOf } from '@/lib/custom-domains';
+import { ADDRESS_UNAVAILABLE, shareUrlLabel } from '@/lib/share-url';
+import { customHostnameMissing, customHostnameOf } from '@/lib/custom-domains';
 
 export const runtime = 'edge';
 
@@ -41,7 +41,9 @@ export default async function ShareAnalyticsPage({
   // would dead-end anyway).
   const { data: share } = await supabase
     .from('document_shares')
-    .select('*, documents!inner(title, deleted_at), custom_domains(hostname, state)')
+    .select(
+      '*, custom_domain_id, documents!inner(title, deleted_at), custom_domains(hostname, state)',
+    )
     .eq('slug', params.slug)
     .is('documents.deleted_at', null)
     .single();
@@ -155,7 +157,12 @@ export default async function ShareAnalyticsPage({
       ? ('expired' as const)
       : ('live' as const);
   const customHostname = customHostnameOf(share);
-  const fullUrl = shareUrlLabel(share.slug, share.host_handle, customHostname);
+  // The share names a domain and the join did not bring its hostname back.
+  // Nothing prints an address in that case, and no copy button offers one.
+  const addressUnavailable = customHostnameMissing(share);
+  const fullUrl = addressUnavailable
+    ? ADDRESS_UNAVAILABLE
+    : shareUrlLabel(share.slug, share.host_handle, customHostname);
 
   return (
     <div className="py-8">
@@ -192,17 +199,20 @@ export default async function ShareAnalyticsPage({
 
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-paper px-4 py-3 md:max-w-2xl">
         <span className="min-w-0 flex-1 truncate font-mono text-[13.5px] text-ink">{fullUrl}</span>
-        <CopySlugButton
-          slug={share.slug}
-          hostHandle={share.host_handle}
-          customHostname={customHostname}
-        />
+        {!addressUnavailable && (
+          <CopySlugButton
+            slug={share.slug}
+            hostHandle={share.host_handle}
+            customHostname={customHostname}
+          />
+        )}
       </div>
 
       <div className="mt-12">
         <ShareAnalytics
           hostHandle={share.host_handle}
           customHostname={customHostname}
+          addressUnavailable={addressUnavailable}
           shareSlug={share.slug}
           recipientLabel={share.recipient_label}
           viewers={visibleViewers}

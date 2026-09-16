@@ -13,6 +13,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Copy, Globe } from 'lucide-react';
+import { SHARE_HOST } from '@/lib/share-url';
 
 export interface CustomDomainView {
   id: string;
@@ -23,6 +24,11 @@ export interface CustomDomainView {
   // row reach 'live', so the DNS instructions would be a waste of the
   // customer's afternoon; they get the one sentence that moves it forward.
   needsReview: boolean;
+  // Live AND the account's default. The two can come apart: the write that
+  // makes a live domain the default can fail on its own, and until it lands no
+  // new link goes here. The panel says which of the two is true rather than
+  // promising the second because the first happened.
+  isDefault: boolean;
   // The record, in the two shapes DNS providers ask for: a bare label at
   // providers that append the zone, and the whole name at providers that do
   // not. One of the two is always wrong for a given provider, and the customer
@@ -171,15 +177,26 @@ export function CustomDomain({
             </div>
           )}
 
-          {domain.state === 'live' && (
+          {domain.state === 'live' && domain.isDefault && (
             <div className="border-b border-line px-5 py-4 text-[13.5px] leading-relaxed text-ink">
               Every new link goes on {domain.hostname}. Each one can still be created on ours
               instead, from the link form.
             </div>
           )}
 
+          {domain.state === 'live' && !domain.isDefault && (
+            <div className="border-b border-line px-5 py-4 text-[13.5px] leading-relaxed text-ink">
+              The domain is serving, but we have not managed to make it the address for your new
+              links yet, so they are still going out on {SHARE_HOST}. Press Check again.
+            </div>
+          )}
+
+          {/* Always offered, whatever the state and whatever we have switched
+              off at our end. It is how a customer sees what their hostname is
+              doing, and how a live domain that failed to become the account's
+              default gets made the default. */}
           <div className="flex flex-wrap items-center gap-3 px-5 py-4">
-            {domain.state !== 'live' && !domain.needsReview && (
+            {!domain.needsReview && (
               <button
                 type="button"
                 onClick={() => run(checkAction)}

@@ -21,6 +21,8 @@ import {
   connectDomain,
   createHostname,
   customDomainsEnabled,
+  customDomainsPublished,
+  customHostnameMissing,
   customHostnameOf,
   defaultDomainForNewShare,
   deleteHostname,
@@ -31,6 +33,7 @@ import {
   getHostname,
   hostnameOfDomain,
   normalizeHostname,
+  findHostname,
   probe,
   restartValidation,
   shareHostArgs,
@@ -49,6 +52,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env['CUSTOM_DOMAINS_ENABLED'];
+  delete process.env['CUSTOM_DOMAINS_PUBLISHED'];
+  delete process.env['CUSTOM_DOMAINS_PILOT_OWNERS'];
   delete process.env['CLOUDFLARE_API_TOKEN'];
   delete process.env['CLOUDFLARE_ZONE_ID_PAGE'];
   vi.unstubAllGlobals();
@@ -74,11 +79,26 @@ describe('the feature switch', () => {
       expect(customDomainsEnabled(), value).toBe(true);
     }
   });
+
+  // Two switches because the pilot needs the feature working on production
+  // for one account before the pricing page tells the world it exists.
+  it('advertises the feature only on its own separate switch', () => {
+    process.env['CUSTOM_DOMAINS_ENABLED'] = '1';
+    expect(customDomainsPublished()).toBe(false);
+    process.env['CUSTOM_DOMAINS_PUBLISHED'] = '1';
+    delete process.env['CUSTOM_DOMAINS_ENABLED'];
+    expect(customDomainsPublished()).toBe(true);
+    expect(customDomainsEnabled()).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // What a customer may connect
 // ---------------------------------------------------------------------------
+
+// Either sentence is a refusal: a name of ours trips the "htmlradar" rule and
+// the own-domains rule, and which one answers first is not the point.
+const REFUSED = /one of our own domains|mistaken for one of ours/;
 
 describe('the name a customer types', () => {
   it('survives being pasted out of a browser address bar', () => {
@@ -132,6 +152,26 @@ describe('the name a customer types', () => {
 
   it('asks for something when nothing was typed', () => {
     expect(describeHostnameProblem('   ')).toMatch(/Type the subdomain/);
+  });
+
+  // The pilot's own test names are ours, so every rule above refuses them.
+  // They are admitted for the listed accounts and nobody else.
+  it('refuses the pilot test names when no pilot is running', () => {
+    for (const hostname of ['decks.gethtmlradar.com', 'links.gethtmlradar.com']) {
+      expect(describeHostnameProblem(hostname), hostname).toMatch(REFUSED);
+      expect(describeHostnameProblem(hostname, USER), hostname).toMatch(REFUSED);
+    }
+  });
+
+  it('admits the pilot test names for a listed account, and refuses them for anyone else', () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = ` ${USER} , other-account `;
+    for (const hostname of ['decks.gethtmlradar.com', 'links.gethtmlradar.com']) {
+      expect(describeHostnameProblem(hostname, USER), hostname).toBeNull();
+      expect(describeHostnameProblem(hostname, 'someone-else'), hostname).toMatch(REFUSED);
+      expect(describeHostnameProblem(hostname), hostname).toMatch(REFUSED);
+    }
+    // Only those two exact names, not the rest of the zone.
+    expect(describeHostnameProblem('other.gethtmlradar.com', USER)).toMatch(REFUSED);
   });
 });
 
@@ -240,6 +280,30 @@ describe('the Cloudflare client', () => {
     await deleteHostname('cf-1');
     expect(seen[0]?.method).toBe('DELETE');
     expect(seen[0]?.init.body).toBeUndefined();
+  });
+
+  it('finds a hostname Cloudflare already holds for a name', async () => {
+    const seen = stubFetch(() => ({ json: { success: true, result: [OK.result] } }));
+    const found = await findHostname('decks.acme.com');
+    expect(seen[0]?.url).toBe(
+      `https://api.cloudflare.com/client/v4/zones/${ZONE}/custom_hostnames?hostname=decks.acme.com`,
+    );
+    expect(found?.id).toBe('cf-1');
+  });
+
+  it('says so when Cloudflare holds nothing for that name', async () => {
+    stubFetch(() => ({ json: { success: true, result: [] } }));
+    expect(await findHostname('decks.acme.com')).toBeNull();
+  });
+
+  // Otherwise the retry inside disconnect, and the monitor's sweep behind it,
+  // loop forever on a hostname somebody has already removed by hand.
+  it('treats a 404 on delete as done', async () => {
+    stubFetch(() => ({
+      status: 404,
+      json: { success: false, errors: [{ message: 'not found' }] },
+    }));
+    await expect(deleteHostname('cf-1')).resolves.toBeUndefined();
   });
 
   it('turns a Cloudflare refusal into an error carrying its message', async () => {
@@ -378,6 +442,7 @@ const pending: CustomDomainRow = {
   last_checked_at: null,
   last_error: null,
   consecutive_failures: 0,
+  cloudflare_deleted_at: null,
   previous_owner_review: false,
 };
 
@@ -411,9 +476,7 @@ describe('connecting a domain', () => {
   // accounts claiming one hostname, and it cannot do that from inside a
   // Cloudflare response.
   it('claims the row before it asks Cloudflare, then stores the hostname id', async () => {
-    const { admin, calls } = fakeDb((call) =>
-      call.op === 'insert' ? { data: { id: DOMAIN } } : {},
-    );
+    const { admin, calls } = fakeDb(() => ({ data: { id: DOMAIN } }));
     const seen = stubFetch(() => ({ json: OK }));
 
     const result = await connectDomain(admin, USER, 'https://Decks.Acme.com/');
@@ -463,9 +526,7 @@ describe('connecting a domain', () => {
   });
 
   it('keeps the claim when Cloudflare fails, so Check again can finish the job', async () => {
-    const { admin, calls } = fakeDb((call) =>
-      call.op === 'insert' ? { data: { id: DOMAIN } } : {},
-    );
+    const { admin, calls } = fakeDb(() => ({ data: { id: DOMAIN } }));
     stubFetch(() => ({ status: 500, json: { success: false, errors: [{ message: 'boom' }] } }));
 
     const result = await connectDomain(admin, USER, 'decks.acme.com');
@@ -484,6 +545,87 @@ describe('connecting a domain', () => {
       error: expect.stringMatching(/not available/),
     });
     expect(calls).toEqual([]);
+  });
+
+  // Turning the runtime switch on in production must not be the same act as
+  // opening enrolment to everybody, so the list is enforced here and not only
+  // in the interface.
+  it('lets only the pilot accounts enrol while a pilot is running', async () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = 'somebody-else';
+    const { admin, calls } = fakeDb(() => ({}));
+    const seen = stubFetch(() => ({ json: OK }));
+    expect(await connectDomain(admin, USER, 'decks.acme.com')).toEqual({
+      error: expect.stringMatching(/not open to every account yet/),
+    });
+    expect(calls).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+
+  it('lets a listed pilot account enrol', async () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = `other,${USER}`;
+    const { admin } = fakeDb((call) =>
+      call.op === 'insert' ? { data: { id: DOMAIN } } : { data: { id: DOMAIN } },
+    );
+    stubFetch(() => ({ json: OK }));
+    expect(await connectDomain(admin, USER, 'decks.gethtmlradar.com')).toMatchObject({ ok: true });
+  });
+
+  // A claim disconnected during the seconds a create takes would otherwise
+  // leave a live certificate in our zone with no row naming it: invisible to
+  // the monitor's sweep, invisible in Settings, still answering for a hostname
+  // the customer believes they took back.
+  it('gives the certificate back when the row that would hold its id is gone', async () => {
+    const { admin } = fakeDb((call) =>
+      call.op === 'insert' ? { data: { id: DOMAIN } } : { data: null },
+    );
+    const seen = stubFetch(() => ({ json: OK }));
+
+    const result = await connectDomain(admin, USER, 'decks.acme.com');
+    expect(result).toEqual({ error: expect.stringMatching(/disconnected while we were setting/) });
+    expect(seen.map((r) => r.method)).toEqual(['POST', 'DELETE']);
+    expect(seen[1]?.url).toMatch(/custom_hostnames\/cf-1$/);
+  });
+
+  // A failed POST is ambiguous: "Cloudflare refused it" and "Cloudflare did it
+  // and the answer never arrived" look identical from here, and posting again
+  // would leave a second certificate nothing of ours can name.
+  it('adopts a hostname an uncertain first attempt already created, rather than creating a second', async () => {
+    const { admin, calls } = fakeDb((call) =>
+      call.op === 'insert' ? { data: { id: DOMAIN } } : { data: { id: DOMAIN } },
+    );
+    let posts = 0;
+    const seen = stubFetch((request) => {
+      if (request.method === 'POST') {
+        posts += 1;
+        return { status: 500, json: { success: false, errors: [{ message: 'timeout' }] } };
+      }
+      return { json: { success: true, result: [OK.result] } };
+    });
+
+    const result = await connectDomain(admin, USER, 'decks.acme.com');
+    expect(result).toMatchObject({ ok: true, state: 'pending' });
+    expect(posts).toBe(1);
+    expect(seen[1]?.url).toContain('?hostname=decks.acme.com');
+    expect(calls[1]).toMatchObject({ op: 'update', payload: { cloudflare_id: 'cf-1' } });
+  });
+
+  it('creates once more only when Cloudflare holds nothing for the name', async () => {
+    const { admin } = fakeDb((call) =>
+      call.op === 'insert' ? { data: { id: DOMAIN } } : { data: { id: DOMAIN } },
+    );
+    let posts = 0;
+    stubFetch((request) => {
+      if (request.method === 'POST') {
+        posts += 1;
+        return posts === 1
+          ? { status: 500, json: { success: false, errors: [{ message: 'timeout' }] } }
+          : { json: OK };
+      }
+      return { json: { success: true, result: [] } };
+    });
+
+    expect(await connectDomain(admin, USER, 'decks.acme.com')).toMatchObject({ ok: true });
+    expect(posts).toBe(2);
   });
 });
 
@@ -599,6 +741,46 @@ describe('checking a domain', () => {
     expect(seen.map((r) => r.method)).toEqual(['GET', 'PATCH']);
   });
 
+  // "New links use this domain" is the one sentence a customer acts on, so it
+  // is only said when the write that backs it landed.
+  it('does not promise the domain is the default when that write matched no row', async () => {
+    const { admin, calls } = fakeDb((call) =>
+      call.table === 'custom_domains' ? { data: { id: DOMAIN } } : { data: null },
+    );
+    cloudflareLiveAndReachable();
+
+    const result = await checkDomain(admin, USER, pending);
+    expect(result).toEqual({
+      ok: true,
+      state: 'live',
+      message: expect.stringMatching(/Setting it as your default failed; press Check again/),
+    });
+    expect(calls[1]?.table).toBe('profiles');
+  });
+
+  // The retry is the same button: a live row re-checked runs the whole branch
+  // again, including the default write.
+  it('re-sets the default when Check again is pressed on a domain that is already live', async () => {
+    const { admin, calls } = fakeDb(() => ({ data: { id: DOMAIN } }));
+    cloudflareLiveAndReachable();
+
+    const result = await checkDomain(admin, USER, { ...pending, state: 'live' });
+    expect(result).toMatchObject({ ok: true, state: 'live' });
+    expect(calls[0]?.filters).toMatchObject({ id: DOMAIN, state: 'live' });
+    expect(calls[1]).toMatchObject({
+      table: 'profiles',
+      payload: { default_custom_domain_id: DOMAIN },
+    });
+  });
+
+  it('gives back a hostname it created for a row that vanished mid-check', async () => {
+    const { admin } = fakeDb(() => ({ data: null }));
+    const seen = cloudflareLiveAndReachable();
+    const result = await checkDomain(admin, USER, { ...pending, cloudflare_id: null });
+    expect(result).toEqual({ error: expect.stringMatching(/disconnected while we were checking/) });
+    expect(seen.map((r) => r.method)).toEqual(['POST', 'DELETE']);
+  });
+
   it('records why when Cloudflare cannot be reached, and changes no state', async () => {
     const { admin, calls } = fakeDb(() => ({}));
     vi.stubGlobal(
@@ -647,16 +829,47 @@ describe('disconnecting a domain', () => {
       filters: { id: DOMAIN, owner_id: USER, retired_at: null },
     });
     expect(seen[0]?.method).toBe('DELETE');
+    // Only a confirmed delete stamps the row. That stamp is what takes it out
+    // of the monitor's retry sweep.
+    expect(calls[2]).toMatchObject({
+      table: 'custom_domains',
+      op: 'update',
+      payload: { cloudflare_deleted_at: expect.any(String) },
+      filters: { id: DOMAIN, owner_id: USER },
+    });
   });
 
-  // Nothing of ours serves the hostname once the row is retired, so a
-  // certificate left behind at Cloudflare is our tidying, not the customer's.
-  it('still succeeds when Cloudflare refuses the delete', async () => {
-    const { admin } = fakeDb((call) =>
+  // The links have stopped either way, which is what the customer asked for.
+  // The certificate is our housekeeping, so they are told it is in hand.
+  it('still retires the row when Cloudflare refuses the delete, and leaves it to be retried', async () => {
+    const { admin, calls } = fakeDb((call) =>
       call.table === 'custom_domains' ? { data: { cloudflare_id: 'cf-1' } } : {},
     );
     stubFetch(() => ({ status: 500, json: { success: false, errors: [{ message: 'nope' }] } }));
-    expect(await disconnectDomain(admin, USER, DOMAIN)).toMatchObject({ ok: true });
+
+    expect(await disconnectDomain(admin, USER, DOMAIN)).toEqual({
+      ok: true,
+      state: 'retired',
+      message: expect.stringMatching(/Cleanup .* pending; we retry it automatically/),
+    });
+    // No stamp, and the id is never cleared: the row keeps the only handle a
+    // retry has, and stays in the sweep until the delete is confirmed.
+    expect(calls.some((call) => 'cloudflare_deleted_at' in (call.payload ?? {}))).toBe(false);
+    expect(calls.some((call) => 'cloudflare_id' in (call.payload ?? {}))).toBe(false);
+  });
+
+  it('counts a 404 as confirmation, because the hostname is gone either way', async () => {
+    const { admin, calls } = fakeDb((call) =>
+      call.table === 'custom_domains' ? { data: { cloudflare_id: 'cf-1' } } : {},
+    );
+    stubFetch(() => ({ status: 404, json: { success: false } }));
+
+    expect(await disconnectDomain(admin, USER, DOMAIN)).toEqual({
+      ok: true,
+      state: 'retired',
+      message: 'Disconnected.',
+    });
+    expect(calls[2]?.payload).toMatchObject({ cloudflare_deleted_at: expect.any(String) });
   });
 });
 
@@ -732,14 +945,27 @@ describe('the address printed for a link the database just created', () => {
   // address when the account's default has stopped serving.
   it('is the hostname of the domain on the returned row', async () => {
     const { admin, calls } = fakeDb(() => ({ data: { hostname: 'decks.acme.com' } }));
-    expect(await hostnameOfDomain(admin, DOMAIN)).toBe('decks.acme.com');
+    expect(await hostnameOfDomain(admin, DOMAIN)).toEqual({
+      ok: true,
+      hostname: 'decks.acme.com',
+    });
     expect(calls[0]?.filters).toEqual({ id: DOMAIN });
   });
 
   it('is nothing, with no query, when the row carries no domain', async () => {
     const { admin, calls } = fakeDb(() => ({}));
-    expect(await hostnameOfDomain(admin, null)).toBeNull();
+    expect(await hostnameOfDomain(admin, null)).toEqual({ ok: true, hostname: null });
     expect(calls).toEqual([]);
+  });
+
+  // The failure that matters. If it collapsed into "no domain", the caller
+  // would be handed htmlradar.page/r/<slug> for a link that is not there: an
+  // address that looks right, copies cleanly and opens nothing.
+  it('is a failure, and never an HTMLRadar address, when the lookup did not answer', async () => {
+    for (const answer of [{ error: { message: 'connection reset' } }, { data: null }]) {
+      const { admin } = fakeDb(() => answer);
+      expect(await hostnameOfDomain(admin, DOMAIN)).toEqual({ ok: false });
+    }
   });
 });
 
@@ -765,5 +991,22 @@ describe('the hostname on a share row', () => {
     expect(customHostnameOf({ custom_domains: null })).toBeNull();
     expect(customHostnameOf({})).toBeNull();
     expect(customHostnameOf(null)).toBeNull();
+  });
+
+  // The id says whether there is supposed to be a hostname; the join says what
+  // it is. When the first is there and the second is not, nothing may print an
+  // address.
+  it('is reported missing when the row names a domain the join did not bring back', () => {
+    expect(customHostnameMissing({ custom_domain_id: DOMAIN, custom_domains: null })).toBe(true);
+    expect(customHostnameMissing({ custom_domain_id: DOMAIN, custom_domains: {} })).toBe(true);
+    expect(
+      customHostnameMissing({
+        custom_domain_id: DOMAIN,
+        custom_domains: { hostname: 'd.acme.com' },
+      }),
+    ).toBe(false);
+    // A link on the HTMLRadar address names no domain, so nothing is missing.
+    expect(customHostnameMissing({ custom_domain_id: null, custom_domains: null })).toBe(false);
+    expect(customHostnameMissing(null)).toBe(false);
   });
 });

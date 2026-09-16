@@ -28,7 +28,7 @@ import {
 import { findOwnedShare } from '@/lib/api-share-lookup';
 import { isMetaSectionTitle } from '@/lib/section-filter';
 import { shareUrl } from '@/lib/share-url';
-import { customHostnameOf } from '@/lib/custom-domains';
+import { customHostnameMissing, customHostnameOf } from '@/lib/custom-domains';
 import type { Session, SectionEvent, Viewer } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -80,16 +80,30 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     owner_id: string;
     recipient_label: string | null;
     host_handle: string | null;
+    custom_domain_id: string | null;
   }>(
     supabase,
     caller.userId,
     params.id,
-    'id, slug, recipient_label, host_handle, custom_domains(hostname)',
+    'id, slug, recipient_label, host_handle, custom_domain_id, custom_domains(hostname)',
   );
 
   // Someone else's link is indistinguishable from one that does not exist —
   // a key must not be usable to probe for share ids.
   if (!share) return errorResponse(NOT_FOUND);
+
+  // A link on a customer's domain whose hostname did not come back has no
+  // address we can print. The apex address would open nothing, so the report
+  // is refused rather than answered with a URL that is wrong.
+  if (customHostnameMissing(share)) {
+    return errorResponse({
+      status: 500,
+      body: {
+        error: 'internal',
+        message: 'We could not read the address this link is served on. Try again.',
+      },
+    });
+  }
 
   const url = shareUrl(share.slug, share.host_handle, customHostnameOf(share));
 

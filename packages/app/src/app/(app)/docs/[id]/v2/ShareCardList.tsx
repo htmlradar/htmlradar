@@ -32,7 +32,7 @@ import {
 import type { ShareRow, ShareAnalyticsData } from '../DocumentShareManager';
 import { cn } from '@/lib/cn';
 import { localInputToIso } from '@/lib/datetime-local';
-import { SHARE_HOST, shareUrl } from '@/lib/share-url';
+import { ADDRESS_UNAVAILABLE, SHARE_HOST, shareUrl } from '@/lib/share-url';
 
 interface ShareCardListProps {
   documentId: string;
@@ -352,6 +352,10 @@ function LinkSection({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewing, startPreview] = useTransition();
 
+  // The row names a domain and its hostname did not come back with it. There
+  // is no address to print: the apex one would look right, copy cleanly and
+  // open nothing, so the card says so and offers no controls for it.
+  const addressUnavailable = !!share.custom_domain_id && !share.custom_hostname;
   const url = shareUrl(share.slug, share.host_handle, share.custom_hostname);
   const customSlug = hasCustomSlug(share);
   // A link is served from the hostname stored on its own row. If that domain
@@ -401,35 +405,41 @@ function LinkSection({
       <SectionEyebrow>The link</SectionEyebrow>
       <SectionNote>Send this URL — it always opens whichever version is marked Live.</SectionNote>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-line bg-paper-2/40 px-3 py-1.5">
-        <code className="flex-1 truncate font-mono text-[12.5px] text-ink-soft">{url}</code>
-        <button
-          type="button"
-          onClick={onCopy}
-          className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
-        >
-          {copied ? <Check className="size-3.5 text-good" /> : <Copy className="size-3.5" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
-        >
-          <ExternalLink className="size-3.5" />
-          Open
-        </a>
-        <button
-          type="button"
-          onClick={onPreview}
-          disabled={isPreviewing}
-          className="inline-flex items-center gap-1.5 rounded-md border border-signal/30 bg-signal/5 px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-signal-dark hover:bg-signal/10 disabled:opacity-60"
-        >
-          <Eye className="size-3.5" />
-          {isPreviewing ? 'Opening…' : 'Preview as you'}
-        </button>
-      </div>
+      {addressUnavailable ? (
+        <div className="mt-3 rounded-[10px] border border-line bg-paper-2/40 px-3 py-2 text-[12.5px] leading-relaxed text-ink-soft">
+          {ADDRESS_UNAVAILABLE}
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-line bg-paper-2/40 px-3 py-1.5">
+          <code className="flex-1 truncate font-mono text-[12.5px] text-ink-soft">{url}</code>
+          <button
+            type="button"
+            onClick={onCopy}
+            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
+          >
+            {copied ? <Check className="size-3.5 text-good" /> : <Copy className="size-3.5" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
+          >
+            <ExternalLink className="size-3.5" />
+            Open
+          </a>
+          <button
+            type="button"
+            onClick={onPreview}
+            disabled={isPreviewing}
+            className="inline-flex items-center gap-1.5 rounded-md border border-signal/30 bg-signal/5 px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-signal-dark hover:bg-signal/10 disabled:opacity-60"
+          >
+            <Eye className="size-3.5" />
+            {isPreviewing ? 'Opening…' : 'Preview as you'}
+          </button>
+        </div>
+      )}
       {domainDown && (
         <p className="mt-2 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[12.5px] leading-relaxed text-ink">
           {share.custom_hostname} is no longer connected, so this link does not open. Reconnect the

@@ -51,6 +51,7 @@ import { shareUrl } from '@/lib/share-url';
 import { stampShareHost } from '@/lib/handle';
 import {
   customDomainsEnabled,
+  customHostnameMissing,
   customHostnameOf,
   hostnameOfDomain,
   shareHostArgs,
@@ -491,14 +492,37 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Read back from the row the database wrote, never from what was asked for:
+  // an implied choice falls back to the HTMLRadar address when the account's
+  // default has stopped serving, and the URL in this response is the URL the
+  // recipient will open.
+  const address = await hostnameOfDomain(supabase, share.custom_domain_id);
+  if (!address.ok) {
+    // The link exists and is correct; only its address could not be read. An
+    // htmlradar.page URL here would be a working-looking address for a link
+    // that is not there, which is worse than saying so — the caller can list
+    // their shares and find it.
+    await logServerError({
+      source: 'api.v1.shares',
+      message: 'could not read the hostname of the domain the share was created on',
+      userId: caller.userId,
+      route: ROUTE,
+      context: { step: 'hostname_of_domain', share_id: share.id },
+    });
+    return errorResponse({
+      status: 500,
+      body: {
+        error: 'internal',
+        message:
+          'The link was created, but we could not read the address it is served on. List your shares to get it.',
+      },
+    });
+  }
+
   return jsonResponse(201, {
     share_id: share.id,
     document_id: documentId,
-    // Read back from the row the database wrote, never from what was asked
-    // for: an implied choice falls back to the HTMLRadar address when the
-    // account's default has stopped serving, and the URL in this response is
-    // the URL the recipient will open.
-    url: shareUrl(share.slug, hostHandle, await hostnameOfDomain(supabase, share.custom_domain_id)),
+    url: shareUrl(share.slug, hostHandle, address.hostname),
     dashboard_url: `${SITE_URL}/docs/${documentId}`,
   });
 }
@@ -533,7 +557,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('document_shares')
     .select(
-      'id, slug, document_id, recipient_label, created_at, revoked_at, expires_at, host_handle, custom_domains(hostname)',
+      'id, slug, document_id, recipient_label, created_at, revoked_at, expires_at, host_handle, custom_domain_id, custom_domains(hostname)',
     )
     .eq('owner_id', caller.userId)
     // Both columns, in both places: the sort and the cursor have to agree, or
@@ -557,6 +581,28 @@ export async function GET(req: NextRequest) {
 
   const rows = (data ?? []) as ShareListRow[];
   if (rows.length === 0) return jsonResponse(200, { shares: [], next_before: null });
+
+  // A row that names a domain the join did not bring back has no address we
+  // can vouch for, and the apex address would be a wrong one. One such row
+  // fails the page rather than handing the caller a mixture of correct and
+  // confidently incorrect links.
+  const unreadable = rows.find((row) => customHostnameMissing(row));
+  if (unreadable) {
+    await logServerError({
+      source: 'api.v1.shares',
+      message: 'a share names a custom domain whose hostname could not be read',
+      userId: caller.userId,
+      route: ROUTE,
+      context: { step: 'list_shares', share_id: unreadable.id },
+    });
+    return errorResponse({
+      status: 500,
+      body: {
+        error: 'internal',
+        message: 'We could not read the address one of these links is served on. Try again.',
+      },
+    });
+  }
 
   const shareIds = rows.map((row) => row.id);
   const documentIds = [...new Set(rows.map((row) => row.document_id))];
@@ -624,6 +670,10 @@ interface ShareListRow {
   // Null on every share created before handle links were switched on, which
   // is every share that exists today: those are served on the apex forever.
   host_handle: string | null;
+  // Set when the link is on a customer's own domain. Selected beside the
+  // joined hostname so the two can be compared: the id says whether there is
+  // supposed to be a hostname, and the join says what it is.
+  custom_domain_id: string | null;
 }
 
 interface SessionListRow {

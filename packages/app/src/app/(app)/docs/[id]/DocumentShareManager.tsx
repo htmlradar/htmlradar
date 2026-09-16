@@ -36,7 +36,7 @@ import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { GateTag } from '@/components/doc-dashboard/GateTag';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
 import { localInputToIso } from '@/lib/datetime-local';
-import { shareUrl } from '@/lib/share-url';
+import { ADDRESS_UNAVAILABLE, shareUrl } from '@/lib/share-url';
 import type { Viewer, Session } from '@/lib/types';
 
 export interface ShareRow {
@@ -75,6 +75,11 @@ export interface ShareRow {
   // current setting, so a link already sent never moves. Null is an HTMLRadar
   // address, which is every link that exists today.
   custom_hostname: string | null;
+  // The id the row stores. Compared with the hostname above: an id with no
+  // hostname beside it means the join failed, and nothing may print an address
+  // in that case — an apex URL for a link that is not on the apex looks right
+  // and opens nothing.
+  custom_domain_id: string | null;
   // 'live', or the reason links on it have stopped opening.
   custom_domain_state: string | null;
   viewCount: number;
@@ -417,7 +422,12 @@ function SharePane({
   const isRevoked = !!share.revoked_at;
   const isExpired = !!share.expires_at && new Date(share.expires_at) < new Date();
   const isLive = !isRevoked && !isExpired;
-  const fullUrl = shareUrl(share.slug, share.host_handle, share.custom_hostname);
+  // An id with no hostname beside it means the join failed, and an apex
+  // address for a link that is not on the apex opens nothing.
+  const fullUrl =
+    share.custom_domain_id && !share.custom_hostname
+      ? ADDRESS_UNAVAILABLE
+      : shareUrl(share.slug, share.host_handle, share.custom_hostname);
 
   // Use the same identity resolver as the rail + tables so the
   // SharePane heading reads consistently across the page. Without

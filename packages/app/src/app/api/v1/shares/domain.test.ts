@@ -34,6 +34,7 @@ const db = vi.hoisted(() => ({
   // hostname is when the route reads it back.
   createdDomainId: null as string | null,
   hostname: 'decks.acme.com',
+  hostnameLookupFails: false,
   createError: null as string | null,
 }));
 
@@ -60,7 +61,10 @@ vi.mock('@/lib/api-auth', async (importOriginal) => ({
       const call: TableCall = { table, op: 'select', filters: {} };
       const settle = () => {
         db.calls.push(call);
-        if (table === 'custom_domains') return { data: { hostname: db.hostname }, error: null };
+        if (table === 'custom_domains') {
+          if (db.hostnameLookupFails) return { data: null, error: { message: 'connection reset' } };
+          return { data: { hostname: db.hostname }, error: null };
+        }
         return { data: null, error: null };
       };
       const chain: Record<string, unknown> = {
@@ -96,6 +100,7 @@ beforeEach(() => {
   db.rpcArgs = null;
   db.calls = [];
   db.createdDomainId = null;
+  db.hostnameLookupFails = false;
   db.createError = null;
 });
 
@@ -190,5 +195,18 @@ describe('POST /api/v1/shares — domain_id', () => {
     const res = await post(HTML);
     expect(res.status).toBe(201);
     expect(res.body['url']).toBe('https://htmlradar.page/r/quick-glass');
+  });
+
+  // The one answer that must never be substituted. An htmlradar.page URL for a
+  // link that lives on a customer's domain looks right, copies cleanly and
+  // opens nothing — worse than saying we could not read it.
+  it('refuses to answer with an HTMLRadar address when the hostname could not be read', async () => {
+    db.createdDomainId = DOMAIN_ID;
+    db.hostnameLookupFails = true;
+    const res = await post(HTML);
+    expect(res.status).toBe(500);
+    expect(res.body['message']).toMatch(/could not read the address/);
+    // And it says the link exists, because it does.
+    expect(res.body['message']).toMatch(/link was created/);
   });
 });

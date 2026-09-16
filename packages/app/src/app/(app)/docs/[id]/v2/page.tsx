@@ -148,7 +148,7 @@ async function renderV2({
   const [sharesRes, versionsRes, attachmentsRes] = await Promise.all([
     supabase
       .from('document_shares')
-      .select('*, custom_domains(hostname, state)')
+      .select('*, custom_domain_id, custom_domains(hostname, state)')
       .eq('document_id', params.id)
       .order('created_at', { ascending: false }),
     supabase
@@ -255,6 +255,7 @@ async function renderV2({
     revoked_at: s.revoked_at,
     host_handle: (s.host_handle as string | null) ?? null,
     custom_hostname: customHostnameOf(s),
+    custom_domain_id: (s.custom_domain_id as string | null) ?? null,
     custom_domain_state: customDomainStateOf(s),
     viewCount: sessionsByShare[s.id]?.length ?? 0,
   }));

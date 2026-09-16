@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
-import { shareUrlLabel } from '@/lib/share-url';
+import { ADDRESS_UNAVAILABLE, shareUrlLabel } from '@/lib/share-url';
 import { SectionHead } from '@/components/doc-dashboard/SectionHead';
 import type { ShareRow, ShareAnalyticsData } from './DocumentShareManager';
 
@@ -147,7 +147,9 @@ export function SharesTable({
                       </div>
                     )}
                     <div className="mt-0.5 truncate font-mono text-[10.5px] text-graphite">
-                      {shareUrlLabel(share.slug, share.host_handle, share.custom_hostname)}
+                      {share.custom_domain_id && !share.custom_hostname
+                        ? ADDRESS_UNAVAILABLE
+                        : shareUrlLabel(share.slug, share.host_handle, share.custom_hostname)}
                     </div>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">

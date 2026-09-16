@@ -6,8 +6,18 @@
 // ours is not read as ours — the case that costs nothing to hold and is
 // awkward to notice once lost.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// The pilot names come from custom-domains.ts, which reaches the error log,
+// which imports Next's `server-only` — a module that resolves inside the Next
+// build and nowhere else. Same stub as every other test in this package.
+vi.mock('./error-log', () => ({ logServerError: vi.fn(async () => undefined) }));
+
 import { slugOf } from './api-share-lookup';
+
+afterEach(() => {
+  delete process.env['CUSTOM_DOMAINS_PILOT_OWNERS'];
+});
 
 describe('the shapes a share can be named by', () => {
   it('takes a bare slug, a path, and a link on either of our own hosts', () => {
@@ -53,6 +63,23 @@ describe('the shapes a share can be named by', () => {
   // format allows.
   it('still reads a slug that contains the word', () => {
     expect(slugOf('https://decks.acme.com/r/htmlradar-review')).toBe('htmlradar-review');
+  });
+
+  // Our own test names for the pilot. They contain "htmlradar", so the rule
+  // below refuses them like any other lookalike — except while a pilot is
+  // actually configured, which is never in a shipped build.
+  it('refuses the pilot test names when no pilot is running', () => {
+    expect(slugOf('https://decks.gethtmlradar.com/r/acme-proposal')).toBeNull();
+    expect(slugOf('https://links.gethtmlradar.com/r/acme-proposal')).toBeNull();
+  });
+
+  it('reads a pilot link while a pilot is configured, and still refuses the rest of that zone', () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = 'some-owner-id';
+    expect(slugOf('https://decks.gethtmlradar.com/r/acme-proposal')).toBe('acme-proposal');
+    expect(slugOf('https://links.gethtmlradar.com/r/acme-proposal')).toBe('acme-proposal');
+    expect(slugOf('https://other.gethtmlradar.com/r/acme-proposal')).toBeNull();
+    // And the lookalike family is refused with a pilot running, as without.
+    expect(slugOf('https://htmlradar.page.evil.example/r/acme-proposal')).toBeNull();
   });
 
   it('refuses anything that is not a slug', () => {

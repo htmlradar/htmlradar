@@ -10,6 +10,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { SHARE_SLUG_PATTERN } from './share-slug';
 import { SHARE_HOST } from './share-url';
+import { PILOT_HOSTNAMES, pilotOwners } from './custom-domains';
 
 const SITE_HOST = 'htmlradar.com';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,12 +55,21 @@ const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?';
 // The lookahead spans the host and stops at the path separator, so a slug is
 // free to contain the word even though a hostname is not.
 const CUSTOM_HOST = `(?![^/]*htmlradar)${DNS_LABEL}(?:\\.${DNS_LABEL}){2,}`;
-const LINK_HOSTS = [
-  `(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`,
-  escapeHost(SITE_HOST),
-  CUSTOM_HOST,
-].join('|');
-const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
+const linkPattern = (extraHosts: string[]): RegExp => {
+  const hosts = [
+    `(?:${HANDLE_LABEL}\\.)?${escapeHost(SHARE_HOST)}`,
+    escapeHost(SITE_HOST),
+    ...extraHosts.map(escapeHost),
+    CUSTOM_HOST,
+  ].join('|');
+  return new RegExp(`^(?:(?:https://)?(?:${hosts}))?/r/([^/]+)$`);
+};
+const LINK = linkPattern([]);
+// The pilot's two test names are ours, so the lookalike rule above refuses
+// them like any other. They are admitted only while a pilot is actually
+// configured — `CUSTOM_DOMAINS_PILOT_OWNERS` non-empty — which is never in a
+// shipped build, so the refusal is what a customer's installation does.
+const PILOT_LINK = linkPattern(PILOT_HOSTNAMES);
 
 /**
  * The slug in what the caller passed, or null.
@@ -68,7 +78,8 @@ const LINK = new RegExp(`^(?:(?:https://)?(?:${LINK_HOSTS}))?/r/([^/]+)$`);
  * slug it stores, so a malformed value costs a regex and not a query.
  */
 export function slugOf(raw: string): string | null {
-  const candidate = LINK.exec(raw)?.[1] ?? raw;
+  const pattern = pilotOwners().length > 0 ? PILOT_LINK : LINK;
+  const candidate = pattern.exec(raw)?.[1] ?? raw;
   return SHARE_SLUG_PATTERN.test(candidate) ? candidate : null;
 }
 

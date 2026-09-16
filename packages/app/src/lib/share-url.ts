@@ -67,6 +67,17 @@ export const shareUrl = (
  * host, and the customer would copy an address that is not the one on the
  * button beside it.
  */
+/**
+ * What a surface prints instead of an address it could not determine.
+ *
+ * A share that names a customer domain whose hostname did not come back has no
+ * address we can vouch for, and the apex address is not a safe guess: it would
+ * look right, copy cleanly and open nothing. This module owns it because it
+ * owns every other printed address, and because a client component may import
+ * this file and may not import the server-only one.
+ */
+export const ADDRESS_UNAVAILABLE = 'Address unavailable — refresh the page';
+
 export const shareUrlLabel = (
   slug: string,
   hostHandle?: string | null,

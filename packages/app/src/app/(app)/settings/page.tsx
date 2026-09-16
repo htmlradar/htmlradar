@@ -25,7 +25,7 @@ import {
   connectDomainAction,
   disconnectDomainAction,
 } from './custom-domain-actions';
-import { customDomainsEnabled, dnsRecord, readDomain } from '@/lib/custom-domains';
+import { customDomainsEnabled, dnsRecord, pilotOwners, readDomain } from '@/lib/custom-domains';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -478,12 +478,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   const tier = profile?.tier === 'pro' ? 'pro' : 'free';
 
   // Your domain. `comped` is a boolean beside the tier (schema/032), not a
-  // tier of its own, so both are read. The row is read whatever the tier says,
-  // because an account that has lapsed still has to be able to disconnect;
-  // eligibility only decides whether a NEW domain can be connected.
-  const domainsOn = customDomainsEnabled();
-  const domainEligible = tier === 'pro' || profile?.comped === true;
-  const domainRow = domainsOn ? await readDomain(supabase, user.id) : null;
+  // tier of its own, so both are read.
+  //
+  // The row is read whatever the tier says AND whatever the switch says. An
+  // account that has lapsed, and an account whose feature we have rolled back,
+  // both still have a hostname pointed at us that they have to be able to
+  // check and take back. The switch and the tier govern enrolment — making
+  // something new — and nothing else.
+  //
+  // While a pilot is running, enrolment is those accounts and nobody else;
+  // connectDomain enforces the same list server-side, so this only decides
+  // whether the box is worth drawing.
+  const pilot = pilotOwners();
+  const domainEligible =
+    customDomainsEnabled() &&
+    (tier === 'pro' || profile?.comped === true) &&
+    (pilot.length === 0 || pilot.includes(user.id));
+  const domainRow = await readDomain(supabase, user.id);
+  const isDefaultDomain = !!domainRow && profile?.default_custom_domain_id === domainRow.id;
   let subState: ActiveSubscription | null = null;
   if (tier === 'pro') {
     try {
@@ -595,7 +607,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
 
       <ConnectedApps keys={connectorKeys} revokeAction={revokeApiKeyAction} />
 
-      {domainsOn && (domainEligible || domainRow) && (
+      {(domainEligible || domainRow) && (
         <CustomDomain
           domain={
             domainRow
@@ -605,6 +617,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   state: domainRow.state,
                   lastError: domainRow.last_error,
                   needsReview: domainRow.previous_owner_review === true,
+                  isDefault: isDefaultDomain,
                   ...dnsRecord(domainRow.hostname),
                 }
               : null

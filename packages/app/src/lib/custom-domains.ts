@@ -24,20 +24,71 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { logServerError } from './error-log';
 import { SHARE_HOST } from './share-url';
 
+function switchedOn(name: string): boolean {
+  const raw = (process.env[name] ?? '').trim().toLowerCase();
+  return raw === '1' || raw === 'true';
+}
+
 /**
- * The whole of the feature's rollback.
+ * The runtime switch, and the whole of the feature's rollback.
  *
- * Off — empty, unset, anything but the two words below — hides the Settings
- * section, stops share creation from choosing a domain, and makes the API
- * refuse `domain_id`. Links already issued on a customer domain keep serving:
- * the worker answers those, and it has its own switch.
+ * Off — empty, unset, anything but '1' and 'true' — stops ENROLMENT and stops
+ * new links landing on a customer domain. It deliberately does NOT stop
+ * checking or disconnecting a domain that already exists: a customer whose
+ * hostname is pointed at us has to be able to take it back, and turning our
+ * own switch off must not be the thing that traps it. Links already issued
+ * keep serving; the worker answers those and has its own switch.
  *
  * Read inside the function rather than at module load: next-on-pages resolves
  * env at request time on the edge runtime and not always at module load.
  */
 export function customDomainsEnabled(): boolean {
-  const raw = (process.env['CUSTOM_DOMAINS_ENABLED'] ?? '').trim().toLowerCase();
-  return raw === '1' || raw === 'true';
+  return switchedOn('CUSTOM_DOMAINS_ENABLED');
+}
+
+/**
+ * The build-time switch that decides whether we ADVERTISE the feature.
+ *
+ * Separate from the runtime one on purpose: the pilot needs custom domains
+ * working on production for one account before the pricing page tells the
+ * world they exist. Turning this on is a deliberate, separate act, and it is
+ * read at build time because the pricing page is statically rendered.
+ */
+export function customDomainsPublished(): boolean {
+  return switchedOn('CUSTOM_DOMAINS_PUBLISHED');
+}
+
+/**
+ * The accounts allowed to enrol while the feature is being piloted, and the
+ * only accounts that may claim one of our own test names.
+ *
+ * A comma-separated list of user ids. Empty — its shipped state — means no
+ * pilot is running: every eligible account may enrol, and the test names are
+ * refused like any other name of ours. Non-empty means exactly these accounts
+ * and nobody else, which is what keeps a production flag flip from opening
+ * enrolment to everybody before the journey has been walked once.
+ */
+export function pilotOwners(): string[] {
+  return (process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Our own two subdomains on the throwaway zone, used to walk the journey
+ * before a customer does. `decks` is proxied (the orange-to-orange shape) and
+ * `links` is not (the ordinary registrar shape).
+ *
+ * They are names of ours, so the lookalike rule would refuse them. They are
+ * admitted only for an account named in `CUSTOM_DOMAINS_PILOT_OWNERS`, which
+ * is empty in the shipped build.
+ */
+export const PILOT_HOSTNAMES = ['decks.gethtmlradar.com', 'links.gethtmlradar.com'];
+
+/** Is this name one of the pilot test names, with a pilot actually running? */
+export function isPilotHostname(hostname: string): boolean {
+  return pilotOwners().length > 0 && PILOT_HOSTNAMES.includes(hostname);
 }
 
 /** The one record the customer adds, and the only one. */
@@ -56,6 +107,12 @@ export interface CustomDomainRow {
   last_checked_at: string | null;
   last_error: string | null;
   consecutive_failures: number | null;
+  // When the Cloudflare hostname was confirmed gone — a 200, or a 404 meaning
+  // somebody already removed it. Null on a retired row whose delete has not
+  // been confirmed, which is exactly the set the monitor sweeps and retries.
+  // `cloudflare_id` is kept on a retired row for the same reason: it is the
+  // only handle the retry has.
+  cloudflare_deleted_at: string | null;
   // Another account has held this hostname before. Computed by the trigger in
   // schema/052 and never written from here; a row carrying it can never reach
   // 'live', which is the whole mitigation for having no ownership proof beyond
@@ -64,7 +121,7 @@ export interface CustomDomainRow {
 }
 
 export const DOMAIN_COLUMNS =
-  'id, hostname, state, cloudflare_id, cloudflare_status, ssl_status, verified_at, last_checked_at, last_error, consecutive_failures, previous_owner_review';
+  'id, hostname, state, cloudflare_id, cloudflare_status, ssl_status, verified_at, last_checked_at, last_error, consecutive_failures, cloudflare_deleted_at, previous_owner_review';
 
 // ---------------------------------------------------------------------------
 // What a customer may connect
@@ -118,10 +175,19 @@ export function normalizeHostname(raw: string): string {
  * Every rule here is also a trigger in schema/052. This is the copy, not the
  * control.
  */
-export function describeHostnameProblem(raw: string): string | null {
+export function describeHostnameProblem(raw: string, ownerId?: string): string | null {
   const hostname = normalizeHostname(raw);
   if (!hostname) return 'Type the subdomain you want to use, such as decks.acme.com.';
   if (hostname.length > 253) return 'That name is too long for a hostname.';
+
+  // The two test names, for the accounts running the pilot and nobody else.
+  // Checked before the rules below because every one of them refuses a name
+  // of ours, which is what these are.
+  if (isPilotHostname(hostname)) {
+    return ownerId && pilotOwners().includes(ownerId)
+      ? null
+      : 'That is one of our own domains. Use a subdomain of a domain you own, such as decks.acme.com.';
+  }
 
   const labels = hostname.split('.');
   if (labels.some((label) => !LABEL.test(label))) {
@@ -177,15 +243,17 @@ export interface HostnameState {
   sslStatus: string;
 }
 
+type CloudflareHostname = { id?: string; status?: string; ssl?: { status?: string } };
+
 interface CloudflareEnvelope {
   success?: boolean;
   errors?: { code?: number; message?: string }[];
-  result?: { id?: string; status?: string; ssl?: { status?: string } } | null;
+  result?: CloudflareHostname | CloudflareHostname[] | null;
 }
 
 async function cloudflare(
   path: string,
-  init: { method: string; body?: unknown },
+  init: { method: string; body?: unknown; okStatuses?: number[] },
 ): Promise<CloudflareEnvelope> {
   const token = process.env['CLOUDFLARE_API_TOKEN'] ?? '';
   const zone = process.env['CLOUDFLARE_ZONE_ID_PAGE'] ?? '';
@@ -200,6 +268,11 @@ async function cloudflare(
     ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
   });
 
+  // A status the caller has declared acceptable ends the call here: a DELETE
+  // that comes back 404 has achieved what it was for, and reading an envelope
+  // out of it would only turn "already gone" into an error.
+  if (init.okStatuses?.includes(response.status)) return {};
+
   const envelope = (await response.json().catch(() => ({}))) as CloudflareEnvelope;
   if (!response.ok || envelope.success === false) {
     const detail = (envelope.errors ?? []).map((e) => e.message).join('; ');
@@ -213,15 +286,32 @@ async function cloudflare(
 }
 
 function stateOf(envelope: CloudflareEnvelope): HostnameState {
+  const result = (Array.isArray(envelope.result) ? envelope.result[0] : envelope.result) ?? null;
   return {
-    id: envelope.result?.id ?? '',
-    status: envelope.result?.status ?? 'unknown',
-    sslStatus: envelope.result?.ssl?.status ?? 'unknown',
+    id: result?.id ?? '',
+    status: result?.status ?? 'unknown',
+    sslStatus: result?.ssl?.status ?? 'unknown',
   };
 }
 
 export async function createHostname(hostname: string): Promise<HostnameState> {
   return stateOf(await cloudflare('', { method: 'POST', body: { hostname, ssl: SSL_CONFIG } }));
+}
+
+/**
+ * The custom hostname Cloudflare already holds for this name, or null.
+ *
+ * Exists for one case: a POST that timed out. The request may well have been
+ * carried out — we simply never heard the answer — and posting again would
+ * leave a second certificate in the zone that nothing of ours has the id for.
+ * Asking first turns an uncertain create into a certain one.
+ */
+export async function findHostname(hostname: string): Promise<HostnameState | null> {
+  const envelope = await cloudflare(`?hostname=${encodeURIComponent(hostname)}`, {
+    method: 'GET',
+  });
+  const results = Array.isArray(envelope.result) ? envelope.result : [];
+  return results.length > 0 ? stateOf(envelope) : null;
 }
 
 export async function getHostname(id: string): Promise<HostnameState> {
@@ -232,17 +322,83 @@ export async function restartValidation(id: string): Promise<HostnameState> {
   return stateOf(await cloudflare(`/${id}`, { method: 'PATCH', body: { ssl: SSL_CONFIG } }));
 }
 
+/**
+ * Give the certificate back.
+ *
+ * 404 counts as done. The retry this sits inside (and the monitor's sweep
+ * behind it) will otherwise loop forever on a hostname somebody has already
+ * removed by hand.
+ */
 export async function deleteHostname(id: string): Promise<void> {
-  await cloudflare(`/${id}`, { method: 'DELETE' });
+  await cloudflare(`/${id}`, { method: 'DELETE', okStatuses: [404] });
 }
 
-/** One retry, for the two calls whose failure strands a customer. */
+/** One retry, for the calls whose failure strands a customer. */
 async function twice<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();
   } catch {
     return await work();
   }
+}
+
+/**
+ * Create the hostname, or adopt the one an earlier attempt already created.
+ *
+ * A failed POST is ambiguous in exactly the way that matters: "Cloudflare
+ * refused it" and "Cloudflare did it and the answer never came back" look the
+ * same from here. Retrying blindly turns the second case into two certificates
+ * for one name, one of which nothing of ours can ever name again. So the retry
+ * asks before it acts.
+ */
+async function createOrAdoptHostname(hostname: string): Promise<HostnameState> {
+  try {
+    return await createHostname(hostname);
+  } catch (first) {
+    const existing = await findHostname(hostname).catch(() => null);
+    if (existing) return existing;
+    try {
+      return await createHostname(hostname);
+    } catch {
+      throw first;
+    }
+  }
+}
+
+/**
+ * Store the id of a hostname we have just created, and give the certificate
+ * back if the row it belonged to is no longer there to hold it.
+ *
+ * Without this, a claim that is disconnected during the seconds a create takes
+ * leaves a live certificate in our zone with no row naming it — invisible to
+ * the monitor's sweep, invisible in Settings, and still answering for a
+ * hostname the customer believes they took back.
+ */
+async function storeHostnameId(
+  admin: SupabaseClient,
+  domain: { id: string; state: DomainState },
+  state: HostnameState,
+  extra: Record<string, unknown> = {},
+): Promise<boolean> {
+  const { data: stored } = await admin
+    .from('custom_domains')
+    .update({ cloudflare_id: state.id, ...extra })
+    .eq('id', domain.id)
+    .eq('state', domain.state)
+    .select('id')
+    .maybeSingle();
+  if (stored) return true;
+
+  try {
+    await twice(() => deleteHostname(state.id));
+  } catch (e) {
+    await logServerError({
+      source: 'lib.custom-domains',
+      message: e instanceof Error ? e.message : 'orphaned Cloudflare hostname could not be deleted',
+      context: { step: 'delete_orphan', domain_id: domain.id, cloudflare_id: state.id },
+    });
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -375,18 +531,28 @@ export function shareHostArgs(choice: HostChoice): Record<string, unknown> {
  * `create_share`, and it falls back to the HTMLRadar address when the account's
  * default has stopped serving. The row it returns is therefore the only honest
  * source for the address to print.
+ *
+ * THREE ANSWERS, NOT TWO. "This link is on the HTMLRadar address" and "I could
+ * not find out where this link is" must never collapse into the same value.
+ * Collapsing them prints htmlradar.page/r/<slug> for a link that lives on a
+ * customer's domain — an address that looks right, copies cleanly, and does
+ * not open. A failure is a failure and is said so.
  */
+export type HostnameLookup = { ok: true; hostname: string | null } | { ok: false };
+
 export async function hostnameOfDomain(
   admin: SupabaseClient,
   domainId: string | null | undefined,
-): Promise<string | null> {
-  if (!domainId) return null;
-  const { data } = await admin
+): Promise<HostnameLookup> {
+  if (!domainId) return { ok: true, hostname: null };
+  const { data, error } = await admin
     .from('custom_domains')
     .select('hostname')
     .eq('id', domainId)
     .maybeSingle();
-  return (data as { hostname?: string | null } | null)?.hostname ?? null;
+  const hostname = (data as { hostname?: string | null } | null)?.hostname ?? null;
+  if (error || !hostname) return { ok: false };
+  return { ok: true, hostname };
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +648,18 @@ export async function connectDomain(
 ): Promise<DomainOutcome> {
   if (!customDomainsEnabled()) return { error: 'Custom domains are not available yet.' };
 
-  const problem = describeHostnameProblem(rawHostname);
+  // While a pilot is running, enrolment is those accounts and nobody else.
+  // Checked here and not only in the interface: turning the runtime switch on
+  // in production must not be the same act as opening enrolment to everybody.
+  const pilot = pilotOwners();
+  if (pilot.length > 0 && !pilot.includes(userId)) {
+    return {
+      error:
+        'Your own domain is not open to every account yet. Email hello@htmlradar.com to go early.',
+    };
+  }
+
+  const problem = describeHostnameProblem(rawHostname, userId);
   if (problem) return { error: problem };
   const hostname = normalizeHostname(rawHostname);
 
@@ -508,18 +685,16 @@ export async function connectDomain(
   if (!domainId) return { error: 'We could not connect that domain. Try again.' };
 
   try {
-    const state = await twice(() => createHostname(hostname));
-    await admin
-      .from('custom_domains')
-      .update({
-        cloudflare_id: state.id,
-        cloudflare_status: state.status,
-        ssl_status: state.sslStatus,
-        last_checked_at: new Date().toISOString(),
-        last_error: null,
-      })
-      .eq('id', domainId)
-      .eq('state', 'pending');
+    const state = await createOrAdoptHostname(hostname);
+    const stored = await storeHostnameId(admin, { id: domainId, state: 'pending' }, state, {
+      cloudflare_status: state.status,
+      ssl_status: state.sslStatus,
+      last_checked_at: new Date().toISOString(),
+      last_error: null,
+    });
+    if (!stored) {
+      return { error: 'That domain was disconnected while we were setting it up. Try again.' };
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Cloudflare refused the hostname.';
     await logServerError({
@@ -570,13 +745,10 @@ export async function checkDomain(
   let cloudflareId = domain.cloudflare_id;
   try {
     if (!cloudflareId) {
-      const created = await twice(() => createHostname(domain.hostname));
+      const created = await createOrAdoptHostname(domain.hostname);
+      const stored = await storeHostnameId(admin, { id: domain.id, state: from }, created);
+      if (!stored) return { error: 'That domain was disconnected while we were checking it.' };
       cloudflareId = created.id;
-      await admin
-        .from('custom_domains')
-        .update({ cloudflare_id: created.id })
-        .eq('id', domain.id)
-        .eq('state', from);
     }
 
     const state = await getHostname(cloudflareId);
@@ -611,8 +783,32 @@ export async function checkDomain(
       if (!promoted) return { error: 'That domain was disconnected while we were checking it.' };
 
       // A live domain IS the default — the founder's rule is that there is no
-      // toggle to find.
-      await admin.from('profiles').update({ default_custom_domain_id: domain.id }).eq('id', userId);
+      // toggle to find. But the promise only gets made if the write that backs
+      // it actually landed: "new links use this domain" is the one sentence a
+      // customer will act on, and the profile trigger in schema/052 can refuse
+      // this write (a tier that lapsed between the two statements, say).
+      // Check again re-runs this whole branch, so the retry is a button press.
+      const { data: madeDefault, error: defaultError } = await admin
+        .from('profiles')
+        .update({ default_custom_domain_id: domain.id })
+        .eq('id', userId)
+        .select('id')
+        .maybeSingle();
+
+      if (!madeDefault) {
+        await logServerError({
+          source: 'lib.custom-domains',
+          message: defaultError?.message ?? 'setting the default custom domain matched no row',
+          userId,
+          level: 'warn',
+          context: { step: 'set_default_domain', domain_id: domain.id },
+        });
+        return {
+          ok: true,
+          state: 'live',
+          message: 'Live. Setting it as your default failed; press Check again.',
+        };
+      }
 
       return { ok: true, state: 'live', message: 'Live. New links use this domain.' };
     }
@@ -685,22 +881,39 @@ export async function disconnectDomain(
   }
 
   const cloudflareId = (retired as { cloudflare_id?: string | null } | null)?.cloudflare_id ?? null;
-  if (cloudflareId) {
-    try {
-      await twice(() => deleteHostname(cloudflareId));
-    } catch (e) {
-      // The row is already retired, so nothing of ours serves the hostname.
-      // A certificate left behind at Cloudflare is ours to tidy, not the
-      // customer's problem, so it is logged and not shown.
-      await logServerError({
-        source: 'lib.custom-domains',
-        message: e instanceof Error ? e.message : 'deleting the Cloudflare hostname failed',
-        userId,
-        level: 'warn',
-        context: { step: 'delete_hostname', domain_id: domainId, cloudflare_id: cloudflareId },
-      });
-    }
+  if (!cloudflareId) return { ok: true, state: 'retired', message: 'Disconnected.' };
+
+  // `cloudflare_id` deliberately stays on the retired row: it is the only
+  // handle a retry has. `cloudflare_deleted_at` is written only when the
+  // provider has confirmed the hostname is gone — a 200, or a 404 meaning it
+  // already was. A retired row that has the id and not the timestamp is
+  // precisely what the monitor sweeps.
+  try {
+    await twice(() => deleteHostname(cloudflareId));
+  } catch (e) {
+    await logServerError({
+      source: 'lib.custom-domains',
+      message: e instanceof Error ? e.message : 'deleting the Cloudflare hostname failed',
+      userId,
+      level: 'warn',
+      context: { step: 'delete_hostname', domain_id: domainId, cloudflare_id: cloudflareId },
+    });
+    // The links have stopped either way, which is the thing the customer
+    // asked for and the thing they need to know. The certificate is our
+    // housekeeping, so they are told it is in hand and nothing else.
+    return {
+      ok: true,
+      state: 'retired',
+      message:
+        'Disconnected. Cleanup with our certificate provider is pending; we retry it automatically.',
+    };
   }
+
+  await admin
+    .from('custom_domains')
+    .update({ cloudflare_deleted_at: new Date().toISOString() })
+    .eq('id', domainId)
+    .eq('owner_id', userId);
 
   return { ok: true, state: 'retired', message: 'Disconnected.' };
 }
@@ -726,9 +939,28 @@ interface Embedded {
   custom_domains?: { hostname?: string | null; state?: string | null } | null;
 }
 
+// Every select that carries the embed also carries `custom_domain_id`, so the
+// two can be compared: the id says whether there is supposed to be a hostname,
+// and the embed says what it is.
+
 /** The hostname a share was issued on, or null for an HTMLRadar address. */
 export function customHostnameOf(row: unknown): string | null {
   return (row as Embedded | null)?.custom_domains?.hostname ?? null;
+}
+
+/**
+ * The share says it is on a domain, and the join did not bring that domain's
+ * hostname back.
+ *
+ * It should not happen — the foreign key guarantees the row exists and the
+ * owner may read it — but "should not happen" is how a recipient ends up with
+ * an htmlradar.page address for a link that is not on htmlradar.page. When it
+ * is true, nothing prints an address: the surface says so and offers no copy
+ * button for a URL it cannot vouch for.
+ */
+export function customHostnameMissing(row: unknown): boolean {
+  const share = row as (Embedded & { custom_domain_id?: string | null }) | null;
+  return !!share?.custom_domain_id && !share.custom_domains?.hostname;
 }
 
 /** The state of that hostname's domain — 'live', or a reason links fail. */

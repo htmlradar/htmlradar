@@ -24,6 +24,7 @@
     "qa:smoke": "playwright test e2e/smoke.spec.ts",
     "gen:og": "node scripts/generate-og-card.mjs",
     "gen:email-cards": "node scripts/generate-onboarding-cards.mjs",
+    "gen:cd-hero": "node scripts/generate-custom-domains-hero.mjs",
     "gen:email-preview": "node scripts/render-onboarding-email.mjs",
     "gen:llms": "node scripts/gen-llms-full.mjs"
   },

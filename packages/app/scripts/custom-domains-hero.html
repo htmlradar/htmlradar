@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HTMLRadar custom domains announcement hero</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Source for the hero image in the custom-domains announcement e-mail.
+      Rendered to public/brand/email/custom-domains-announcement.png (and the
+      @2x file) by scripts/generate-custom-domains-hero.mjs.
+
+      Same font pair, tokens and display=block reasoning as
+      scripts/onboarding-email-cards.html: the render waits on
+      document.fonts.ready and display=swap would let Chromium paint a
+      fallback first.
+
+      The three panels are drawn, not screenshotted, but every string is the
+      real product's: the CNAME value is customers.htmlradar.page, the two
+      states are "Waiting for DNS" and "Live", and the sample deck is the
+      same Q3 Brief / Acme used by the onboarding e-mail cards.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #fbf1e8;
+        --paper-2: #f4e1cb;
+        --card: #fdf7f0;
+        --ink: #1f1108;
+        --ink-soft: #3a2818;
+        --graphite: #876959;
+        --signal: #7a1f2e;
+        --signal-dark: #5a1521;
+        --line: #e8d5bd;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        width: 1200px;
+        height: 675px;
+        background: #ffffff;
+        font:
+          400 16px/1.5 'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          system-ui,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .card {
+        position: relative;
+        overflow: hidden;
+        width: 1200px;
+        height: 675px;
+        padding: 40px 44px 36px 44px;
+        background: var(--paper);
+        background-image: radial-gradient(rgba(31, 17, 8, 0.05) 1px, transparent 1px);
+        background-size: 22px 22px;
+        display: flex;
+        flex-direction: column;
+      }
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+      }
+
+      /* ---- header ---- */
+      .head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .kicker {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 600;
+        font-size: 16px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--signal);
+      }
+      .title {
+        margin-top: 12px;
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 400;
+        font-size: 46px;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+        font-variation-settings: 'opsz' 60;
+      }
+
+      /* ---- the three-panel strip ---- */
+      .strip {
+        margin-top: 20px;
+        display: flex;
+        gap: 24px;
+        flex: 1;
+      }
+      .col {
+        width: 352px;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel {
+        flex: 1;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+      }
+      .cap {
+        margin-top: 14px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+      .capno {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 600;
+        font-size: 20px;
+        color: var(--signal);
+      }
+      .captext {
+        font-size: 24px;
+        font-weight: 600;
+        line-height: 1.25;
+        color: var(--ink);
+      }
+
+      .label {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 500;
+        font-size: 15px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--graphite);
+      }
+      .field {
+        margin-top: 12px;
+        background: #fffdfa;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 27px;
+        color: var(--ink);
+      }
+      .pillrow {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .pill {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 7px 14px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .pill.wait {
+        background: var(--paper-2);
+        color: var(--ink-soft);
+      }
+      .pill.live {
+        background: var(--signal);
+        color: #fdf7f0;
+      }
+      .note {
+        font-size: 17px;
+        line-height: 1.5;
+        color: var(--graphite);
+      }
+
+      /* ---- panel 1: the DNS record ---- */
+      .dns {
+        margin-top: 16px;
+        background: var(--paper-2);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .dnstop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .dnstag {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--graphite);
+      }
+      .copy {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--signal-dark);
+        background: #fffdfa;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 5px 10px;
+      }
+      .dnsline {
+        margin-top: 10px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 19px;
+        line-height: 1.5;
+        color: var(--ink);
+      }
+      .dnsline .dim {
+        color: var(--graphite);
+      }
+
+      /* ---- panel 2: live ---- */
+      .livebig {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 400;
+        font-size: 40px;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+        font-variation-settings: 'opsz' 48;
+      }
+
+      /* ---- panel 3: phone + report ---- */
+      .phonewrap {
+        display: flex;
+        justify-content: center;
+      }
+      .phone {
+        width: 178px;
+        height: 232px;
+        border: 3px solid var(--ink);
+        border-radius: 22px;
+        background: #ffffff;
+        padding: 9px 8px;
+        overflow: hidden;
+      }
+      .urlbar {
+        background: var(--paper-2);
+        border-radius: 7px;
+        padding: 6px 8px;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        color: var(--ink-soft);
+        text-align: center;
+      }
+      .screen {
+        padding: 12px 8px 0 8px;
+      }
+      .doctitle {
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 19px;
+        line-height: 1.15;
+        color: var(--ink);
+        font-variation-settings: 'opsz' 24;
+      }
+      .line {
+        height: 7px;
+        border-radius: 4px;
+        background: #ece0d3;
+        margin-top: 9px;
+      }
+      .block {
+        margin-top: 14px;
+        height: 42px;
+        border-radius: 6px;
+        background: #f4e8dc;
+      }
+      .report {
+        margin-top: 16px;
+        background: var(--paper-2);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .rwho {
+        margin-top: 8px;
+        font-size: 19px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .rstats {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        font-size: 16px;
+        color: var(--ink-soft);
+      }
+      .track {
+        margin-top: 10px;
+        height: 6px;
+        border-radius: 4px;
+        background: #e2cdb3;
+        overflow: hidden;
+      }
+      .fill {
+        height: 6px;
+        border-radius: 4px;
+        background: var(--signal);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="custom-domains-announcement">
+      <div class="head">
+        <div class="kicker">Included in Pro</div>
+      </div>
+      <div class="title">Your tracked links, on your own domain.</div>
+
+      <div class="strip">
+        <!-- 1. type it, one DNS line -->
+        <div class="col">
+          <div class="panel">
+            <div class="label">Your domain</div>
+            <div class="field">decks.acme.com</div>
+            <div class="pillrow">
+              <span class="pill wait">Waiting for DNS</span>
+            </div>
+            <div class="dns">
+              <div class="dnstop">
+                <span class="dnstag">Add this one record</span>
+                <span class="copy">Copy</span>
+              </div>
+              <div class="dnsline">
+                decks&nbsp;&nbsp;<span class="dim">CNAME</span><br />customers.htmlradar.page
+              </div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="capno">1</span><span class="captext">Type it, add one DNS line.</span>
+          </div>
+        </div>
+
+        <!-- 2. it goes live -->
+        <div class="col">
+          <div class="panel">
+            <div class="label">Your domain</div>
+            <div class="field">decks.acme.com</div>
+            <div class="pillrow">
+              <span class="pill live">Live</span>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center">
+              <div class="livebig">New links use<br />this domain.</div>
+            </div>
+            <div class="note">Certificate issued for you.<br />Nothing else to do.</div>
+          </div>
+          <div class="cap">
+            <span class="capno">2</span><span class="captext">It goes live on its own.</span>
+          </div>
+        </div>
+
+        <!-- 3. the link and the read report -->
+        <div class="col">
+          <div class="panel">
+            <div class="phonewrap">
+              <div class="phone">
+                <div class="urlbar">decks.acme.com/r/&hellip;</div>
+                <div class="screen">
+                  <div class="doctitle">Q3 Brief</div>
+                  <div class="line" style="width: 100%"></div>
+                  <div class="line" style="width: 92%"></div>
+                  <div class="line" style="width: 78%"></div>
+                  <div class="block"></div>
+                  <div class="line" style="width: 96%"></div>
+                  <div class="line" style="width: 64%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="report">
+              <div class="label">Read report</div>
+              <div class="rwho">jane@northwind.com</div>
+              <div class="rstats"><span>6m 26s read</span><span>87% scrolled</span></div>
+              <div class="track"><div class="fill" style="width: 87%"></div></div>
+            </div>
+          </div>
+          <div class="cap">
+            <span class="capno">3</span><span class="captext">Every new link is yours.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

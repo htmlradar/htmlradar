@@ -25,7 +25,14 @@ import {
   connectDomainAction,
   disconnectDomainAction,
 } from './custom-domain-actions';
-import { customDomainsEnabled, dnsRecord, pilotOwners, readDomain } from '@/lib/custom-domains';
+import {
+  customDomainsEnabled,
+  dnsRecord,
+  lookupProvider,
+  pilotOwners,
+  readDomain,
+  registrableDomain,
+} from '@/lib/custom-domains';
 import { ArrowRight, CheckCircle2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -496,6 +503,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     (pilot.length === 0 || pilot.includes(user.id));
   const domainRow = await readDomain(supabase, user.id);
   const isDefaultDomain = !!domainRow && profile?.default_custom_domain_id === domainRow.id;
+  // Who manages this domain's DNS, so the card can name the place and the
+  // clicks instead of saying "your DNS provider". Only while the customer is
+  // still waiting — a live domain's card carries no instructions — and never
+  // stored: schema/052 has no column for it and this is one cheap lookup.
+  const domainProvider =
+    domainRow && domainRow.state !== 'live'
+      ? await lookupProvider(domainRow.hostname)
+      : { name: 'your domain provider', url: null, steps: '' };
   let subState: ActiveSubscription | null = null;
   if (tier === 'pro') {
     try {
@@ -615,9 +630,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   id: domainRow.id,
                   hostname: domainRow.hostname,
                   state: domainRow.state,
-                  lastError: domainRow.last_error,
+                  // Cloudflare has the record and is issuing the certificate.
+                  // Same reading checkDomain makes when it chooses which of
+                  // the two waiting sentences to write.
+                  securing:
+                    domainRow.state === 'pending' && domainRow.cloudflare_status === 'active',
                   needsReview: domainRow.previous_owner_review === true,
                   isDefault: isDefaultDomain,
+                  lastCheckedAt: domainRow.last_checked_at,
+                  registrable: registrableDomain(domainRow.hostname),
+                  provider: domainProvider,
                   ...dnsRecord(domainRow.hostname),
                 }
               : null

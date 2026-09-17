@@ -32,9 +32,11 @@ import {
   dnsRecord,
   getHostname,
   hostnameOfDomain,
+  lookupProvider,
   normalizeHostname,
   findHostname,
   pilotOwners,
+  providerFromNameservers,
   probe,
   restartValidation,
   shareHostArgs,
@@ -1026,5 +1028,83 @@ describe('the hostname on a share row', () => {
     // A link on the HTMLRadar address names no domain, so nothing is missing.
     expect(customHostnameMissing({ custom_domain_id: null, custom_domains: null })).toBe(false);
     expect(customHostnameMissing(null)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Who manages the domain
+// ---------------------------------------------------------------------------
+
+// The point of the table is the sentence a customer reads, so the expectation
+// is the provider's name and the words of its own menus, not an internal key.
+describe('reading the provider off the nameservers', () => {
+  const cases: [string, string[], string][] = [
+    ['Cloudflare', ['dana.ns.cloudflare.com.', 'kirk.ns.cloudflare.com.'], 'Cloudflare'],
+    ['GoDaddy', ['ns13.domaincontrol.com', 'ns14.domaincontrol.com'], 'GoDaddy'],
+    ['Namecheap', ['dns1.registrar-servers.com'], 'Namecheap'],
+    ['Route 53', ['ns-1234.awsdns-26.org', 'ns-5.awsdns-00.com'], 'Amazon Route 53'],
+    ['Google Domains, now Squarespace', ['ns-cloud-a1.googledomains.com'], 'Squarespace'],
+    ['Squarespace', ['ns1.squarespacedns.com'], 'Squarespace'],
+    ['DNSimple', ['ns1.dnsimple.com'], 'DNSimple'],
+    ['Hover', ['ns1.hover.com'], 'Hover'],
+    ['Name.com', ['ns1abc.name.com'], 'Name.com'],
+    ['OVH', ['dns200.anycast.ovh.net'], 'OVH'],
+    ['Gandi', ['ns-1-a.gandi.net'], 'Gandi'],
+    ['Wix', ['ns2.wixdns.net'], 'Wix'],
+    ['Hostinger', ['ns1.dns-parking.com', 'ns1.dns.hostinger.com'], 'Hostinger'],
+    ['Bluehost', ['ns1.bluehost.com'], 'Bluehost'],
+    ['IONOS', ['ns1071.ui-dns.com'], 'IONOS'],
+    ['123 Reg', ['ns.123-reg.co.uk'], '123 Reg'],
+    ['nobody we know', ['ns1.some-local-host.example'], 'your domain provider'],
+    ['a name server list we never got', [], 'your domain provider'],
+  ];
+
+  it.each(cases)('names %s', (_label, nameservers, expected) => {
+    expect(providerFromNameservers(nameservers, 'decks.acme.com').name).toBe(expected);
+  });
+
+  // The steps name the domain they bought, not the subdomain they typed:
+  // the customer is looking for `acme.co.uk` in a list, and `decks.acme.co.uk`
+  // is not in it.
+  it('points the steps at the domain they will see in the list', () => {
+    const cloudflare = providerFromNameservers(['kirk.ns.cloudflare.com'], 'decks.acme.co.uk');
+    expect(cloudflare.steps).toBe(
+      'Open the Cloudflare dashboard, click acme.co.uk, then DNS, then Records, then Add record.',
+    );
+    expect(cloudflare.url).toBe('https://dash.cloudflare.com');
+  });
+
+  it('sends an unknown provider to where they bought the domain, with no link', () => {
+    const unknown = providerFromNameservers(['ns1.nowhere.example'], 'decks.acme.com');
+    expect(unknown.steps).toBe('Sign in where you bought your domain and find its DNS settings.');
+    expect(unknown.url).toBeNull();
+  });
+
+  it('asks the resolver for the registrable domain only, as JSON', async () => {
+    const seen = stubFetch(() => ({
+      json: { Answer: [{ data: 'ns13.domaincontrol.com.' }] },
+    }));
+    const provider = await lookupProvider('decks.acme.com');
+    expect(seen[0]?.url).toBe('https://cloudflare-dns.com/dns-query?name=acme.com&type=NS');
+    expect(seen[0]?.headers['accept']).toBe('application/dns-json');
+    expect(provider.name).toBe('GoDaddy');
+  });
+
+  // A resolver that is down costs the customer the generic sentence and
+  // nothing else. It must never be the reason the card fails to draw.
+  it('tolerates a resolver that refuses, errors or answers nonsense', async () => {
+    stubFetch(() => ({ status: 502 }));
+    expect((await lookupProvider('decks.acme.com')).name).toBe('your domain provider');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network');
+      }),
+    );
+    expect((await lookupProvider('decks.acme.com')).name).toBe('your domain provider');
+
+    stubFetch(() => ({ json: { Status: 3 } }));
+    expect((await lookupProvider('decks.acme.com')).name).toBe('your domain provider');
   });
 });

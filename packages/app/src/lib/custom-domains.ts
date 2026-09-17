@@ -234,6 +234,185 @@ export function dnsRecord(hostname: string): {
   };
 }
 
+/** The domain they actually bought, out of the subdomain they typed. */
+export function registrableDomain(hostname: string): string {
+  const labels = hostname.split('.');
+  const suffix = MULTI_PART_SUFFIXES.find((s) => hostname.endsWith(`.${s}`));
+  return labels.slice(-(suffix ? suffix.split('.').length + 1 : 2)).join('.');
+}
+
+// ---------------------------------------------------------------------------
+// Who manages this domain's DNS
+// ---------------------------------------------------------------------------
+
+// The customer does not think "DNS provider". They think "the place I bought
+// the domain" — and half of them do not remember which place that was. The
+// nameservers do remember, so we ask them and name the place ourselves.
+//
+// NOT STORED. schema/052 has no column for it and this lane adds no
+// migration, so it is looked up when the card is drawn and thrown away. One
+// DNS-over-HTTPS request while a domain is waiting is cheaper than a column.
+
+export interface DnsProvider {
+  /** What the customer calls it, or a phrase that stands in when we cannot tell. */
+  name: string;
+  /** Where they sign in, or null when we do not know who they are. */
+  url: string | null;
+  /** The clicks, in the provider's own menu words. */
+  steps: string;
+}
+
+// Nameserver suffix → who that is, first match wins. Matched with `includes`
+// rather than a suffix test because the shapes vary (`ns-1.awsdns-01.co.uk`,
+// `ns1.ui-dns.de`) and the vendor's name is the part that is stable.
+const PROVIDERS: {
+  ns: string[];
+  name: string;
+  url: string;
+  steps: (domain: string) => string;
+}[] = [
+  {
+    ns: ['cloudflare.com', 'ns.cloudflare'],
+    name: 'Cloudflare',
+    url: 'https://dash.cloudflare.com',
+    steps: (d) =>
+      `Open the Cloudflare dashboard, click ${d}, then DNS, then Records, then Add record.`,
+  },
+  {
+    ns: ['domaincontrol.com'],
+    name: 'GoDaddy',
+    url: 'https://dcc.godaddy.com/control/dnsmanagement',
+    steps: (d) => `Open GoDaddy, My Products, then DNS beside ${d}, then Add New Record.`,
+  },
+  {
+    ns: ['registrar-servers.com'],
+    name: 'Namecheap',
+    url: 'https://ap.www.namecheap.com',
+    steps: (d) => `Open Namecheap, Domain List, Manage beside ${d}, then Advanced DNS.`,
+  },
+  {
+    ns: ['awsdns'],
+    name: 'Amazon Route 53',
+    url: 'https://console.aws.amazon.com/route53/v2/hostedzones',
+    steps: (d) => `Open the Route 53 console, Hosted zones, click ${d}, then Create record.`,
+  },
+  {
+    ns: ['googledomains.com', 'squarespacedns.com'],
+    name: 'Squarespace',
+    url: 'https://account.squarespace.com/domains',
+    steps: (d) => `Open Squarespace, Domains, click ${d}, then DNS Settings.`,
+  },
+  {
+    ns: ['dnsimple'],
+    name: 'DNSimple',
+    url: 'https://dnsimple.com/dashboard',
+    steps: (d) => `Open DNSimple, click ${d}, then DNS, then Manage records.`,
+  },
+  {
+    ns: ['hover.com'],
+    name: 'Hover',
+    url: 'https://www.hover.com/control_panel/domains',
+    steps: (d) => `Open Hover, click ${d}, then the DNS tab, then Add a record.`,
+  },
+  {
+    ns: ['name.com'],
+    name: 'Name.com',
+    url: 'https://www.name.com/account/domain',
+    steps: (d) => `Open Name.com, My Domains, click ${d}, then DNS Records.`,
+  },
+  {
+    ns: ['ovh.net'],
+    name: 'OVH',
+    url: 'https://www.ovh.com/manager/',
+    steps: (d) => `Open the OVH control panel, Domains, click ${d}, then the DNS zone tab.`,
+  },
+  {
+    ns: ['gandi.net'],
+    name: 'Gandi',
+    url: 'https://admin.gandi.net/domain',
+    steps: (d) => `Open Gandi, Domains, click ${d}, then DNS Records.`,
+  },
+  {
+    ns: ['wixdns.net'],
+    name: 'Wix',
+    url: 'https://www.wix.com/my-account/sites',
+    steps: (d) => `Open Wix, Domains, click ${d}, then Advanced, then Edit DNS.`,
+  },
+  {
+    ns: ['dns.hostinger'],
+    name: 'Hostinger',
+    url: 'https://hpanel.hostinger.com/domains',
+    steps: (d) => `Open hPanel, Domains, click ${d}, then DNS / Nameservers.`,
+  },
+  {
+    ns: ['bluehost.com'],
+    name: 'Bluehost',
+    url: 'https://my.bluehost.com/',
+    steps: (d) => `Open Bluehost, Domains, click ${d}, then DNS.`,
+  },
+  {
+    ns: ['ionos', 'ui-dns'],
+    name: 'IONOS',
+    url: 'https://my.ionos.com/domains',
+    steps: (d) => `Open IONOS, Domains & SSL, click ${d}, then DNS.`,
+  },
+  {
+    ns: ['123-reg.co.uk'],
+    name: '123 Reg',
+    url: 'https://www.123-reg.co.uk/secure/cpanel/domain/overview',
+    steps: (d) => `Open 123 Reg, Manage Domains, click ${d}, then Manage DNS.`,
+  },
+];
+
+/** What we say when the nameservers tell us nothing we recognise. */
+const UNKNOWN_PROVIDER: DnsProvider = {
+  name: 'your domain provider',
+  url: null,
+  steps: 'Sign in where you bought your domain and find its DNS settings.',
+};
+
+/** Who manages this domain, read off its nameservers. Pure; the lookup is below. */
+export function providerFromNameservers(nameservers: string[], hostname: string): DnsProvider {
+  const names = nameservers.map((ns) => ns.trim().toLowerCase().replace(/\.$/, ''));
+  const found = PROVIDERS.find((provider) =>
+    names.some((ns) => provider.ns.some((needle) => ns.includes(needle))),
+  );
+  if (!found) return UNKNOWN_PROVIDER;
+  return { name: found.name, url: found.url, steps: found.steps(registrableDomain(hostname)) };
+}
+
+const DOH_TIMEOUT_MS = 5000;
+
+/**
+ * The domain's nameservers, over DNS-over-HTTPS, turned into a provider.
+ *
+ * Never throws and never blocks the card: a resolver that is slow, down or
+ * unhelpful costs the customer the generic sentence, which is the sentence
+ * they had before this existed.
+ */
+export async function lookupProvider(hostname: string): Promise<DnsProvider> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DOH_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(
+        registrableDomain(hostname),
+      )}&type=NS`,
+      { headers: { accept: 'application/dns-json' }, signal: controller.signal },
+    );
+    if (!response.ok) return UNKNOWN_PROVIDER;
+    const body = (await response.json()) as { Answer?: { data?: string }[] };
+    return providerFromNameservers(
+      (body.Answer ?? []).map((answer) => answer.data ?? ''),
+      hostname,
+    );
+  } catch {
+    return UNKNOWN_PROVIDER;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cloudflare: four calls, and the exact bodies Astra verified
 // ---------------------------------------------------------------------------

@@ -31,6 +31,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     },
     { url: `${baseUrl}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
+    // Published 2026-09-17, behind CUSTOM_DOMAINS_PUBLISHED — see
+    // src/lib/custom-domains.ts. Listed unconditionally like every other
+    // route here; the page itself answers 404 until the flag is on.
+    {
+      url: `${baseUrl}/custom-domains`,
+      lastModified: '2026-09-17',
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
     // /sign-in, /feedback and /connect are utility pages, not search results.
     // Their page metadata sets noindex, so they are deliberately omitted.
     { url: `${baseUrl}/privacy`, changeFrequency: 'yearly', priority: 0.4 },
@@ -119,6 +128,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     { url: `${baseUrl}/blog`, changeFrequency: 'weekly', priority: 0.6 },
+    {
+      url: `${baseUrl}/blog/whats-new-custom-domains`,
+      lastModified: '2026-09-17',
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
     {
       url: `${baseUrl}/blog/how-we-built-htmlradar`,
       changeFrequency: 'monthly',

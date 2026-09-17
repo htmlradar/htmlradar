@@ -36,6 +36,12 @@ const SHARE_FIELDS: [string, string, string, string][] = [
   ['allowed_email_domains', 'string[]', 'none', 'Only these domains may open it.'],
   ['expires_in_hours', 'number', 'never', 'Positive number. The link stops working after it.'],
   ['slug', 'string', 'generated', 'Custom link name. Paid plans.'],
+  [
+    'domain_id',
+    'string | null',
+    'account default',
+    "Omit it to use the account's own connected domain if one is live, or the HTMLRadar address if not. Pass null to force the HTMLRadar address on this one link. Pass a domain's id to use it explicitly — it must belong to this account and be live, or the call returns a 422.",
+  ],
 ];
 
 const ERROR_ROWS: [string, string, string][] = [
@@ -187,6 +193,15 @@ export default function ApiDocsPage() {
               label="response — 201"
               code={`{\n  "share_id": "11111111-1111-4111-8111-111111111111",\n  "document_id": "22222222-2222-4222-8222-222222222222",\n  "url": "https://htmlradar.page/r/acme-proposal",\n  "dashboard_url": "https://htmlradar.com/docs/22222222-2222-4222-8222-222222222222"\n}`}
             />
+            <p className="mt-3 text-[14px] leading-relaxed text-graphite">
+              <span className="font-mono text-[13px]">url</span> — here and everywhere it appears
+              below, including <span className="font-mono text-[13px]">list-shares</span>,{' '}
+              <span className="font-mono text-[13px]">revoke</span> and{' '}
+              <span className="font-mono text-[13px]">activity</span> — is read back from the
+              link&rsquo;s own row, never assumed from the request. On a custom domain it is that
+              domain&rsquo;s address; otherwise it is htmlradar.page. That is the exact address the
+              recipient opens.
+            </p>
           </section>
 
           <section className="mt-14" id="list-shares">

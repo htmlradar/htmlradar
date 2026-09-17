@@ -185,6 +185,10 @@ export default function PrivacyPage() {
                 localStorage and applies to every HTMLRadar link they open in that browser
                 afterwards.
               </p>
+              <p className="mt-3">
+                The same page also carries a link to report it, which works the same way whether it
+                opens on htmlradar.page or on a customer&rsquo;s own connected domain.
+              </p>
             </Section>
 
             <Section title="Cookies">

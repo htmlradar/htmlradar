@@ -412,32 +412,41 @@ function LinkSection({
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-line bg-paper-2/40 px-3 py-1.5">
           <code className="flex-1 truncate font-mono text-[12.5px] text-ink-soft">{url}</code>
-          <button
-            type="button"
-            onClick={onCopy}
-            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
-          >
-            {copied ? <Check className="size-3.5 text-good" /> : <Copy className="size-3.5" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
-          >
-            <ExternalLink className="size-3.5" />
-            Open
-          </a>
-          <button
-            type="button"
-            onClick={onPreview}
-            disabled={isPreviewing}
-            className="inline-flex items-center gap-1.5 rounded-md border border-signal/30 bg-signal/5 px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-signal-dark hover:bg-signal/10 disabled:opacity-60"
-          >
-            <Eye className="size-3.5" />
-            {isPreviewing ? 'Opening…' : 'Preview as you'}
-          </button>
+          {/* No controls for an address that opens nothing. The address itself
+              stays, because the owner has to see WHICH link is affected, and
+              "Preview as you" goes with the other two: the owner's preview is
+              issued on the share's own hostname (previewShareAction), so it is
+              as dead as the recipient's link. */}
+          {!domainDown && (
+            <>
+              <button
+                type="button"
+                onClick={onCopy}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
+              >
+                {copied ? <Check className="size-3.5 text-good" /> : <Copy className="size-3.5" />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-ink hover:bg-paper-2/60"
+              >
+                <ExternalLink className="size-3.5" />
+                Open
+              </a>
+              <button
+                type="button"
+                onClick={onPreview}
+                disabled={isPreviewing}
+                className="inline-flex items-center gap-1.5 rounded-md border border-signal/30 bg-signal/5 px-2.5 py-1.5 font-sans text-[12.5px] font-medium text-signal-dark hover:bg-signal/10 disabled:opacity-60"
+              >
+                <Eye className="size-3.5" />
+                {isPreviewing ? 'Opening…' : 'Preview as you'}
+              </button>
+            </>
+          )}
         </div>
       )}
       {domainDown && (

@@ -214,7 +214,10 @@ export default async function ShareAnalyticsPage({
         )}
       </div>
 
-      {domainDown && (
+      {/* Said once per page. With no reads yet the waiting panel below owns
+          this sentence, because it is what replaces its invitation to send
+          the link; with reads, that panel is stats and this row owns it. */}
+      {domainDown && sessionList.length > 0 && (
         <p className="mt-2 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[12.5px] leading-relaxed text-ink md:max-w-2xl">
           {domainDisconnectedNote(customHostname!)}
         </p>
@@ -225,6 +228,7 @@ export default async function ShareAnalyticsPage({
           hostHandle={share.host_handle}
           customHostname={customHostname}
           addressUnavailable={addressUnavailable}
+          domainDown={domainDown}
           shareSlug={share.slug}
           recipientLabel={share.recipient_label}
           viewers={visibleViewers}

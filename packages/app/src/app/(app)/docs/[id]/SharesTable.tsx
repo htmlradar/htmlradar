@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { resolveRecipientIdentity } from '@/lib/recipient-identity';
-import { ADDRESS_UNAVAILABLE, shareUrlLabel } from '@/lib/share-url';
+import { ADDRESS_UNAVAILABLE, domainDisconnectedNote, shareUrlLabel } from '@/lib/share-url';
 import { SectionHead } from '@/components/doc-dashboard/SectionHead';
 import type { ShareRow, ShareAnalyticsData } from './DocumentShareManager';
 
@@ -151,6 +151,14 @@ export function SharesTable({
                         ? ADDRESS_UNAVAILABLE
                         : shareUrlLabel(share.slug, share.host_handle, share.custom_hostname)}
                     </div>
+                    {/* The row above is an address that opens nothing once the
+                        domain stops answering. Same sentence as the share card
+                        and the per-share dashboard. */}
+                    {!!share.custom_hostname && share.custom_domain_state !== 'live' && (
+                      <div className="mt-1 rounded-md border border-alert/30 bg-alert/5 px-2 py-1 text-[11.5px] leading-relaxed text-ink">
+                        {domainDisconnectedNote(share.custom_hostname)}
+                      </div>
+                    )}
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">
                     <StatusDot status={status} />

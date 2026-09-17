@@ -59,6 +59,8 @@ interface World {
   scanRun?: Answer;
   radarDigest?: Answer;
   heartbeat?: Answer;
+  /** Custom hostnames standing at Cloudflare; only `retired_at` is read. */
+  customDomains?: Answer;
 }
 
 function json(body: unknown): Response {
@@ -94,6 +96,7 @@ function stubWorld(world: World) {
         return new Response('', { status: 201 });
       }
       if (url.includes('/abuse_reports')) return reply(world.abuse);
+      if (url.includes('/custom_domains')) return reply(world.customDomains);
       if (url.includes('/notifications_log')) {
         const unverified = url.includes('status=eq.unverified');
         const answer = unverified ? world.notificationsUnverified : world.notificationsFailed;
@@ -145,7 +148,14 @@ const allClear = (nowMs: number): World => ({
   scanRun: healthyScanRun(nowMs),
   radarDigest: healthyRadarDigest(nowMs),
   heartbeat: freshHeartbeat(nowMs, 2),
+  customDomains: [],
 });
+
+/** `n` hostnames standing at Cloudflare, `retiredHoursAgo` of them tombstoned. */
+const standingHostnames = (n: number, nowMs: number, retiredHoursAgo: number[] = []) => [
+  ...retiredHoursAgo.map((h) => ({ retired_at: new Date(nowMs - h * 3_600_000).toISOString() })),
+  ...Array.from({ length: n - retiredHoursAgo.length }, () => ({ retired_at: null })),
+];
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -329,6 +339,71 @@ describe('the heartbeat age decides whether anyone is minding the register', () 
     await sentinel(env, TUESDAY);
 
     expect(telegram[0]!.text).toContain('(no heartbeat row ever)');
+  });
+});
+
+// Cloudflare for SaaS gives 100 custom hostnames free and bills $0.10 each
+// after that, and a retired hostname whose delete never landed costs one of
+// those 100 while serving nobody. Both come off one read of the table.
+describe('the Cloudflare hostname allowance', () => {
+  it('stays quiet at 79 hostnames and names the number at 80', async () => {
+    const quiet = stubWorld({
+      ...allClear(TUESDAY),
+      customDomains: standingHostnames(79, TUESDAY),
+    });
+    await sentinel(env, TUESDAY);
+    expect(quiet.telegram).toHaveLength(0);
+    vi.restoreAllMocks();
+
+    const loud = stubWorld({ ...allClear(TUESDAY), customDomains: standingHostnames(80, TUESDAY) });
+    await sentinel(env, TUESDAY);
+    expect(loud.telegram).toHaveLength(1);
+    expect(loud.telegram[0]!.text).toContain(
+      'custom domains: 80 of the 100 free Cloudflare hostnames used',
+    );
+    expect(loud.outbox[0]!.meta).toMatchObject({ custom_hostnames: 80 });
+  });
+
+  it('reports a retired hostname the hourly sweep has not managed to delete', async () => {
+    // 30 hours retired and still standing: the sweep has had 30 chances.
+    const { telegram, outbox } = stubWorld({
+      ...allClear(TUESDAY),
+      customDomains: standingHostnames(3, TUESDAY, [30, 26]),
+    });
+
+    await sentinel(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0]!.text).toContain(
+      'custom domains: 2 retired hostnames older than a day still not deleted at Cloudflare',
+    );
+    // Three hostnames standing, well under the allowance: no second line.
+    expect(telegram[0]!.text).not.toContain('free Cloudflare hostnames used');
+    expect(outbox[0]!.meta).toMatchObject({ custom_hostnames: 3, custom_hostnames_unswept: 2 });
+  });
+
+  it('leaves a hostname retired within the last day to the hourly sweep', async () => {
+    const { telegram } = stubWorld({
+      ...allClear(TUESDAY),
+      customDomains: standingHostnames(2, TUESDAY, [3]),
+    });
+
+    await sentinel(env, TUESDAY);
+
+    expect(telegram).toHaveLength(0);
+  });
+
+  it('names one unavailable check when the single read fails, not two', async () => {
+    const { telegram } = stubWorld({
+      ...allClear(TUESDAY),
+      customDomains: new Response(null, { status: 503 }),
+    });
+
+    await sentinel(env, TUESDAY);
+
+    expect(telegram).toHaveLength(1);
+    const lines = telegram[0]!.text.split('\n').filter((l) => l.includes('check unavailable'));
+    expect(lines).toEqual(['• check unavailable: custom_domains — custom_domains read HTTP 503']);
   });
 });
 

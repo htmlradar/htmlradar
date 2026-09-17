@@ -15,7 +15,7 @@
 import { cn } from '@/lib/cn';
 import { CopySlugButton } from '@/components/CopySlugButton';
 import { countDistinctViewers } from '@/lib/viewer-metrics';
-import { ADDRESS_UNAVAILABLE, shareUrl } from '@/lib/share-url';
+import { ADDRESS_UNAVAILABLE, domainDisconnectedNote, shareUrl } from '@/lib/share-url';
 import { SessionsList } from '@/components/SessionsList';
 import type { Viewer, Session } from '@/lib/types';
 
@@ -40,6 +40,9 @@ export interface ShareAnalyticsProps {
   // The share names a domain whose hostname could not be read. Nothing prints
   // an address then: an apex URL would look right and open nothing.
   addressUnavailable?: boolean;
+  // The share's own domain has stopped answering (schema/052). The link does
+  // not open, so the waiting panel must not invite the owner to send it.
+  domainDown?: boolean;
   recipientLabel: string | null;
   viewers: Viewer[];
   sessions: Session[];
@@ -82,6 +85,7 @@ export function ShareAnalytics({
   hostHandle,
   customHostname = null,
   addressUnavailable = false,
+  domainDown = false,
   recipientLabel,
   viewers,
   sessions,
@@ -98,6 +102,7 @@ export function ShareAnalytics({
         hostHandle={hostHandle}
         customHostname={customHostname}
         addressUnavailable={addressUnavailable}
+        domainDown={domainDown}
         recipientLabel={recipientLabel}
         shareStatus={shareStatus}
       />
@@ -224,6 +229,7 @@ function WaitingState({
   hostHandle,
   customHostname,
   addressUnavailable = false,
+  domainDown = false,
   recipientLabel,
   shareStatus = 'live',
 }: {
@@ -231,6 +237,7 @@ function WaitingState({
   hostHandle: string | null;
   customHostname: string | null;
   addressUnavailable?: boolean;
+  domainDown?: boolean;
   recipientLabel: string | null;
   shareStatus?: 'live' | 'revoked' | 'expired';
 }) {
@@ -255,6 +262,28 @@ function WaitingState({
           {isRevoked
             ? 'Recipients currently see a “sender turned this link off” notice. Re-enable it from the document page to start collecting reads.'
             : 'Recipients currently see an Expired notice. Extend the expiry from the document page, or create a fresh share, to start collecting reads.'}
+        </p>
+      </div>
+    );
+  }
+
+  // The link's own domain has stopped answering, so the address below would
+  // copy cleanly and open nothing and the invitation to send it would be
+  // wrong. Same sentence as the share card and the share table, said once, in
+  // place of that invitation — for the same reason the revoked branch above
+  // exists. Revoked and expired come first: those are the owner's own doing,
+  // and re-enabling the link is the next step whatever the domain is doing.
+  if (domainDown && customHostname) {
+    return (
+      <div className="space-y-3 rounded-xl border border-dashed border-alert/30 bg-alert/5 px-5 py-6">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-alert">
+          Domain disconnected
+        </p>
+        <h3 className="font-serif text-[20px] leading-snug text-ink md:text-[22px]">
+          No reads yet, and none can arrive.
+        </h3>
+        <p className="max-w-md text-[13.5px] leading-relaxed text-ink-soft">
+          {domainDisconnectedNote(customHostname)}
         </p>
       </div>
     );

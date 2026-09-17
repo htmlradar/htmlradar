@@ -13,14 +13,16 @@
 //
 //   node packages/app/scripts/live-journey.mjs
 //
-// Runs daily from .github/workflows/live-journey.yml. Three steps:
+// Runs daily from .github/workflows/live-journey.yml. Four steps:
 //
-//   sign-in  — mint a magic-link token with the Supabase admin API and walk
-//              it through /auth/callback exactly as the e-mail link does.
-//   api      — create a tracked link, fetch it on the content domain, read
-//              its activity, then revoke it.
-//   cleanup  — delete yesterday's journey documents, so a daily check does
-//              not leave a year of clutter on a real account.
+//   sign-in     — mint a magic-link token with the Supabase admin API and walk
+//                 it through /auth/callback exactly as the e-mail link does.
+//   api         — create a tracked link, fetch it on the content domain, read
+//                 its activity, then revoke it.
+//   custom-host — the same journey on the account's own domain, when it has a
+//                 live one. Skipped, not failed, when it has none.
+//   cleanup     — delete yesterday's journey documents, so a daily check does
+//                 not leave a year of clutter on a real account.
 //
 // JOURNEY_EMAIL is required and must be a PRO or COMPED account. A free
 // account is capped at two tracked links for its lifetime by the
@@ -113,13 +115,7 @@ export async function signInStep(cfg) {
  * account; only the link is switched off.
  */
 export async function apiStep(cfg, sleep = (ms) => new Promise((r) => setTimeout(r, ms))) {
-  const title = `live-journey ${new Date().toISOString()}`;
-  const html =
-    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body>` +
-    `<h1>${title}</h1>` +
-    `<section><h2>Why this document exists</h2><p>Automated daily check of the live journey.</p></section>` +
-    `<section><h2>What it proves</h2><p>A link was created, served and revoked.</p></section>` +
-    `</body></html>`;
+  const { title, html } = journeyDocument();
 
   // require_email: false — the gate would serve a form instead of the
   // document, and what this step is checking is that the document is served.
@@ -152,8 +148,92 @@ export async function apiStep(cfg, sleep = (ms) => new Promise((r) => setTimeout
   return notes.join('; ');
 }
 
+/** The tiny document every step of the journey creates. */
+function journeyDocument() {
+  const title = `live-journey ${new Date().toISOString()}`;
+  return {
+    title,
+    html:
+      `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body>` +
+      `<h1>${title}</h1>` +
+      `<section><h2>Why this document exists</h2><p>Automated daily check of the live journey.</p></section>` +
+      `<section><h2>What it proves</h2><p>A link was created, served and revoked.</p></section>` +
+      `</body></html>`,
+  };
+}
+
+/** The journey account's own id, which the API never returns. */
+async function journeyOwnerId(cfg) {
+  const owners = await rest(
+    cfg,
+    'GET',
+    `/profiles?email=eq.${encodeURIComponent(cfg.journeyEmail)}&select=id`,
+  );
+  const ownerId = owners[0]?.id;
+  if (!ownerId) throw new Error(`no profiles row for ${cfg.journeyEmail}`);
+  return ownerId;
+}
+
 /**
- * Step 3 — take yesterday's journey documents away.
+ * Step 3 — the same journey, on the customer's own hostname.
+ *
+ * A link on a customer domain (schema/052) is served by the same worker
+ * through a different hostname, a different Cloudflare custom-hostname
+ * certificate and a different SSL renewal clock. Every one of those can lapse
+ * on its own while htmlradar.page keeps answering perfectly, so the api step
+ * above proves nothing about them.
+ *
+ * It SKIPS rather than fails when the journey account has no live domain,
+ * because that is the ordinary state of the feature before an internal
+ * account is enrolled, and a step that goes red for being switched off is a
+ * step the founder learns to ignore.
+ */
+export async function customHostStep(cfg) {
+  const ownerId = await journeyOwnerId(cfg);
+  const domains = await rest(
+    cfg,
+    'GET',
+    `/custom_domains?owner_id=eq.${ownerId}&state=eq.live&select=id,hostname&limit=1`,
+  );
+  const domain = domains[0];
+  if (!domain) return 'SKIP custom-host — no live domain on the journey account';
+
+  const { title, html } = journeyDocument();
+  const share = await api(cfg, 'POST', '/api/v1/shares', {
+    html,
+    title,
+    require_email: false,
+    domain_id: domain.id,
+  });
+  const notes = [];
+  try {
+    // The address is the assertion: a link created with a domain_id that came
+    // back on htmlradar.page would be a link the recipient opens somewhere
+    // the customer never agreed to, and it would fetch a healthy 200.
+    const expected = `https://${domain.hostname}/`;
+    if (!share.url.startsWith(expected)) {
+      throw new Error(`share url is ${share.url}, not on ${domain.hostname}`);
+    }
+    const page = await fetch(share.url);
+    const body = await page.text();
+    if (page.status !== 200) throw new Error(`${share.url} returned ${page.status}`);
+    if (!body.includes(title)) {
+      throw new Error(`${share.url} returned 200 but not the document — title missing from body`);
+    }
+    notes.push(`${domain.hostname} served the document`);
+  } finally {
+    try {
+      await api(cfg, 'POST', `/api/v1/shares/${share.share_id}/revoke`, {});
+      notes.push('link revoked');
+    } catch (error) {
+      notes.push(`CLEANUP FAILED: ${error.message}`);
+    }
+  }
+  return notes.join('; ');
+}
+
+/**
+ * Step 4 — take yesterday's journey documents away.
  *
  * The v1 API has no delete route, so this goes at the database directly. It
  * is scoped three ways — the journey account's owner_id, a title that starts
@@ -173,14 +253,7 @@ export async function apiStep(cfg, sleep = (ms) => new Promise((r) => setTimeout
  * him to ignore the alert.
  */
 export async function cleanupStep(cfg) {
-  const owners = await rest(
-    cfg,
-    'GET',
-    `/profiles?email=eq.${encodeURIComponent(cfg.journeyEmail)}&select=id`,
-  );
-  const ownerId = owners[0]?.id;
-  if (!ownerId) throw new Error(`no profiles row for ${cfg.journeyEmail}`);
-
+  const ownerId = await journeyOwnerId(cfg);
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const removed = await rest(
     cfg,
@@ -228,7 +301,12 @@ async function api(cfg, method, path, body) {
 /** Runs every step, times each one, and returns the report. */
 export async function runJourney(
   cfg,
-  steps = { 'sign-in': signInStep, api: apiStep, cleanup: cleanupStep },
+  steps = {
+    'sign-in': signInStep,
+    api: apiStep,
+    'custom-host': customHostStep,
+    cleanup: cleanupStep,
+  },
 ) {
   const lines = [];
   let firstFailure = null;
@@ -236,7 +314,13 @@ export async function runJourney(
     const started = Date.now();
     try {
       const detail = await step(cfg);
-      lines.push(`PASS ${name} ${Date.now() - started}ms — ${detail}`);
+      // A step that had nothing to check says so itself and says why. No
+      // timing, because nothing was timed.
+      lines.push(
+        String(detail).startsWith('SKIP ')
+          ? detail
+          : `PASS ${name} ${Date.now() - started}ms — ${detail}`,
+      );
     } catch (error) {
       const level = step.warnOnly === true ? 'WARN' : 'FAIL';
       lines.push(`${level} ${name} ${Date.now() - started}ms — ${error.message}`);

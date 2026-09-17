@@ -2817,6 +2817,12 @@ const HEARTBEAT_STALE_HOURS = 48;
 // Telegram's 4096-char cap.
 const SENTINEL_DETAIL_CHARS = 300;
 
+// Cloudflare for SaaS gives 100 custom hostnames on the free allowance and
+// charges $0.10 each after that. 80 is early enough that the decision — pay,
+// or stop taking new domains — is made calmly rather than on an invoice.
+const CLOUDFLARE_FREE_HOSTNAMES = 100;
+const CLOUDFLARE_HOSTNAME_WARN = 80;
+
 interface AbuseRow {
   reason: string;
   document_id: string | null;
@@ -2912,6 +2918,44 @@ export async function sentinel(env: Env, nowMs: number = Date.now()): Promise<vo
     meta['notifications_unverified'] = unverified;
     return unverified > 0
       ? `notifications: ${unverified} unverified in 24h — reconciler cron or pg_net may be down`
+      : null;
+  });
+
+  // Custom hostnames standing at Cloudflare — two questions, one read.
+  //
+  // "Standing" is `cloudflare_id is not null and cloudflare_deleted_at is
+  // null`: the hostname exists at Cloudflare and nobody has confirmed it
+  // gone. That is the set Cloudflare counts against the allowance, and it
+  // deliberately includes a retired row whose delete never landed — such a
+  // row costs us a hostname while serving nobody, which is the second
+  // finding. `retired_at` is the only column either question needs.
+  await run('custom_domains', async () => {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/custom_domains` +
+        `?cloudflare_id=not.is.null&cloudflare_deleted_at=is.null&select=retired_at`,
+      { headers },
+    );
+    if (!res.ok) throw new Error(`custom_domains read HTTP ${res.status}`);
+    const standing = (await res.json()) as { retired_at: string | null }[];
+    meta['custom_hostnames'] = standing.length;
+
+    // Pushed rather than returned because one read answers two questions and
+    // the runner returns one finding. A failed read is still one "check
+    // unavailable" line, which is the point of doing it in a single check.
+    if (standing.length >= CLOUDFLARE_HOSTNAME_WARN) {
+      findings.push(
+        `custom domains: ${standing.length} of the ${CLOUDFLARE_FREE_HOSTNAMES} ` +
+          'free Cloudflare hostnames used',
+      );
+    }
+
+    const unswept = standing.filter(
+      (r) => r.retired_at && Date.parse(r.retired_at) <= nowMs - SENTINEL_WINDOW_MS,
+    ).length;
+    meta['custom_hostnames_unswept'] = unswept;
+    return unswept > 0
+      ? `custom domains: ${unswept} retired hostnames older than a day ` +
+          'still not deleted at Cloudflare'
       : null;
   });
 

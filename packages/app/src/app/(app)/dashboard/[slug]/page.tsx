@@ -21,8 +21,8 @@ import { requireUser, serverClient } from '@/lib/supabase-server';
 import { ShareAnalytics } from '@/components/ShareAnalytics';
 import { CopySlugButton } from '@/components/CopySlugButton';
 import { isMetaSectionTitle } from '@/lib/section-filter';
-import { ADDRESS_UNAVAILABLE, shareUrlLabel } from '@/lib/share-url';
-import { customHostnameMissing, customHostnameOf } from '@/lib/custom-domains';
+import { ADDRESS_UNAVAILABLE, domainDisconnectedNote, shareUrlLabel } from '@/lib/share-url';
+import { customDomainStateOf, customHostnameMissing, customHostnameOf } from '@/lib/custom-domains';
 
 export const runtime = 'edge';
 
@@ -160,6 +160,12 @@ export default async function ShareAnalyticsPage({
   // The share names a domain and the join did not bring its hostname back.
   // Nothing prints an address in that case, and no copy button offers one.
   const addressUnavailable = customHostnameMissing(share);
+  // The link is served from the hostname stored on its own row, so if that
+  // domain has stopped answering the link stops opening — and this page is one
+  // of the three places the owner might be looking when that happens. Same
+  // sentence and same treatment as the share card, and the copy button goes:
+  // an address that copies cleanly and opens nothing is worse than none.
+  const domainDown = !!customHostname && customDomainStateOf(share) !== 'live';
   const fullUrl = addressUnavailable
     ? ADDRESS_UNAVAILABLE
     : shareUrlLabel(share.slug, share.host_handle, customHostname);
@@ -199,7 +205,7 @@ export default async function ShareAnalyticsPage({
 
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-paper px-4 py-3 md:max-w-2xl">
         <span className="min-w-0 flex-1 truncate font-mono text-[13.5px] text-ink">{fullUrl}</span>
-        {!addressUnavailable && (
+        {!addressUnavailable && !domainDown && (
           <CopySlugButton
             slug={share.slug}
             hostHandle={share.host_handle}
@@ -208,11 +214,21 @@ export default async function ShareAnalyticsPage({
         )}
       </div>
 
+      {/* Said once per page. With no reads yet the waiting panel below owns
+          this sentence, because it is what replaces its invitation to send
+          the link; with reads, that panel is stats and this row owns it. */}
+      {domainDown && sessionList.length > 0 && (
+        <p className="mt-2 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[12.5px] leading-relaxed text-ink md:max-w-2xl">
+          {domainDisconnectedNote(customHostname!)}
+        </p>
+      )}
+
       <div className="mt-12">
         <ShareAnalytics
           hostHandle={share.host_handle}
           customHostname={customHostname}
           addressUnavailable={addressUnavailable}
+          domainDown={domainDown}
           shareSlug={share.slug}
           recipientLabel={share.recipient_label}
           viewers={visibleViewers}

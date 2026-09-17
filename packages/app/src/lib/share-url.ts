@@ -78,6 +78,20 @@ export const shareUrl = (
  */
 export const ADDRESS_UNAVAILABLE = 'Address unavailable — refresh the page';
 
+/**
+ * What every surface says about a link whose domain has stopped answering.
+ *
+ * One sentence, in one place, because it appears on three surfaces — the share
+ * card, the share table and the per-share dashboard — and the owner reaching
+ * the same link from three directions must not get three different accounts of
+ * what is wrong with it. Same reason ADDRESS_UNAVAILABLE lives here: this
+ * module owns what is printed about an address, and a client component can
+ * import it.
+ */
+export const domainDisconnectedNote = (hostname: string): string =>
+  `${hostname} is no longer connected, so this link does not open. ` +
+  `Reconnect the domain in Settings, or send a new link.`;
+
 export const shareUrlLabel = (
   slug: string,
   hostHandle?: string | null,

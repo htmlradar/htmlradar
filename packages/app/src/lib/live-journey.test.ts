@@ -18,7 +18,9 @@ const scriptUrl = new URL('../../scripts/live-journey.mjs', import.meta.url).hre
 const scriptPath = fileURLToPath(scriptUrl);
 
 // A variable specifier, so `tsc` leaves the untyped .mjs alone.
-const { signInStep, cleanupStep, runJourney } = await import(/* @vite-ignore */ scriptPath);
+const { signInStep, cleanupStep, customHostStep, runJourney } = await import(
+  /* @vite-ignore */ scriptPath
+);
 
 const cfg = {
   baseUrl: 'https://htmlradar.com',
@@ -115,6 +117,73 @@ describe('cleanupStep', () => {
     });
     expect(report).toMatch(/^WARN cleanup \d+ms — .*returned 500/m);
     // null is what the script checks before exiting 1, so this is exit 0.
+    expect(firstFailure).toBe(null);
+  });
+});
+
+// A link on a customer's own hostname has its own certificate and its own
+// renewal clock, so htmlradar.page answering says nothing about it. What this
+// pins is the address assertion — a link created on a domain must come back on
+// that domain — and that an account with no domain skips rather than fails.
+describe('customHostStep', () => {
+  const HOSTNAME = 'decks.gethtmlradar.com';
+
+  /** PostgREST answers the owner and domain lookups; the API answers `url`. */
+  function stubCustomHost(domains: unknown[], url: string) {
+    const calls: string[] = [];
+    // The served page echoes the title the step actually created, so the
+    // "200 but not the document" branch stays a real assertion rather than
+    // one that fires because the stub guessed the timestamp wrong.
+    let served = '';
+    vi.stubGlobal('fetch', (target: string, init?: { method?: string; body?: string }) => {
+      calls.push(`${init?.method ?? 'GET'} ${target}`);
+      const body = (value: unknown) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(value)),
+        });
+      if (target.includes('/rest/v1/profiles')) return body([{ id: 'owner-1' }]);
+      if (target.includes('/rest/v1/custom_domains')) return body(domains);
+      if (target.endsWith('/api/v1/shares')) {
+        served = (JSON.parse(String(init?.body)) as { html: string }).html;
+        return body({ share_id: 'share-1', url });
+      }
+      if (target.includes('/revoke')) return body({ ok: true });
+      // The recipient fetch of the link itself.
+      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(served) });
+    });
+    return calls;
+  }
+
+  it('creates the link on the live domain and asserts the address it came back on', async () => {
+    const calls = stubCustomHost(
+      [{ id: 'domain-1', hostname: HOSTNAME }],
+      `https://${HOSTNAME}/r/quick-glass`,
+    );
+
+    await expect(customHostStep(cfg)).resolves.toContain(`${HOSTNAME} served the document`);
+    expect(calls[1]).toContain('owner_id=eq.owner-1');
+    expect(calls[1]).toContain('state=eq.live');
+    expect(calls[2]).toContain('POST https://htmlradar.com/api/v1/shares');
+    expect(calls.at(-1)).toContain('/api/v1/shares/share-1/revoke');
+  });
+
+  // The failure that would otherwise pass: a healthy 200 from the wrong host.
+  it('fails when the link comes back on htmlradar.page instead', async () => {
+    stubCustomHost(
+      [{ id: 'domain-1', hostname: HOSTNAME }],
+      'https://htmlradar.page/r/quick-glass',
+    );
+    await expect(customHostStep(cfg)).rejects.toThrow(/not on decks\.gethtmlradar\.com/);
+  });
+
+  it('skips with a reason, and passes the journey, when no domain is live', async () => {
+    stubCustomHost([], '');
+
+    const { report, firstFailure } = await runJourney(cfg, { 'custom-host': customHostStep });
+
+    expect(report).toBe('SKIP custom-host — no live domain on the journey account');
     expect(firstFailure).toBe(null);
   });
 });

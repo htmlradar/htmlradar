@@ -32,7 +32,7 @@ import {
 import type { ShareRow, ShareAnalyticsData } from '../DocumentShareManager';
 import { cn } from '@/lib/cn';
 import { localInputToIso } from '@/lib/datetime-local';
-import { ADDRESS_UNAVAILABLE, SHARE_HOST, shareUrl } from '@/lib/share-url';
+import { ADDRESS_UNAVAILABLE, SHARE_HOST, domainDisconnectedNote, shareUrl } from '@/lib/share-url';
 
 interface ShareCardListProps {
   documentId: string;
@@ -442,8 +442,7 @@ function LinkSection({
       )}
       {domainDown && (
         <p className="mt-2 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[12.5px] leading-relaxed text-ink">
-          {share.custom_hostname} is no longer connected, so this link does not open. Reconnect the
-          domain in Settings, or send a new link.
+          {domainDisconnectedNote(share.custom_hostname!)}
         </p>
       )}
       {customSlug && (

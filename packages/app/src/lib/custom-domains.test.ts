@@ -34,6 +34,7 @@ import {
   hostnameOfDomain,
   normalizeHostname,
   findHostname,
+  pilotOwners,
   probe,
   restartValidation,
   shareHostArgs,
@@ -89,6 +90,23 @@ describe('the feature switch', () => {
     delete process.env['CUSTOM_DOMAINS_ENABLED'];
     expect(customDomainsPublished()).toBe(true);
     expect(customDomainsEnabled()).toBe(false);
+  });
+});
+
+describe('the pilot list', () => {
+  it('opens enrolment when set to the explicit "all" value', () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = 'all';
+    expect(pilotOwners()).toEqual([]);
+  });
+
+  it('treats "all" as case-insensitive and trims surrounding whitespace', () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = ' ALL ';
+    expect(pilotOwners()).toEqual([]);
+  });
+
+  it('still restricts enrolment to a real id list', () => {
+    process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] = `${USER},other-account`;
+    expect(pilotOwners()).toEqual([USER, 'other-account']);
   });
 });
 

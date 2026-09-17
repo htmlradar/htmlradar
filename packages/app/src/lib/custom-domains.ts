@@ -67,9 +67,16 @@ export function customDomainsPublished(): boolean {
  * refused like any other name of ours. Non-empty means exactly these accounts
  * and nobody else, which is what keeps a production flag flip from opening
  * enrolment to everybody before the journey has been walked once.
+ *
+ * `all` (any case, trimmed) means the same as empty. Cloudflare Pages keeps
+ * the last non-empty value of a secret, so clearing this one on production
+ * cannot be relied on to actually clear it — `all` is the explicit way to
+ * open enrolment, and every reader of this env var goes through here.
  */
 export function pilotOwners(): string[] {
-  return (process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] ?? '')
+  const raw = (process.env['CUSTOM_DOMAINS_PILOT_OWNERS'] ?? '').trim();
+  if (raw.toLowerCase() === 'all') return [];
+  return raw
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean);

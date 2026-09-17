@@ -132,6 +132,8 @@ jobs:
         run: cp packages/tracker/dist/tracker.js packages/app/public/v1/tracker.js
 
       - name: Build app for Cloudflare Pages
+        env:
+          CUSTOM_DOMAINS_PUBLISHED: ${{ secrets.CUSTOM_DOMAINS_PUBLISHED }}
         run: cd packages/app && pnpm exec next-on-pages
 
       - name: Bundle check — verify NEXT_PUBLIC_* were actually inlined
@@ -424,9 +426,10 @@ jobs:
           CLOUDFLARE_ZONE_ID_PAGE: ${{ secrets.CLOUDFLARE_ZONE_ID_PAGE }}
           CUSTOM_DOMAINS_ENABLED: ${{ secrets.CUSTOM_DOMAINS_ENABLED }}
           CUSTOM_DOMAINS_PILOT_OWNERS: ${{ secrets.CUSTOM_DOMAINS_PILOT_OWNERS }}
+          CUSTOM_DOMAINS_PUBLISHED: ${{ secrets.CUSTOM_DOMAINS_PUBLISHED }}
         run: |
           set -e
-          for NAME in CONNECT_SIGNING_SECRET CONNECT_EXCHANGE_SECRET CLOUDFLARE_API_TOKEN CLOUDFLARE_ZONE_ID_PAGE CUSTOM_DOMAINS_ENABLED CUSTOM_DOMAINS_PILOT_OWNERS; do
+          for NAME in CONNECT_SIGNING_SECRET CONNECT_EXCHANGE_SECRET CLOUDFLARE_API_TOKEN CLOUDFLARE_ZONE_ID_PAGE CUSTOM_DOMAINS_ENABLED CUSTOM_DOMAINS_PILOT_OWNERS CUSTOM_DOMAINS_PUBLISHED; do
             VALUE="${!NAME}"
             [ -n "$VALUE" ] || { echo "skip $NAME (empty)"; continue; }
             echo "Setting Pages secret $NAME on project htmlradar..."

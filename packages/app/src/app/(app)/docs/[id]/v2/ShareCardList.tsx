@@ -501,11 +501,16 @@ function ShareForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, startSubmit] = useTransition();
   // The founder's rule: a live domain is the default and there is no toggle to
-  // find. The only choice offered is the opposite one, per link, at creation.
+  // find. The choice of the other address is the prefix of the Link address
+  // field itself — there was a separate "Link domain" section with a toggle in
+  // it until 17 September, and reading a toggle about one address while
+  // looking at another one printed above it was the confusion he named.
   const [useHtmlradarHost, setUseHtmlradarHost] = useState(false);
   const isCreate = mode === 'create';
-  const newLinkHost =
-    isCreate && defaultDomainHostname && !useHtmlradarHost ? defaultDomainHostname : SHARE_HOST;
+  // The account has somewhere else to put this link, so the prefix is a
+  // choice rather than a label. When it is false there is only one address a
+  // new link can take, and the prefix says it plainly.
+  const hostChoice = isCreate && !!defaultDomainHostname;
 
   // Create submits through onSubmit rather than the form `action` prop on
   // purpose. A rejected link address must leave the customer looking at the
@@ -569,18 +574,41 @@ function ShareForm({
             </SectionNote>
             <div className="mt-3 flex items-stretch overflow-hidden rounded-md border border-line bg-paper focus-within:border-signal">
               {/* The host this link will actually be created on: the owner's
-                  own domain when they have a live one and have not asked for
-                  the HTMLRadar address below, and the apex otherwise. There is
-                  no share row yet to read a stored hostname from, so this is
-                  the one address in the app assembled from a host rather than
+                  own domain when they have a live one and have not picked the
+                  HTMLRadar address here, and the apex otherwise. There is no
+                  share row yet to read a stored hostname from, so this is the
+                  one address in the app assembled from a host rather than
                   from a row.
                   ponytail: still the apex when handle links are switched on
                   (TRUST_HANDLES) — read the owner's handle in v2/page.tsx and
                   pass it down when that gate opens. Cosmetic: the link created
                   is correct either way. */}
-              <span className="shrink-0 border-r border-line bg-paper-2/40 px-3 py-2 font-mono text-[12.5px] leading-normal text-graphite">
-                {newLinkHost}/r/
-              </span>
+              {hostChoice ? (
+                <>
+                  <label htmlFor="link-address-prefix" className="sr-only">
+                    Link address prefix
+                  </label>
+                  {/* A native select, so it is keyboard and screen-reader
+                      correct for free. Its name and values are the ones the
+                      toggle submitted, so the server action is unchanged: the
+                      database picks the domain inside create_share and all
+                      this form can say is the opposite choice. */}
+                  <select
+                    id="link-address-prefix"
+                    name="use_htmlradar_host"
+                    value={useHtmlradarHost ? 'on' : 'off'}
+                    onChange={(e) => setUseHtmlradarHost(e.target.value === 'on')}
+                    className="shrink-0 border-r border-line bg-paper-2/40 px-3 py-2 font-mono text-[12.5px] leading-normal text-graphite focus:outline-none focus:ring-1 focus:ring-inset focus:ring-signal"
+                  >
+                    <option value="off">{defaultDomainHostname}/r/</option>
+                    <option value="on">{SHARE_HOST}/r/</option>
+                  </select>
+                </>
+              ) : (
+                <span className="shrink-0 border-r border-line bg-paper-2/40 px-3 py-2 font-mono text-[12.5px] leading-normal text-graphite">
+                  {SHARE_HOST}/r/
+                </span>
+              )}
               <input
                 type="text"
                 name="slug"
@@ -619,30 +647,6 @@ function ShareForm({
             </SectionNote>
           </section>
         ))}
-
-      {/* Which host this one link goes on. Shown only to an owner who has a
-          live domain of their own, because for everybody else there is no
-          choice to make. The default is their domain; this is how they opt one
-          link out of it, and it is fixed on the row the moment the link is
-          created. */}
-      {isCreate && defaultDomainHostname && (
-        <section>
-          <SectionEyebrow>Link domain</SectionEyebrow>
-          <SectionNote>
-            New links go on {defaultDomainHostname}. This one can go on {SHARE_HOST} instead — the
-            choice is fixed once the link is created.
-          </SectionNote>
-          <div className="mt-3">
-            <ToggleRow
-              label={`Use ${SHARE_HOST} for this link`}
-              desc={`This link will be ${newLinkHost}/r/…`}
-              name="use_htmlradar_host"
-              checked={useHtmlradarHost}
-              onChange={setUseHtmlradarHost}
-            />
-          </div>
-        </section>
-      )}
 
       {/* Audience section */}
       <section>

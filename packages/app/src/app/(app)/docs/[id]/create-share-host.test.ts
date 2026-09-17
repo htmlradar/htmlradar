@@ -109,10 +109,20 @@ describe('creating a link from the dashboard', () => {
   });
 
   // The founder's rule: the domain is the default and there is no toggle to
-  // find. The only choice offered is the opposite one, per link, at creation.
+  // find. The only choice offered is the opposite one, per link, at creation —
+  // the prefix of the Link address field, which submits this same field.
   it('names the HTMLRadar address when the form asked for it, for that link only', async () => {
     await create({ use_htmlradar_host: 'on' });
     expect(state.rpcArgs?.['p_use_htmlradar_address']).toBe(true);
+    expect(state.rpcArgs).not.toHaveProperty('p_custom_domain_id');
+  });
+
+  // The prefix always submits something, so "their own domain" arrives as a
+  // value rather than as an absent field. It must still mean "I did not
+  // choose", which is what leaves the database to read the default.
+  it('leaves the hostname to the creating call when the prefix is their own domain', async () => {
+    await create({ use_htmlradar_host: 'off' });
+    expect(state.rpcArgs).not.toHaveProperty('p_use_htmlradar_address');
     expect(state.rpcArgs).not.toHaveProperty('p_custom_domain_id');
   });
 

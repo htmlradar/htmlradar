@@ -14,6 +14,13 @@
 // touch. The jargon that is left — CNAME — is left because it is a value they
 // must type into a box, not a thing they have to understand.
 //
+// AND THE END OF IT IS A MOMENT, not a beige pill. The founder walked the
+// live card on 17 September: "it is very static and boring". So a connected
+// domain gets the green check, the word Connected, and the one thing the
+// customer came for — what their links look like now — with the way out of it
+// kept quiet at the bottom. There is no Check again on a domain that is
+// finished; the monitor looks again every hour.
+//
 // Nothing here decides anything. The states come from the row, the
 // transitions come from the server actions. The only behaviour this file owns
 // is the timer: while a domain is waiting, the card checks every thirty
@@ -117,6 +124,19 @@ export function CustomDomain({
   // answers, not waits, and a hidden tab is nobody watching.
   const autoChecking = !!domain && domain.state === 'pending' && !domain.needsReview;
 
+  // The domain is serving AND new links go to it: the one state that is
+  // finished, and the only one that gets the Connected card.
+  const connected = !!domain && domain.state === 'live' && domain.isDefault;
+
+  // The check is revealed with a short animation only when the flip happened
+  // while somebody was watching. A page that was already live on arrival shows
+  // the check plainly — an animation on every visit is decoration, not news.
+  const [wasWaiting, setWasWaiting] = useState(false);
+  const state = domain?.state;
+  useEffect(() => {
+    if (state && state !== 'live') setWasWaiting(true);
+  }, [state]);
+
   useEffect(() => {
     if (!autoChecking) return;
     setNow(Date.now());
@@ -188,7 +208,12 @@ export function CustomDomain({
         <div className="mt-5 max-w-xl overflow-hidden rounded-2xl border border-line bg-paper">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
             <span className="font-mono text-[14px] text-ink">{domain.hostname}</span>
-            <StatusBadge state={domain.state} securing={domain.securing} />
+            <StatusBadge
+              state={domain.state}
+              securing={domain.securing}
+              connected={connected}
+              reveal={connected && wasWaiting}
+            />
           </div>
 
           {domain.needsReview && (
@@ -273,10 +298,23 @@ export function CustomDomain({
             </div>
           )}
 
-          {domain.state === 'live' && domain.isDefault && (
-            <div className="border-b border-line px-5 py-4 text-[13.5px] leading-relaxed text-ink">
-              Every new link goes on {domain.hostname}. Each one can still be created on ours
-              instead, from the link form.
+          {connected && (
+            <div className="border-b border-line px-5 py-5">
+              <p className="text-[13.5px] leading-relaxed text-ink-soft">
+                Your links now look like
+              </p>
+              <code className="mt-1.5 block font-mono text-[15px] text-ink">
+                {domain.hostname}/r/your-deck
+              </code>
+              <p className="mt-3 text-[13.5px] leading-relaxed text-ink-soft">
+                Every new link uses it. Links you have already sent stay where they are.
+              </p>
+              <a
+                href="/docs"
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-signal px-5 py-2.5 text-[14px] font-medium text-paper transition hover:bg-signal-dark"
+              >
+                Create a link
+              </a>
             </div>
           )}
 
@@ -287,12 +325,14 @@ export function CustomDomain({
             </div>
           )}
 
-          {/* Always offered, whatever the state and whatever we have switched
-              off at our end. It is how a customer sees what their hostname is
-              doing, and how a live domain that failed to become the account's
-              default gets made the default. */}
+          {/* Offered in every state that is still waiting on something, and in
+              the one live state that did not finish: it is how a customer sees
+              what their hostname is doing, and how a live domain that failed
+              to become the account's default gets made the default. A
+              connected domain has nothing left to press — the monitor
+              re-checks it hourly — so it gets no button. */}
           <div className="flex flex-wrap items-center gap-3 px-5 py-4">
-            {!domain.needsReview && (
+            {!domain.needsReview && !connected && (
               <button
                 type="button"
                 onClick={() => run(checkAction)}
@@ -328,7 +368,13 @@ export function CustomDomain({
                 type="button"
                 onClick={() => setConfirming(true)}
                 disabled={pending}
-                className="rounded-md border border-line bg-paper px-4 py-2 font-mono text-[12px] uppercase tracking-[0.16em] text-graphite transition hover:border-alert hover:text-alert disabled:opacity-60"
+                // Quiet once the domain is connected: the card's job by then is
+                // to show the address, not to offer the way out of it.
+                className={
+                  connected
+                    ? 'text-[12.5px] text-graphite underline underline-offset-4 transition hover:text-alert disabled:opacity-60'
+                    : 'rounded-md border border-line bg-paper px-4 py-2 font-mono text-[12px] uppercase tracking-[0.16em] text-graphite transition hover:border-alert hover:text-alert disabled:opacity-60'
+                }
               >
                 Disconnect
               </button>
@@ -404,7 +450,34 @@ export function instructionsText(domain: CustomDomainView): string {
   ].join('\n');
 }
 
-function StatusBadge({ state, securing }: { state: CustomDomainView['state']; securing: boolean }) {
+function StatusBadge({
+  state,
+  securing,
+  connected,
+  reveal,
+}: {
+  state: CustomDomainView['state'];
+  securing: boolean;
+  // Serving AND collecting new links. Its own answer, not a shade of 'live':
+  // a live domain that never became the default is still unfinished, and gets
+  // the pill and the sentence that says so.
+  connected: boolean;
+  // Draw the check in. True only on the render where the flip happened in
+  // front of somebody.
+  reveal: boolean;
+}) {
+  if (connected) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-good">
+        <Check
+          aria-hidden
+          className={`size-4 ${reveal ? 'motion-safe:animate-check-in' : ''}`}
+          strokeWidth={3}
+        />
+        Connected
+      </span>
+    );
+  }
   const copy: Record<CustomDomainView['state'], { label: string; className: string }> = {
     // `needs review` is not a state of its own: the row is pending and the
     // badge beside it says so, while the panel explains why it will stay that

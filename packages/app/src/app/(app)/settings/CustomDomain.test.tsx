@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
-// Two things about the card are worth pinning: the words a customer is asked
-// to follow, and the fact that the page does the waiting for them.
+// Three things about the card are worth pinning: the words a customer is asked
+// to follow, the fact that the page does the waiting for them, and the state it
+// is all for — Connected, with nothing left to press.
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -135,5 +136,90 @@ describe('waiting without pressing anything', () => {
 
     await act(async () => live.root.unmount());
     live.host.remove();
+  });
+});
+
+describe('the card once the domain is connected', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const render = async (domain: CustomDomainView) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const show = async (next: CustomDomainView) => {
+      await act(async () => {
+        root.render(
+          <CustomDomain
+            domain={next}
+            eligible
+            connectAction={async () => ({ ok: true, state: 'pending', message: '' })}
+            checkAction={async () => ({ ok: true, state: 'live', message: '' })}
+            disconnectAction={async () => ({ ok: true, state: 'retired', message: '' })}
+          />,
+        );
+      });
+    };
+    await show(domain);
+    return { host, root, show };
+  };
+
+  const LIVE: CustomDomainView = { ...CLOUDFLARE, state: 'live', isDefault: true };
+
+  it('says Connected, shows what a link looks like, and offers nothing to press', async () => {
+    const { host, root } = await render(LIVE);
+
+    expect(host.textContent).toContain('Connected');
+    expect(host.textContent).toContain('Your links now look like');
+    expect(host.textContent).toContain('decks.draconic.ai/r/your-deck');
+    expect(host.textContent).toContain(
+      'Every new link uses it. Links you have already sent stay where they are.',
+    );
+    // The monitor re-checks hourly, so there is nothing here to press.
+    expect(host.textContent).not.toContain('Check again');
+    // The beige pill is gone with it.
+    expect(host.textContent).not.toContain('Live');
+
+    const cta = host.querySelector('a[href="/docs"]');
+    expect(cta?.textContent).toBe('Create a link');
+    // The way out stays, quietly.
+    expect(host.textContent).toContain('Disconnect');
+
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  it('draws the check in only when the flip happened in front of somebody', async () => {
+    const drawn = (host: HTMLElement) => !!host.querySelector('[class*="animate-check-in"]');
+
+    // Arriving at a page that is already live is not news.
+    const arrived = await render(LIVE);
+    expect(arrived.host.textContent).toContain('Connected');
+    expect(drawn(arrived.host)).toBe(false);
+    await act(async () => arrived.root.unmount());
+    arrived.host.remove();
+
+    // Watching it happen is.
+    const watched = await render(CLOUDFLARE);
+    expect(drawn(watched.host)).toBe(false);
+    await watched.show(LIVE);
+    expect(watched.host.textContent).toContain('Connected');
+    expect(drawn(watched.host)).toBe(true);
+    await act(async () => watched.root.unmount());
+    watched.host.remove();
+  });
+
+  // Live and not the account's default is unfinished, whatever the row says:
+  // new links are still going out on ours, and the button that fixes it has to
+  // be there.
+  it('keeps the old wording and the button when a live domain is not the default', async () => {
+    const { host, root } = await render({ ...LIVE, isDefault: false });
+    expect(host.textContent).not.toContain('Connected');
+    expect(host.textContent).toContain('Check again');
+    expect(host.textContent).not.toContain('Your links now look like');
+    await act(async () => root.unmount());
+    host.remove();
   });
 });

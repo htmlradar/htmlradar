@@ -669,6 +669,13 @@ describe('checking a domain', () => {
       payload: { state: 'live', consecutive_failures: 0 },
       filters: { id: DOMAIN, state: 'pending' },
     });
+    // Both Cloudflare columns are written with what Cloudflare just said, so
+    // the row cannot read 'pending' underneath a live state. Settings shows
+    // one thing and support reads the other; they have to agree.
+    expect(calls[0]?.payload).toMatchObject({
+      cloudflare_status: 'active',
+      ssl_status: 'active',
+    });
     // The founder's rule: a live domain IS the default, with no toggle to find.
     expect(calls[1]).toMatchObject({
       table: 'profiles',

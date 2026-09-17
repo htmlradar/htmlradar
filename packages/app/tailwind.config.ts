@@ -53,6 +53,14 @@ const config: Config = {
           '0%, 100%': { boxShadow: '0 0 0 0 rgba(31, 122, 58, 0.4)' },
           '50%': { boxShadow: '0 0 0 6px rgba(31, 122, 58, 0)' },
         },
+        // The one moment a custom domain goes live while its owner is
+        // watching. Settings → Your domain uses it on the green check, and
+        // only on the render where the flip happened.
+        'check-in': {
+          '0%': { opacity: '0', transform: 'scale(0.4)' },
+          '60%': { opacity: '1', transform: 'scale(1.15)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
       },
       animation: {
         // 700ms ease-out with `both` fill-mode so the element starts at the
@@ -62,6 +70,9 @@ const config: Config = {
         'reveal-up': 'reveal-up 700ms cubic-bezier(0.16, 1, 0.3, 1) both',
         'radar-pulse': 'radar-pulse 3s ease-in-out infinite',
         'live-pulse': 'live-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        // Applied as `motion-safe:animate-check-in`, so a reduced-motion
+        // preference gets the check with no animation at all.
+        'check-in': 'check-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both',
       },
     },
   },

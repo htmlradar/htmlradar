@@ -148,6 +148,107 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* ─────────────────────── OWN DOMAIN ─────────────────────── */}
+      {customDomains && (
+        <section style={{ padding: '0 56px 100px', maxWidth: 1180, margin: '0 auto' }}>
+          <div
+            className="v2-pricing-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 40,
+              alignItems: 'center',
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 16,
+              padding: '36px 40px',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                  color: 'var(--brand)',
+                }}
+              >
+                Included in Pro
+              </div>
+              <h2
+                style={{
+                  fontFamily: 'var(--serif)',
+                  fontWeight: 600,
+                  letterSpacing: '-0.02em',
+                  fontSize: 'clamp(24px, 3vw, 34px)',
+                  lineHeight: 1.15,
+                  margin: '10px 0 0',
+                }}
+              >
+                Your links, your domain.
+              </h2>
+              <ol
+                style={{
+                  margin: '20px 0 0',
+                  padding: 0,
+                  listStyle: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                {[
+                  'Type your subdomain in Settings — decks.acme.com.',
+                  'Add the one CNAME record we show you.',
+                  'It turns Live on its own, usually in minutes.',
+                ].map((step, i) => (
+                  <li
+                    key={step}
+                    style={{ display: 'flex', gap: 10, fontSize: 14.5, lineHeight: 1.5 }}
+                  >
+                    <span
+                      style={{ fontFamily: 'var(--mono)', color: 'var(--brand)', fontWeight: 700 }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span style={{ color: 'var(--ink-2)' }}>{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <Link
+                href="/custom-domains"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginTop: 22,
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  color: 'var(--brand)',
+                  textDecoration: 'none',
+                  fontWeight: 700,
+                }}
+              >
+                See how it works
+                <ArrowUpRight style={{ width: 14, height: 14 }} />
+              </Link>
+            </div>
+            <img
+              src="/brand/email/custom-domains-announcement.png"
+              srcSet="/brand/email/custom-domains-announcement.png 1x, /brand/email/custom-domains-announcement@2x.png 2x"
+              width={1200}
+              height={675}
+              alt="Three panels. One: the Settings box holding decks.acme.com with the status Waiting for DNS and the single record to add, decks CNAME customers.htmlradar.page. Two: the same box with the status Live and the line, new links use this domain. Three: a phone opening a tracked link at decks.acme.com/r/, with a read report under it for jane@northwind.com, 6m 26s read, 87 per cent scrolled."
+              style={{ width: '100%', height: 'auto', borderRadius: 12, display: 'block' }}
+            />
+          </div>
+        </section>
+      )}
+
       {/* ─────────────────────── SELF-HOST (dark card) ─────────────────────── */}
       <section className="v2-os v2-os-tight">
         <div className="v2-os-card">

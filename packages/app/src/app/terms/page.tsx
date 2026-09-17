@@ -135,6 +135,10 @@ export default function TermsPage() {
                 </Link>
                 .
               </p>
+              <p className="mt-4">
+                If you connect your own domain, this does not change: content served on it is
+                exactly as much your responsibility as it would be on the HTMLRadar address.
+              </p>
             </Section>
 
             <Section title="What you may not do">

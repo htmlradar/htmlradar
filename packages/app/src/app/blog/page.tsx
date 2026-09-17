@@ -25,6 +25,14 @@ interface Post {
 
 const POSTS: Post[] = [
   {
+    slug: 'whats-new-custom-domains',
+    title: 'Tracked links, now on your own domain',
+    description:
+      'Pro accounts can now serve tracked links from their own subdomain instead of htmlradar.page. One CNAME record, three steps, nothing else changes.',
+    date: '2026-09-17',
+    readingTime: '2 min',
+  },
+  {
     slug: 'what-deck-sharing-tools-record',
     title: "What seven deck-sharing tools actually load in your recipient's browser",
     description:

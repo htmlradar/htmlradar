@@ -3,6 +3,7 @@ import { ArrowRight, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { requireUser, serverClient } from '@/lib/supabase-server';
 import { captureServerEvent } from '@/lib/events';
 import { readQuota } from '@/lib/quota';
+import { customDomainsPublished } from '@/lib/custom-domains';
 import { PlanChoice } from './PlanChoice';
 
 export const runtime = 'edge';
@@ -140,7 +141,9 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
             'Name your own links: htmlradar.page/r/acme-proposal',
             'No “Powered by HTMLRadar” footer on recipient views',
             'Priority support',
-            'Coming soon: custom domain (share.yourdomain.com)',
+            customDomainsPublished()
+              ? 'Your own domain for links: decks.yourcompany.com/r/acme-proposal'
+              : 'Coming soon: custom domain (share.yourdomain.com)',
             'Coming soon: dynamic per-viewer watermark',
             'Coming soon: repeat-open alerts',
           ].map((f) => (
@@ -150,6 +153,26 @@ export default async function UpgradePage({ searchParams }: { searchParams: Sear
             </li>
           ))}
         </ul>
+
+        {customDomainsPublished() && (
+          <div className="mt-6 flex flex-col gap-4 rounded-xl border border-line bg-paper-2/40 p-4 sm:flex-row sm:items-center">
+            <img
+              src="/brand/email/custom-domains-announcement.png"
+              srcSet="/brand/email/custom-domains-announcement.png 1x, /brand/email/custom-domains-announcement@2x.png 2x"
+              width={1200}
+              height={675}
+              alt="Three panels. One: the Settings box holding decks.acme.com with the status Waiting for DNS and the single record to add, decks CNAME customers.htmlradar.page. Two: the same box with the status Live and the line, new links use this domain. Three: a phone opening a tracked link at decks.acme.com/r/, with a read report under it for jane@northwind.com, 6m 26s read, 87 per cent scrolled."
+              className="w-full max-w-full shrink-0 rounded-lg sm:w-[200px]"
+              style={{ height: 'auto' }}
+            />
+            <p className="text-[13.5px] leading-relaxed text-ink-soft">
+              Send links from{' '}
+              <span className="font-mono text-[12.5px] text-ink">decks.yourcompany.com</span>{' '}
+              instead of htmlradar.page. Add one DNS record in Settings and it goes Live on its own
+              — tracking, gates and reports stay exactly the same.
+            </p>
+          </div>
+        )}
 
         {checkoutAvailable ? (
           <PlanChoice

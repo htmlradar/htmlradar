@@ -8,6 +8,7 @@ import { V2Footer } from '@/components/V2Footer';
 import { BreadcrumbLd } from '@/components/JsonLd';
 import { SectionMark } from '@/components/SectionMark';
 import { pageMeta } from '@/lib/seo';
+import { customDomainsPublished } from '@/lib/custom-domains';
 
 export const runtime = 'edge';
 
@@ -42,6 +43,22 @@ const TOOLS = [
 ];
 
 export default function ToolsIndexPage() {
+  // Not a free tool like the four above — a Pro feature — but it belongs on
+  // this page for the same reason: one page a visitor can find it from, and
+  // /tools already ranks for the free-tools intent nearby. Gated the same as
+  // the pricing page and /custom-domains itself: off until the pilot's two
+  // drills pass (see src/lib/custom-domains.ts).
+  const tools = customDomainsPublished()
+    ? [
+        ...TOOLS,
+        {
+          href: '/custom-domains',
+          title: 'Your own domain for tracked links',
+          description:
+            'Serve links from decks.yourcompany.com instead of htmlradar.page. Included in Pro.',
+        },
+      ]
+    : TOOLS;
   return (
     <>
       <NavBar />
@@ -63,7 +80,7 @@ export default function ToolsIndexPage() {
           </p>
 
           <ul className="mt-16 divide-y divide-line">
-            {TOOLS.map((t) => (
+            {tools.map((t) => (
               <li key={t.href} className="py-8 first:pt-0">
                 <Link href={t.href} className="group block">
                   <h2 className="font-serif text-[28px] leading-snug text-ink transition group-hover:text-signal-dark md:text-[32px]">

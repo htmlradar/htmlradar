@@ -17,18 +17,18 @@ You also need a domain (any) and a [Resend](https://resend.com) account (free 10
    - **anon public key** → `SUPABASE_ANON_KEY`
    - **service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (keep this secret — never put in client code)
 3. From `Project Settings → Database`, note your DB password.
-4. In `SQL Editor`, run every numbered file directly under `schema/`, in ascending numeric order, starting at `001` — and nothing in `schema/tests/`. There is deliberately no last file named here. The folder grows with the product, and a number written into this page goes stale the next time it does; the rule is "everything in the folder, in order", and it stays true. As of this commit the chain runs `001_init.sql` to `047_radar_drafts.sql`, forty-seven files. Order matters: several migrations alter what an earlier one created, and `045_connect_handles.sql` in particular has to run after `040_api_key_scopes.sql`. Every migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running one, or the whole chain, is safe — this is verified by applying all forty-seven twice against an empty database.
+4. In `SQL Editor`, run every numbered file directly under `schema/`, in ascending numeric order, starting at `001` — and nothing in `schema/tests/`. There is deliberately no last file named here. The folder grows with the product, and a number written into this page goes stale the next time it does; the rule is "everything in the folder, in order", and it stays true. As of this commit the chain runs `001_init.sql` to `052_custom_domains.sql`, fifty-two files. Order matters: several migrations alter what an earlier one created, and `045_connect_handles.sql` in particular has to run after `040_api_key_scopes.sql`. Every migration is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DO $$ ... IF NOT EXISTS ... $$`), so re-running one, or the whole chain, is safe — this is verified by applying all fifty-two twice against an empty database.
 
    The files in `schema/tests/` are destructive test programs for a scratch database and must never run against a real install.
 
    One file wants editing before you run it: `032_comped_accounts.sql` carries a placeholder list of internal addresses that are never billed and are exempt from the expiry sweep. Put your own addresses in it, or leave it empty.
 
    The five most recent migrations, so you can see where the chain currently ends:
-   - `043_trust_layer_foundation.sql` — per-customer handles, the permanent registry of claimed names behind them, the per-share hostname the proxy routes on, and the private `share_lookup` view the proxy reads instead of three separate tables.
-   - `044_notification_reconciler.sql` — `reconcile_notification_sends()`, which moves a notification row off `queued` by joining it against `pg_net`'s own response table.
-   - `045_connect_handles.sql` — the short-lived, single-use handoff from the signed-in consent page to the remote MCP connector; only a hash of the handle is stored.
-   - `046_connector_grants.sql` — what the application knows about each remote-connector connection and what became of it.
-   - `047_radar_drafts.sql` — the drafted-reply queue and the reservation ledger behind "one comment per thread, five a day".
+   - `048_onboarding_email.sql` — the one onboarding e-mail sent about fifteen minutes after sign-up, and its send state.
+   - `049_notify_first_open_share_toggle.sql` — a per-share switch to turn the first-open e-mail off, so a public demo share does not spend the Resend quota.
+   - `050_document_creation_id.sql` — an idempotency key on documents, so a retried browser upload after sign-in cannot create a duplicate.
+   - `051_user_feed_cursor.sql` — the cursor behind the founder's Telegram feed, so a five-minute cron reports each event once.
+   - `052_custom_domains.sql` — the table, share column, profile default and triggers behind a customer's own subdomain for tracked links.
 
 5. Extensions. Two are required and both exist on every Supabase tier, so there is nothing to install:
    - `pgcrypto` — `gen_random_uuid`, `digest` and `hmac`, used throughout.
@@ -192,6 +192,28 @@ The content domain needs a DNS record for the worker route to attach to. A proxi
 Deploying the proxy syncs both `[[routes]]` entries, so the Cloudflare API token needs **Workers Routes: Edit on both zones**, not just one.
 
 For your own domains, substitute `htmlradar.com` and `htmlradar.page` with yours throughout — including the hardcoded site URL in `packages/app/src/app/sitemap.ts`, `robots.ts`, and `lib/seo.ts` (the app deliberately does not read `NEXT_PUBLIC_APP_URL` for these; see the comment in `sitemap.ts`).
+
+## Custom domains
+
+Optional, and layered on top of everything above. If you want customers to serve their tracked
+links from their own subdomain instead of `SHARE_HOST`, three things have to be in place before you
+set `CUSTOM_DOMAINS_ENABLED=1`:
+
+1. **Cloudflare for SaaS** enabled on the content zone — the zone serving `SHARE_HOST`
+   (`htmlradar.page` on the hosted service). This is what makes the `custom_hostnames` API that
+   `packages/app/src/lib/custom-domains.ts` calls available on that zone, and it is a paid add-on
+   above the free tier.
+2. **A fallback origin record.** `customers.<SHARE_HOST>` (`customers.htmlradar.page` on the hosted
+   service) must resolve on that zone — it is the one CNAME target every customer's own subdomain
+   points at.
+3. **Two secrets**, on top of everything in the environment-variables table above:
+   `CLOUDFLARE_API_TOKEN` needs one extra permission for this feature, `Zone > SSL and Certificates
+   > Edit`, on the content zone; and `CLOUDFLARE_ZONE_ID_PAGE` is that zone's id.
+
+Apply `schema/052_custom_domains.sql` (already covered by "run every numbered file" above) before
+turning the flag on. `CUSTOM_DOMAINS_PUBLISHED` is a separate, build-time flag that decides whether
+the pricing page and `/custom-domains` mention the feature at all — leave it unset until a domain has
+actually gone live on your install.
 
 ## Verifying the install
 

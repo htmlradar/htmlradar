@@ -3354,8 +3354,16 @@ interface CloudflareHostname {
 /**
  * `provider: true` means we failed, not the domain: nothing was learnt about
  * the customer's hostname, so nothing may be counted against it.
+ *
+ * A pass carries Cloudflare's own two words back out with it, because the row
+ * has a column for each of them and a promotion that leaves them behind shows
+ * a customer 'Connected' in Settings over a row that still reads 'pending'.
+ * They are both 'active' by construction — a pass is the only way past the
+ * comparison below — but they are written as read rather than as assumed.
  */
-type DomainCheck = { ok: true } | { ok: false; provider: boolean; reason: string };
+type DomainCheck =
+  | { ok: true; status: string; sslStatus: string }
+  | { ok: false; provider: boolean; reason: string };
 
 const providerProblem = (reason: string): DomainCheck => ({ ok: false, provider: true, reason });
 const domainProblem = (reason: string): DomainCheck => ({ ok: false, provider: false, reason });
@@ -3385,6 +3393,10 @@ async function readCappedBody(res: Response): Promise<string | null> {
 
 async function checkDomain(env: Env, row: DomainRow): Promise<DomainCheck> {
   if (!row.cloudflare_id) return domainProblem('no Cloudflare hostname id on the row');
+  // Declared out here so the pass at the bottom can carry them back to the
+  // caller, which writes them to the row.
+  let status = 'unknown';
+  let ssl = 'unknown';
   try {
     const res = await fetch(
       `https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID_PAGE}` +
@@ -3403,11 +3415,11 @@ async function checkDomain(env: Env, row: DomainRow): Promise<DomainCheck> {
       return providerProblem('cloudflare answered with a body we could not read');
     }
     if (!body.result) return providerProblem('cloudflare answered without a hostname');
-    const hostname = body.result.status ?? 'unknown';
-    const ssl = body.result.ssl?.status ?? 'unknown';
+    status = body.result.status ?? 'unknown';
+    ssl = body.result.ssl?.status ?? 'unknown';
     // A successful call saying "not active" IS news about the domain.
-    if (hostname !== 'active' || ssl !== 'active') {
-      return domainProblem(`cloudflare hostname ${hostname}, certificate ${ssl}`);
+    if (status !== 'active' || ssl !== 'active') {
+      return domainProblem(`cloudflare hostname ${status}, certificate ${ssl}`);
     }
   } catch (err) {
     return providerProblem(`cloudflare unreachable: ${(err as Error).message}`);
@@ -3433,7 +3445,7 @@ async function checkDomain(env: Env, row: DomainRow): Promise<DomainCheck> {
   } catch (err) {
     return domainProblem(`probe failed: ${(err as Error).message}`);
   }
-  return { ok: true };
+  return { ok: true, status, sslStatus: ssl };
 }
 
 const domainHeaders = (env: Env) => ({
@@ -3607,6 +3619,8 @@ async function settleDomain(env: Env, row: DomainRow, at: string): Promise<void>
 
   if (row.state === 'live') {
     const changed = await patchDomain(env, row, {
+      cloudflare_status: check.status,
+      ssl_status: check.sslStatus,
       last_checked_at: at,
       consecutive_failures: 0,
       last_error: null,
@@ -3617,9 +3631,15 @@ async function settleDomain(env: Env, row: DomainRow, at: string): Promise<void>
     return;
   }
 
-  // Pending or disconnected, and both parties agree: live, and say so.
+  // Pending or disconnected, and both parties agree: live, and say so. The
+  // two Cloudflare columns go with the state: this is the write that most
+  // promotions actually come through — the five-minute cron, not a customer
+  // sitting on the Settings page — so it is the one that would otherwise
+  // leave 'pending' underneath a live row.
   const changed = await patchDomain(env, row, {
     state: 'live',
+    cloudflare_status: check.status,
+    ssl_status: check.sslStatus,
     verified_at: at,
     last_checked_at: at,
     consecutive_failures: 0,

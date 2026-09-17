@@ -241,8 +241,12 @@ describe('promotion', () => {
     expect(w.domainPatches).toHaveLength(1);
     expect(w.domainPatches[0]!.url).toContain(`id=eq.${DOMAIN_ID}&state=eq.pending`);
     expect(w.domainPatches[0]!.url).toContain('last_checked_at=is.null');
+    // Cloudflare's own two words go in with the state, so the row cannot read
+    // 'pending' underneath a live domain while Settings says Connected.
     expect(w.domainPatches[0]!.body).toEqual({
       state: 'live',
+      cloudflare_status: 'active',
+      ssl_status: 'active',
       verified_at: AT,
       last_checked_at: AT,
       consecutive_failures: 0,
@@ -266,6 +270,8 @@ describe('promotion', () => {
 
     expect(w.telegram).toEqual([`${HOSTNAME} connected`]);
     expect(w.domainPatches[2]!.body).toEqual({
+      cloudflare_status: 'active',
+      ssl_status: 'active',
       last_checked_at: new Date(NOW + 2 * AN_HOUR).toISOString(),
       consecutive_failures: 0,
       last_error: null,
@@ -429,6 +435,8 @@ describe('the hourly re-check', () => {
     expect(w.domainPatches[0]!.url).toContain('state=eq.disconnected');
     expect(w.domainPatches[0]!.body).toEqual({
       state: 'live',
+      cloudflare_status: 'active',
+      ssl_status: 'active',
       verified_at: AT,
       last_checked_at: AT,
       consecutive_failures: 0,
